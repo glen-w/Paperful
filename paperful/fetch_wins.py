@@ -132,7 +132,7 @@ def _warn_no_dir() -> None:
         return
     _warned_no_dir = True
     print(
-        "playbooks promote=auto skipped: set grey_playbooks_dir (e.g. \"packs\")",
+        'playbooks promote=auto skipped: set grey_playbooks_dir (e.g. "packs")',
         flush=True,
     )
 
@@ -187,7 +187,11 @@ def recipe_from_row(row: dict) -> GreyPlaybook | None:
     host = host_label(final or start)
     if not host or is_search_engine_host(host):
         return None
-    if host_label(start) and host_label(start) != host and not same_enough(start, final):
+    if (
+        host_label(start)
+        and host_label(start) != host
+        and not same_enough(start, final)
+    ):
         return None
     rewritten = rewrite_between_urls(start, final)
     slug = _slug(host, "rewrite" if rewritten else _win_slug(win))
@@ -245,11 +249,7 @@ def rewrite_between_urls(start: str, final: str) -> tuple[str, str] | None:
     prefix = sp[: slash + 1]
     sp_rest, fp_rest = sp[len(prefix) :], fp[len(prefix) :]
     j = 0
-    while (
-        j < len(sp_rest)
-        and j < len(fp_rest)
-        and sp_rest[-1 - j] == fp_rest[-1 - j]
-    ):
+    while j < len(sp_rest) and j < len(fp_rest) and sp_rest[-1 - j] == fp_rest[-1 - j]:
         j += 1
     if j < 2:
         return None
@@ -319,7 +319,9 @@ def write_learned(directory: Path, books: list[GreyPlaybook]) -> bool:
     """
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / LEARNED_NAME
-    existing = {pb.name: pb for pb in load_pack_file(path) if pb.name.startswith("learned-")}
+    existing = {
+        pb.name: pb for pb in load_pack_file(path) if pb.name.startswith("learned-")
+    }
     for book in books:
         if book.name.startswith("learned-"):
             existing[book.name] = book

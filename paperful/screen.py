@@ -162,7 +162,9 @@ def _read_fingerprint_cache_file(path: Path) -> list[FingerprintRow]:
     return []
 
 
-def _read_fingerprint_cache(cfg: Config, family: str, *, allow_stale: bool) -> list[FingerprintRow]:
+def _read_fingerprint_cache(
+    cfg: Config, family: str, *, allow_stale: bool
+) -> list[FingerprintRow]:
     cache = _fingerprint_cache_path(cfg, family)
     if not cache.is_file():
         return []
@@ -446,7 +448,9 @@ def pubpeer_lookup(
     return out
 
 
-def pdf_text(cfg: Config, item: Item, manifest: Manifest | None, backend: LibraryBackend | None) -> str:
+def pdf_text(
+    cfg: Config, item: Item, manifest: Manifest | None, backend: LibraryBackend | None
+) -> str:
     path = ensure_pdf(cfg, item, manifest, backend)
     if path is None or not path.is_file():
         return ""
@@ -488,7 +492,13 @@ def screen_item(
     findings: list[ScreenFinding] = []
     doi = normalize_doi(item.doi) if item.doi else None
 
-    def add(code: str, detail: str, *, evidence: list[str] | None = None, url: str | None = None) -> None:
+    def add(
+        code: str,
+        detail: str,
+        *,
+        evidence: list[str] | None = None,
+        url: str | None = None,
+    ) -> None:
         findings.append(
             ScreenFinding(
                 itemKey=item.key,
@@ -599,7 +609,12 @@ def _tag_summary(findings: list[ScreenFinding]) -> str:
     parts = []
     for code in sorted(by_code):
         n = by_code[code]
-        if n == 1 and code in {"retracted", "withdrawn", "expression_of_concern", "pubpeer"}:
+        if n == 1 and code in {
+            "retracted",
+            "withdrawn",
+            "expression_of_concern",
+            "pubpeer",
+        }:
             parts.append(code.replace("_", " "))
         else:
             parts.append(f"{code.replace('_', ' ')} ({n})")
@@ -610,16 +625,13 @@ def _note_body(findings: list[ScreenFinding], item: Item) -> str:
     lines = [
         "<p>Screening flag from <code>paperful screen</code>. "
         "This is not a misconduct finding — review the evidence.</p>",
-        f"<p>Method: <a href=\"{PPS_METHOD}\">Problematic Paper Screener</a> "
-        f"(<a href=\"{PPS_HOME}\">PPS</a>).</p>",
+        f'<p>Method: <a href="{PPS_METHOD}">Problematic Paper Screener</a> '
+        f'(<a href="{PPS_HOME}">PPS</a>).</p>',
     ]
     doi = normalize_doi(item.doi) if item.doi else None
     if doi:
-        pps = (
-            "https://dbrech.irit.fr/pls/apex/f?p=9999:3"
-            f":::::IR[DOI]:{quote(doi)}"
-        )
-        lines.append(f"<p>DOI: {doi} — <a href=\"{pps}\">PPS report</a></p>")
+        pps = f"https://dbrech.irit.fr/pls/apex/f?p=9999:3:::::IR[DOI]:{quote(doi)}"
+        lines.append(f'<p>DOI: {doi} — <a href="{pps}">PPS report</a></p>')
     lines.append("<ul>")
     for f in findings:
         extra = ""

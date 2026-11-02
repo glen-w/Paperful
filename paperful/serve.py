@@ -38,7 +38,13 @@ def create_app(cfg: Config) -> Any:
     """ASGI app. Import FastAPI only when the extra is installed."""
     from fastapi import FastAPI
 
-    from .agent_ops import collections_tree, doctor_payload, last_run, run_ask, run_refs_gap
+    from .agent_ops import (
+        collections_tree,
+        doctor_payload,
+        last_run,
+        run_ask,
+        run_refs_gap,
+    )
 
     app = FastAPI(title="paperful", version=__version__)
 

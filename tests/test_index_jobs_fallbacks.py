@@ -67,9 +67,7 @@ def test_rag_ingest_dry_run_skips_embedder(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path)
     _cmd(cfg, "ing1")
     jobs.rag_ingest_fn = None
-    monkeypatch.setattr(
-        "paperful.rag.ingest.select_entries", lambda *_a, **_k: ["e1"]
-    )
+    monkeypatch.setattr("paperful.rag.ingest.select_entries", lambda *_a, **_k: ["e1"])
 
     class Batch:
         def summary(self):
@@ -315,9 +313,7 @@ def test_ask_batch_fallback_without_zotero_note(tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.llm.preflight.validate_embedder", lambda _c: None)
     monkeypatch.setattr("paperful.llm.get_client", lambda _c: "c")
     monkeypatch.setattr("paperful.rag.prompt.parse_focus", lambda v: v or "none")
-    monkeypatch.setattr(
-        "paperful.rag.index.Index.open", lambda _c: SimpleNamespace()
-    )
+    monkeypatch.setattr("paperful.rag.index.Index.open", lambda _c: SimpleNamespace())
     monkeypatch.setattr("paperful.rag.index.ledger_path", lambda _c: tmp_path / "l")
 
     class FakeLedger:
@@ -360,9 +356,7 @@ def test_rag_answered_fallback(tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_ask", lambda _c: None)
     monkeypatch.setattr("paperful.llm.preflight.validate_embedder", lambda _c: None)
     monkeypatch.setattr("paperful.llm.get_client", lambda _c: "c")
-    monkeypatch.setattr(
-        "paperful.rag.index.Index.open", lambda _c: SimpleNamespace()
-    )
+    monkeypatch.setattr("paperful.rag.index.Index.open", lambda _c: SimpleNamespace())
     monkeypatch.setattr("paperful.rag.index.ledger_path", lambda _c: tmp_path / "l")
 
     class FakeLedger:
@@ -422,7 +416,9 @@ def test_summarize_fallback_empty_and_ok(tmp_path, monkeypatch):
     item = SimpleNamespace(key="ITEM1")
     monkeypatch.setattr(
         "paperful.scope.load_scope",
-        lambda *_a, **_k: SimpleNamespace(items=[item, SimpleNamespace(key="ITEM2")], label="BBNJ"),
+        lambda *_a, **_k: SimpleNamespace(
+            items=[item, SimpleNamespace(key="ITEM2")], label="BBNJ"
+        ),
     )
 
     class Batch:
@@ -516,9 +512,7 @@ def test_synthesize_fallback_dry_run_and_skips(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "paperful.synthesize.prepare_synthesis", lambda *_a, **_k: filled
     )
-    monkeypatch.setattr(
-        "paperful.synthesize.report_is_current", lambda *_a, **_k: True
-    )
+    monkeypatch.setattr("paperful.synthesize.report_is_current", lambda *_a, **_k: True)
     _cmd(cfg, "syn2")
     index_jobs.synthesize(
         cfg,

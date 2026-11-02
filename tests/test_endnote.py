@@ -100,7 +100,11 @@ def test_endnote_reads_refs_groups_and_pdfs(cfg, tmp_path):
     dest = tmp_path / "exported.pdf"
     assert backend.export_pdf(it, dest) == dest
     assert dest.read_bytes() == PDF_BYTES
-    notes = [ch for ch in backend.children("1") if (ch.get("data") or {}).get("itemType") == "note"]
+    notes = [
+        ch
+        for ch in backend.children("1")
+        if (ch.get("data") or {}).get("itemType") == "note"
+    ]
     assert notes
 
 
@@ -193,13 +197,9 @@ def test_endnote_reads_groups_from_spec_and_members(cfg, tmp_path):
     conn.execute(
         "CREATE TABLE groups (group_id INTEGER PRIMARY KEY, spec BLOB, members BLOB)"
     )
-    spec = (
-        b'<group version="1"><ids><id>aaaa</id><name>BBNJ</name></ids></group>'
-    )
+    spec = b'<group version="1"><ids><id>aaaa</id><name>BBNJ</name></ids></group>'
     members = struct.pack(">II", 2, 1) + struct.pack(">I", 1)
-    conn.execute(
-        "INSERT INTO refs VALUES (1, 'The Sea', 0, 0, '10.1000/xyz')"
-    )
+    conn.execute("INSERT INTO refs VALUES (1, 'The Sea', 0, 0, '10.1000/xyz')")
     conn.execute("INSERT INTO groups VALUES (10, ?, ?)", (spec, members))
     conn.commit()
     conn.close()
@@ -331,9 +331,7 @@ def test_endnote_db_reference_type_17_maps_to_bill_not_journal(cfg, tmp_path):
         )
         """
     )
-    conn.execute(
-        "INSERT INTO refs VALUES (2, 'A Bill', 0, 17, '')"
-    )
+    conn.execute("INSERT INTO refs VALUES (2, 'A Bill', 0, 17, '')")
     conn.commit()
     conn.close()
     backend = _backend(cfg, enl)

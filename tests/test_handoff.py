@@ -136,9 +136,16 @@ def test_open_tabs_confirms_when_many():
         for i in range(25)
     ]
     opened: list[str] = []
-    assert open_tabs(rows, confirm=lambda n: False, opener=lambda u: opened.append(u) or True) == 0
+    assert (
+        open_tabs(
+            rows, confirm=lambda n: False, opener=lambda u: opened.append(u) or True
+        )
+        == 0
+    )
     assert opened == []
-    n = open_tabs(rows, confirm=lambda n: True, opener=lambda u: opened.append(u) or True)
+    n = open_tabs(
+        rows, confirm=lambda n: True, opener=lambda u: opened.append(u) or True
+    )
     assert n == 25 and len(opened) == 25
 
 
@@ -188,9 +195,7 @@ def test_attach_pdf_file_writes_manifest(cfg, tmp_path: Path):
 
             return R()
 
-    rec = attach_pdf_file(
-        cfg, Backend(), Manifest(cfg.manifest_path), item, pdf
-    )
+    rec = attach_pdf_file(cfg, Backend(), Manifest(cfg.manifest_path), item, pdf)
     assert rec.status == STATUS_ATTACHED and rec.itemKey == "HAND0001"
     assert attached and attached[0][0] == "HAND0001"
     assert (cfg.out_dir / "Col").exists()

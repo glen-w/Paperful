@@ -70,7 +70,9 @@ class StubLib:
 
 
 def _cfg(tmp_path: Path) -> Config:
-    cfg = Config(email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg = Config(
+        email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state"
+    )
     cfg.state_dir.mkdir(parents=True)
     cfg.out_dir.mkdir(parents=True)
     cfg.searxng_base_url = "http://searx.test"
@@ -91,7 +93,9 @@ def test_doctor_searxng_amber_when_unset(tmp_path: Path, monkeypatch):
     from paperful.doctor import run_checks
 
     monkeypatch.delenv("SEARXNG_BASE_URL", raising=False)
-    cfg = Config(email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg = Config(
+        email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state"
+    )
     cfg.searxng_base_url = ""
     rows = {c.name: c for c in run_checks(cfg, zl=None, probe=False)}
     assert rows["SearXNG"].status == "amber"
@@ -102,7 +106,9 @@ def test_doctor_searxng_amber_when_unset(tmp_path: Path, monkeypatch):
 
 
 def test_fanout_includes_quoted_and_unhosted():
-    qs = fanout_queries(["Kristina", "Gjerde", "IUCN"], filetype="pdf", hosts=["iucn.org"])
+    qs = fanout_queries(
+        ["Kristina", "Gjerde", "IUCN"], filetype="pdf", hosts=["iucn.org"]
+    )
     blob = " ".join(qs)
     assert any("filetype:pdf" in q for q in qs)
     assert any('"Kristina Gjerde"' in q for q in qs)
@@ -172,9 +178,13 @@ def test_keeps_fifty_grey_hits(tmp_path: Path):
     )
     assert bundle["summary"]["kept"] == 50
     assert bundle["summary"]["blocked"] >= 1
-    assert all("scholar.google" not in (r.get("url") or "") for r in bundle["candidates"])
+    assert all(
+        "scholar.google" not in (r.get("url") or "") for r in bundle["candidates"]
+    )
     lib = StubLib()
-    result = apply_candidates(cfg, bundle["candidates"], "Gjerde tribute/grey", backend=lib)
+    result = apply_candidates(
+        cfg, bundle["candidates"], "Gjerde tribute/grey", backend=lib
+    )
     assert result["created"] == 50
     assert len(lib.created) == 50
     assert all((row.get("url") or "").endswith(".pdf") for row in lib.created)
@@ -203,7 +213,9 @@ def test_keeps_two_hundred_grey_hits(tmp_path: Path):
         run_id="two-hundred-web",
     )
     assert bundle["summary"]["kept"] == 200
-    assert all("scholar.google" not in (r.get("url") or "") for r in bundle["candidates"])
+    assert all(
+        "scholar.google" not in (r.get("url") or "") for r in bundle["candidates"]
+    )
 
 
 def test_collects_hits_from_later_fanout_queries(tmp_path: Path):
@@ -215,7 +227,12 @@ def test_collects_hits_from_later_fanout_queries(tmp_path: Path):
             else:
                 url = PDF
                 title = "Gjerde IUCN 2018 high seas governance"
-            return {"results": [{"url": url, "title": title}, {"url": SCHOLAR, "title": "junk"}]}
+            return {
+                "results": [
+                    {"url": url, "title": title},
+                    {"url": SCHOLAR, "title": "junk"},
+                ]
+            }
 
     cfg = _cfg(tmp_path)
     bundle = run_search(
@@ -232,7 +249,9 @@ def test_collects_hits_from_later_fanout_queries(tmp_path: Path):
 
 
 def test_build_query_filetype_and_hosts():
-    q = build_query(["Gjerde", "IUCN"], filetype="pdf", hosts=["iucn.org", "undocs.org"])
+    q = build_query(
+        ["Gjerde", "IUCN"], filetype="pdf", hosts=["iucn.org", "undocs.org"]
+    )
     assert "filetype:pdf" in q
     assert "site:iucn.org" in q and "site:undocs.org" in q
     none = build_query(["Gjerde"], filetype="none")
@@ -240,7 +259,10 @@ def test_build_query_filetype_and_hosts():
 
 
 def test_parse_hosts_dedupes():
-    assert parse_hosts("iucn.org, www.iucn.org; undocs.org") == ["iucn.org", "undocs.org"]
+    assert parse_hosts("iucn.org, www.iucn.org; undocs.org") == [
+        "iucn.org",
+        "undocs.org",
+    ]
 
 
 def test_score_drops_blocked_and_platform():
@@ -248,8 +270,12 @@ def test_score_drops_blocked_and_platform():
     assert score_hit(SCHOLAR, title="x", playbooks=books)[0] < 0
     assert score_hit(PUBLISHER, title="x", playbooks=books)[0] < 0
     assert score_hit(WIKI, title="x", playbooks=books)[0] < 0
-    pdf_score, _, _ = score_hit(PDF, title="Gjerde", query="Gjerde IUCN", playbooks=books)
-    land_score, pb, _ = score_hit(LANDING, title="Gjerde", query="Gjerde IUCN", playbooks=books)
+    pdf_score, _, _ = score_hit(
+        PDF, title="Gjerde", query="Gjerde IUCN", playbooks=books
+    )
+    land_score, pb, _ = score_hit(
+        LANDING, title="Gjerde", query="Gjerde IUCN", playbooks=books
+    )
     assert pdf_score > land_score
     assert pb == "iucn-dosi"
     undocs_score, undocs_pb, rewritten = score_hit(
@@ -309,7 +335,9 @@ def test_out_dir_override(tmp_path: Path):
 
 def test_unset_searxng_raises_code_2(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("SEARXNG_BASE_URL", raising=False)
-    cfg = Config(email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg = Config(
+        email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state"
+    )
     cfg.state_dir.mkdir(parents=True)
     cfg.searxng_base_url = ""
     try:
@@ -344,8 +372,13 @@ def test_apply_dry_run_vs_write(tmp_path: Path):
     )
     lib = StubLib()
     mark_exists(cfg, bundle["candidates"], backend=lib)
-    assert all(row.get("status") in {"new", "exists", "blocked"} for row in bundle["candidates"])
-    result = apply_candidates(cfg, bundle["candidates"], "Gjerde tribute/grey", backend=lib)
+    assert all(
+        row.get("status") in {"new", "exists", "blocked"}
+        for row in bundle["candidates"]
+    )
+    result = apply_candidates(
+        cfg, bundle["candidates"], "Gjerde tribute/grey", backend=lib
+    )
     assert result["created"] >= 1
     assert lib.created
     extra = str(lib.created[0].get("extra") or "")
@@ -367,7 +400,16 @@ def test_cli_json_and_exit_2(tmp_path: Path, monkeypatch):
     )
     res = runner.invoke(
         cli.app,
-        ["search", "Gjerde", "IUCN", "--no-probe", "--run-id", "cli-web", "--format", "json"],
+        [
+            "search",
+            "Gjerde",
+            "IUCN",
+            "--no-probe",
+            "--run-id",
+            "cli-web",
+            "--format",
+            "json",
+        ],
     )
     assert res.exit_code == 0, res.output
     body = json.loads(res.stdout)
@@ -376,7 +418,9 @@ def test_cli_json_and_exit_2(tmp_path: Path, monkeypatch):
     assert body["summary"]["run_id"] == "cli-web"
 
     monkeypatch.delenv("SEARXNG_BASE_URL", raising=False)
-    bare = Config(email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    bare = Config(
+        email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state"
+    )
     bare.state_dir.mkdir(parents=True, exist_ok=True)
     bare.searxng_base_url = ""
     monkeypatch.setattr("paperful.cli_runtime._cfg", lambda _path=None: bare)

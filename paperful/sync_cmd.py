@@ -19,6 +19,7 @@ from .runreport import write_command_report, write_run_report
 from .store import Manifest
 from . import cli_runtime as cli_mod
 
+
 def _print_sync(stats, *, dry_run: bool) -> None:
     was = "none" if stats.previous is None else f"v{stats.previous}"
     kind = "full" if stats.full else "changes since last refresh"
@@ -46,6 +47,7 @@ def _print_sync(stats, *, dry_run: bool) -> None:
             "file behind them. See paperful attachments.[/]"
         )
 
+
 def run_sync_command(
     console: Console,
     full: Any,
@@ -71,7 +73,12 @@ def run_sync_command(
     if not callable(getattr(backend, "changes", None)):
         # No change feed on this manager: read it whole, as snapshot does.
         loaded = cli_mod._load_scope(
-            backend, collection=[], library=True, year_from=None, year_to=None, item_type=[]
+            backend,
+            collection=[],
+            library=True,
+            year_from=None,
+            year_to=None,
+            item_type=[],
         )
         with cli_mod._item_progress() as progress:
             snap = run_snapshot(
@@ -117,6 +124,7 @@ def run_sync_command(
     if not dry_run:
         # Copies do not go through the manifest, so name the items.
         cli_mod._rag_auto(cfg, time.time(), keys=stats.pdf_keys)
+
 
 def run_import_library(
     console: Console,
@@ -172,7 +180,10 @@ def run_import_library(
         cli_mod._exit_env(cli_mod._no_write(backend), cfg)
     with cli_mod._item_progress(json_out=json_out) as progress:
         done = apply_import(
-            records, backend, dry_run=False, track=cli_mod._track(progress, "Importing records")
+            records,
+            backend,
+            dry_run=False,
+            track=cli_mod._track(progress, "Importing records"),
         )
     from .agent_json import envelope
 
@@ -186,11 +197,16 @@ def run_import_library(
         console.print(
             f"[bold]created {done['create']}[/] · attached {done['attach']} · "
             f"notes {done['notes']}"
-            + (f" · missing PDFs {done['skipped_pdf']}" if done.get("skipped_pdf") else "")
+            + (
+                f" · missing PDFs {done['skipped_pdf']}"
+                if done.get("skipped_pdf")
+                else ""
+            )
         )
 
     cli_mod._emit_agent(payload, json_out=json_out, human=_human_imp_done)
     cli_mod._flush(backend)
+
 
 def run_openalex_store_build_cites(
     console: Console,
@@ -210,7 +226,10 @@ def run_openalex_store_build_cites(
     """
     from . import cli_runtime as cli_mod
 
-    from .snowball.local_openalex import OpenAlexStoreError, build_cites_index_from_config
+    from .snowball.local_openalex import (
+        OpenAlexStoreError,
+        build_cites_index_from_config,
+    )
 
     cfg = cli_mod._cfg(config)
     try:
@@ -230,4 +249,3 @@ def run_openalex_store_build_cites(
         f"total {counts['total']}. "
         f"Set [openalex_store].cites_index_glob to that tree (e.g. {example})."
     )
-

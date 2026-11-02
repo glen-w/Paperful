@@ -157,9 +157,7 @@ def describe(entry: MirrorEntry) -> dict[str, object]:
     }
 
 
-def _pdf_unchanged(
-    row: LedgerRow, pdf: PdfStat, hasher: Callable[[Path], str]
-) -> bool:
+def _pdf_unchanged(row: LedgerRow, pdf: PdfStat, hasher: Callable[[Path], str]) -> bool:
     if not row.pdf_sha256:
         return False
     if row.pdf_size == pdf.size and row.pdf_mtime_ns == pdf.mtime_ns:

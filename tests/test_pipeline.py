@@ -343,9 +343,7 @@ def test_session_expired_items_ignores_other_rows(cfg):
     manifest.write(
         Record(itemKey="A", status=STATUS_RETRYABLE, reason="session expired")
     )
-    manifest.write(
-        Record(itemKey="B", status=STATUS_RETRYABLE, reason="source paused")
-    )
+    manifest.write(Record(itemKey="B", status=STATUS_RETRYABLE, reason="source paused"))
     manifest.write(
         Record(itemKey="C", status=STATUS_NOT_FOUND, reason="session expired")
     )
@@ -364,7 +362,11 @@ def test_ezproxy_second_pass_retries_skipped_keys(pipe_factory):
 
     ez = StubSource(
         "ezproxy",
-        {"A": Candidate.miss("ezproxy", Outcome.ERROR, "ezproxy session expired - re-login")},
+        {
+            "A": Candidate.miss(
+                "ezproxy", Outcome.ERROR, "ezproxy session expired - re-login"
+            )
+        },
     )
     pipe, manifest = pipe_factory({"ezproxy": ez}, ["ezproxy"])
     pipe.try_all = True
@@ -442,7 +444,11 @@ def test_ezproxy_expiry_marks_the_rest_retryable(pipe_factory):
 
     ez = StubSource(
         "ezproxy",
-        {"A": Candidate.miss("ezproxy", Outcome.ERROR, "ezproxy session expired - re-login")},
+        {
+            "A": Candidate.miss(
+                "ezproxy", Outcome.ERROR, "ezproxy session expired - re-login"
+            )
+        },
     )
     pipe, manifest = pipe_factory({"ezproxy": ez}, ["ezproxy"])
     pipe.try_all = True
@@ -881,9 +887,7 @@ def test_soft_blocked_non_publisher_url_retries_via_browser(pipe_factory):
     def handler(req):
         return httpx.Response(202, content=b"", headers={"content-type": "text/html"})
 
-    pipe, manifest = pipe_factory(
-        {"unpaywall": src}, ["unpaywall"], handler=handler
-    )
+    pipe, manifest = pipe_factory({"unpaywall": src}, ["unpaywall"], handler=handler)
     pipe.browser = browser
     pipe.ctx.browser = browser
     pipe.run([make_item(key="A", url=url)])
@@ -904,9 +908,7 @@ def test_soft_block_without_browser_is_retryable(pipe_factory):
     def handler(req):
         return httpx.Response(202, content=b"", headers={"content-type": "text/html"})
 
-    pipe, manifest = pipe_factory(
-        {"unpaywall": src}, ["unpaywall"], handler=handler
-    )
+    pipe, manifest = pipe_factory({"unpaywall": src}, ["unpaywall"], handler=handler)
     # No vault browser → soft block stays retryable for the next run.
     pipe.browser = None
     pipe.ctx.browser = None
@@ -1051,15 +1053,11 @@ def test_oa_skips_publisher_host_across_items(pipe_factory):
             ),
         },
     )
-    pipe, manifest = pipe_factory(
-        {"unpaywall": up}, ["unpaywall"], handler=handler
-    )
+    pipe, manifest = pipe_factory({"unpaywall": up}, ["unpaywall"], handler=handler)
     pipe.cfg.concurrency_oa = 1
     pipe.run([make_item(key="A"), make_item(key="B")])
     assert len(calls) == 1
-    assert any(
-        "host already blocked" in a for a in manifest.get("B").attempts
-    )
+    assert any("host already blocked" in a for a in manifest.get("B").attempts)
 
 
 def test_vault_sso_misses_trip_ezproxy_and_skip_proxify(pipe_factory, cfg):
@@ -1089,10 +1087,7 @@ def test_vault_sso_misses_trip_ezproxy_and_skip_proxify(pipe_factory, cfg):
     browser = LoginBrowser()
     src = StubSource(
         "unpaywall",
-        {
-            key: Candidate(url=url, source="unpaywall")
-            for key, url in pubs.items()
-        },
+        {key: Candidate(url=url, source="unpaywall") for key, url in pubs.items()},
     )
     pipe, manifest = pipe_factory(
         {"unpaywall": src},
@@ -1107,9 +1102,7 @@ def test_vault_sso_misses_trip_ezproxy_and_skip_proxify(pipe_factory, cfg):
     wraps = [u for u in browser.urls if "idm.oclc.org" in u]
     assert len(wraps) == 1
     assert any("session expired" in a for a in manifest.get("A").attempts)
-    assert any(
-        "skipped(session expired)" in a for a in manifest.get("B").attempts
-    )
+    assert any("skipped(session expired)" in a for a in manifest.get("B").attempts)
 
 
 def test_dead_vault_landing_skips_browser_across_items(pipe_factory):
@@ -1161,9 +1154,7 @@ def test_dead_vault_landing_skips_browser_across_items(pipe_factory):
     pipe.ctx.browser = browser
     pipe.run([make_item(key="A"), make_item(key="B")])
     assert browser.urls == ["https://hal.science/hal-0001/document"]
-    assert any(
-        "host already blocked" in a for a in manifest.get("B").attempts
-    )
+    assert any("host already blocked" in a for a in manifest.get("B").attempts)
 
 
 def test_connect_timeout_does_not_block_publisher_until_threshold(pipe_factory):
@@ -1194,9 +1185,7 @@ def test_connect_timeout_does_not_block_publisher_until_threshold(pipe_factory):
             ),
         },
     )
-    pipe, _manifest = pipe_factory(
-        {"unpaywall": up}, ["unpaywall"], handler=handler
-    )
+    pipe, _manifest = pipe_factory({"unpaywall": up}, ["unpaywall"], handler=handler)
     pipe.cfg.concurrency_oa = 1
     pipe.browser = None
     pipe.ctx.browser = None
@@ -1205,10 +1194,7 @@ def test_connect_timeout_does_not_block_publisher_until_threshold(pipe_factory):
     pipe.run(items)
     # Each fetch_pdf does 2 transport attempts; host dies after 3 item fails.
     assert len(calls) == 6  # A+B+C × 2 attempts, D skipped
-    assert any(
-        "host already blocked" in a
-        for a in pipe.manifest.get("D").attempts
-    )
+    assert any("host already blocked" in a for a in pipe.manifest.get("D").attempts)
 
 
 def test_ezproxy_down_hook_fires_between_batches(pipe_factory, cfg):
@@ -1238,10 +1224,7 @@ def test_ezproxy_down_hook_fires_between_batches(pipe_factory, cfg):
 
     src = StubSource(
         "unpaywall",
-        {
-            key: Candidate(url=url, source="unpaywall")
-            for key, url in pubs.items()
-        },
+        {key: Candidate(url=url, source="unpaywall") for key, url in pubs.items()},
     )
     pipe, manifest = pipe_factory(
         {"unpaywall": src},
@@ -1258,9 +1241,7 @@ def test_ezproxy_down_hook_fires_between_batches(pipe_factory, cfg):
     assert pipe._ezproxy_down is True
     assert hooks == [True]
     assert any("session expired" in a for a in manifest.get("A").attempts)
-    assert any(
-        "skipped(session expired)" in a for a in manifest.get("B").attempts
-    )
+    assert any("skipped(session expired)" in a for a in manifest.get("B").attempts)
 
 
 def test_ezproxy_down_hook_recovery_clears_skip(pipe_factory, cfg):
@@ -1351,9 +1332,9 @@ def test_strict_pdf_doi_saves_without_attach(cfg, monkeypatch):
     assert rec.status == STATUS_OK
     assert rec.reason == REASON_STRICT_PDF_DOI
     assert manifest.pending_attach() == []
-    assert [r.itemKey for r in manifest.pending_attach(allow_pdf_doi_mismatch=True)] == [
-        "A"
-    ]
+    assert [
+        r.itemKey for r in manifest.pending_attach(allow_pdf_doi_mismatch=True)
+    ] == ["A"]
 
 
 def test_pdf_doi_mismatch_attaches_with_warning_by_default(cfg, monkeypatch):
@@ -1552,10 +1533,9 @@ def test_strict_pdf_doi_precedes_short_pdf_hold(cfg, monkeypatch):
     rec = manifest.get("A")
     assert rec.reason == REASON_STRICT_PDF_DOI
     assert manifest.pending_attach(allow_short_pdf=True) == []
-    assert [r.itemKey for r in manifest.pending_attach(allow_pdf_doi_mismatch=True)] == [
-        "A"
-    ]
-
+    assert [
+        r.itemKey for r in manifest.pending_attach(allow_pdf_doi_mismatch=True)
+    ] == ["A"]
 
 
 # ---- vault browser download fallback ------------------------------------------
@@ -1630,7 +1610,9 @@ def test_browser_pdf_tries_the_proxied_url_then_the_raw_one(pipe_factory):
     assert attempts == ["unpaywall:browser-failed(timeout)", "unpaywall:browser"]
 
 
-def test_browser_pdf_skips_the_proxy_lane_while_the_campus_session_is_down(pipe_factory):
+def test_browser_pdf_skips_the_proxy_lane_while_the_campus_session_is_down(
+    pipe_factory,
+):
     browser = _VaultBrowser({_PUB: PDF_BYTES})
     pipe, _ = _vault_pipe(pipe_factory, browser, ezproxy_base=_PROXY)
     pipe._ezproxy_down = True
@@ -1666,7 +1648,9 @@ def test_attach_record_with_a_missing_file_is_an_attach_failure(pipe_factory):
 
     attacher = FakeAttacher()
     pipe, manifest = pipe_factory({}, [], attacher=attacher)
-    rec = Record(itemKey="GONE", status=STATUS_OK, path=str(pipe.cfg.out_dir / "gone.pdf"))
+    rec = Record(
+        itemKey="GONE", status=STATUS_OK, path=str(pipe.cfg.out_dir / "gone.pdf")
+    )
     assert pipe.attach_record(rec) is False
     assert attacher.calls == []
     saved = manifest.get("GONE")
@@ -1804,4 +1788,3 @@ def test_pipeline_serpapi_max_calls_zero_is_unlimited(pipe_factory, cfg, monkeyp
     pipe.try_all = True
     pipe.run([make_item(key="A"), make_item(key="B")])
     assert sp.calls == ["A", "B"]
-

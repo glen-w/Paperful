@@ -116,7 +116,9 @@ def test_resume_fingerprint_marks_exists(tmp_path: Path):
             return [held]
 
     console = Console(file=StringIO(), highlight=False)
-    request = SnowballRequest(gate="auto", collection="Inbox/Snowball", dedupe_scope="library")
+    request = SnowballRequest(
+        gate="auto", collection="Inbox/Snowball", dedupe_scope="library"
+    )
     _fingerprint_rows(cfg, request, [row], backend=Lib(), console=console)
     assert row.status == "exists"
 
@@ -194,7 +196,13 @@ def test_work_to_candidate_keeps_author_ids():
         "open_access": {},
     }
     row = work_to_candidate(
-        work, run_id="r", seed={"type": "doi", "value": "10.1000/x"}, hop=0, direction="refs", why="s", gate="dry-run"
+        work,
+        run_id="r",
+        seed={"type": "doi", "value": "10.1000/x"},
+        hop=0,
+        direction="refs",
+        why="s",
+        gate="dry-run",
     )
     recs = row.biblio["author_records"]
     assert recs[0]["openalex"] == "A1"
@@ -218,7 +226,10 @@ def test_coauthor_graph_ranks_by_frequency():
     rows = [
         _row(
             ids={"doi": "10.1000/1"},
-            biblio={"authors": ["Ada Lovelace", "Charles Babbage"], "author_records": [a, b]},
+            biblio={
+                "authors": ["Ada Lovelace", "Charles Babbage"],
+                "author_records": [a, b],
+            },
         ),
         _row(
             ids={"doi": "10.1000/2"},
@@ -283,9 +294,9 @@ def test_preflight_writes_proposed_pack(tmp_path: Path):
 
 
 def test_searxng_rank_surname_in_host():
-    assert rank_hit("https://mendenhall.github.io/paper.pdf", surname="mendenhall") > rank_hit(
-        "https://publisher.example/article", surname="mendenhall"
-    )
+    assert rank_hit(
+        "https://mendenhall.github.io/paper.pdf", surname="mendenhall"
+    ) > rank_hit("https://publisher.example/article", surname="mendenhall")
     assert rank_hit("https://www.researchgate.net/x.pdf", surname="mendenhall") < 0
 
 
@@ -364,7 +375,10 @@ def test_name_fingerprint():
 
 def test_apply_scope_ignores_config_and_needs_explicit_flag():
     assert _apply_fingerprint_scope(SnowballRequest()) == "library"
-    assert _apply_fingerprint_scope(SnowballRequest(dedupe_scope="collection")) == "collection"
+    assert (
+        _apply_fingerprint_scope(SnowballRequest(dedupe_scope="collection"))
+        == "collection"
+    )
     assert _apply_fingerprint_scope(SnowballRequest(dedupe_scope="none")) == "none"
 
 

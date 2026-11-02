@@ -53,9 +53,7 @@ Rules:
 """
 
 
-def outline_slices(
-    text: str, cfg: Config | None = None
-) -> list[tuple[str, str]]:
+def outline_slices(text: str, cfg: Config | None = None) -> list[tuple[str, str]]:
     """``(heading, body)`` spans, including short outline subsections."""
     from .rag.chunk import section_spans
     from .sections.headings import named_headings_set
@@ -141,9 +139,7 @@ def pack_outline_excerpt(
     return packed if len(packed) <= cap else packed[:cap]
 
 
-def _thin_findings(
-    doc: ExtractedDoc, slices: list[tuple[str, str]]
-) -> list[Finding]:
+def _thin_findings(doc: ExtractedDoc, slices: list[tuple[str, str]]) -> list[Finding]:
     extra: list[Finding] = []
     for heading, body in slices:
         if not heading:
@@ -216,9 +212,7 @@ def suggested_from_outline(
             "detail": f.detail,
         }
         for f in findings
-        if f.lane == "checked"
-        and not f.dismissed
-        and f.code not in _SKIP_CHECKED
+        if f.lane == "checked" and not f.dismissed and f.code not in _SKIP_CHECKED
     ][:40]
     skeleton_md = "\n".join(
         f"- {row['heading']} ({row['words']} words)"

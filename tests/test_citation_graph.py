@@ -92,7 +92,9 @@ def test_map_categories_from_study_designs():
 
 
 def test_graph_nodes_carry_categories_and_legend():
-    seed = _candidate("10.1000/seed", "W1", "Seed paper", 2024, 12, hop=0, direction="search")
+    seed = _candidate(
+        "10.1000/seed", "W1", "Seed paper", 2024, 12, hop=0, direction="search"
+    )
     meta = _candidate(
         "10.1000/meta",
         "W2",
@@ -328,7 +330,9 @@ def test_discover_graph_meta_and_annotate_routes(tmp_path, monkeypatch):
     row = _candidate("10.1000/a", "W1", "Paper A", 2021, 4, hop=0, direction="search")
     write_queue(cfg.state_dir, "Rlib", [row], _client({}), library_unread=False)
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
     monkeypatch.setattr(
         "paperful.snowball.graph_library.list_collection_paths",
         lambda *_a, **_k: ["Inbox"],
@@ -362,7 +366,9 @@ def test_discover_graph_meta_and_annotate_routes(tmp_path, monkeypatch):
 
 
 def test_edges_and_threshold_from_queue():
-    seed = _candidate("10.1000/seed", "W1", "Seed paper", 2024, 12, hop=0, direction="search")
+    seed = _candidate(
+        "10.1000/seed", "W1", "Seed paper", 2024, 12, hop=0, direction="search"
+    )
     old = _candidate(
         "10.1000/old",
         "W2",
@@ -414,7 +420,9 @@ def test_edges_and_threshold_from_queue():
     assert by_id[hot.identity]["role"] == "influential"
     assert by_id[fresh.identity]["role"] == "emerging"
     assert by_id[quiet.identity]["occasional"] is True
-    pairs = {(edge["source"], edge["target"], edge["direction"]) for edge in graph["edges"]}
+    pairs = {
+        (edge["source"], edge["target"], edge["direction"]) for edge in graph["edges"]
+    }
     assert (seed.identity, old.identity, "refs") in pairs
     assert (hot.identity, seed.identity, "cites") in pairs
 
@@ -429,7 +437,9 @@ def test_single_seed_fallback_when_links_were_not_recorded():
 
 
 def test_node_cap_keeps_seeds():
-    rows = [_candidate("10.1000/seed", "W0", "Seed", 2020, 1, hop=0, direction="search")]
+    rows = [
+        _candidate("10.1000/seed", "W0", "Seed", 2020, 1, hop=0, direction="search")
+    ]
     for index in range(MAX_NODES + 20):
         rows.append(
             _candidate(
@@ -471,7 +481,9 @@ def test_doi_hop_records_parent_link():
 
 
 def test_expand_merges_neighbours_and_keeps_summary(tmp_path: Path):
-    seed = _candidate("10.1000/seed", "W1", "Seed paper", 2019, 30, hop=0, direction="doi")
+    seed = _candidate(
+        "10.1000/seed", "W1", "Seed paper", 2019, 30, hop=0, direction="doi"
+    )
     state = tmp_path / "state"
     dest = state / "snowball" / "Rexpand"
     dest.mkdir(parents=True)
@@ -546,9 +558,27 @@ def test_graph_for_run_rewrites_the_file(tmp_path: Path):
 
 def test_triage_orders_influential_before_library():
     nodes = [
-        {"id": "a", "role": "influential", "in_library": False, "seed": False, "cited_by_count": 10},
-        {"id": "b", "role": "foundational", "in_library": False, "seed": False, "cited_by_count": 100},
-        {"id": "c", "role": "emerging", "in_library": True, "seed": False, "cited_by_count": 2},
+        {
+            "id": "a",
+            "role": "influential",
+            "in_library": False,
+            "seed": False,
+            "cited_by_count": 10,
+        },
+        {
+            "id": "b",
+            "role": "foundational",
+            "in_library": False,
+            "seed": False,
+            "cited_by_count": 100,
+        },
+        {
+            "id": "c",
+            "role": "emerging",
+            "in_library": True,
+            "seed": False,
+            "cited_by_count": 2,
+        },
     ]
     triage = build_triage(nodes)
     assert triage[0]["id"] == "a"
@@ -583,7 +613,9 @@ def test_add_and_remove_library_from_queue(tmp_path: Path, monkeypatch):
     from paperful.snowball.queue import load_queue
 
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
-    row = _candidate("10.1000/new", "W1", "New paper", 2024, 3, hop=0, direction="search")
+    row = _candidate(
+        "10.1000/new", "W1", "New paper", 2024, 3, hop=0, direction="search"
+    )
     write_queue(cfg.state_dir, "Radd", [row], _client({}), library_unread=False)
 
     class Item:
@@ -595,7 +627,10 @@ def test_add_and_remove_library_from_queue(tmp_path: Path, monkeypatch):
     )
     monkeypatch.setattr(
         "paperful.snowball.ingest.create_new",
-        lambda backend, rows, collection, **kwargs: ([Item()], {"created": 1, "failed": 0}),
+        lambda backend, rows, collection, **kwargs: (
+            [Item()],
+            {"created": 1, "failed": 0},
+        ),
     )
     result = add_one_to_library(cfg, "Radd", row.identity, collection="Inbox")
     assert result["item_key"] == "ITEMKEY1"
@@ -698,7 +733,9 @@ def test_discover_graph_repair_route(tmp_path, monkeypatch):
     seed = _candidate("10.1000/seed", "W1", "Seed", 2020, 9, hop=0, direction="search")
     write_queue(cfg.state_dir, "Rrepair", [seed], _client({}), library_unread=False)
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
     monkeypatch.setattr(
         "paperful.snowball.citation_graph.repair_queue_links",
         lambda state_dir, run_id, client, **kwargs: graph_for_run(
@@ -718,10 +755,14 @@ def test_discover_page_includes_the_map(tmp_path, monkeypatch):
     from paperful.serve import create_app
 
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
-    seed = _candidate("10.1000/seed", "W1", "Seed paper", 2020, 9, hop=0, direction="search")
+    seed = _candidate(
+        "10.1000/seed", "W1", "Seed paper", 2020, 9, hop=0, direction="search"
+    )
     write_queue(cfg.state_dir, "Rpage", [seed], _client({}), library_unread=False)
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
     client = TestClient(create_app(cfg))
     page = client.get("/discover")
     assert page.status_code == 200
@@ -742,7 +783,9 @@ def test_discover_page_includes_the_map(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "paperful.snowball.citation_graph.expand_queue",
-        lambda state_dir, run_id, node_id, direction, client, **kw: graph_for_run(state_dir, run_id),
+        lambda state_dir, run_id, node_id, direction, client, **kw: graph_for_run(
+            state_dir, run_id
+        ),
     )
     expand = client.post(
         "/discover/graph/expand",

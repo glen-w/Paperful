@@ -61,9 +61,7 @@ def find(item: Item, ctx: Context) -> Candidate:
                     item,
                     books,
                     str(resp.url),
-                    Candidate(
-                        url=str(resp.url), source=NAME, note="content-type pdf"
-                    ),
+                    Candidate(url=str(resp.url), source=NAME, note="content-type pdf"),
                 )
             if resp.status_code < 400 and "octet-stream" in ctype:
                 head = b""

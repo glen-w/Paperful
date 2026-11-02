@@ -103,15 +103,11 @@ def test_snapshot_pdf_modes_and_record_roundtrip(tmp_path):
     cols = json.loads((cfg.out_dir / "_collections.json").read_text())
     assert cols["collections"][0]["path"] == "BBNJ"
 
-    dry = run_snapshot(
-        cfg, backend, [item], pdfs="all", dry_run=True, manifest=None
-    )
+    dry = run_snapshot(cfg, backend, [item], pdfs="all", dry_run=True, manifest=None)
     assert dry.pdf_exports == 1 and backend.exports == 0
     assert not any((cfg.out_dir / "BBNJ" / item_dirname(item)).glob("*.pdf"))
 
-    live = run_snapshot(
-        cfg, backend, [item], pdfs="all", dry_run=False, manifest=None
-    )
+    live = run_snapshot(cfg, backend, [item], pdfs="all", dry_run=False, manifest=None)
     assert live.pdf_exports == 1 and backend.exports == 1
     assert any((cfg.out_dir / "BBNJ" / item_dirname(item)).glob("*.pdf"))
 
@@ -316,7 +312,9 @@ def test_pdfs_none_keeps_existing_bytes_and_skips_linked_url(tmp_path):
     linked = _item(key="LINKED01", has_pdf=True, has_linked_url=True)
     run_snapshot(cfg, backend, [linked], pdfs="all", dry_run=False, manifest=None)
     assert backend.exports == 0
-    assert not (cfg.out_dir / "BBNJ" / item_dirname(linked)).joinpath("kept.pdf").exists()
+    assert (
+        not (cfg.out_dir / "BBNJ" / item_dirname(linked)).joinpath("kept.pdf").exists()
+    )
 
 
 def test_snapshot_copies_summary_and_hardlinks_second_collection(tmp_path):
@@ -457,7 +455,9 @@ def test_restore_ignores_annotations_json(tmp_path):
     folder = tmp_path / "BBNJ" / item_dirname(_item())
     folder.mkdir(parents=True)
     (folder / "annotations.json").write_text(
-        json.dumps({"schema": "paperful.annotations.v1", "annotations": [{"key": "N1"}]})
+        json.dumps(
+            {"schema": "paperful.annotations.v1", "annotations": [{"key": "N1"}]}
+        )
     )
     record = {
         "schema": "paperful.item.v1",
@@ -479,5 +479,3 @@ def test_dirname_keeps_key_when_title_is_long():
     name = item_dirname(item)
     assert name.endswith(" -- ABCD1234")
     assert len(name) <= 180
-
-

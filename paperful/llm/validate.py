@@ -28,7 +28,11 @@ def _replace_url_host(url: str, new_host: str) -> str:
     parsed = urlparse(url.strip())
     port = parsed.port
     # Bracket IPv6 literals in the netloc.
-    host_part = f"[{new_host}]" if ":" in new_host and not new_host.startswith("[") else new_host
+    host_part = (
+        f"[{new_host}]"
+        if ":" in new_host and not new_host.startswith("[")
+        else new_host
+    )
     netloc = f"{host_part}:{port}" if port is not None else host_part
     if parsed.username:
         user = parsed.username

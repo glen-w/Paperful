@@ -71,7 +71,9 @@ def run_export_library(
         for it in cli_mod._track(progress, "Exporting records")(items):
             rec_json = None
             for folder in it.collection_paths or ["_uncollected"]:
-                rec_json = load_json(record_path(cfg.out_dir / folder / item_dirname(it)))
+                rec_json = load_json(
+                    record_path(cfg.out_dir / folder / item_dirname(it))
+                )
                 if rec_json:
                     break
             rec = record_from_item_json(rec_json or {}, None)
@@ -79,8 +81,12 @@ def run_export_library(
             rec["title"] = it.title
             rec["doi"] = it.doi
             rec["year"] = it.year
-            rec["date"] = it.date or rec.get("date") or (str(it.year) if it.year else "")
-            rec["publication_title"] = it.publication_title or rec.get("publication_title")
+            rec["date"] = (
+                it.date or rec.get("date") or (str(it.year) if it.year else "")
+            )
+            rec["publication_title"] = it.publication_title or rec.get(
+                "publication_title"
+            )
             rec["url"] = it.url
             rec["pmid"] = it.pmid
             rec["abstract"] = it.abstract or rec.get("abstract")

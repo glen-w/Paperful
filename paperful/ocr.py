@@ -132,7 +132,9 @@ def _probe_pdf(
     return None, probe
 
 
-def _run_ocrmypdf(src: Path, dest: Path, *, langs: str, thin: bool, timeout_s: float) -> tuple[int, str]:
+def _run_ocrmypdf(
+    src: Path, dest: Path, *, langs: str, thin: bool, timeout_s: float
+) -> tuple[int, str]:
     exe = shutil.which("ocrmypdf")
     if not exe:
         return 127, "ocrmypdf is not on PATH"
@@ -188,13 +190,21 @@ def _apply_one(
             timeout_s=timeout_s,
         )
         if code != 0 or not tmp.is_file() or tmp.stat().st_size == 0:
-            return OcrRow(item.key, item.title, str(durable), "failed", err or f"ocrmypdf exited {code}")
+            return OcrRow(
+                item.key,
+                item.title,
+                str(durable),
+                "failed",
+                err or f"ocrmypdf exited {code}",
+            )
         os.replace(tmp, durable)
     finally:
         tmp.unlink(missing_ok=True)
     reason = why
     if attach and backend is not None:
-        result = backend.attach(item.key, durable, title="PDF (OCR)", note="paperful ocr")
+        result = backend.attach(
+            item.key, durable, title="PDF (OCR)", note="paperful ocr"
+        )
         if result.ok:
             reason = f"{why}; attached"
         else:

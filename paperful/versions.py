@@ -515,7 +515,9 @@ def _oa_pdf_url(client: httpx.Client, doi: str, email: str) -> str | None:
         return None
 
 
-def _markdown(scope: str, counts: dict[str, int], proposals: list[VersionProposal]) -> str:
+def _markdown(
+    scope: str, counts: dict[str, int], proposals: list[VersionProposal]
+) -> str:
     lines = [
         f"# Versions — {scope}",
         "",

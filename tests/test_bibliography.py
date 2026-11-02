@@ -40,14 +40,16 @@ def test_open_pdf_url_prefers_oa_pdf():
         "primary_location": {"pdf_url": "https://example.test/other.pdf"},
     }
     assert open_pdf_url(work) == "https://example.test/a.pdf"
-    assert open_pdf_url({"open_access": {"oa_url": "https://example.test/landing"}}) == (
-        "https://example.test/landing"
-    )
+    assert open_pdf_url(
+        {"open_access": {"oa_url": "https://example.test/landing"}}
+    ) == ("https://example.test/landing")
     assert open_pdf_url({}) == ""
 
 
 def test_recover_skips_when_openalex_refs_present():
-    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=lambda p, q: {})
+    client = OpenAlexClient(
+        email="t@example.org", api_key="", sleep_s=0, getter=lambda p, q: {}
+    )
     called: list[str] = []
     client.s2_getter = lambda doi: called.append(doi) or {}
     client.pdf_fetcher = lambda url: called.append(url) or ""
@@ -140,7 +142,9 @@ def test_unsplit_body_falls_back_to_a_single_entry():
 
 
 def test_trailing_venue_crumb_is_trimmed_from_title():
-    entry = bib._parse_entry("Ada. (2022). High seas governance. Marine Policy 12, 1-9.")
+    entry = bib._parse_entry(
+        "Ada. (2022). High seas governance. Marine Policy 12, 1-9."
+    )
     assert entry["title"] == "High seas governance"
 
 
@@ -176,7 +180,9 @@ def test_landing_list_keeps_a_reference_that_has_no_doi():
     rows = bib.parse_landing_bibliography(html)
     assert [r["doi"] for r in rows if r["doi"]] == ["10.1000/a", "10.1000/c"]
     title_only = [r for r in rows if not r["doi"]]
-    assert [(r["title"], r["year"]) for r in title_only] == [("Title with no DOI here", 2020)]
+    assert [(r["title"], r["year"]) for r in title_only] == [
+        ("Title with no DOI here", 2020)
+    ]
 
 
 def test_landing_caps_the_doi_list():
@@ -205,10 +211,19 @@ def test_landing_empty_html():
     "work, expected",
     [
         (
-            {"primary_location": {"landing_page_url": "https://pub.test/a"}, "doi": "https://doi.org/10.1000/x"},
+            {
+                "primary_location": {"landing_page_url": "https://pub.test/a"},
+                "doi": "https://doi.org/10.1000/x",
+            },
             "https://pub.test/a",
         ),
-        ({"primary_location": {"landing_page_url": "ftp://nope"}, "doi": "10.1000/X"}, "https://doi.org/10.1000/x"),
+        (
+            {
+                "primary_location": {"landing_page_url": "ftp://nope"},
+                "doi": "10.1000/X",
+            },
+            "https://doi.org/10.1000/x",
+        ),
         ({"ids": {"doi": "https://doi.org/10.1000/y"}}, "https://doi.org/10.1000/y"),
         ({}, ""),
     ],
@@ -238,7 +253,11 @@ def _search_client(hits, *, fail: bool = False):
 
 
 def _hit(oa, title, year=2020):
-    return {"id": f"https://openalex.org/{oa}", "display_name": title, "publication_year": year}
+    return {
+        "id": f"https://openalex.org/{oa}",
+        "display_name": title,
+        "publication_year": year,
+    }
 
 
 def test_title_match_accepts_a_single_clear_hit():
@@ -251,8 +270,16 @@ def test_title_match_accepts_a_single_clear_hit():
     "hits, title, year",
     [
         ([_hit("W1", "Deep sea mining and the common heritage")], "short", 2020),
-        ([_hit("W1", "Deep sea mining and the common heritage", 2011)], "Deep sea mining and the common heritage", 2020),
-        ([_hit("W1", "Something else entirely about fisheries")], "Deep sea mining and the common heritage", 2020),
+        (
+            [_hit("W1", "Deep sea mining and the common heritage", 2011)],
+            "Deep sea mining and the common heritage",
+            2020,
+        ),
+        (
+            [_hit("W1", "Something else entirely about fisheries")],
+            "Deep sea mining and the common heritage",
+            2020,
+        ),
     ],
     ids=["too-short", "year-mismatch", "low-similarity"],
 )
@@ -261,7 +288,14 @@ def test_title_match_rejects(hits, title, year):
 
 
 def test_title_match_swallows_search_errors():
-    assert bib._match_title(_search_client([], fail=True), "Deep sea mining and the common heritage", None) is None
+    assert (
+        bib._match_title(
+            _search_client([], fail=True),
+            "Deep sea mining and the common heritage",
+            None,
+        )
+        is None
+    )
 
 
 def test_resolve_dois_dedupes_skips_failures_and_tags_source():
@@ -278,6 +312,10 @@ def test_resolve_dois_dedupes_skips_failures_and_tags_source():
         return works.get(doi, {})
 
     client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
-    out = bib._resolve_dois(client, ["10.1/a", "10.1/boom", "10.1/a-alias", "10.1/missing", "10.1/b"], source="landing")
+    out = bib._resolve_dois(
+        client,
+        ["10.1/a", "10.1/boom", "10.1/a-alias", "10.1/missing", "10.1/b"],
+        source="landing",
+    )
     assert [w["id"].rsplit("/", 1)[1] for w in out] == ["W1", "W2"]
     assert {w["_recovery"] for w in out} == {"landing"}

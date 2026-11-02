@@ -31,8 +31,8 @@ def run_inbox_watch(
 ) -> None:
     """Long-running sidecar: poll inbox.dir and attach by PDF DOI (no FIFO).
 
-Defaults to the whole library so one drop folder can serve every topic.
-Pass ``-C`` only when you intentionally want a narrower DOI index."""
+    Defaults to the whole library so one drop folder can serve every topic.
+    Pass ``-C`` only when you intentionally want a narrower DOI index."""
     from . import cli_runtime as cli_mod
 
     from .inbox import (
@@ -42,7 +42,9 @@ Pass ``-C`` only when you intentionally want a narrower DOI index."""
         summary_from_stats,
     )
 
-    library = cli_mod._inbox_library_when_unscoped(collection, library, profile, run_config)
+    library = cli_mod._inbox_library_when_unscoped(
+        collection, library, profile, run_config
+    )
     cfg = cli_mod._cfg(config)
     bound = cli_mod._bind_run(
         cfg,
@@ -114,7 +116,6 @@ Pass ``-C`` only when you intentionally want a narrower DOI index."""
         console.print(f"Inbox report: {path}")
 
 
-
 def run_inbox_drain(
     console: Console,
     *,
@@ -131,9 +132,9 @@ def run_inbox_drain(
 ) -> None:
     """One-shot: ingest current PDFs in inbox.dir.
 
-Default match is DOI-only. ``[inbox].match`` can add title / OCR / LLM stages.
-Defaults to the whole library so one drop folder can serve every topic.
-Pass ``-C`` only when you intentionally want a narrower DOI index."""
+    Default match is DOI-only. ``[inbox].match`` can add title / OCR / LLM stages.
+    Defaults to the whole library so one drop folder can serve every topic.
+    Pass ``-C`` only when you intentionally want a narrower DOI index."""
     from . import cli_runtime as cli_mod
 
     from .inbox import (
@@ -143,7 +144,9 @@ Pass ``-C`` only when you intentionally want a narrower DOI index."""
         summary_from_stats,
     )
 
-    library = cli_mod._inbox_library_when_unscoped(collection, library, profile, run_config)
+    library = cli_mod._inbox_library_when_unscoped(
+        collection, library, profile, run_config
+    )
     cfg = cli_mod._cfg(config)
     json_out = cli_mod._agent_json(fmt)
     bound = cli_mod._bind_run(
@@ -215,7 +218,9 @@ Pass ``-C`` only when you intentionally want a narrower DOI index."""
         items=items_out,
         paths={"report": str(path) if path else "", "inbox_dir": str(root)},
         flags={"once": True},
-        exit_code=batch_exit(ok=int(stats.attached or 0), failed=int(stats.errors or 0)),
+        exit_code=batch_exit(
+            ok=int(stats.attached or 0), failed=int(stats.errors or 0)
+        ),
     )
 
     def _human_drain() -> None:
@@ -228,7 +233,6 @@ Pass ``-C`` only when you intentionally want a narrower DOI index."""
             console.print(f"Inbox report: {path}")
 
     cli_mod._emit_agent(payload, json_out=json_out, human=_human_drain)
-
 
 
 def run_inbox_proposals_list(
@@ -278,7 +282,6 @@ def run_inbox_proposals_list(
     cli_mod._emit_agent(payload, json_out=json_out, human=_human)
 
 
-
 def run_inbox_proposals_apply(
     console: Console,
     *,
@@ -325,7 +328,6 @@ def run_inbox_proposals_apply(
     cli_mod._emit_agent(payload, json_out=json_out, human=_human_apply)
 
 
-
 def run_inbox_proposals_reject(
     console: Console,
     *,
@@ -356,4 +358,3 @@ def run_inbox_proposals_reject(
         console.print(f"Rejected proposal {proposal_id}")
 
     cli_mod._emit_agent(payload, json_out=json_out, human=_human_reject)
-

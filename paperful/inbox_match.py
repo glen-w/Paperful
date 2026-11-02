@@ -94,9 +94,7 @@ def build_title_year_index(items: list[Item]) -> dict[tuple[str, int], Item | No
         if not title or year is None:
             continue
         counts.setdefault((title, year), []).append(item)
-    return {
-        key: (rows[0] if len(rows) == 1 else None) for key, rows in counts.items()
-    }
+    return {key: (rows[0] if len(rows) == 1 else None) for key, rows in counts.items()}
 
 
 def _unique_index(rows: dict[str, list[Item]]) -> dict[str, Item | None]:
@@ -140,9 +138,7 @@ def build_grey_index(items: list[Item]) -> dict[tuple[str, int, str], Item | Non
         if key is None:
             continue
         counts.setdefault(key, []).append(item)
-    return {
-        key: (rows[0] if len(rows) == 1 else None) for key, rows in counts.items()
-    }
+    return {key: (rows[0] if len(rows) == 1 else None) for key, rows in counts.items()}
 
 
 def pdf_title_year(path: Path, text: str = "") -> tuple[str, int | None]:
@@ -205,7 +201,9 @@ def match_ladder(
     else:
         doi_miss = "no DOI in PDF"
 
-    if "ocr" in stages and (cfg.inbox_ocr_for_match or cfg.inbox_match in {"doi+title+ocr", "full"}):
+    if "ocr" in stages and (
+        cfg.inbox_ocr_for_match or cfg.inbox_match in {"doi+title+ocr", "full"}
+    ):
         if _thin(text) and ocr_text is not None:
             extra = ocr_text(path) or ""
             if extra.strip():
@@ -218,14 +216,21 @@ def match_ladder(
                         doi = normalize_doi(m.group(1))
                         item = doi_index.get(doi) if doi else None
                         if item is not None:
-                            return done(item=item, how="ocr", doi=doi, title=title, year=year)
+                            return done(
+                                item=item, how="ocr", doi=doi, title=title, year=year
+                            )
                 title, year = pdf_title_year(path, text)
 
     if "title_fingerprint" in stages and isbn:
         hit = isbn_index.get(isbn)
         if hit is None and isbn in isbn_index:
             return done(
-                item=None, how="none", doi=doi, title=title, year=year, reason="ambiguous ISBN"
+                item=None,
+                how="none",
+                doi=doi,
+                title=title,
+                year=year,
+                reason="ambiguous ISBN",
             )
         if hit is not None:
             return done(
@@ -300,7 +305,12 @@ def match_ladder(
                     year=year,
                 )
 
-    if "title_resolve" in stages and cfg.inbox_title_resolve and title_resolve and title:
+    if (
+        "title_resolve" in stages
+        and cfg.inbox_title_resolve
+        and title_resolve
+        and title
+    ):
         resolved = title_resolve(title, year)
         doi_r = normalize_doi(getattr(resolved, "doi", None) if resolved else None)
         if doi_r:
@@ -335,9 +345,7 @@ def match_ladder(
     reason = doi_miss
     if title:
         reason = f"{doi_miss}; title {title!r}"
-    return done(
-        item=None, how="none", doi=doi, title=title, year=year, reason=reason
-    )
+    return done(item=None, how="none", doi=doi, title=title, year=year, reason=reason)
 
 
 def match_pdf(

@@ -66,9 +66,7 @@ def render_markdown(
             lines.append(f"- `{row.get('finding_id')}`: {row.get('reason')}")
         lines.append("")
     files = [
-        name
-        for name in (pack.get("tracked"), pack.get("odt"), pack.get("pdf"))
-        if name
+        name for name in (pack.get("tracked"), pack.get("odt"), pack.get("pdf")) if name
     ]
     if files:
         lines.extend(["## Files", ""])

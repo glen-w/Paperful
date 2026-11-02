@@ -120,11 +120,17 @@ class FakeMendeley:
             self.files[did] = []
             self.annotations[did] = []
             return _json(doc, 201)
-        if path.startswith("/documents/") and path.endswith("/trash") and method == "POST":
+        if (
+            path.startswith("/documents/")
+            and path.endswith("/trash")
+            and method == "POST"
+        ):
             did = path.split("/")[2]
             doc = self.docs.pop(did, None)
             if doc is not None:
-                self.deleted[did] = str(doc.get("last_modified") or "2026-01-01T00:00:00.000Z")
+                self.deleted[did] = str(
+                    doc.get("last_modified") or "2026-01-01T00:00:00.000Z"
+                )
             return httpx.Response(204)
         if path.startswith("/documents/") and method == "PATCH":
             did = path.split("/")[2]
@@ -173,9 +179,7 @@ class FakeMendeley:
             if request.headers.get("Authorization"):
                 return httpx.Response(403, text="bearer on s3")
             fid = path.rsplit("/", 1)[-1]
-            return httpx.Response(
-                200, content=self.file_bytes.get(fid) or PDF_BYTES
-            )
+            return httpx.Response(200, content=self.file_bytes.get(fid) or PDF_BYTES)
         if path == "/annotations" and method == "GET":
             did = request.url.params.get("document_id")
             return _json(self.annotations.get(did or "", []))
@@ -236,9 +240,7 @@ def test_mendeley_lists_folder_items_and_maps_types(cfg):
     assert it.collection_paths == ["BBNJ"]
     assert not it.has_pdf
     kids = backend.children(DOC_ID)
-    assert any(
-        "library note" in str((ch.get("data") or {}).get("note")) for ch in kids
-    )
+    assert any("library note" in str((ch.get("data") or {}).get("note")) for ch in kids)
 
 
 def test_mendeley_attach_note_patch_export(cfg, tmp_path):
@@ -500,9 +502,7 @@ def test_mendeley_s3_download_rejects_forwarded_bearer(cfg, tmp_path):
             if request.headers.get("Authorization"):
                 return httpx.Response(403, text="bearer on s3")
             fid = request.url.path.rsplit("/", 1)[-1]
-            return httpx.Response(
-                200, content=fake.file_bytes.get(fid) or PDF_BYTES
-            )
+            return httpx.Response(200, content=fake.file_bytes.get(fid) or PDF_BYTES)
         return orig(request)
 
     backend2 = _backend(cfg, fake)

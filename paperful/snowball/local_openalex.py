@@ -102,7 +102,9 @@ def columns_for_select(select: str) -> list[str]:
         if not name:
             continue
         if name not in _ALLOWED_COLUMNS:
-            raise OpenAlexStoreError(f"openalex store select column not allowed: {name!r}")
+            raise OpenAlexStoreError(
+                f"openalex store select column not allowed: {name!r}"
+            )
         if name not in out:
             out.append(name)
     return out or list(STORE_COLUMNS)
@@ -181,11 +183,11 @@ def build_works_sql(
 ) -> str:
     """Build a DuckDB SELECT over ``read_parquet`` for DOI or id batches."""
     if bool(dois) == bool(openalex_ids):
-        raise OpenAlexStoreError("build_works_sql needs exactly one of dois or openalex_ids")
+        raise OpenAlexStoreError(
+            "build_works_sql needs exactly one of dois or openalex_ids"
+        )
     cols = ", ".join(columns)
-    source = (
-        f"read_parquet({_sql_str(parquet_glob)}, union_by_name := true)"
-    )
+    source = f"read_parquet({_sql_str(parquet_glob)}, union_by_name := true)"
     if dois is not None:
         cleaned = [normalize_store_doi(d) for d in dois if normalize_store_doi(d)]
         if not cleaned:
@@ -229,9 +231,7 @@ def build_citing_sql(
         f"read_parquet({_sql_str(cites_glob)}, union_by_name := true, "
         f"hive_partitioning := true) AS c"
     )
-    works = (
-        f"read_parquet({_sql_str(works_glob)}, union_by_name := true) AS w"
-    )
+    works = f"read_parquet({_sql_str(works_glob)}, union_by_name := true) AS w"
     where = [f"c.cited_id = {_sql_str(cited)}"]
     if prefix:
         where.append(f"c.cited_prefix = {_sql_str(prefix)}")
@@ -514,9 +514,7 @@ class _DuckDbWorksStore:
         works_root = works_root_from_glob(self.parquet_glob)
         dates = self._list_updated_dates(works_root)
         if not dates:
-            raise OpenAlexStoreError(
-                f"no updated_date=* partitions under {works_root}"
-            )
+            raise OpenAlexStoreError(f"no updated_date=* partitions under {works_root}")
         self._ensure_dir(f"{out}/.done")
         tmp = f"{out}/.duckdb_tmp"
         self._ensure_dir(tmp)
@@ -623,9 +621,7 @@ class SshDuckDbStore(_DuckDbWorksStore):
         root = works_root_from_glob(self.parquet_glob)
         if not root:
             return ""
-        remote = (
-            f"find {shlex.quote(root)} -name '*.parquet' -print -quit 2>/dev/null || true"
-        )
+        remote = f"find {shlex.quote(root)} -name '*.parquet' -print -quit 2>/dev/null || true"
         try:
             out = self._ssh_run(remote, timeout_s=min(15.0, self.timeout_s)).strip()
         except OpenAlexStoreError:
@@ -646,7 +642,9 @@ class SshDuckDbStore(_DuckDbWorksStore):
         except (subprocess.TimeoutExpired, OSError) as exc:
             raise OpenAlexStoreError(f"openalex store SSH failed: {exc}") from exc
         if proc.returncode != 0:
-            err = (proc.stderr or proc.stdout or "").strip() or f"exit {proc.returncode}"
+            err = (
+                proc.stderr or proc.stdout or ""
+            ).strip() or f"exit {proc.returncode}"
             raise OpenAlexStoreError(f"openalex store SSH failed: {err}")
         return proc.stdout or ""
 
@@ -655,7 +653,9 @@ class SshDuckDbStore(_DuckDbWorksStore):
             f"ls -1d {shlex.quote(works_root.rstrip('/') + '/updated_date=*')} "
             "2>/dev/null || true"
         )
-        lines = [line.strip() for line in self._ssh_run(remote).splitlines() if line.strip()]
+        lines = [
+            line.strip() for line in self._ssh_run(remote).splitlines() if line.strip()
+        ]
         dates = sorted({updated_date_from_dirname(line) for line in lines if line})
         return [d for d in dates if d]
 
@@ -843,9 +843,7 @@ def _run_ssh_duckdb_exec(
     )
 
 
-def _run_duckdb_cmd(
-    cmd: list[str], *, sql: str, timeout_s: float, label: str
-) -> str:
+def _run_duckdb_cmd(cmd: list[str], *, sql: str, timeout_s: float, label: str) -> str:
     try:
         proc = subprocess.run(
             cmd,
@@ -887,7 +885,9 @@ def store_from_config(cfg: Any) -> WorksStore | None:
     if not backend:
         return None
 
-    duckdb_bin = str(getattr(cfg, "openalex_store_duckdb_bin", "") or "").strip() or "duckdb"
+    duckdb_bin = (
+        str(getattr(cfg, "openalex_store_duckdb_bin", "") or "").strip() or "duckdb"
+    )
     timeout_s = float(getattr(cfg, "openalex_store_timeout_s", 120.0) or 120.0)
     parquet_glob = _parquet_glob_from(cfg)
     cites_index_glob = _cites_index_glob_from(cfg)

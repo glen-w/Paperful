@@ -146,7 +146,11 @@ def _discourse_flags(text: str, paragraphs: list[str]) -> list[str]:
 def compute_ai_tells(text: str, paragraphs: list[str] | None = None) -> dict[str, Any]:
     """Return metrics for the pack ``ai_tells`` object (always safe JSON)."""
     prose = elide_direct_quotes(text)
-    paras = paragraphs if paragraphs is not None else [p for p in prose.split("\n\n") if p.strip()]
+    paras = (
+        paragraphs
+        if paragraphs is not None
+        else [p for p in prose.split("\n\n") if p.strip()]
+    )
     tokens = tokenize(prose)
     word_count = len(tokens)
     if word_count < MIN_AI_TELL_WORDS:

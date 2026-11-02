@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from .attributes import ATTRIBUTE_FIELDS, merge_attributes, seed_attributes, write_attributes_csv
+from .attributes import (
+    ATTRIBUTE_FIELDS,
+    merge_attributes,
+    seed_attributes,
+    write_attributes_csv,
+)
 from .build import build_ego_graph, works_to_records
 from .metrics import NETWORKX_HINT, compute_graph_metrics, gould_fernandez
 from .phases import BBNJ_PHASES, Phase, load_phases, slice_graph

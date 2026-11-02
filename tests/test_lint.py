@@ -70,10 +70,7 @@ def test_title_to_title_case():
         title_to_title_case("CLIMATE CHANGE: THE OCEAN AND US")
         == "Climate Change: The Ocean and US"
     )
-    assert (
-        title_to_title_case("THE BBNJ AGREEMENT", ["BBNJ"])
-        == "The BBNJ Agreement"
-    )
+    assert title_to_title_case("THE BBNJ AGREEMENT", ["BBNJ"]) == "The BBNJ Agreement"
 
 
 def test_normalize_saved_title():

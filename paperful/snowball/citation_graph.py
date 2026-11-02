@@ -185,7 +185,9 @@ def write_graph(
 def write_graph_file(dest: Path, graph: dict[str, Any]) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
     path = dest / GRAPH_FILE
-    path.write_text(json.dumps(graph, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(graph, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     return path
 
 
@@ -205,7 +207,11 @@ def _summary_map_settings(
     cats = raw.get("map_categories")
     defs = raw.get("map_category_defs")
     cat_out = [str(item) for item in cats] if isinstance(cats, list) else None
-    def_out = [dict(item) for item in defs if isinstance(item, dict)] if isinstance(defs, list) else None
+    def_out = (
+        [dict(item) for item in defs if isinstance(item, dict)]
+        if isinstance(defs, list)
+        else None
+    )
     return cat_out, def_out
 
 
@@ -236,7 +242,9 @@ def graph_for_run(
         watch_seen=watch_seen,
         compare_ids=compare_ids,
         map_categories=summary_cats if summary_cats is not None else map_categories,
-        map_category_defs=summary_defs if summary_defs is not None else map_category_defs,
+        map_category_defs=summary_defs
+        if summary_defs is not None
+        else map_category_defs,
         out_dir=out_dir,
     )
     write_graph_file(dest, graph)
@@ -284,11 +292,15 @@ def repair_queue_links(
         oa = short_id(str(work.get("id") or "")) or (seed_row.ids.get("openalex") or "")
         if oa:
             try:
-                citing = client.works_citing(oa, limit=NEIGHBOR_CAP, sort="cited_by_count:desc")
+                citing = client.works_citing(
+                    oa, limit=NEIGHBOR_CAP, sort="cited_by_count:desc"
+                )
             except OpenAlexBudgetExceeded:
                 raise
             except (OpenAlexError, httpx.HTTPError) as exc:
-                raise CitationGraphError("OpenAlex could not repair cited-by links.") from exc
+                raise CitationGraphError(
+                    "OpenAlex could not repair cited-by links."
+                ) from exc
             for child in citing:
                 cid = work_node_id(child)
                 if cid in by_id:
@@ -376,7 +388,9 @@ def library_halo(
     if len(nodes) < cap:
         oa = short_id(str(work.get("id") or "")) or (target.ids.get("openalex") or "")
         if oa:
-            citing = client.works_citing(oa, limit=NEIGHBOR_CAP, sort="cited_by_count:desc")
+            citing = client.works_citing(
+                oa, limit=NEIGHBOR_CAP, sort="cited_by_count:desc"
+            )
             for child in citing:
                 add_ghost(child, "cites")
                 if len(nodes) >= cap:

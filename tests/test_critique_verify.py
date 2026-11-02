@@ -19,9 +19,9 @@ def test_density_budget_proof_vs_ack():
         "contractivity. $T(x)=x$ and \\begin{eq} a=1 \\end{eq}."
     )
     assert density_budget(proof, family="") == "heavy"
-    assert density_budget("We thank the funders and colleagues.", family="acknowledgements") == (
-        "light"
-    )
+    assert density_budget(
+        "We thank the funders and colleagues.", family="acknowledgements"
+    ) == ("light")
     methods = "n=40. We measured yield under the ABC protocol. sample size was fixed."
     assert density_budget(methods, family="methodology") in {"medium", "heavy"}
 

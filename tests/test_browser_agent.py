@@ -54,9 +54,7 @@ def test_browser_use_import_hides_pyzotero_request_logs(caplog):
     httpx2 = logging.getLogger("httpx2")
     assert not httpx2.isEnabledFor(logging.INFO)
     with caplog.at_level(logging.DEBUG):
-        httpx2.info(
-            'HTTP Request: GET http://localhost:23119/api/ "HTTP/1.0 200 OK"'
-        )
+        httpx2.info('HTTP Request: GET http://localhost:23119/api/ "HTTP/1.0 200 OK"')
     assert "localhost:23119" not in caplog.text
 
 
@@ -259,17 +257,18 @@ def test_browser_runner_skips_fallback_after_captcha(cfg, monkeypatch):
 
 def test_agent_win_from_trace_click_label():
     trace = [{"action": "click", "detail": 'Clicked "Download PDF"'}]
-    assert ba.agent_win_from_trace(
-        trace, start_url="https://x.test/a", final_url="https://x.test/a.pdf"
-    ) == "click:Download PDF"
+    assert (
+        ba.agent_win_from_trace(
+            trace, start_url="https://x.test/a", final_url="https://x.test/a.pdf"
+        )
+        == "click:Download PDF"
+    )
 
 
 def test_agent_win_from_trace_rewrite():
     start = "https://onlinelibrary.wiley.com/doi/abs/10.1002/foo"
     final = "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1002/foo"
-    assert (
-        ba.agent_win_from_trace([], start_url=start, final_url=final) == "rewrite"
-    )
+    assert ba.agent_win_from_trace([], start_url=start, final_url=final) == "rewrite"
 
 
 def test_run_recover_uses_injected_runner(cfg, monkeypatch):
@@ -707,7 +706,11 @@ def test_pipeline_recover_after_scholar_miss(cfg, monkeypatch):
     )
     monkeypatch.setattr(
         "paperful.pipeline.REGISTRY",
-        {"unpaywall": StubSource("unpaywall"), "scholar": scholar, "browser_agent": agent},
+        {
+            "unpaywall": StubSource("unpaywall"),
+            "scholar": scholar,
+            "browser_agent": agent,
+        },
     )
     monkeypatch.setattr("paperful.pipeline.prepare_identifiers", lambda *a, **k: [])
     pipe = Pipeline(
@@ -742,7 +745,11 @@ def test_pipeline_recover_skipped_without_browser_lane_failure(cfg, monkeypatch)
     )
     monkeypatch.setattr(
         "paperful.pipeline.REGISTRY",
-        {"unpaywall": StubSource("unpaywall"), "scholar": scholar, "browser_agent": agent},
+        {
+            "unpaywall": StubSource("unpaywall"),
+            "scholar": scholar,
+            "browser_agent": agent,
+        },
     )
     monkeypatch.setattr("paperful.pipeline.prepare_identifiers", lambda *a, **k: [])
     pipe = Pipeline(

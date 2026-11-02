@@ -134,9 +134,7 @@ class Attacher:
                 self._checked_write_support = bool(info.get("supports_write"))
                 if not self._checked_write_support:
                     version = info.get("zotero_version") or "unknown"
-                    self._write_block_reason = (
-                        f"Zotero {version} local API has no write support (needs Zotero 10+)"
-                    )
+                    self._write_block_reason = f"Zotero {version} local API has no write support (needs Zotero 10+)"
             except Exception as exc:
                 self._checked_write_support = False
                 self._write_block_reason = (

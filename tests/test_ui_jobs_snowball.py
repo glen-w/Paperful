@@ -65,7 +65,9 @@ def test_snowball_run_records_error(tmp_path, monkeypatch):
     payload = parse_discover_topic({"kind": "search"}, advanced=True)
     monkeypatch.setattr(
         "paperful.snowball.command.run_search",
-        lambda *_a, **_k: (_ for _ in ()).throw(SnowballError("Enter a keyword query.")),
+        lambda *_a, **_k: (_ for _ in ()).throw(
+            SnowballError("Enter a keyword query.")
+        ),
     )
     try:
         jobs.snowball_run(cfg, cmd_id, payload=payload, collection="BBNJ")

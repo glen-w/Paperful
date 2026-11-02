@@ -459,7 +459,6 @@ def save_pdf(
     return primary, extras
 
 
-
 def record_path(item_dir: Path) -> Path:
     return item_dir / "record.json"
 

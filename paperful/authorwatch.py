@@ -515,7 +515,9 @@ def accept_suggestions(
 ) -> list[Person]:
     rows = load_suggestions(cfg, name)
     if not rows:
-        raise AuthorwatchError("No suggestions on that list. Run authorwatch suggest first.")
+        raise AuthorwatchError(
+            "No suggestions on that list. Run authorwatch suggest first."
+        )
     want = {str(item).strip() for item in (ids or set()) if str(item).strip()}
     if not want and not all_pending:
         raise AuthorwatchError("Pass --id (repeatable) or --all-pending.")
@@ -553,7 +555,9 @@ def accept_suggestions(
     return accepted
 
 
-def remove_person(cfg: Config, name: str, *, orcid: str = "", person_id: str = "") -> Person:
+def remove_person(
+    cfg: Config, name: str, *, orcid: str = "", person_id: str = ""
+) -> Person:
     people = load_people(cfg, name)
     cleaned = normalize_orcid(orcid)
     want_id = (person_id or "").strip()
@@ -644,7 +648,11 @@ def resolve_people(cfg: Config, name: str, *, client: Any = None) -> list[Person
             continue
         if person.orcid:
             try:
-                hit = oa.author_by_orcid(person.orcid) if hasattr(oa, "author_by_orcid") else None
+                hit = (
+                    oa.author_by_orcid(person.orcid)
+                    if hasattr(oa, "author_by_orcid")
+                    else None
+                )
             except Exception:
                 hit = None
             if isinstance(hit, dict):
@@ -662,7 +670,9 @@ def resolve_people(cfg: Config, name: str, *, client: Any = None) -> list[Person
             person.status = "unresolved"
             continue
         if person.affiliation_host:
-            narrowed = [row for row in hits if _affiliation_match(row, person.affiliation_host)]
+            narrowed = [
+                row for row in hits if _affiliation_match(row, person.affiliation_host)
+            ]
             if narrowed:
                 hits = narrowed
         if len(hits) == 1:
@@ -725,7 +735,9 @@ def show_list(cfg: Config, name: str, *, console: Console) -> None:
     people = load_people(cfg, name)
     ok, held, unresolved = _status_counts(people)
     console.print(f"authorwatch {name}")
-    console.print(f"  people · {len(people)} (ok {ok} · held {held} · unresolved {unresolved})")
+    console.print(
+        f"  people · {len(people)} (ok {ok} · held {held} · unresolved {unresolved})"
+    )
     console.print(f"  inbox · {inbox_count(cfg, name)}")
     console.print(f"  seen · {len(load_seen(cfg, name))}")
     if body.get("baseline_at"):
@@ -850,8 +862,10 @@ def _poll_authorwatch_people(
             f"[yellow]capped at {len(capped)} authors "
             f"(of {len(ok_people)}); pass --max-authors[/]"
         )
-    created_cursor = None if backfill else _cursor_date(
-        body.get("last_run_at") or body.get("baseline_at")
+    created_cursor = (
+        None
+        if backfill
+        else _cursor_date(body.get("last_run_at") or body.get("baseline_at"))
     )
     try:
         for person in capped:
@@ -884,8 +898,7 @@ def _poll_authorwatch_people(
         raise AuthorwatchError(
             "OpenAlex daily budget is spent. "
             f"Set OPENALEX_API_KEY ({KEY_URL}) if this IP is sharing the "
-            f"no-key pool, then: paperful authorwatch run {name}."
-            + wait
+            f"no-key pool, then: paperful authorwatch run {name}." + wait
         ) from exc
     return PollBatch(proposed=proposed, seen=seen, exists=exists, polled=polled)
 
@@ -939,7 +952,9 @@ def _print_authorwatch_run_summary(
         f"proposed {len(batch.proposed)} · exists {batch.exists} · skipped_held {skipped_held}"
     )
     if batch.proposed:
-        console.print(f"Next: paperful authorwatch apply {name} -C <collection> --apply")
+        console.print(
+            f"Next: paperful authorwatch apply {name} -C <collection> --apply"
+        )
     else:
         console.print(f"Next: paperful authorwatch run {name}")
 
@@ -1118,8 +1133,7 @@ def _openalex_budget_error(name: str, exc: OpenAlexBudgetExceeded) -> Authorwatc
     return AuthorwatchError(
         "OpenAlex daily budget is spent. "
         f"Set OPENALEX_API_KEY ({KEY_URL}) if this IP is sharing the "
-        f"no-key pool, then: paperful authorwatch briefing {name}."
-        + wait
+        f"no-key pool, then: paperful authorwatch briefing {name}." + wait
     )
 
 
@@ -1187,7 +1201,9 @@ def gather_briefing(
                 )
             enriched.append(
                 {
-                    "display_name": person.display_name or person.orcid or person.openalex,
+                    "display_name": person.display_name
+                    or person.orcid
+                    or person.openalex,
                     "orcid": person.orcid,
                     "openalex": person.openalex,
                     "recent_works": recent,
@@ -1228,7 +1244,9 @@ def _briefing_markdown(data: dict[str, Any]) -> str:
             )
         lines.append("")
     for person in data.get("people") or []:
-        label = person.get("display_name") or person.get("orcid") or person.get("openalex")
+        label = (
+            person.get("display_name") or person.get("orcid") or person.get("openalex")
+        )
         lines.append(f"## {label}")
         lines.append("")
         recent = person.get("recent_works") or []
@@ -1251,7 +1269,9 @@ def _briefing_markdown(data: dict[str, Any]) -> str:
                     bits.append(str(row["orcid"]))
                 if row.get("openalex"):
                     bits.append(str(row["openalex"]))
-                lines.append(f"- {' · '.join(b for b in bits if b)} ({row.get('count')})")
+                lines.append(
+                    f"- {' · '.join(b for b in bits if b)} ({row.get('count')})"
+                )
             lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -1435,7 +1455,9 @@ def import_file(
                     name,
                     orcid=orcid,
                     display_name=display_name,
-                    affiliation_host=_cell(raw, fields, "affiliation", "host", "affiliation_host"),
+                    affiliation_host=_cell(
+                        raw, fields, "affiliation", "host", "affiliation_host"
+                    ),
                     source="csv",
                     client=client,
                 )
@@ -1457,7 +1479,9 @@ def import_file(
                     cfg,
                     name,
                     orcid=str(item.get("orcid") or ""),
-                    display_name=str(item.get("name") or item.get("display_name") or ""),
+                    display_name=str(
+                        item.get("name") or item.get("display_name") or ""
+                    ),
                     affiliation_host=str(
                         item.get("affiliation") or item.get("affiliation_host") or ""
                     ),
@@ -1472,7 +1496,9 @@ def import_file(
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            added.append(add_person(cfg, name, orcid=line, source="orcid", client=client))
+            added.append(
+                add_person(cfg, name, orcid=line, source="orcid", client=client)
+            )
     if resolve:
         resolve_people(cfg, name, client=client)
     return added
@@ -1497,7 +1523,10 @@ def list_summaries(cfg: Config) -> list[tuple[str, int, int]]:
     for path in sorted(root.iterdir()):
         if not path.is_dir():
             continue
-        if not (path / "watch.json").is_file() and not (path / "people.jsonl").is_file():
+        if (
+            not (path / "watch.json").is_file()
+            and not (path / "people.jsonl").is_file()
+        ):
             continue
         try:
             people = load_people(cfg, path.name)

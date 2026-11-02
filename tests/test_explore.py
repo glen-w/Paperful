@@ -103,7 +103,9 @@ def test_discover_explore_route(tmp_path, monkeypatch):
 
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
 
     def fake_start(_cfg, _client, **kwargs):
         from paperful.snowball.candidate import Candidate
@@ -122,13 +124,26 @@ def test_discover_explore_route(tmp_path, monkeypatch):
             provenance={"backend": "openalex"},
             gate="dry-run",
         )
-        write_queue(_cfg.state_dir, run_id, [row], _FakeClient(), library_unread=False, meta={"mode": "explore"})
-        return run_id, {"schema": "paperful.citation_graph.v1", "nodes": [], "edges": []}
+        write_queue(
+            _cfg.state_dir,
+            run_id,
+            [row],
+            _FakeClient(),
+            library_unread=False,
+            meta={"mode": "explore"},
+        )
+        return run_id, {
+            "schema": "paperful.citation_graph.v1",
+            "nodes": [],
+            "edges": [],
+        }
 
     monkeypatch.setattr("paperful.snowball.explore.start_explore", fake_start)
     client = TestClient(create_app(cfg))
     page = client.get("/discover?tab=explore")
     assert "discoverExploreSection" in page.text
-    resp = client.post("/discover/explore", data={"query": "10.1000/seed"}, follow_redirects=False)
+    resp = client.post(
+        "/discover/explore", data={"query": "10.1000/seed"}, follow_redirects=False
+    )
     assert resp.status_code == 303
     assert "/discover?tab=queue" in resp.headers["location"]

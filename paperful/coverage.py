@@ -96,7 +96,9 @@ def extract_mentions(text: str) -> list[Mention]:
     mentions: list[Mention] = []
     seen: set[str] = set()
 
-    def _add(doi: str = "", title: str = "", year: int | None = None, raw: str = "") -> None:
+    def _add(
+        doi: str = "", title: str = "", year: int | None = None, raw: str = ""
+    ) -> None:
         doi = _clean_doi(doi)
         title = (title or "").strip()
         if doi:
@@ -148,7 +150,9 @@ def extract_mentions(text: str) -> list[Mention]:
     return mentions
 
 
-def load_text_from_note(backend: Any, key_or_path: str, *, out_dir: Path | None = None) -> tuple[str, dict[str, Any]]:
+def load_text_from_note(
+    backend: Any, key_or_path: str, *, out_dir: Path | None = None
+) -> tuple[str, dict[str, Any]]:
     """Load note HTML/text. ``key_or_path`` is a filesystem path or note item key."""
     path = Path(key_or_path)
     if path.is_file():
@@ -255,7 +259,11 @@ def _provenance_hint(tags: list[str]) -> str:
     bits: list[str] = []
     for tag in tags:
         low = str(tag or "").strip().lower()
-        if low.startswith("grey:") or low.startswith("oa:") or low.startswith("campus:"):
+        if (
+            low.startswith("grey:")
+            or low.startswith("oa:")
+            or low.startswith("campus:")
+        ):
             bits.append(low)
     return ", ".join(bits[:4])
 

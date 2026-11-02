@@ -18,6 +18,7 @@ from .library import LibraryError
 from .runreport import write_command_report, write_run_report
 from .store import Manifest
 
+
 def run_ingest_dois(
     console: Console,
     collection: Any,
@@ -50,12 +51,16 @@ def run_ingest_dois(
         raise typer.Exit(1)
     cfg = cli_mod._cfg(config)
     json_out = cli_mod._agent_json(fmt)
-    bound = cli_mod._bind_run(cfg, profile=profile, run_config=run_config, collection=collection)
+    bound = cli_mod._bind_run(
+        cfg, profile=profile, run_config=run_config, collection=collection
+    )
     collection, _library, _yf, _yt, _types = cli_mod._take_scope(bound)
     if not collection:
         cli_mod._refuse_missing_scope()
     if from_file is None and from_pack is None:
-        console.print("[red]Pass --from-file dois.txt or --from-pack state/refs-gaps/.../pack.json[/]")
+        console.print(
+            "[red]Pass --from-file dois.txt or --from-pack state/refs-gaps/.../pack.json[/]"
+        )
         raise typer.Exit(1)
     if from_pack is not None:
         pack_path = from_pack / "pack.json" if from_pack.is_dir() else from_pack
@@ -68,7 +73,9 @@ def run_ingest_dois(
         console.print("No DOIs to ingest.")
         raise typer.Exit(0)
     backend = cli_mod._connect(cfg, quiet=json_out)
-    all_items = list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else []
+    all_items = (
+        list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else []
+    )
     fingerprint = LibraryFingerprint.from_items(
         all_items,
         scope=cfg.ingest_dedupe_scope,
@@ -135,4 +142,3 @@ def run_ingest_dois(
             console.print(f"Next: paperful run -C {collection[0]}")
 
     cli_mod._emit_agent(payload, json_out=json_out, human=_human_ingest)
-

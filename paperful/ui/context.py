@@ -22,7 +22,9 @@ class UiContext:
     app: FastAPI
     cfg: Config
     templates: Jinja2Templates
-    health_cache: dict[str, Any] = field(default_factory=lambda: {"at": 0.0, "checks": []})
+    health_cache: dict[str, Any] = field(
+        default_factory=lambda: {"at": 0.0, "checks": []}
+    )
 
     def remember_doctor(self, checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         self.health_cache["at"] = time.time()
@@ -54,7 +56,9 @@ class UiContext:
         return path + (("?" + urlencode(pairs)) if pairs else "")
 
     def after_job(self, path: str, cmd_id: str, **extra: Any) -> RedirectResponse:
-        return RedirectResponse(url=self.page_url(path, run=cmd_id, **extra), status_code=303)
+        return RedirectResponse(
+            url=self.page_url(path, run=cmd_id, **extra), status_code=303
+        )
 
     def optional_int(self, raw: object, *, positive: bool = False) -> int | None:
         text = str(raw or "").strip()

@@ -20,7 +20,11 @@ def _work(oa: str, *, keywords: list[str] | None = None, cites: int = 1) -> dict
         "cited_by_count": cites,
         "referenced_works": [],
         "keywords": [
-            {"id": f"https://openalex.org/keywords/{k}", "display_name": k, "score": 0.9}
+            {
+                "id": f"https://openalex.org/keywords/{k}",
+                "display_name": k,
+                "score": 0.9,
+            }
             for k in (keywords or [])
         ],
         "authorships": [{"author": {"display_name": "Ada Lovelace"}}],
@@ -113,8 +117,14 @@ def test_seeds_resume_honours_include_seeds_false():
 
 
 def test_keywords_resume_pauses_on_the_second_seed():
-    seeds = {"S1": _work("S1", keywords=["kelp"]), "S2": _work("S2", keywords=["krill"])}
-    hits = {"kelp": _work("K1", keywords=["kelp"]), "krill": _work("K2", keywords=["krill"])}
+    seeds = {
+        "S1": _work("S1", keywords=["kelp"]),
+        "S2": _work("S2", keywords=["krill"]),
+    }
+    hits = {
+        "kelp": _work("K1", keywords=["kelp"]),
+        "krill": _work("K2", keywords=["krill"]),
+    }
     spent_once = {"krill": True}
 
     def route(path: str, params: dict) -> dict:

@@ -46,7 +46,11 @@ def colour_for(stage: str) -> str:
         return "green"
     if "pdf" in step:
         return "cyan"
-    if step.startswith("crossref") or step.startswith("semantic") or step.startswith("europepmc"):
+    if (
+        step.startswith("crossref")
+        or step.startswith("semantic")
+        or step.startswith("europepmc")
+    ):
         return "magenta"
     if "cited-by" in step:
         return "blue"
@@ -170,7 +174,9 @@ class Tally:
     def start(self) -> None:
         if self._thread is not None:
             return
-        self._thread = threading.Thread(target=self._loop, name="snowball-tally", daemon=True)
+        self._thread = threading.Thread(
+            target=self._loop, name="snowball-tally", daemon=True
+        )
         self._thread.start()
 
     def stop(self) -> None:

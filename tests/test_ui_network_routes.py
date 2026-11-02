@@ -19,7 +19,9 @@ pytestmark = pytest.mark.skipif(
 def env(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
-    cfg = Config(email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg = Config(
+        email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state"
+    )
     cfg.state_dir.mkdir(parents=True)
     monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _c, probe=False: [])
     monkeypatch.setattr(
@@ -137,7 +139,9 @@ def test_people_page_hides_panel_when_pref_off(tmp_path, monkeypatch):
 
     from paperful.serve import create_app
 
-    cfg = Config(email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg = Config(
+        email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state"
+    )
     cfg.state_dir.mkdir(parents=True)
     cfg.ui_coauthor_network = "off"
     monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _c, probe=False: [])

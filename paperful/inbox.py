@@ -243,9 +243,7 @@ def ingest_one(
     if matched.item is not None:
         if matched.how == "llm" and matched.confidence is not None:
             if matched.confidence < cfg.inbox_llm_auto_attach_min:
-                return _propose_attach(
-                    cfg, pdf, matched, collection, say, gated=True
-                )
+                return _propose_attach(cfg, pdf, matched, collection, say, gated=True)
         return _attach_matched(
             cfg, backend, manifest, pdf, matched, doi_index, title_index, say
         )
@@ -589,7 +587,11 @@ def _unmatched_path(
                 detail="quarantine_after_s",
             )
     routed: RouteResult | None = None
-    if not collection.strip() and cfg.inbox_route != "off" and cfg.inbox_create != "attach_only":
+    if (
+        not collection.strip()
+        and cfg.inbox_route != "off"
+        and cfg.inbox_create != "attach_only"
+    ):
         routed = route_collection(
             cfg,
             backend,
@@ -623,8 +625,14 @@ def _unmatched_path(
                     cfg, backend, data, work=work, extra_tags=extra_tags
                 )
                 attached = _attach_matched(
-                    cfg, backend, manifest, pdf, MatchResult(item=item, how="doi", doi=matched.doi),
-                    doi_index, title_index, say,
+                    cfg,
+                    backend,
+                    manifest,
+                    pdf,
+                    MatchResult(item=item, how="doi", doi=matched.doi),
+                    doi_index,
+                    title_index,
+                    say,
                 )
                 attached.status = "created_auto"
                 attached.detail = _created_detail(routed)
@@ -645,14 +653,17 @@ def _unmatched_path(
             if hasattr(backend, "items_in_scope")
             else []
         )
-        if fp.find(
-            None,
-            matched.title,
-            matched.year,
-            isbn=matched.isbn,
-            report_number=matched.report_number,
-            host=matched.host,
-        ) is None:
+        if (
+            fp.find(
+                None,
+                matched.title,
+                matched.year,
+                isbn=matched.isbn,
+                report_number=matched.report_number,
+                host=matched.host,
+            )
+            is None
+        ):
             data = {
                 "doi": "",
                 "title": matched.title,
@@ -700,9 +711,7 @@ def _unmatched_path(
     )
 
 
-def _route_as_gated(
-    cfg: Config, collection: str, routed: RouteResult | None
-) -> bool:
+def _route_as_gated(cfg: Config, collection: str, routed: RouteResult | None) -> bool:
     """True when a routed create_auto should write a proposal instead of minting."""
     if routed is None or cfg.inbox_create != "create_auto":
         return False
@@ -801,7 +810,9 @@ def _create_inbox_parent(
     record = {
         "item_type": _item_type(work.work_type if work else "") or "journalArticle",
         "title": title,
-        "creators": _creators([work.first_author] if work and work.first_author else []),
+        "creators": _creators(
+            [work.first_author] if work and work.first_author else []
+        ),
         "date": (work.date if work and work.date else str(year or "")),
         "doi": doi or (work.doi if work else ""),
         "publication_title": (work.venue if work else "") or "",

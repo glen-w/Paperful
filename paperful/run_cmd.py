@@ -106,8 +106,10 @@ def run_fetch(
     source_list = with_serpapi_lane(cfg, source_list)
     e2e = os.environ.get("PAPERFUL_E2E") == "1"
     # Live E2E streams human progress on stderr so --format json stays parseable.
-    talk = console if not json_out else (
-        Console(stderr=True, highlight=False) if e2e else None
+    talk = (
+        console
+        if not json_out
+        else (Console(stderr=True, highlight=False) if e2e else None)
     )
     if not json_out:
         cli_mod._warn_if_scihub(source_list)
@@ -378,7 +380,9 @@ def run_run_command(
         preset=preset,
         scihub=scihub,
         upgrade_linked=upgrade_linked,
-        upgrade_snapshot=upgrade_snapshot if isinstance(upgrade_snapshot, bool) else None,
+        upgrade_snapshot=upgrade_snapshot
+        if isinstance(upgrade_snapshot, bool)
+        else None,
         strict_pdf_doi=strict_pdf_doi,
     )
     collection, library, year_from, year_to, item_type = cli_mod._take_scope(bound)

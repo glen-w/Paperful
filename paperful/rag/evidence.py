@@ -156,9 +156,7 @@ def summarize_hits(
     if workers == 1:
         return [_one(cfg, hit, question, client, model) for hit in hits]
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        return list(
-            pool.map(lambda hit: _one(cfg, hit, question, client, model), hits)
-        )
+        return list(pool.map(lambda hit: _one(cfg, hit, question, client, model), hits))
 
 
 def filter_evidence(cfg: Config, hits: list[Hit]) -> list[Hit]:

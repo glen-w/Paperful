@@ -52,7 +52,9 @@ def test_follow_without_backfill(tmp_path):
         calls.append({"orcid": orcid, "backfill": backfill_from})
 
     jobs.authorwatch_run_fn = run_fn
-    jobs.follow_person(cfg, "x", orcid="0000-0002-1825-0097", list_name="p", backfill_from=None)
+    jobs.follow_person(
+        cfg, "x", orcid="0000-0002-1825-0097", list_name="p", backfill_from=None
+    )
     assert calls[0]["backfill"] is None
     jobs.authorwatch_run_fn = None
 
@@ -74,16 +76,23 @@ def test_check_again_does_not_create_parents(tmp_path):
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)
     applied: list[str] = []
-    jobs.authorwatch_apply_fn = lambda cfg, list_name="", collection="": applied.append(list_name)
-    jobs.authorwatch_run_fn = lambda cfg, orcid="", list_name="", backfill_from=None: None
-    jobs.follow_person(cfg, "x", orcid="0000-0002-1825-0097", list_name="p", backfill_from=None)
+    jobs.authorwatch_apply_fn = lambda cfg, list_name="", collection="": applied.append(
+        list_name
+    )
+    jobs.authorwatch_run_fn = lambda cfg, orcid="", list_name="", backfill_from=None: (
+        None
+    )
+    jobs.follow_person(
+        cfg, "x", orcid="0000-0002-1825-0097", list_name="p", backfill_from=None
+    )
     assert applied == []
     jobs.authorwatch_apply_fn = None
     jobs.authorwatch_run_fn = None
 
 
 @pytest.mark.skipif(
-    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available()
+    is False,
     reason="paperful[serve] extra missing",
 )
 def test_discover_topic_kind_doi_enqueues(tmp_path, monkeypatch):
@@ -121,7 +130,8 @@ def test_discover_topic_kind_doi_enqueues(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(
-    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available()
+    is False,
     reason="paperful[serve] extra missing",
 )
 def test_simple_ignores_kind(tmp_path, monkeypatch):
@@ -156,7 +166,8 @@ def test_simple_ignores_kind(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(
-    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available()
+    is False,
     reason="paperful[serve] extra missing",
 )
 def test_resume_enqueues(tmp_path, monkeypatch):
@@ -201,7 +212,8 @@ def test_resume_enqueues(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(
-    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available()
+    is False,
     reason="paperful[serve] extra missing",
 )
 def test_watch_save_calls_save_watch(tmp_path, monkeypatch):
@@ -242,7 +254,8 @@ def test_watch_save_calls_save_watch(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(
-    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available()
+    is False,
     reason="paperful[serve] extra missing",
 )
 def test_ingest_apply_http_409(tmp_path, monkeypatch):
@@ -263,7 +276,8 @@ def test_ingest_apply_http_409(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(
-    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available()
+    is False,
     reason="paperful[serve] extra missing",
 )
 def test_discover_topic_redirects_with_run_status(tmp_path, monkeypatch):
@@ -317,7 +331,9 @@ def test_discover_topic_redirects_with_run_status(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(
-    not __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available(),
+    not __import__(
+        "paperful.serve", fromlist=["fastapi_available"]
+    ).fastapi_available(),
     reason="paperful[serve] extra missing",
 )
 def test_discover_shows_stop_rule_and_next_hop(tmp_path, monkeypatch):
@@ -357,7 +373,9 @@ def test_discover_shows_stop_rule_and_next_hop(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
     client = TestClient(create_app(cfg))
     client.cookies.set("pf_advanced", "1")
     topic = client.get("/discover?tab=topic")

@@ -18,6 +18,7 @@ from .library import LibraryError
 from .runreport import print_run_summary, write_command_report, write_run_report
 from .store import Manifest, STATUS_ATTACHED, STATUS_NOT_FOUND
 
+
 def run_report(
     console: Console,
     config: Any,
@@ -82,6 +83,7 @@ def run_report(
             )
         console.print(t)
 
+
 def run_export_proposals(
     console: Console,
     pack: Any,
@@ -111,9 +113,8 @@ def run_export_proposals(
         raise typer.Exit(1) from exc
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(text, encoding="utf-8")
-    console.print(
-        f"[green]Wrote[/] {dest} ({n} records from {jsonl.name})"
-    )
+    console.print(f"[green]Wrote[/] {dest} ({n} records from {jsonl.name})")
+
 
 def run_report_counts(
     console: Console,
@@ -129,6 +130,7 @@ def run_report_counts(
     payload = json.loads(report_file.read_text(encoding="utf-8"))
     print(nightshift_counts_line(payload))
 
+
 def run_report_new_count(
     console: Console,
     report_file: Any,
@@ -142,4 +144,3 @@ def run_report_new_count(
 
     payload = json.loads(report_file.read_text(encoding="utf-8"))
     print(nightshift_report_new_count(payload))
-

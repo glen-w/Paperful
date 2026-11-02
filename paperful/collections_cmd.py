@@ -62,14 +62,21 @@ def run_collections_add(
 
     from .agent_json import envelope
     from .agent_ops import collections_add_exit
-    from .collections_add import apply_adds, classify_rows, keys_from_file, write_summary
+    from .collections_add import (
+        apply_adds,
+        classify_rows,
+        keys_from_file,
+        write_summary,
+    )
 
     if apply and dry_run:
         console.print("[red]Pass either --dry-run or --apply, not both.[/]")
         raise typer.Exit(1)
     cfg = cli_mod._cfg(config)
     json_out = cli_mod._agent_json(fmt)
-    bound = cli_mod._bind_run(cfg, profile=profile, run_config=run_config, collection=collection)
+    bound = cli_mod._bind_run(
+        cfg, profile=profile, run_config=run_config, collection=collection
+    )
     collection, _library, _yf, _yt, _types = cli_mod._take_scope(bound)
     if not collection:
         cli_mod._refuse_missing_scope()
@@ -92,7 +99,9 @@ def run_collections_add(
     if apply:
         cli_mod._require_manager(cfg)
         if not backend.supports_write():
-            cli_mod._exit_env("collections add --apply needs library write support.", cfg)
+            cli_mod._exit_env(
+                "collections add --apply needs library write support.", cfg
+            )
         apply_adds(backend, batch, target.key)
         cli_mod._flush(backend)
     folder = write_summary(cfg.state_dir, target.path, batch)

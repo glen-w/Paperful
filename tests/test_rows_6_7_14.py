@@ -43,7 +43,9 @@ def test_fingerprint_host_mismatch_is_not_exists():
 
 
 def test_fingerprint_isbn_before_title():
-    lib = make_item(key="B", doi=None, title="Ocean book", year=2020, isbn="9780306406157")
+    lib = make_item(
+        key="B", doi=None, title="Ocean book", year=2020, isbn="9780306406157"
+    )
     fp = LibraryFingerprint.from_items([lib])
     hit = fp.find(None, "Different title", 1999, isbn="978-0-306-40615-7")
     assert hit is not None and hit.kind == "isbn" and hit.item_key == "B"
@@ -51,16 +53,41 @@ def test_fingerprint_isbn_before_title():
 
 def test_dedupe_does_not_merge_conflicting_hosts():
     items = [
-        make_item(key="A", doi=None, title="Shared grey title about fisheries", year=2022, url="https://www.fao.org/a"),
-        make_item(key="B", doi=None, title="Shared grey title about fisheries", year=2022, url="https://www.oecd.org/b"),
+        make_item(
+            key="A",
+            doi=None,
+            title="Shared grey title about fisheries",
+            year=2022,
+            url="https://www.fao.org/a",
+        ),
+        make_item(
+            key="B",
+            doi=None,
+            title="Shared grey title about fisheries",
+            year=2022,
+            url="https://www.oecd.org/b",
+        ),
     ]
     assert classify(items, "all") == []
 
 
 def test_dedupe_isbn_is_actionable_like_doi():
     items = [
-        make_item(key="A", doi=None, title="Same book title here", year=2020, isbn="9780306406157", has_pdf=True),
-        make_item(key="B", doi=None, title="Same book title here", year=2020, isbn="9780306406157"),
+        make_item(
+            key="A",
+            doi=None,
+            title="Same book title here",
+            year=2020,
+            isbn="9780306406157",
+            has_pdf=True,
+        ),
+        make_item(
+            key="B",
+            doi=None,
+            title="Same book title here",
+            year=2020,
+            isbn="9780306406157",
+        ),
     ]
     groups = classify(items, "all")
     assert len(groups) == 1
@@ -70,20 +97,58 @@ def test_dedupe_isbn_is_actionable_like_doi():
 
 
 def test_url_findings_cover_each_code():
-    assert classify_probe(status=200, url="https://example.org/a", final_url="https://example.org/a", content_type="application/pdf") == "ok"
-    assert classify_probe(status=200, url="https://example.org/old", final_url="https://example.org/new", content_type="application/pdf") == "redirect"
-    assert classify_probe(status=200, url="https://example.org/gone", content_type="text/html", body="<html>page not found</html>") == "soft_404"
+    assert (
+        classify_probe(
+            status=200,
+            url="https://example.org/a",
+            final_url="https://example.org/a",
+            content_type="application/pdf",
+        )
+        == "ok"
+    )
+    assert (
+        classify_probe(
+            status=200,
+            url="https://example.org/old",
+            final_url="https://example.org/new",
+            content_type="application/pdf",
+        )
+        == "redirect"
+    )
+    assert (
+        classify_probe(
+            status=200,
+            url="https://example.org/gone",
+            content_type="text/html",
+            body="<html>page not found</html>",
+        )
+        == "soft_404"
+    )
     assert classify_probe(status=404, url="https://example.org/a") == "hard_dead"
-    assert classify_probe(status=None, url="https://example.org/a", error="ConnectError") == "hard_dead"
+    assert (
+        classify_probe(status=None, url="https://example.org/a", error="ConnectError")
+        == "hard_dead"
+    )
     assert classify_probe(status=410, url="https://example.org/a") == "hard_dead"
     wall = "Please subscribe to continue reading this article. " * 5
-    assert classify_probe(status=200, url="https://example.org/pay", content_type="text/html", body=wall) == "paywall_html"
+    assert (
+        classify_probe(
+            status=200,
+            url="https://example.org/pay",
+            content_type="text/html",
+            body=wall,
+        )
+        == "paywall_html"
+    )
     assert planned_rewrite("https://example.org/not-a-playbook") is None
 
 
 def test_url_findings_and_rewrite_refusal():
     assert classify_probe(status=404, url="https://example.org/a") == "hard_dead"
-    assert classify_probe(status=None, url="https://example.org/a", error="ConnectError") == "hard_dead"
+    assert (
+        classify_probe(status=None, url="https://example.org/a", error="ConnectError")
+        == "hard_dead"
+    )
     assert (
         classify_probe(
             status=200,
@@ -108,10 +173,24 @@ def test_url_findings_and_rewrite_refusal():
 def test_print_refusal_blocks_landing_pages():
     article = "Mesopelagic harvest rules for the high seas. " * 80
     assert print_page_refusal("https://pub.test/a", article) is None
-    assert print_page_refusal("https://pub.test/a", "Download PDF\n" + article) == "native-pdf-offered"
-    assert print_page_refusal("https://pub.test/login", "Central Authentication Service password") == "login"
-    assert print_page_refusal("https://pub.test/c", "We use cookies. Accept all cookies.") == "cookie-wall"
-    assert print_page_refusal("https://pub.test/a", "subscribe to continue " * 20) == "paywall"
+    assert (
+        print_page_refusal("https://pub.test/a", "Download PDF\n" + article)
+        == "native-pdf-offered"
+    )
+    assert (
+        print_page_refusal(
+            "https://pub.test/login", "Central Authentication Service password"
+        )
+        == "login"
+    )
+    assert (
+        print_page_refusal("https://pub.test/c", "We use cookies. Accept all cookies.")
+        == "cookie-wall"
+    )
+    assert (
+        print_page_refusal("https://pub.test/a", "subscribe to continue " * 20)
+        == "paywall"
+    )
     assert (
         print_page_refusal(
             "https://pub.test/a",
@@ -137,12 +216,18 @@ def test_academic_gated_writes_proposal(ctx_factory, monkeypatch, tmp_path):
     monkeypatch.setattr(
         htmlpdf,
         "_render_pdf",
-        lambda url, ua, title="", require_article=False, **_k: (PDF_BYTES, url, "chromium print"),
+        lambda url, ua, title="", require_article=False, **_k: (
+            PDF_BYTES,
+            url,
+            "chromium print",
+        ),
     )
     ctx = ctx_factory(lambda r: None)
     ctx.config.state_dir = tmp_path
     ctx.config.htmlpdf_academic = "gated"
-    item = make_item(key="J1", item_type="journalArticle", url="https://pub.test/article")
+    item = make_item(
+        key="J1", item_type="journalArticle", url="https://pub.test/article"
+    )
     cand = find(item, ctx)
     assert cand.outcome is Outcome.SKIPPED
     assert "proposal" in cand.note
@@ -153,7 +238,12 @@ def test_snapshot_is_not_import_ok_and_upgrade_selects_it():
     assert provenance_label("htmlpdf") == "snapshot:htmlpdf"
     assert provenance_stamp("htmlpdf") == "paperful snapshot:htmlpdf"
     assert is_snapshot_note(provenance_stamp("htmlpdf"))
-    assert project_miss_surface(doi="10.1/x", has_pdf=True, status=STATUS_ATTACHED, source="htmlpdf") == "snapshot"
+    assert (
+        project_miss_surface(
+            doi="10.1/x", has_pdf=True, status=STATUS_ATTACHED, source="htmlpdf"
+        )
+        == "snapshot"
+    )
     snap = make_item(key="S", has_pdf=True, pdf_tier="snapshot")
     native = make_item(key="N", has_pdf=True, pdf_tier="native")
     assert items_without_stored_pdf([snap, native]) == []
@@ -189,10 +279,21 @@ def test_proposal_gate_rechecks_saved_page():
     from paperful.sources.htmlpdf import proposal_gate
 
     title = "Mesopelagic harvest rules for the high seas"
-    assert proposal_gate({"title": title, "url": "https://pub.test/a", "body": ""}) == "no page text"
-    assert proposal_gate({"title": title, "url": "https://pub.test/a", "body": "Download PDF"}) == "native-pdf-offered"
+    assert (
+        proposal_gate({"title": title, "url": "https://pub.test/a", "body": ""})
+        == "no page text"
+    )
+    assert (
+        proposal_gate(
+            {"title": title, "url": "https://pub.test/a", "body": "Download PDF"}
+        )
+        == "native-pdf-offered"
+    )
     article = f"{title}. " + ("The fishery stayed open through the season. " * 40)
-    assert proposal_gate({"title": title, "url": "https://pub.test/a", "body": article}) is None
+    assert (
+        proposal_gate({"title": title, "url": "https://pub.test/a", "body": article})
+        is None
+    )
 
 
 def test_native_attach_trashes_snapshot_child():
@@ -205,8 +306,22 @@ def test_native_attach_trashes_snapshot_child():
         def children(self, key: str) -> list[dict]:
             assert key == "ITEM"
             return [
-                {"key": "SNAP", "data": {"linkMode": "imported_file", "contentType": "application/pdf", "note": provenance_stamp("htmlpdf")}},
-                {"key": "REAL", "data": {"linkMode": "imported_file", "contentType": "application/pdf", "note": "paperful oa:unpaywall"}},
+                {
+                    "key": "SNAP",
+                    "data": {
+                        "linkMode": "imported_file",
+                        "contentType": "application/pdf",
+                        "note": provenance_stamp("htmlpdf"),
+                    },
+                },
+                {
+                    "key": "REAL",
+                    "data": {
+                        "linkMode": "imported_file",
+                        "contentType": "application/pdf",
+                        "note": "paperful oa:unpaywall",
+                    },
+                },
             ]
 
         def trash_attachment(self, key: str) -> None:
@@ -223,18 +338,39 @@ def test_ambiguous_grey_fingerprint_does_not_attach(monkeypatch, tmp_path):
     from paperful.inbox_match import match_ladder
 
     title = "Shared grey title about fisheries management"
-    monkeypatch.setattr("paperful.inbox_match.text_from_pdf", lambda *_a, **_k: "copy at https://www.fao.org/doc")
+    monkeypatch.setattr(
+        "paperful.inbox_match.text_from_pdf",
+        lambda *_a, **_k: "copy at https://www.fao.org/doc",
+    )
     monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda *_a, **_k: None)
-    monkeypatch.setattr("paperful.inbox_match.pdf_title_year", lambda *_a, **_k: (title, 2022))
+    monkeypatch.setattr(
+        "paperful.inbox_match.pdf_title_year", lambda *_a, **_k: (title, 2022)
+    )
     items = [
-        make_item(key="A", doi=None, title=title, year=2022, url="https://www.fao.org/a", has_pdf=False),
-        make_item(key="B", doi=None, title=title, year=2022, url="https://www.fao.org/b", has_pdf=False),
+        make_item(
+            key="A",
+            doi=None,
+            title=title,
+            year=2022,
+            url="https://www.fao.org/a",
+            has_pdf=False,
+        ),
+        make_item(
+            key="B",
+            doi=None,
+            title=title,
+            year=2022,
+            url="https://www.fao.org/b",
+            has_pdf=False,
+        ),
     ]
     cfg = Config()
     cfg.inbox_match = "doi+title"
     pdf = tmp_path / "drop.pdf"
     pdf.write_bytes(b"%PDF")
-    result = match_ladder(pdf, cfg=cfg, doi_index={}, title_index={}, missing_items=items)
+    result = match_ladder(
+        pdf, cfg=cfg, doi_index={}, title_index={}, missing_items=items
+    )
     assert result.item is None
     assert result.reason == "ambiguous grey fingerprint"
 
@@ -259,7 +395,21 @@ def test_handoff_prefers_dead_url_health(tmp_path):
         encoding="utf-8",
     )
     rows = [
-        MissingPdf(key="OK", title="Aaa", doi="", url="https://ok.test", hint="doi_only", attempts=[]),
-        MissingPdf(key="DEAD", title="Zzz", doi="", url="https://dead.test", hint="doi_only", attempts=[]),
+        MissingPdf(
+            key="OK",
+            title="Aaa",
+            doi="",
+            url="https://ok.test",
+            hint="doi_only",
+            attempts=[],
+        ),
+        MissingPdf(
+            key="DEAD",
+            title="Zzz",
+            doi="",
+            url="https://dead.test",
+            hint="doi_only",
+            attempts=[],
+        ),
     ]
     assert [row.key for row in rank_missing(rows, tmp_path)] == ["DEAD", "OK"]

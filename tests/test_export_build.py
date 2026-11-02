@@ -12,7 +12,9 @@ from conftest import make_item
 
 
 class _Backend:
-    def __init__(self, *, children=None, export_pdf=None, boom_children=False, boom_pdf=False):
+    def __init__(
+        self, *, children=None, export_pdf=None, boom_children=False, boom_pdf=False
+    ):
         self._children = children if children is not None else []
         self._export_pdf = export_pdf
         self.boom_children = boom_children
@@ -41,7 +43,9 @@ def _seed_record(cfg, item, **extra):
         {
             "item_type": "document",
             "title": "disk title",
-            "creators": [{"creatorType": "author", "lastName": "Smith", "firstName": "Ada"}],
+            "creators": [
+                {"creatorType": "author", "lastName": "Smith", "firstName": "Ada"}
+            ],
             "date": "2018",
             "publication_title": "Disk Journal",
             **extra,
@@ -130,7 +134,9 @@ def test_notes_are_optional_and_a_children_failure_is_empty(cfg):
     assert records[0]["notes"] == [
         {"file": "NOTE1.html", "html": "<p>hello</p>", "tag": "paperful-summary"}
     ]
-    bare, _ = build_scope_records(cfg, _Backend(children=kids), [item], include_notes=False)
+    bare, _ = build_scope_records(
+        cfg, _Backend(children=kids), [item], include_notes=False
+    )
     assert bare[0]["notes"] == []
     failed, _ = build_scope_records(cfg, _Backend(boom_children=True), [item])
     assert failed[0]["notes"] == []

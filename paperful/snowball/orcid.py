@@ -101,7 +101,11 @@ def _dois_from_payload(payload: dict[str, Any] | list[Any]) -> list[str]:
                     continue
                 if str(ext.get("external-id-type") or "").lower() != "doi":
                     continue
-                value = ext.get("external-id-normalized") or ext.get("external-id-value") or ""
+                value = (
+                    ext.get("external-id-normalized")
+                    or ext.get("external-id-value")
+                    or ""
+                )
                 if isinstance(value, dict):
                     value = value.get("value") or ""
                 doi = normalize_doi(str(value))

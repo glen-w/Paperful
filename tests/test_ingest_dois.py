@@ -13,7 +13,9 @@ from tests.conftest import make_item
 
 
 def _work(doi: str, title: str, year: int = 2020) -> WorkMeta:
-    return WorkMeta(doi=doi, title=title, year=year, source="crossref", work_type="journal-article")
+    return WorkMeta(
+        doi=doi, title=title, year=year, source="crossref", work_type="journal-article"
+    )
 
 
 def test_parse_doi_lines_comments_and_urls():
@@ -42,8 +44,18 @@ def test_classify_title_case_keeps_allowlist_acronyms():
 def test_classify_exists_unresolved_held_create():
     fp = LibraryFingerprint.from_items(
         [
-            make_item(key="E", doi="10.1000/exists", title="Existing work title here", year=2019),
-            make_item(key="T", doi="10.1000/other", title="Shared title about oceans", year=2020),
+            make_item(
+                key="E",
+                doi="10.1000/exists",
+                title="Existing work title here",
+                year=2019,
+            ),
+            make_item(
+                key="T",
+                doi="10.1000/other",
+                title="Shared title about oceans",
+                year=2020,
+            ),
         ]
     )
     works = {
@@ -98,7 +110,11 @@ def test_dois_from_refs_pack(tmp_path):
     pack = {
         "schema": "paperful.refs_gap.pack.v1",
         "rows": [
-            {"doi": "10.1000/a", "suggested_action": "ingest-dois", "already_exists": False},
+            {
+                "doi": "10.1000/a",
+                "suggested_action": "ingest-dois",
+                "already_exists": False,
+            },
             {"doi": "10.1000/b", "suggested_action": "skip", "already_exists": True},
         ],
     }

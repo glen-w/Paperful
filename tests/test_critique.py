@@ -327,9 +327,9 @@ def test_render_markdown_critical_path_hygiene_and_incomplete_lanes():
 def test_incomplete_lane_rows_top_level_when_no_reviewer_skips():
     assert _incomplete_lane_rows({}) == []
     assert _incomplete_lane_rows(None) == []
-    assert _incomplete_lane_rows({"skipped": "llm_disabled", "lanes": ["adversary"]}) == [
-        ("llm", "llm_disabled")
-    ]
+    assert _incomplete_lane_rows(
+        {"skipped": "llm_disabled", "lanes": ["adversary"]}
+    ) == [("llm", "llm_disabled")]
     assert _incomplete_lane_rows(
         {
             "reviewers": [{"id": "marg-clarity", "skipped": "timeout"}],
@@ -2315,7 +2315,14 @@ def test_context_lane_writes_suggested_comments(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr(
         "paperful.critique_context.library_passages",
         lambda *_a, **_k: (
-            [{"item_key": "X", "title": "Prior ABC", "year": 2020, "text": "ABC protocol"}],
+            [
+                {
+                    "item_key": "X",
+                    "title": "Prior ABC",
+                    "year": 2020,
+                    "text": "ABC protocol",
+                }
+            ],
             "",
         ),
     )
@@ -2502,7 +2509,11 @@ def test_outline_merges_duplicate_headings_from_toc():
     slices = [
         ("1. Introduction", "The compliance problem. Suggested length 800."),
         ("2. Methodology", "What an SoK is."),
-        ("1. Introduction", "The cost of the silo and why banks share suspicion, not customer data. " * 8),
+        (
+            "1. Introduction",
+            "The cost of the silo and why banks share suspicion, not customer data. "
+            * 8,
+        ),
         ("2. Methodology", "Sources, selection, and coding. " * 6),
     ]
     merged = merge_duplicate_headings(slices)
@@ -2521,7 +2532,9 @@ def test_pack_outline_excerpt_keeps_middle_section():
     for i, token in enumerate(
         ("ALPHAHEAD", "BRAVOHEAD", "CHARLIEHEAD", "DELTAHEAD", "ECHOHEAD"), start=1
     ):
-        chunks.append(f"\n{i}. Section Title\n\nUnique body token {token} " + ("word " * 80))
+        chunks.append(
+            f"\n{i}. Section Title\n\nUnique body token {token} " + ("word " * 80)
+        )
     text = "".join(chunks)
     slices = outline_slices(text)
     packed = pack_outline_excerpt(text, slices, 1200)

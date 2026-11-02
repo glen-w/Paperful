@@ -60,9 +60,7 @@ _OA_NOT_FOUND_HINTS = (
     "oa landing, no pdf",
     "no pdf_url",
 )
-_PAYWALL_REASONS = frozenset(
-    {"paywall", "login", "blocked", "cloudflare", "captcha"}
-)
+_PAYWALL_REASONS = frozenset({"paywall", "login", "blocked", "cloudflare", "captcha"})
 _ATTEMPT_OA_SOURCE = re.compile(
     r"^(unpaywall|openalex|semanticscholar|core|openaire|europepmc):"
 )
@@ -166,9 +164,10 @@ def import_ok_honest(
     if not any(str(supplied.get(field) or "").strip() for field in stamp_fields):
         return True
     for field in stamp_fields:
-        if str(supplied.get(field) or "").strip() and not str(
-            (oa_stamp or {}).get(field) or ""
-        ).strip():
+        if (
+            str(supplied.get(field) or "").strip()
+            and not str((oa_stamp or {}).get(field) or "").strip()
+        ):
             return False
     return True
 
@@ -299,7 +298,8 @@ def honesty_row_for_item(
     return row_from_item(
         doi=getattr(item, "doi", None),
         arxiv_id=getattr(item, "arxiv_id", None),
-        url=(getattr(item, "url", None) or "") or (getattr(rec, "url", None) if rec else None),
+        url=(getattr(item, "url", None) or "")
+        or (getattr(rec, "url", None) if rec else None),
         has_pdf=bool(getattr(item, "has_pdf", False)),
         status=str(getattr(rec, "status", "") or "") if rec else "",
         reason=str(getattr(rec, "reason", "") or "") if rec else "",

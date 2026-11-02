@@ -106,7 +106,9 @@ def scope_for_fetch(
         items = [
             it
             for it in items
-            if _item_in_filters(it, year_from=year_from, year_to=year_to, item_type=item_type)
+            if _item_in_filters(
+                it, year_from=year_from, year_to=year_to, item_type=item_type
+            )
         ]
     return items, manifest
 
@@ -466,7 +468,9 @@ def snowball_run(
         elif kind == "collection":
             seed = collection.strip() or (payload.seeds[0] if payload.seeds else "")
             if not seed:
-                raise SnowballError("Set the collection chip or a seed collection path.")
+                raise SnowballError(
+                    "Set the collection chip or a seed collection path."
+                )
             run_collection(cfg, seed, req, console=console)
         else:
             query = compose_query(payload) or payload.query
@@ -636,7 +640,12 @@ def critique(
         if http is not None:
             http.close()
     applied = 0
-    if apply and target is not None and backend is not None and backend.supports_write():
+    if (
+        apply
+        and target is not None
+        and backend is not None
+        and backend.supports_write()
+    ):
         html = note_html(pack)
         tag = (cfg.critique_tag or "paperful-critique").strip()
         backend.create_or_update_note(target.key, html, tag)
@@ -1027,7 +1036,9 @@ def follow_person(
     backfill_from: str | None,
 ) -> None:
     if authorwatch_run_fn is not None:
-        authorwatch_run_fn(cfg, orcid=orcid, list_name=list_name, backfill_from=backfill_from)
+        authorwatch_run_fn(
+            cfg, orcid=orcid, list_name=list_name, backfill_from=backfill_from
+        )
         return
     from ..authorwatch import add_person, run_list
 
@@ -1085,9 +1096,7 @@ def _watch_apply_fingerprint(cfg: Config, watch_name: str, collection: str) -> s
     from ..snowball.watch import inbox_count
 
     n = inbox_count(cfg, watch_name)
-    return hashlib.sha256(
-        f"watch|{watch_name}|{collection}|{n}".encode()
-    ).hexdigest()
+    return hashlib.sha256(f"watch|{watch_name}|{collection}|{n}".encode()).hexdigest()
 
 
 def discover_apply_preview(

@@ -148,7 +148,9 @@ def run_all(
                     )
                     raise typer.Exit(1)
                 if not json_out:
-                    console.print("[yellow]Skipping summarize — llm.enabled is false.[/]")
+                    console.print(
+                        "[yellow]Skipping summarize — llm.enabled is false.[/]"
+                    )
                 steps_done.append({"step": step, "status": "skipped"})
                 continue
             if not json_out:
@@ -178,7 +180,9 @@ def run_all(
                         dry_run=dry_run,
                         browser_agent=browser_agent,
                         camofox=camofox,
-                        serpapi_max=serpapi_max if isinstance(serpapi_max, int) else None,
+                        serpapi_max=serpapi_max
+                        if isinstance(serpapi_max, int)
+                        else None,
                     )
                 steps_done.append({"step": step, "status": "ok"})
             except typer.Exit as exc:
@@ -210,6 +214,7 @@ def run_all(
     )
     cli_mod._emit_agent(payload, json_out=json_out, human=lambda: None)
 
+
 def _call_step(fn, /, **kwargs: Any) -> None:
     """Run one verb. ``typer.Exit(0)`` (dry-run tables) does not stop the chain."""
     try:
@@ -217,6 +222,7 @@ def _call_step(fn, /, **kwargs: Any) -> None:
     except typer.Exit as exc:
         if exc.exit_code not in (0, None):
             raise
+
 
 def _all_scope(bound: ResolvedRunConfig, config: Path | None) -> dict[str, Any]:
     return {
@@ -229,6 +235,7 @@ def _all_scope(bound: ResolvedRunConfig, config: Path | None) -> dict[str, Any]:
         "run_config": None,
         "config": config,
     }
+
 
 def _run_downloads_dir(bound: ResolvedRunConfig) -> Path | None:
     if not bound.downloads_dir:
@@ -430,5 +437,3 @@ def _dispatch_all_step(
         return
     console.print(f"[red]Unknown step {step!r}.[/]")
     raise typer.Exit(1)
-
-

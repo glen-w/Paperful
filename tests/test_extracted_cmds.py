@@ -80,9 +80,7 @@ def test_run_screen_strict_raises_exit(cfg_file, stub_zotero, monkeypatch):
 
     monkeypatch.setattr(
         "paperful.screen.screen_items",
-        lambda *a, **k: [
-            ScreenFinding("I1", "retracted", "Title", "detail")
-        ],
+        lambda *a, **k: [ScreenFinding("I1", "retracted", "Title", "detail")],
     )
     monkeypatch.setattr(
         "paperful.pipeline.make_client",
@@ -145,9 +143,7 @@ def test_run_screen_apply_calls_apply_screen(cfg_file, stub_zotero, monkeypatch)
     from paperful.screen import ScreenFinding
 
     finding = ScreenFinding("I1", "retracted", "T", "d")
-    monkeypatch.setattr(
-        "paperful.screen.screen_items", lambda *a, **k: [finding]
-    )
+    monkeypatch.setattr("paperful.screen.screen_items", lambda *a, **k: [finding])
     applied: list[int] = []
 
     def fake_apply(backend, cfg, items, findings):
@@ -229,7 +225,9 @@ def test_run_ocr_ignore_add_and_remove(cfg_file, tmp_path):
 
 def test_run_ocr_ignore_add_requires_item(cfg_file):
     with pytest.raises(typer.Exit) as exc:
-        ocr_ignore_cmd.run_ocr_ignore_add(_console(), item=[], reason="", config=cfg_file)
+        ocr_ignore_cmd.run_ocr_ignore_add(
+            _console(), item=[], reason="", config=cfg_file
+        )
     assert exc.value.exit_code == 1
 
 

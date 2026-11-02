@@ -18,6 +18,7 @@ from .library import LibraryError
 from .runreport import write_command_report, write_run_report
 from .store import Manifest
 
+
 def run_rag_ingest(
     console: Console,
     item: Any,
@@ -151,6 +152,7 @@ def run_rag_ingest(
     if dry_run:
         console.print("Run without --dry-run to build the index.")
 
+
 def run_rag_status(
     console: Console,
     json_out: Any,
@@ -206,6 +208,7 @@ def run_rag_status(
             "[dim]`paperful rag ingest --library` brings the index up to date.[/]"
         )
 
+
 def run_rag_search(
     console: Console,
     query: Any,
@@ -241,7 +244,13 @@ def run_rag_search(
     )
     try:
         hits = search(
-            cfg, query, k=top_k, keys=keys, embedder=embedder, index=index, ledger=ledger
+            cfg,
+            query,
+            k=top_k,
+            keys=keys,
+            embedder=embedder,
+            index=index,
+            ledger=ledger,
         )
     except LLMClientError as exc:
         console.print(str(exc), markup=False, style="red")
@@ -258,6 +267,7 @@ def run_rag_search(
         console.print("[yellow]No passages match.[/]")
         return
     cli_mod._print_hits(hits)
+
 
 def run_rag_questions(
     console: Console,
@@ -357,6 +367,7 @@ def run_rag_questions(
             exit_code=code,
         )
         cli_mod._emit_agent(payload, json_out=True, human=lambda: None)
+
 
 def run_rag_answered(
     console: Console,
@@ -515,4 +526,3 @@ def run_rag_answered(
         return
     if pack.failed:
         raise typer.Exit(1)
-

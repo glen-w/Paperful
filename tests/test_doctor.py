@@ -191,12 +191,24 @@ def test_osf_signal_counts_recent_misses_only(tmp_path):
     manifest = Manifest(tmp_path / "manifest.jsonl")
     for i in range(MIN_OSF_MISSES):
         manifest.write(
-            Record(itemKey=f"O{i}", status=STATUS_NOT_FOUND, url=f"https://osf.io/preprints/x{i}")
+            Record(
+                itemKey=f"O{i}",
+                status=STATUS_NOT_FOUND,
+                url=f"https://osf.io/preprints/x{i}",
+            )
         )
-    manifest.write(Record(itemKey="OLD", status=STATUS_NOT_FOUND, url="https://osf.io/old"))
-    manifest.records["OLD"].ts = time.time() - 200 * 86400  # write() stamps now; age it after
+    manifest.write(
+        Record(itemKey="OLD", status=STATUS_NOT_FOUND, url="https://osf.io/old")
+    )
+    manifest.records["OLD"].ts = (
+        time.time() - 200 * 86400
+    )  # write() stamps now; age it after
     manifest.write(Record(itemKey="HAVE", status=STATUS_OK, url="https://osf.io/have"))
-    manifest.write(Record(itemKey="ELSE", status=STATUS_NOT_FOUND, attempts=["unpaywall:not_found"]))
+    manifest.write(
+        Record(
+            itemKey="ELSE", status=STATUS_NOT_FOUND, attempts=["unpaywall:not_found"]
+        )
+    )
     sig = osf_signal(manifest)
     assert (sig.misses, sig.osf) == (MIN_OSF_MISSES + 1, MIN_OSF_MISSES)
     assert sig.meaningful
@@ -253,7 +265,11 @@ def test_osf_check_amber_when_the_demand_bar_is_met(tmp_path):
     manifest = Manifest(cfg.manifest_path)
     for i in range(MIN_OSF_MISSES):
         manifest.write(
-            Record(itemKey=f"O{i}", status=STATUS_NOT_FOUND, url=f"https://psyarxiv.com/x{i}")
+            Record(
+                itemKey=f"O{i}",
+                status=STATUS_NOT_FOUND,
+                url=f"https://psyarxiv.com/x{i}",
+            )
         )
     check = _osf_check(cfg)
     assert check is not None

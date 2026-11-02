@@ -39,7 +39,9 @@ def handle_discover_search(ui: UiContext, run_id: str = "") -> JSONResponse:
     from ..search.store import SearchError, load_run
 
     if ui.cfg.ui_web_search == "off":
-        return JSONResponse({"ok": False, "error": "Web search is off."}, status_code=404)
+        return JSONResponse(
+            {"ok": False, "error": "Web search is off."}, status_code=404
+        )
     cleaned = (run_id or "").strip()
     if not cleaned:
         return JSONResponse({"ok": False, "error": "run_id required"}, status_code=400)
@@ -84,7 +86,9 @@ async def handle_discover_search_run(
         max_hits = int(str(form.get("max") or ui.cfg.search_max or 20).strip() or "20")
     except ValueError:
         return RedirectResponse(
-            url=ui.page_url("/discover", tab="web", error="Max hits must be a whole number."),
+            url=ui.page_url(
+                "/discover", tab="web", error="Max hits must be a whole number."
+            ),
             status_code=303,
         )
     if not query:
@@ -141,7 +145,9 @@ async def handle_discover_search_apply(
         if not collection:
             return RedirectResponse(
                 url=ui.page_url(
-                    "/discover", tab="web", error="Set the collection chip before adding hits."
+                    "/discover",
+                    tab="web",
+                    error="Set the collection chip before adding hits.",
                 ),
                 status_code=303,
             )
@@ -181,7 +187,9 @@ async def handle_discover_search_watch_save(
         interval = int(str(form.get("interval_days") or "7").strip() or "7")
     except ValueError:
         return RedirectResponse(
-            url=ui.page_url("/discover", tab="web", error="Interval must be a whole number of days."),
+            url=ui.page_url(
+                "/discover", tab="web", error="Interval must be a whole number of days."
+            ),
             status_code=303,
         )
     from ..search.store import SearchError
@@ -227,7 +235,9 @@ async def handle_discover_search_watch_run(
     force = str(form.get("force") or "").strip() in {"1", "true", "on"}
     if not name:
         return RedirectResponse(
-            url=ui.page_url("/discover", tab="web", error="Pick a search watch to run."),
+            url=ui.page_url(
+                "/discover", tab="web", error="Pick a search watch to run."
+            ),
             status_code=303,
         )
 
@@ -259,5 +269,3 @@ async def handle_discover_search_watch_run(
 
     cmd_id = commands.enqueue(ui.cfg, "search_watch", work)
     return ui.after_job("/discover", cmd_id, tab="web")
-
-

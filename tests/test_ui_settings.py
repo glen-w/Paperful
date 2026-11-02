@@ -20,7 +20,9 @@ def test_advanced_cookie_reveals_nav_without_llm(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ops,
         "doctor_payload",
-        lambda _cfg, probe=False: [{"name": "x", "status": "green", "code": "", "detail": ""}],
+        lambda _cfg, probe=False: [
+            {"name": "x", "status": "green", "code": "", "detail": ""}
+        ],
     )
     monkeypatch.setattr(
         ops,
@@ -49,7 +51,9 @@ def test_settings_saves_preset_cookie(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ops,
         "doctor_payload",
-        lambda _cfg, probe=False: [{"name": "x", "status": "green", "code": "", "detail": ""}],
+        lambda _cfg, probe=False: [
+            {"name": "x", "status": "green", "code": "", "detail": ""}
+        ],
     )
     client = TestClient(create_app(cfg))
     res = client.post(
@@ -86,7 +90,9 @@ def test_settings_saves_attach_mode(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ops,
         "doctor_payload",
-        lambda _cfg, probe=False: [{"name": "x", "status": "green", "code": "", "detail": ""}],
+        lambda _cfg, probe=False: [
+            {"name": "x", "status": "green", "code": "", "detail": ""}
+        ],
     )
     client = TestClient(create_app(cfg))
     page = client.get("/settings")
@@ -100,7 +106,7 @@ def test_settings_saves_attach_mode(tmp_path, monkeypatch):
     assert res.status_code == 303
     assert cfg.ui_attach_mode == "auto"
     text = cfg.config_path.read_text(encoding="utf-8")
-    assert '[ui]' in text
+    assert "[ui]" in text
     assert 'attach_mode = "auto"' in text
     assert text.index("[ui]") < text.index('attach_mode = "auto"')
     again = client.post(

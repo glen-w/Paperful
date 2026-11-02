@@ -82,7 +82,9 @@ class Client:
         ]
 
     def works_citing(self, oa_id, *, limit, from_created_date=None, sort=None):
-        self.cite_calls.append({"id": oa_id, "limit": limit, "since": from_created_date})
+        self.cite_calls.append(
+            {"id": oa_id, "limit": limit, "since": from_created_date}
+        )
         return list(self.citers.get(oa_id, []))
 
 
@@ -135,8 +137,12 @@ def test_probe_needs_dois_and_resolved_seeds(tmp_path):
 
 def test_probe_filters_muted_and_seen_and_passes_since(tmp_path):
     client = Client(citers={"S0": [_work(1), _work(2), _work(3)], "S1": []})
-    muted_ident = _probe(_cfg(tmp_path), Client(citers={"S0": [_work(1)]}))[0][0].identity
-    seen_ident = _probe(_cfg(tmp_path), Client(citers={"S0": [_work(2)]}))[0][0].identity
+    muted_ident = _probe(_cfg(tmp_path), Client(citers={"S0": [_work(1)]}))[0][
+        0
+    ].identity
+    seen_ident = _probe(_cfg(tmp_path), Client(citers={"S0": [_work(2)]}))[0][
+        0
+    ].identity
     rows, polled, _out = _probe(
         _cfg(tmp_path),
         client,
@@ -173,7 +179,11 @@ def test_probe_marks_items_already_in_library(tmp_path):
     client = Client(citers={"S0": [_work(1), _work(2)]})
 
     def lookup(doi, title, year, **_kw):
-        return SimpleNamespace(key="LIB1", title="in library") if doi == "10.5555/c1" else None
+        return (
+            SimpleNamespace(key="LIB1", title="in library")
+            if doi == "10.5555/c1"
+            else None
+        )
 
     rows, _p, _o = _probe(_cfg(tmp_path), client, lookup=lookup)
     assert [r.ids["doi"] for r in rows] == ["10.5555/c2"]

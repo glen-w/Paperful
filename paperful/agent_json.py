@@ -70,7 +70,9 @@ def dumps(payload: dict[str, Any]) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False, default=str)
 
 
-_suppress_stdout: ContextVar[bool] = ContextVar("agent_json_suppress_stdout", default=False)
+_suppress_stdout: ContextVar[bool] = ContextVar(
+    "agent_json_suppress_stdout", default=False
+)
 
 
 def stdout_suppressed() -> bool:

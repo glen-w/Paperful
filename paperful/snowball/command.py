@@ -552,11 +552,7 @@ def _open_stop(
         if request.study_designs is None
         else request.study_designs
     )
-    lists = (
-        cfg.snowball_listed_in
-        if request.listed_in is None
-        else request.listed_in
-    )
+    lists = cfg.snowball_listed_in if request.listed_in is None else request.listed_in
     state = {
         "schema": SCHEMA,
         "rule": params.rule,
@@ -823,18 +819,6 @@ def _live_tally(console: Console) -> Tally:
         bar.start()
         tally.bind_bar(bar, bar.add_task("snowball", total=None))
     return tally
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def _library_lookup(backend: Any, *, scope: str, collection: str) -> Lookup:
@@ -1269,9 +1253,7 @@ def _summary_meta(
     )
     if designs:
         meta["study_designs"] = list(designs)
-    lists = (
-        cfg.snowball_listed_in if request.listed_in is None else request.listed_in
-    )
+    lists = cfg.snowball_listed_in if request.listed_in is None else request.listed_in
     if lists:
         meta["listed_in"] = list(lists)
     map_cats = (
@@ -1308,6 +1290,7 @@ def _summary_meta(
         if found:
             console.print("suggestions: " + "; ".join(found))
     return meta
+
 
 from .apply import _resume_saved_queue, run_apply, run_continue, run_resume  # noqa: E402
 from .execute import (  # noqa: E402

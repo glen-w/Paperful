@@ -92,9 +92,7 @@ def _render(
     lines = [f"# {title}", ""]
     lines.extend(intro)
     lines.append("")
-    lines.append(
-        " · ".join(f"{key} {counts[key]}" for key in (*_SECTIONS, "other"))
-    )
+    lines.append(" · ".join(f"{key} {counts[key]}" for key in (*_SECTIONS, "other")))
     lines.append("")
     for key in _SECTIONS:
         chunk = grouped.get(key) or []

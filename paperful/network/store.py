@@ -50,7 +50,9 @@ def network_root(cfg: Config) -> Path:
 def run_dir(cfg: Config, run_id: str) -> Path:
     cleaned = (run_id or "").strip()
     if not _SAFE_RUN.match(cleaned):
-        raise NetworkError("Run id must be 4–80 letters, digits, dots, underscores, or hyphens.")
+        raise NetworkError(
+            "Run id must be 4–80 letters, digits, dots, underscores, or hyphens."
+        )
     return network_root(cfg) / cleaned
 
 
@@ -90,7 +92,9 @@ def load_run(cfg: Config, run_id: str) -> dict[str, Any]:
         raise NetworkError(f"No network run at {dest}.", code=1)
     meta = _read_json(meta_path)
     graph = _read_json(dest / "graph.json") if (dest / "graph.json").is_file() else {}
-    metrics = _read_json(dest / "metrics.json") if (dest / "metrics.json").is_file() else {}
+    metrics = (
+        _read_json(dest / "metrics.json") if (dest / "metrics.json").is_file() else {}
+    )
     phases: dict[str, Any] = {}
     phase_dir = dest / "phases"
     if phase_dir.is_dir():

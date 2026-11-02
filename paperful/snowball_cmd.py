@@ -19,6 +19,7 @@ from .runreport import write_command_report, write_run_report
 from .store import Manifest
 from . import cli_runtime as cli_mod
 
+
 def _snowball_request(
     cfg: Config,
     *,
@@ -109,20 +110,30 @@ def _snowball_request(
         stop_max_screened=stop_max_screened,
     )
 
+
 def _csv(raw: str | None) -> tuple[str, ...]:
     return tuple(part.strip() for part in (raw or "").split(",") if part.strip())
+
 
 def _compose_keywords(queries: list[str], *, or_mode: bool) -> str:
     from .snowball.expand import compose_keyword_query
 
     notices: list[str] = []
-    query = compose_keyword_query(queries, op="or" if or_mode else "and", notices=notices)
+    query = compose_keyword_query(
+        queries, op="or" if or_mode else "and", notices=notices
+    )
     for note in notices:
         cli_mod.console.print(f"[yellow]{note}[/]")
     return query
 
+
 def _doi_seeds(dois: list[str] | None, seeds_file: str | Path | None) -> list[str]:
-    from .snowball.seeds import dois_from_seeds, merge_tokens, parse_seed_lines, read_seeds_text
+    from .snowball.seeds import (
+        dois_from_seeds,
+        merge_tokens,
+        parse_seed_lines,
+        read_seeds_text,
+    )
 
     extra: list[str] = []
     if seeds_file is not None:
@@ -134,8 +145,14 @@ def _doi_seeds(dois: list[str] | None, seeds_file: str | Path | None) -> list[st
         raise SnowballError("Pass one or more DOIs or --seeds-file.")
     return dois_from_seeds(merged)
 
+
 def _orcid_seeds(orcids: list[str] | None, seeds_file: str | Path | None) -> list[str]:
-    from .snowball.seeds import merge_tokens, orcids_from_seeds, parse_seed_lines, read_seeds_text
+    from .snowball.seeds import (
+        merge_tokens,
+        orcids_from_seeds,
+        parse_seed_lines,
+        read_seeds_text,
+    )
 
     extra: list[str] = []
     if seeds_file is not None:
@@ -147,7 +164,10 @@ def _orcid_seeds(orcids: list[str] | None, seeds_file: str | Path | None) -> lis
         raise SnowballError("Pass one or more ORCID iDs or --seeds-file.")
     return orcids_from_seeds(merged)
 
-def _profile_queries(body: dict[str, Any], queries: list[str], *, or_mode: bool) -> None:
+
+def _profile_queries(
+    body: dict[str, Any], queries: list[str], *, or_mode: bool
+) -> None:
     """Persist one ``query`` or a ``queries`` array (+ optional ``query_op``)."""
     if len(queries) == 1:
         body["query"] = queries[0]
@@ -156,12 +176,14 @@ def _profile_queries(body: dict[str, Any], queries: list[str], *, or_mode: bool)
     if or_mode:
         body["query_op"] = "or"
 
+
 def _snowball_console(*, json_out: bool) -> Console:
     if json_out:
         # Live E2E babysits long snowball phases; keep progress on stderr.
         quiet = os.environ.get("PAPERFUL_E2E") != "1"
         return Console(file=sys.stderr, highlight=False, quiet=quiet)
     return cli_mod.console
+
 
 def _run_snowball(
     cfg: Config,
@@ -206,7 +228,9 @@ def _run_snowball(
         raise typer.Exit(result.exit_code)
 
 
-def _print_briefing(briefing: Any, *, apply: bool, collection: str, cfg: Config) -> None:
+def _print_briefing(
+    briefing: Any, *, apply: bool, collection: str, cfg: Config
+) -> None:
     counts = briefing.counts
     order = ("new", "exists", "deferred", "inbox")
     summary = " · ".join(f"{key} {counts[key]}" for key in order if key in counts)
@@ -324,6 +348,7 @@ def run_snowball_search(
         command="snowball search",
     )
 
+
 def run_snowball_hybrid(
     console: Console,
     queries: Any,
@@ -413,6 +438,7 @@ def run_snowball_hybrid(
         command="snowball hybrid",
     )
 
+
 def run_snowball_doi(
     console: Console,
     dois: Any,
@@ -493,6 +519,7 @@ def run_snowball_doi(
         command="snowball doi",
     )
 
+
 def run_snowball_orcid(
     console: Console,
     orcids: Any,
@@ -567,8 +594,12 @@ def run_snowball_orcid(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     _run_snowball(
-        cfg, lambda c: run_orcid(c, seeds, request, console=out), json_out=json_out, command="snowball orcid"
+        cfg,
+        lambda c: run_orcid(c, seeds, request, console=out),
+        json_out=json_out,
+        command="snowball orcid",
     )
+
 
 def run_snowball_collection(
     console: Console,
@@ -645,6 +676,7 @@ def run_snowball_collection(
         command="snowball collection",
     )
 
+
 def run_snowball_trends(
     console: Console,
     query: Any,
@@ -669,6 +701,7 @@ def run_snowball_trends(
         fmt=fmt,
     )
 
+
 def run_snowball_briefing(
     console: Console,
     run_id: Any,
@@ -690,6 +723,7 @@ def run_snowball_briefing(
         raise typer.Exit(exc.code) from exc
     _print_briefing(briefing, apply=apply, collection=collection, cfg=cfg)
 
+
 def run_snowball_digest(
     console: Console,
     run_id: Any,
@@ -710,6 +744,7 @@ def run_snowball_digest(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     _print_briefing(digest, apply=apply, collection=collection, cfg=cfg)
+
 
 def run_snowball_resume(
     console: Console,
@@ -750,6 +785,7 @@ def run_snowball_resume(
         command="snowball resume",
     )
 
+
 def run_snowball_continue(
     console: Console,
     run_id: Any,
@@ -771,6 +807,7 @@ def run_snowball_continue(
         json_out=json_out,
         command="snowball continue",
     )
+
 
 def run_snowball_apply(
     console: Console,
@@ -811,6 +848,7 @@ def run_snowball_apply(
         command="snowball apply",
     )
 
+
 def run_snowball_run(
     console: Console,
     profile: Any,
@@ -847,7 +885,11 @@ def run_snowball_run(
         run_orcid,
         run_search,
     )
-    from .snowball.profile import composed_query_from_profile, load_profile, request_from_profile
+    from .snowball.profile import (
+        composed_query_from_profile,
+        load_profile,
+        request_from_profile,
+    )
 
     try:
         raw = load_profile(cfg, profile)
@@ -927,6 +969,7 @@ def run_snowball_run(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     _run_snowball(cfg, action, json_out=json_out, command="snowball run")
+
 
 def run_snowball_profile_save(
     console: Console,
@@ -1130,6 +1173,7 @@ def run_snowball_profile_save(
         raise typer.Exit(exc.code) from exc
     console.print(f"Wrote [bold]{path}[/]")
 
+
 def run_snowball_packs_promote(
     console: Console,
     slug: Any,
@@ -1148,6 +1192,7 @@ def run_snowball_packs_promote(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     console.print(f"Promoted [bold]{path}[/]")
+
 
 def run_snowball_watch_save(
     console: Console,
@@ -1168,6 +1213,7 @@ def run_snowball_watch_save(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     console.print(f"Wrote [bold]{path}[/] · profile {profile}")
+
 
 def run_snowball_watch_run(
     console: Console,
@@ -1199,6 +1245,7 @@ def run_snowball_watch_run(
 
     _run_snowball(cfg, _run, command="snowball watch run")
 
+
 def run_snowball_watch_rebaseline(
     console: Console,
     name: Any,
@@ -1225,13 +1272,18 @@ def run_snowball_watch_rebaseline(
     try:
         for n in names:
             res = rebaseline_watch(cfg, n, apply=apply, force=force)
-            verb = "reset" if res["applied"] else ("would reset" if res["action"] == "rebaseline" else "skip")
+            verb = (
+                "reset"
+                if res["applied"]
+                else ("would reset" if res["action"] == "rebaseline" else "skip")
+            )
             console.print(f"{n}: {verb} · {res['reason']}")
     except SnowballError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     if not apply and any(True for _ in names):
         console.print("[dim]Dry run. Pass --apply to write.[/]")
+
 
 def run_snowball_watch_show(
     console: Console,
@@ -1250,6 +1302,7 @@ def run_snowball_watch_show(
     except SnowballError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
+
 
 def run_snowball_watch_briefing(
     console: Console,
@@ -1272,6 +1325,7 @@ def run_snowball_watch_briefing(
         raise typer.Exit(exc.code) from exc
     _print_briefing(briefing, apply=apply, collection=collection, cfg=cfg)
 
+
 def run_snowball_watch_digest(
     console: Console,
     name: Any,
@@ -1292,6 +1346,7 @@ def run_snowball_watch_digest(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     _print_briefing(digest, apply=apply, collection=collection, cfg=cfg)
+
 
 def run_snowball_watch_apply(
     console: Console,
@@ -1331,4 +1386,3 @@ def run_snowball_watch_apply(
         raise typer.Exit(exc.code) from exc
     if result.failed and result.created:
         raise typer.Exit(3)
-

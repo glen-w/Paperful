@@ -21,7 +21,12 @@ from paperful.grobid_client import (
     validate_grobid_url,
 )
 from paperful.rag.chunk import chunk_pages
-from paperful.rag.extract import GrobidParser, ParserUnavailable, file_sha256, get_parser
+from paperful.rag.extract import (
+    GrobidParser,
+    ParserUnavailable,
+    file_sha256,
+    get_parser,
+)
 from paperful.sections.command import SCHEMA, SECTION_KEYS, extract_item, write_item
 from paperful.sections.grobid import (
     TEI_SCHEMA,
@@ -297,7 +302,9 @@ def test_warm_cache_without_server(cfg: Config, tmp_path):
 
 
 def test_extract_item_grobid_engine(cfg: Config, tmp_path, monkeypatch):
-    pdf = _pdf(cfg.out_dir / "coll" / "item -- KEY1" / "paper.pdf", b"%PDF-1.4\n" + b"x" * 200)
+    pdf = _pdf(
+        cfg.out_dir / "coll" / "item -- KEY1" / "paper.pdf", b"%PDF-1.4\n" + b"x" * 200
+    )
     entry = MirrorEntry(
         key="KEY1",
         dirs=["coll/item -- KEY1"],
@@ -556,7 +563,9 @@ def test_grobid_client_from_config_loopback(cfg: Config):
     cfg.grobid_allow_remote = False
     client = grobid_client_from_config(cfg)
     try:
-        assert "127.0.0.1" in client.base_url or "host.docker.internal" in client.base_url
+        assert (
+            "127.0.0.1" in client.base_url or "host.docker.internal" in client.base_url
+        )
     finally:
         client.close()
     cfg.grobid_base_url = "http://grobid.example.com:8070"

@@ -95,7 +95,9 @@ class ProbeRow:
         return row
 
 
-def playbooks_for_probe(cfg_books: list[GreyPlaybook], *, examples: bool) -> list[GreyPlaybook]:
+def playbooks_for_probe(
+    cfg_books: list[GreyPlaybook], *, examples: bool
+) -> list[GreyPlaybook]:
     """Config playbooks, with the shipped energy and intl-org examples underneath."""
     if not examples:
         return list(cfg_books)
@@ -205,9 +207,7 @@ def probe_corpus(
             time.sleep(delay_s)
         rows.append(
             _redact_row(
-                probe_one(
-                    target, playbooks, client, check=check, min_bytes=min_bytes
-                )
+                probe_one(target, playbooks, client, check=check, min_bytes=min_bytes)
             )
         )
     return rows
@@ -244,7 +244,9 @@ def probe_one(
     rewritten = bool(target.url) and resolved != target.url
     synthesized = not target.url and bool(target.extra)
     if rewritten or synthesized or looks_like_pdf_url(resolved):
-        hit = _peek_pdf(client, resolved, referer=target.url or None, min_bytes=min_bytes)
+        hit = _peek_pdf(
+            client, resolved, referer=target.url or None, min_bytes=min_bytes
+        )
         row.checked = [hit]
         row.chosen = resolved
         row.nbytes = int(hit.get("nbytes") or 0)

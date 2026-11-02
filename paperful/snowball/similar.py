@@ -22,7 +22,9 @@ _S2_RECS = "https://api.semanticscholar.org/recommendations/v1/papers"
 Recommend = Callable[[list[str], int], list[dict[str, Any]]]
 
 
-def reference_sample(seeds: list[dict[str, Any]], *, limit: int = REF_SAMPLE) -> list[str]:
+def reference_sample(
+    seeds: list[dict[str, Any]], *, limit: int = REF_SAMPLE
+) -> list[str]:
     """OpenAlex ids the seeds cite, most-shared first."""
     counts: dict[str, int] = {}
     order: list[str] = []
@@ -100,7 +102,9 @@ def recommendation_work(paper: dict[str, Any]) -> dict[str, Any] | None:
         return None
     return {
         "id": "",
-        "doi": doi if doi.lower().startswith("https://doi.org/") else f"https://doi.org/{doi}",
+        "doi": doi
+        if doi.lower().startswith("https://doi.org/")
+        else f"https://doi.org/{doi}",
         "display_name": paper.get("title") or "",
         "publication_year": paper.get("year"),
         "type": "article",

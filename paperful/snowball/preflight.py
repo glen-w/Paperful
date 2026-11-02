@@ -36,7 +36,9 @@ def run_author_site_preflight(
     max_authors: int | None = None,
     max_queries: int | None = None,
 ) -> Path | None:
-    cap = int(max_authors if max_authors is not None else cfg.snowball_author_site_max_authors)
+    cap = int(
+        max_authors if max_authors is not None else cfg.snowball_author_site_max_authors
+    )
     query_cap = int(
         max_queries if max_queries is not None else cfg.snowball_author_site_max_queries
     )
@@ -78,7 +80,9 @@ def run_author_site_preflight(
             hits = search_author_site(
                 cfg,
                 name=author.name,
-                surname=(author.fingerprint.split("|", 1)[0] if author.fingerprint else ""),
+                surname=(
+                    author.fingerprint.split("|", 1)[0] if author.fingerprint else ""
+                ),
                 getter=searx_getter,
                 cache_dir=cfg.state_dir / "snowball" / "cache" / "searxng",
             )

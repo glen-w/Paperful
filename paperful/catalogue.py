@@ -113,7 +113,9 @@ class MirrorCatalogue:
                 continue
             found.extend(
                 sorted(
-                    d for d in folder.iterdir() if d.is_dir() and is_item_dirname(d.name)
+                    d
+                    for d in folder.iterdir()
+                    if d.is_dir() and is_item_dirname(d.name)
                 )
             )
         return found
@@ -240,9 +242,7 @@ class MirrorCatalogue:
                 return body
         return None
 
-    def _raw_from_standalone(
-        self, key: str, record: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _raw_from_standalone(self, key: str, record: dict[str, Any]) -> dict[str, Any]:
         kind = record.get("item_type") or "note"
         tags = [{"tag": t} for t in (record.get("tags") or []) if t]
         data: dict[str, Any] = {
@@ -254,7 +254,10 @@ class MirrorCatalogue:
         }
         if kind == "note":
             note_path = (
-                self.out_dir / "_notes" / key / str(record.get("note_file") or "note.html")
+                self.out_dir
+                / "_notes"
+                / key
+                / str(record.get("note_file") or "note.html")
             )
             data["note"] = (
                 note_path.read_text(encoding="utf-8") if note_path.is_file() else ""

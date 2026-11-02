@@ -315,7 +315,9 @@ def handle_discover_network(
     from ..network.store import NetworkError, load_run
 
     if ui.cfg.ui_coauthor_network == "off":
-        return JSONResponse({"ok": False, "error": "Co-author network is off."}, status_code=404)
+        return JSONResponse(
+            {"ok": False, "error": "Co-author network is off."}, status_code=404
+        )
     cleaned = (run_id or "").strip()
     if not cleaned:
         return JSONResponse({"ok": False, "error": "run_id required"}, status_code=400)
@@ -397,5 +399,3 @@ async def handle_discover_network_run(
 
     cmd_id = commands.enqueue(ui.cfg, "network_orcid", work)
     return ui.after_job("/discover", cmd_id, tab="people")
-
-

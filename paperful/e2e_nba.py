@@ -162,6 +162,7 @@ def resolve_e2e_state_dir(
             return candidate
     return root / "state" / "e2e" / run_id
 
+
 PHASES = (
     "doctor",
     "snowball_search",
@@ -187,9 +188,7 @@ class PhaseResult:
     summary: dict[str, Any] = field(default_factory=dict)
 
 
-def extract_orcids_from_candidates(
-    path: Path, *, limit: int = MAX_ORCIDS
-) -> list[str]:
+def extract_orcids_from_candidates(path: Path, *, limit: int = MAX_ORCIDS) -> list[str]:
     """Collect unique ORCID iDs from a snowball ``candidates.jsonl`` queue."""
     from .snowball.openalex import normalize_orcid
 
@@ -344,9 +343,7 @@ class E2ERunner:
         out_path.write_text("", encoding="utf-8")
         err_path.write_text("", encoding="utf-8")
 
-        def _pump(
-            stream: Any, chunks: list[str], mirror: Any, log_path: Path
-        ) -> None:
+        def _pump(stream: Any, chunks: list[str], mirror: Any, log_path: Path) -> None:
             if stream is None:
                 return
             with log_path.open("a", encoding="utf-8") as log:
@@ -396,7 +393,10 @@ class E2ERunner:
             json.dumps(asdict(result), indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
-        self._log(f"{result.name}: {result.status}" + (f" — {result.reason}" if result.reason else ""))
+        self._log(
+            f"{result.name}: {result.status}"
+            + (f" — {result.reason}" if result.reason else "")
+        )
         return result
 
     def _parse_agent_json(self, stdout: str) -> dict[str, Any] | None:
@@ -430,8 +430,12 @@ class E2ERunner:
             full.extend(["--format", "json"])
         self._log("$ uv run paperful " + " ".join(full))
         proc = self._paperful(full, phase=phase)
-        (self.dest / f"{phase}.stdout.txt").write_text(proc.stdout or "", encoding="utf-8")
-        (self.dest / f"{phase}.stderr.txt").write_text(proc.stderr or "", encoding="utf-8")
+        (self.dest / f"{phase}.stdout.txt").write_text(
+            proc.stdout or "", encoding="utf-8"
+        )
+        (self.dest / f"{phase}.stderr.txt").write_text(
+            proc.stderr or "", encoding="utf-8"
+        )
         payload = self._parse_agent_json(proc.stdout or "") if want_json else None
         ok = proc.returncode == 0 or (proc.returncode == 3 and not required)
         status = "ok" if proc.returncode in (0, 3) else "fail"
@@ -493,7 +497,9 @@ class E2ERunner:
         return argv
 
     def phase_doctor(self) -> PhaseResult:
-        result, _ = self._run_cmd(["doctor", "--no-guide"], phase="doctor", required=True)
+        result, _ = self._run_cmd(
+            ["doctor", "--no-guide"], phase="doctor", required=True
+        )
         # doctor: 0 ok, 1 warnings, 2 env/manager missing
         if result.exit_code in (0, 1):
             result.status = "ok"
@@ -577,7 +583,11 @@ class E2ERunner:
         root = self.root / "state" / "snowball"
         if not root.is_dir():
             return None
-        dirs = [p for p in root.iterdir() if p.is_dir() and (p / "candidates.jsonl").is_file()]
+        dirs = [
+            p
+            for p in root.iterdir()
+            if p.is_dir() and (p / "candidates.jsonl").is_file()
+        ]
         if not dirs:
             return None
         return max(dirs, key=lambda p: p.stat().st_mtime)
@@ -585,7 +595,13 @@ class E2ERunner:
     def phase_snowball_orcid(self) -> PhaseResult:
         queue: Path | None = None
         if self.snowball_run_id:
-            queue = self.root / "state" / "snowball" / self.snowball_run_id / "candidates.jsonl"
+            queue = (
+                self.root
+                / "state"
+                / "snowball"
+                / self.snowball_run_id
+                / "candidates.jsonl"
+            )
         if queue is None or not queue.is_file():
             newest = self._newest_snowball_run()
             queue = (newest / "candidates.jsonl") if newest else None
@@ -598,9 +614,7 @@ class E2ERunner:
                     reason="no candidates.jsonl to extract ORCIDs from",
                 )
             )
-        orcids = extract_orcids_from_candidates(
-            queue, limit=self.plan.max_orcids
-        )
+        orcids = extract_orcids_from_candidates(queue, limit=self.plan.max_orcids)
         if not orcids:
             return self._record(
                 PhaseResult(
@@ -856,7 +870,9 @@ class E2ERunner:
                 webbrowser.open = real_open  # type: ignore[method-assign]
 
         if not tabs_live:
-            result.reason = result.reason or "PAPERFUL_E2E_TABS unset; used handoff list"
+            result.reason = (
+                result.reason or "PAPERFUL_E2E_TABS unset; used handoff list"
+            )
             result.summary["tabs_live"] = False
         else:
             result.summary["tabs_live"] = True
@@ -868,9 +884,7 @@ class E2ERunner:
         return self._record(result)
 
     def phase_report(self) -> PhaseResult:
-        required_failed = [
-            r for r in self.results if r.required and r.status == "fail"
-        ]
+        required_failed = [r for r in self.results if r.required and r.status == "fail"]
         ok = not required_failed
         result = PhaseResult(
             name="report",
@@ -908,9 +922,7 @@ class E2ERunner:
         ]
         for r in self.results:
             reason = (r.reason or "").replace("|", "\\|")
-            lines.append(
-                f"| `{r.name}` | {r.status} | {r.required} | {reason} |"
-            )
+            lines.append(f"| `{r.name}` | {r.status} | {r.required} | {reason} |")
         lines.append("")
         lines.append(f"Machine witness: `{report_json}`")
         lines.append("")

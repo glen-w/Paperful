@@ -33,7 +33,10 @@ from .download import (
 from .pdfid import doi_from_pdf, probe_pdf_bytes, short_pdf_verdict
 from .mirror import pdf_for_key
 from .pipeline_attach import attach_after_remap
-from .pipeline_browser import release_browser_for_agent, skip_recover_without_lane_failure
+from .pipeline_browser import (
+    release_browser_for_agent,
+    skip_recover_without_lane_failure,
+)
 from .pipeline_save import commit_download, try_download
 from .playbooks import looks_like_pdf_url
 from .resolve import (
@@ -281,7 +284,9 @@ def _is_soft_block_error(exc: DownloadError) -> bool:
     return "too small" in msg or msg.startswith("not a PDF")
 
 
-def _drop_snapshot_attachments(attacher: Any, item_key: str, emit: Callable[[str], None]) -> None:
+def _drop_snapshot_attachments(
+    attacher: Any, item_key: str, emit: Callable[[str], None]
+) -> None:
     """Trash htmlpdf snapshot children after a native PDF attaches."""
     from .greyid import is_snapshot_note
     from .zot import is_pdf_attachment
@@ -534,11 +539,8 @@ class Pipeline:
 
         return phase_oa(self, item, oa_sources)
 
-
     # ---- phase 2: campus EZProxy, serial ------------------------------------
-    def _htmlpdf_deferred(
-        self, item: Item, name: str, htmlpdf_scope: str
-    ) -> bool:
+    def _htmlpdf_deferred(self, item: Item, name: str, htmlpdf_scope: str) -> bool:
         if name != "htmlpdf" or htmlpdf_scope == "all":
             return False
         academic = academic_htmlpdf_item(item, self.cfg)
@@ -552,7 +554,6 @@ class Pipeline:
         from .pipeline_phases import phase_one
 
         return phase_one(self, name, item, attempts)
-
 
     def _phase_serial(
         self,
@@ -568,7 +569,6 @@ class Pipeline:
             self, queue, name, htmlpdf_scope=htmlpdf_scope, scihub_delay=scihub_delay
         )
 
-
     def _phase_interleave(
         self,
         queue: list[tuple[Item, list[str]]],
@@ -578,7 +578,6 @@ class Pipeline:
         from .pipeline_phases import phase_interleave
 
         return phase_interleave(self, queue, first, second)
-
 
     def _mark_scholar_down(self, why: str) -> None:
         if self._scholar_down:
@@ -743,11 +742,7 @@ class Pipeline:
                         self._blocked_hosts.add(key)
             return
         # Path-specific 403 on a grey/org PDF must not silence the whole host.
-        if (
-            exc is not None
-            and "403" in str(exc)
-            and not is_publisher_url(url)
-        ):
+        if exc is not None and "403" in str(exc) and not is_publisher_url(url):
             with self._stats_lock:
                 for key in keys:
                     n = self._transport_fail_hosts.get(key, 0) + 1
@@ -785,7 +780,9 @@ class Pipeline:
             link = version_link(self.client, query, self.cfg.email, self._id_cache)
         except Exception:
             return False
-        published = normalize_doi(getattr(link, "published_doi", None) if link else None)
+        published = normalize_doi(
+            getattr(link, "published_doi", None) if link else None
+        )
         if not published or published == normalize_doi(item.doi):
             return False
         attempts.append(f"version:{published}")
@@ -823,7 +820,6 @@ class Pipeline:
         from .pipeline_phases import phase_scihub
 
         return phase_scihub(self, queue)
-
 
     # ---- helpers ----------------------------------------------------------------
     def _applicable(self, item: Item) -> list[str]:
@@ -919,9 +915,7 @@ class Pipeline:
             # host is not on the publisher allowlist (e.g. AMS downloadpdf).
             # Transport blips do not force a vault retry.
             if soft or (not browser_first and not is_transport_download_error(exc)):
-                return self._browser_pdf(
-                    item, cand, url, attempts, force=soft
-                )
+                return self._browser_pdf(item, cand, url, attempts, force=soft)
             return None
 
     def _browser_first(self, url: str, source: str) -> bool:
@@ -1117,10 +1111,7 @@ class Pipeline:
                     a.startswith("browser_agent:")
                     and not a.startswith("browser_agent:skipped")
                 )
-                or (
-                    a.startswith("camofox:")
-                    and not a.startswith("camofox:skipped")
-                )
+                or (a.startswith("camofox:") and not a.startswith("camofox:skipped"))
                 for a in attempts
             )
             if not recover_done:

@@ -64,7 +64,9 @@ def save_cache(watch_folder: Path, cache: dict[str, Any]) -> Path:
     watch_folder.mkdir(parents=True, exist_ok=True)
     body = {
         "schema": SCHEMA,
-        "entries": cache.get("entries") if isinstance(cache.get("entries"), dict) else {},
+        "entries": cache.get("entries")
+        if isinstance(cache.get("entries"), dict)
+        else {},
     }
     path = cache_path(watch_folder)
     atomic_write_json(path, body)
@@ -109,9 +111,13 @@ def classify_drift(watch_folder: Path, rows: list[Candidate]) -> dict[str, int]:
             continue
         digest = candidate_hash(row)
         previous = entries.get(row.identity) if isinstance(entries, dict) else None
-        drift = classify_row(previous if isinstance(previous, dict) else None, row, digest)
+        drift = classify_row(
+            previous if isinstance(previous, dict) else None, row, digest
+        )
         counts[drift] = counts.get(drift, 0) + 1
         record_row(cache, row, digest, drift)
-        entries = cache.get("entries") if isinstance(cache.get("entries"), dict) else entries
+        entries = (
+            cache.get("entries") if isinstance(cache.get("entries"), dict) else entries
+        )
     save_cache(watch_folder, cache)
     return counts

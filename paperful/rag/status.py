@@ -47,7 +47,9 @@ def _lists_pdf(entry: MirrorEntry) -> bool:
     return False
 
 
-def index_status(cfg: Config, entries: list[MirrorEntry] | None = None) -> dict[str, Any]:
+def index_status(
+    cfg: Config, entries: list[MirrorEntry] | None = None
+) -> dict[str, Any]:
     """Facts for ``rag status`` and ``doctor``. Reads only; never embeds.
 
     With ``entries`` (the mirror in scope) it also reports coverage: how many

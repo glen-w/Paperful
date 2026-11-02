@@ -10,7 +10,9 @@ from xml.etree import ElementTree as ET
 from .types import endnote_to_zotero, zotero_to_endnote
 
 
-def parse_endnote_xml(text: str, *, xml_path: Path | None = None) -> list[dict[str, Any]]:
+def parse_endnote_xml(
+    text: str, *, xml_path: Path | None = None
+) -> list[dict[str, Any]]:
     """Parse EndNote-generated XML. Resolves internal-pdf:// against xml_path parent."""
     if text.startswith("\ufeff"):
         text = text[1:]
@@ -54,9 +56,7 @@ def _from_record(el: ET.Element, base: Path | None) -> dict[str, Any]:
     for editor in el.findall("./contributors/secondary-authors/author"):
         creators.append(_person(_style_text(editor), "editor"))
     keywords = [
-        _style_text(k)
-        for k in el.findall("./keywords/keyword")
-        if _style_text(k)
+        _style_text(k) for k in el.findall("./keywords/keyword") if _style_text(k)
     ]
     notes: list[dict[str, Any]] = []
     research = _style_text(el.find("research-notes"))
@@ -256,9 +256,7 @@ def _pdf_href(pdf: Any) -> str:
 
 
 def _escape(text: str) -> str:
-    return (
-        text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    )
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _strip_html(html: str) -> str:

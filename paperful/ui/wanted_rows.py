@@ -89,7 +89,9 @@ def wanted_rows(
             )
             if code == "import_ok":
                 continue
-            plain = miss_surface_plain(code) if code else miss_surface_plain("not_fetched")
+            plain = (
+                miss_surface_plain(code) if code else miss_surface_plain("not_fetched")
+            )
             code = code or "not_fetched"
         if not plain:
             continue

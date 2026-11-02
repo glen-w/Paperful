@@ -74,7 +74,9 @@ def zotero_local_host() -> str:
     the host. The CLI also loads that file. Outside a container the name often
     does not resolve, so use localhost unless this process is in Docker.
     """
-    host = (os.environ.get("PAPERFUL_ZOTERO_HOST") or "localhost").strip() or "localhost"
+    host = (
+        os.environ.get("PAPERFUL_ZOTERO_HOST") or "localhost"
+    ).strip() or "localhost"
     if host == "host.docker.internal" and not Path("/.dockerenv").exists():
         return "localhost"
     return host
@@ -271,7 +273,9 @@ class ZoteroLocal:
             f"{self.zot.endpoint}/users/0/items/{key}/file", follow_redirects=False
         )
         location = resp.headers.get("Location") or ""
-        if resp.status_code not in (301, 302, 303, 307) or not location.startswith("file:"):
+        if resp.status_code not in (301, 302, 303, 307) or not location.startswith(
+            "file:"
+        ):
             return None
         path = Path(unquote(urlparse(location).path))
         # storage/<key>/<file>: with no storage/ here, the path says nothing.
@@ -386,9 +390,7 @@ class ZoteroLocal:
             raw = self.zot.everything(self.zot.top())
             selected: set[str] | None = None
         else:
-            tick(
-                f"Fetching items from {len(collection_keys)} collection subtree(s)…"
-            )
+            tick(f"Fetching items from {len(collection_keys)} collection subtree(s)…")
             raw_by_key: dict[str, dict[str, Any]] = {}
             for ck in collection_keys:
                 for it in self.zot.everything(self.zot.collection_items_top(ck)):
@@ -408,7 +410,9 @@ class ZoteroLocal:
                     selected,
                     has_pdf=key in imported,
                     has_linked_url=key in linked_only,
-                    pdf_tier="snapshot" if key in snapshot_only else ("native" if key in imported else ""),
+                    pdf_tier="snapshot"
+                    if key in snapshot_only
+                    else ("native" if key in imported else ""),
                 )
             )
         items.sort(
@@ -527,9 +531,7 @@ def resolve_collection_in(cols: dict[str, Collection], spec: str) -> Collection:
     # Bare leaf names that appear more than once must use a path — even when one
     # of them also has an exact path match (e.g. empty top-level BBNJ vs ocean/BBNJ).
     if "/" not in spec_norm and "\\" not in spec_norm:
-        name_matches = [
-            c for c in cols.values() if c.name.lower() == spec_norm.lower()
-        ]
+        name_matches = [c for c in cols.values() if c.name.lower() == spec_norm.lower()]
         if len(name_matches) > 1:
             paths = ", ".join(sorted(c.path for c in name_matches))
             raise LookupError(
@@ -544,9 +546,7 @@ def resolve_collection_in(cols: dict[str, Collection], spec: str) -> Collection:
         return matches[0]
     if len(matches) > 1:
         paths = ", ".join(sorted(c.path for c in matches))
-        raise LookupError(
-            f"Collection name '{spec}' is ambiguous; use a path: {paths}"
-        )
+        raise LookupError(f"Collection name '{spec}' is ambiguous; use a path: {paths}")
     raise LookupError(f"No collection matching '{spec}'")
 
 

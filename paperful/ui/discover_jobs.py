@@ -44,7 +44,9 @@ def ingest_preview(
     if not dois:
         raise ValueError("No DOIs to ingest.")
     backend = open_library(cfg)
-    all_items = list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else []
+    all_items = (
+        list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else []
+    )
     fingerprint = LibraryFingerprint.from_items(
         all_items,
         scope=cfg.ingest_dedupe_scope,
@@ -79,9 +81,7 @@ def ingest_preview(
     return token
 
 
-def ingest_apply(
-    cfg: Config, *, token: str, collection: str
-) -> tuple[bool, str]:
+def ingest_apply(cfg: Config, *, token: str, collection: str) -> tuple[bool, str]:
     from ..acronyms import load_acronym_allowlist
     from ..catalogue import open_library
     from ..identity import LibraryFingerprint
@@ -107,11 +107,15 @@ def ingest_apply(
     fingerprint_hex = hashlib.sha256(
         f"{coll}|{source}|{','.join(dois)}".encode("utf-8")
     ).hexdigest()
-    ok, msg = commands.consume_review(cfg, token, fingerprint=fingerprint_hex, keys=None)
+    ok, msg = commands.consume_review(
+        cfg, token, fingerprint=fingerprint_hex, keys=None
+    )
     if not ok:
         return False, msg
     backend = open_library(cfg)
-    all_items = list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else []
+    all_items = (
+        list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else []
+    )
     fingerprint = LibraryFingerprint.from_items(
         all_items,
         scope=cfg.ingest_dedupe_scope,
@@ -159,7 +163,9 @@ def file_frontier_note(cfg: Config, html: str, collection: str) -> str:
     return str(key)
 
 
-def _search_apply_fingerprint(cfg: Config, run_id: str, collection: str, urls: list[str]) -> str:
+def _search_apply_fingerprint(
+    cfg: Config, run_id: str, collection: str, urls: list[str]
+) -> str:
     import hashlib
 
     joined = ",".join(sorted(u for u in urls if u))
@@ -204,15 +210,17 @@ def search_apply_preview(
         flags={"run_id": cleaned, "urls": selected},
     )
     rec = commands.read_command(cfg, cmd_id) or {}
-    rec["result"] = {"run_id": cleaned, "selected": len(selected), "review_token": token}
+    rec["result"] = {
+        "run_id": cleaned,
+        "selected": len(selected),
+        "review_token": token,
+    }
     rec["review_token"] = token
     commands.write_command(cfg, rec)
     return token
 
 
-def search_apply(
-    cfg: Config, *, token: str, collection: str
-) -> tuple[bool, str]:
+def search_apply(cfg: Config, *, token: str, collection: str) -> tuple[bool, str]:
     from ..search.apply import apply_candidates, mark_exists
     from ..search.store import load_run
 

@@ -293,8 +293,6 @@ def get_embedder(cfg) -> Embedder:
         model=model,
         batch_size=cfg.rag_embed_batch_size,
         timeout_s=cfg.llm_timeout_s,
-        base_url=resolve_ollama_base_url(
-            cfg.rag_embed_base_url or cfg.llm_base_url
-        ),
+        base_url=resolve_ollama_base_url(cfg.rag_embed_base_url or cfg.llm_base_url),
         allow_remote=cfg.llm_allow_remote,
     )

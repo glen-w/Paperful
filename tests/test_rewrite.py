@@ -104,9 +104,7 @@ def test_dismissed_and_quotes_are_skipped():
     dismissed["dismissed"] = True
     quoted = _finding()
     quoted["quote"] = "Maritime Area beyond national jurisdictions"
-    buckets, skips = bucket_findings(
-        [dismissed, quoted], areas=("style",), hay=hay
-    )
+    buckets, skips = bucket_findings([dismissed, quoted], areas=("style",), hay=hay)
     reasons = {s["reason"] for s in skips}
     assert "dismissed" in reasons
     assert "quote" in reasons
@@ -302,9 +300,11 @@ def test_cli_pack_and_dry_run(cfg, tmp_path: Path):
     body = json.loads(res.stdout)
     assert body["command"] == "rewrite"
     assert body["summary"]["edits"] >= 1
-    assert not list((cfg.state_dir / "rewrites").glob("**/*")) if (
-        cfg.state_dir / "rewrites"
-    ).exists() else True
+    assert (
+        not list((cfg.state_dir / "rewrites").glob("**/*"))
+        if (cfg.state_dir / "rewrites").exists()
+        else True
+    )
 
 
 def test_tracked_docx_insert_delete(tmp_path: Path):
@@ -433,7 +433,7 @@ def test_tracked_docx_keeps_existing_comments(tmp_path: Path):
     assert "ns0:" not in doc
     assert "comments.xml" in rels
     assert rels.count("comments.xml") == 1
-    assert 'xmlns:w14=' in doc
+    assert "xmlns:w14=" in doc
     assert 'mc:Ignorable="w14"' in doc
     assert docx_structural_issues(dest) == []
 
@@ -876,7 +876,10 @@ def test_sdk_errors_skips_non_office(tmp_path: Path):
 def test_openxml_audit_pptx_diffs_vs_source(cfg, tmp_path: Path, monkeypatch):
     from paperful.rewrite_openxml import audit_office_file
 
-    src = _pptx(tmp_path / "src.pptx", "The regime applies in areas beyond national jurisdiction.")
+    src = _pptx(
+        tmp_path / "src.pptx",
+        "The regime applies in areas beyond national jurisdiction.",
+    )
     dest = tmp_path / "out.pptx"
     apply_pptx(
         src,

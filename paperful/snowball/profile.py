@@ -62,23 +62,33 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
     per_hop = raw.get("per_hop_limit")
     return SnowballRequest(
         gate=str(raw.get("gate") or cfg.snowball_gate),
-        collection=str(raw.get("target_collection") or cfg.snowball_target_collection or ""),
+        collection=str(
+            raw.get("target_collection") or cfg.snowball_target_collection or ""
+        ),
         fetch_pdfs=(
             _profile_pdf_mode(raw["fetch_pdfs"])
             if "fetch_pdfs" in raw
             else cfg.snowball_fetch_pdfs
         ),
         depth=int(depth) if depth is not None else None,
-        max_candidates=_profile_cap(max_candidates) if max_candidates is not None else None,
+        max_candidates=_profile_cap(max_candidates)
+        if max_candidates is not None
+        else None,
         per_hop_limit=_profile_cap(per_hop) if per_hop is not None else None,
-        per_hop_rank=_profile_rank(raw["per_hop_rank"]) if raw.get("per_hop_rank") else None,
+        per_hop_rank=_profile_rank(raw["per_hop_rank"])
+        if raw.get("per_hop_rank")
+        else None,
         year_from=int(raw["year_from"]) if raw.get("year_from") is not None else None,
         year_to=int(raw["year_to"]) if raw.get("year_to") is not None else None,
-        direction=str(raw.get("direction") or cfg.snowball_direction or "refs+keywords"),
+        direction=str(
+            raw.get("direction") or cfg.snowball_direction or "refs+keywords"
+        ),
         keyword_limit=raw.get("keyword_limit"),
         keyword_hop_limit=raw.get("keyword_hop_limit"),
         keyword_min_score=raw.get("keyword_min_score"),
-        search_keywords=bool(raw["search_keywords"]) if "search_keywords" in raw else None,
+        search_keywords=bool(raw["search_keywords"])
+        if "search_keywords" in raw
+        else None,
         cites_query=str(raw.get("cites_query") or "").strip(),
         dedupe_scope=str(raw["dedupe_scope"]) if raw.get("dedupe_scope") else None,
         tag_prefix=str(raw["tag_prefix"]) if raw.get("tag_prefix") else None,
@@ -99,14 +109,26 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         if "map_category_defs" in raw
         else None,
         oa_only=bool(raw["oa_only"]) if "oa_only" in raw else None,
-        venue_include=_strs(raw.get("venue_include")) if "venue_include" in raw else None,
-        venue_exclude=_strs(raw.get("venue_exclude")) if "venue_exclude" in raw else None,
+        venue_include=_strs(raw.get("venue_include"))
+        if "venue_include" in raw
+        else None,
+        venue_exclude=_strs(raw.get("venue_exclude"))
+        if "venue_exclude" in raw
+        else None,
         languages=_strs(raw.get("languages")) if "languages" in raw else None,
-        min_seed_citations=int(raw["min_seed_citations"]) if raw.get("min_seed_citations") is not None else None,
-        note_provenance=bool(raw["note_provenance"]) if "note_provenance" in raw else None,
+        min_seed_citations=int(raw["min_seed_citations"])
+        if raw.get("min_seed_citations") is not None
+        else None,
+        note_provenance=bool(raw["note_provenance"])
+        if "note_provenance" in raw
+        else None,
         backends=_strs(raw.get("backends")) if "backends" in raw else None,
-        hybrid_seeds=int(raw["hybrid_seeds"]) if raw.get("hybrid_seeds") is not None else None,
-        approve_each_max=int(raw["approve_each_max"]) if raw.get("approve_each_max") is not None else None,
+        hybrid_seeds=int(raw["hybrid_seeds"])
+        if raw.get("hybrid_seeds") is not None
+        else None,
+        approve_each_max=int(raw["approve_each_max"])
+        if raw.get("approve_each_max") is not None
+        else None,
         refine=bool(raw["refine"]) if "refine" in raw else None,
         dedupe_after=str(raw["dedupe_after"]) if raw.get("dedupe_after") else None,
         author_site_preflight=bool(raw["author_site_preflight"])
@@ -116,8 +138,12 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         stop_eps=float(raw["stop_eps"]) if raw.get("stop_eps") is not None else None,
         stop_k=int(raw["stop_k"]) if raw.get("stop_k") is not None else None,
         stop_tau=float(raw["stop_tau"]) if raw.get("stop_tau") is not None else None,
-        stop_min_points=int(raw["stop_min_points"]) if raw.get("stop_min_points") is not None else None,
-        stop_max_screened=int(raw["stop_max_screened"]) if raw.get("stop_max_screened") is not None else None,
+        stop_min_points=int(raw["stop_min_points"])
+        if raw.get("stop_min_points") is not None
+        else None,
+        stop_max_screened=int(raw["stop_max_screened"])
+        if raw.get("stop_max_screened") is not None
+        else None,
     )
 
 
@@ -216,11 +242,15 @@ def save_profile(cfg: Config, name: str, body: dict[str, Any], *, force: bool) -
 
     check_profile_name(name)
     if cfg.config_path is None:
-        raise SnowballError("No config.toml found. Pass --config so the profile is saved beside it.")
+        raise SnowballError(
+            "No config.toml found. Pass --config so the profile is saved beside it."
+        )
     _refuse_secrets(body)
     gate = str(body.get("gate") or "dry-run")
     if gate != "dry-run" and not force:
-        raise SnowballError("Saving a writing gate needs --force after a dry-run of that job.")
+        raise SnowballError(
+            "Saving a writing gate needs --force after a dry-run of that job."
+        )
     path = profile_path(cfg, name)
     if path.exists() and not force:
         raise SnowballError(f"{path} already exists. Pass --force to overwrite.")
@@ -234,7 +264,9 @@ def _refuse_secrets(body: dict[str, Any]) -> None:
         lowered = key.lower().replace("-", "_")
         if any(token in lowered for token in _SECRET):
             raise SnowballError("Refusing to store a key.")
-        if isinstance(value, str) and any(token in value.lower() for token in ("api_key", "openapi_key", "bearer ")):
+        if isinstance(value, str) and any(
+            token in value.lower() for token in ("api_key", "openapi_key", "bearer ")
+        ):
             raise SnowballError("Refusing to store a key.")
 
 

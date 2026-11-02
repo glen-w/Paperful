@@ -71,7 +71,9 @@ def _host(url: str | None) -> str:
 
 
 def _platform(host: str) -> bool:
-    return any(host == suffix or host.endswith("." + suffix) for suffix in _PLATFORM_SUFFIXES)
+    return any(
+        host == suffix or host.endswith("." + suffix) for suffix in _PLATFORM_SUFFIXES
+    )
 
 
 def registrable_host(url: str | None) -> str:

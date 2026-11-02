@@ -217,9 +217,7 @@ def fetch_pdf(
                             first = chunk
                             if not looks_like_pdf(first):
                                 ctype = resp.headers.get("content-type", "?")
-                                raise DownloadError(
-                                    f"not a PDF (content-type {ctype})"
-                                )
+                                raise DownloadError(f"not a PDF (content-type {ctype})")
                         chunks.append(chunk)
                         total += len(chunk)
                         if total > MAX_PDF_BYTES:

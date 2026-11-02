@@ -179,7 +179,9 @@ def seed_attributes(graph: dict[str, Any]) -> list[dict[str, str]]:
     return rows
 
 
-def apply_attributes(graph: dict[str, Any], rows: list[dict[str, str]]) -> dict[str, Any]:
+def apply_attributes(
+    graph: dict[str, Any], rows: list[dict[str, str]]
+) -> dict[str, Any]:
     """Copy overlay fields onto graph nodes (id match)."""
     by_id = {str(row.get("id") or ""): row for row in rows if row.get("id")}
     nodes = []
@@ -223,7 +225,9 @@ def write_attributes_csv(path: Path, rows: list[dict[str, str]]) -> Path:
         writer = csv.DictWriter(handle, fieldnames=list(ATTRIBUTE_FIELDS))
         writer.writeheader()
         for row in rows:
-            writer.writerow({field: str(row.get(field) or "") for field in ATTRIBUTE_FIELDS})
+            writer.writerow(
+                {field: str(row.get(field) or "") for field in ATTRIBUTE_FIELDS}
+            )
     return path
 
 

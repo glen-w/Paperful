@@ -29,9 +29,7 @@ _WE_ASK = re.compile(
     r"address(?:es|ed)?|seek(?:s|ing)?\s+to\s+(?:understand|determine))\b"
     r"[^.?!]{10,280}[.?!]"
 )
-_NUMBERED = re.compile(
-    r"(?m)^\s*(?:\(?[RQrq]\s*\d+\)?|\d+[\).]|[-*•])\s+(.+\?)\s*$"
-)
+_NUMBERED = re.compile(r"(?m)^\s*(?:\(?[RQrq]\s*\d+\)?|\d+[\).]|[-*•])\s+(.+\?)\s*$")
 _QUESTION_LINE = re.compile(r"(?m)^\s*(.+\?)\s*$")
 
 _LLM_SYSTEM = """\
@@ -189,9 +187,7 @@ def extract_llm(
         if not cleaned.endswith("?"):
             cleaned = cleaned.rstrip(".!;:") + "?"
         seen.add(cleaned)
-        out.append(
-            ExtractedQuestion(id=_qid(cleaned), text=cleaned, provenance="llm")
-        )
+        out.append(ExtractedQuestion(id=_qid(cleaned), text=cleaned, provenance="llm"))
     return out
 
 

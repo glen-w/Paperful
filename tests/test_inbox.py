@@ -207,7 +207,9 @@ def test_process_unmatched_moves_file(cfg, tmp_path: Path, monkeypatch):
     ensure_inbox_dirs(cfg)
     pdf = root / "nope.pdf"
     pdf.write_bytes(b"%PDF-1.4 " + b"y" * 200)
-    monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/missing")
+    monkeypatch.setattr(
+        "paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/missing"
+    )
 
     class Backend:
         def supports_write(self):
@@ -238,7 +240,9 @@ def test_process_attach_by_doi(cfg, tmp_path: Path, monkeypatch):
     ensure_inbox_dirs(cfg)
     pdf = root / "paper.pdf"
     pdf.write_bytes(b"%PDF-1.4 " + b"z" * 2000)
-    item = make_item(key="ATT1", doi="10.1000/ok", has_pdf=False, collection_paths=["Col"])
+    item = make_item(
+        key="ATT1", doi="10.1000/ok", has_pdf=False, collection_paths=["Col"]
+    )
     monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: "10.1000/ok")
     attached: list[str] = []
 
@@ -281,7 +285,9 @@ def test_process_fifo_when_no_doi(cfg, tmp_path: Path, monkeypatch):
     ensure_inbox_dirs(cfg)
     pdf = root / "hand.pdf"
     pdf.write_bytes(b"%PDF-1.4 " + b"f" * 2000)
-    item = make_item(key="FIFO2", doi="10.1000/fifo2", has_pdf=False, collection_paths=["Col"])
+    item = make_item(
+        key="FIFO2", doi="10.1000/fifo2", has_pdf=False, collection_paths=["Col"]
+    )
     monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: None)
     attached: list[str] = []
 
@@ -502,12 +508,14 @@ def test_gated_proposal_apply_reject(cfg, tmp_path: Path, monkeypatch):
     save_proposal({**rows[0], "_path": rows[0]["_path"]})
     monkeypatch.setattr(
         "paperful.inbox._default_resolve",
-        lambda _cfg: lambda doi: WorkMeta(
-            doi=doi,
-            title="A sufficiently long new work title",
-            year=2022,
-            source="crossref",
-            work_type="journal-article",
+        lambda _cfg: (
+            lambda doi: WorkMeta(
+                doi=doi,
+                title="A sufficiently long new work title",
+                year=2022,
+                source="crossref",
+                work_type="journal-article",
+            )
         ),
     )
     # PDF was moved to review/
@@ -636,8 +644,16 @@ def test_llm_when_thin_logs_without_auto_attach(cfg, tmp_path: Path, monkeypatch
     cfg.inbox_llm_match = "when_thin"
     cfg.inbox_llm_match_min_confidence = 0.5
     cfg.inbox_llm_auto_attach_min = 0.95
-    item = make_item(key="L1", doi="10.1000/l", title="LLM candidate paper title", year=2020, has_pdf=False)
-    stub = StubLLM(data={"match": True, "confidence": 0.6, "item_key": "L1", "reason": "maybe"})
+    item = make_item(
+        key="L1",
+        doi="10.1000/l",
+        title="LLM candidate paper title",
+        year=2020,
+        has_pdf=False,
+    )
+    stub = StubLLM(
+        data={"match": True, "confidence": 0.6, "item_key": "L1", "reason": "maybe"}
+    )
     monkeypatch.setattr("paperful.llm.get_client", lambda _cfg: stub)
     monkeypatch.setattr("paperful.inbox_match.doi_from_pdf", lambda _p: None)
     monkeypatch.setattr(
@@ -648,7 +664,9 @@ def test_llm_when_thin_logs_without_auto_attach(cfg, tmp_path: Path, monkeypatch
     pdf.write_bytes(b"%PDF")
     from paperful.inbox import _llm_match
 
-    hit = _llm_match(cfg, pdf, "LLM candidate paper title excerpt about oceans " * 4, [item])
+    hit = _llm_match(
+        cfg, pdf, "LLM candidate paper title excerpt about oceans " * 4, [item]
+    )
     assert hit is not None
     assert hit.how == "llm"
     assert hit.confidence == 0.6
@@ -802,7 +820,9 @@ def test_route_auto_creates_into_snowball_collection(cfg, tmp_path: Path, monkey
     assert "route:ocean/bbnj:snowball" in stats.events[0].detail
 
 
-def test_route_off_unscoped_create_still_needs_collection(cfg, tmp_path: Path, monkeypatch):
+def test_route_off_unscoped_create_still_needs_collection(
+    cfg, tmp_path: Path, monkeypatch
+):
     from paperful.resolve import WorkMeta
 
     root = tmp_path / "inbox"
@@ -862,7 +882,9 @@ def _route_backend(paths: tuple[str, ...] = ("ocean/bbnj",)):
 
         def collections(self):
             return {
-                f"K{i}": Collection(key=f"K{i}", name=p.split("/")[-1], parent=None, path=p)
+                f"K{i}": Collection(
+                    key=f"K{i}", name=p.split("/")[-1], parent=None, path=p
+                )
                 for i, p in enumerate(paths)
             }
 
@@ -1020,7 +1042,9 @@ def test_llm_when_thin_writes_gated_route_proposal(cfg, tmp_path: Path, monkeypa
     assert stub.calls
 
 
-def test_attach_only_ignores_route_and_stays_unmatched(cfg, tmp_path: Path, monkeypatch):
+def test_attach_only_ignores_route_and_stays_unmatched(
+    cfg, tmp_path: Path, monkeypatch
+):
     root = tmp_path / "inbox"
     cfg.inbox_dir = str(root)
     cfg.state_dir = tmp_path / "state"

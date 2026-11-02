@@ -18,6 +18,7 @@ from .library import LibraryError
 from .runreport import write_command_report, write_run_report
 from .store import Manifest
 
+
 def run_playbooks_probe(
     console: Console,
     corpus: Any,
@@ -39,7 +40,12 @@ def run_playbooks_probe(
 
     import httpx
 
-    from .grey_probe import load_corpus, playbooks_for_probe, probe_corpus, save_recorded
+    from .grey_probe import (
+        load_corpus,
+        playbooks_for_probe,
+        probe_corpus,
+        save_recorded,
+    )
 
     if check < 1:
         console.print("[red]--check must be >= 1[/]")
@@ -105,6 +111,7 @@ def run_playbooks_probe(
     if any(row.status != "pass" for row in rows):
         raise typer.Exit(1)
 
+
 def run_playbooks_propose(
     console: Console,
     config: Any,
@@ -130,6 +137,7 @@ def run_playbooks_propose(
     else:
         console.print("[dim]No promotable wins yet.[/]")
     console.print(f"Wrote {dest}")
+
 
 def run_playbooks_promote(
     console: Console,
@@ -165,4 +173,3 @@ def run_playbooks_promote(
         console.print(f"[green]Promoted[/] {len(books)} playbook(s) to {dest}")
     else:
         console.print(f"[dim]Unchanged[/] {dest}")
-

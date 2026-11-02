@@ -68,7 +68,9 @@ class OpenAlexClient:
         store_fail_limit: int = 3,
     ):
         self.email = email
-        self.api_key = api_key if api_key is not None else os.environ.get("OPENALEX_API_KEY", "")
+        self.api_key = (
+            api_key if api_key is not None else os.environ.get("OPENALEX_API_KEY", "")
+        )
         self.sleep_s = sleep_s
         self.max_retries = max_retries
         self.backoff_base_s = backoff_base_s
@@ -129,7 +131,11 @@ class OpenAlexClient:
             query["mailto"] = self.email
         self.requests += 1
         try:
-            data = self._getter(path, query) if self._getter is not None else self._http(path, query)
+            data = (
+                self._getter(path, query)
+                if self._getter is not None
+                else self._http(path, query)
+            )
         except OpenAlexBudgetExceeded as exc:
             self._latch_budget(exc)
             raise
@@ -281,7 +287,9 @@ class OpenAlexClient:
             if not batch:
                 break
             out.extend(batch)
-            meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else None
+            meta = (
+                payload.get("meta") if isinstance(payload.get("meta"), dict) else None
+            )
             if not meta:
                 break
             count = int(meta.get("count") or 0)
@@ -292,7 +300,9 @@ class OpenAlexClient:
             page += 1
         return out if uncapped else out[:limit]
 
-    def _collect_cursor(self, path: str, params: dict[str, Any], limit: int) -> list[dict[str, Any]]:
+    def _collect_cursor(
+        self, path: str, params: dict[str, Any], limit: int
+    ) -> list[dict[str, Any]]:
         """Cursor pages. Used when a search asks for more than 50 pages."""
         uncapped = limit <= 0
         out: list[dict[str, Any]] = []
@@ -310,7 +320,9 @@ class OpenAlexClient:
             if not batch:
                 break
             out.extend(batch)
-            meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else None
+            meta = (
+                payload.get("meta") if isinstance(payload.get("meta"), dict) else None
+            )
             nxt = str((meta or {}).get("next_cursor") or "")
             count = int((meta or {}).get("count") or 0)
             if not nxt or (count and len(out) >= count):
@@ -442,7 +454,9 @@ class OpenAlexClient:
         if self._api_blocked() and self.store is not None:
             return None
         if self._api_blocked():
-            raise self._budget or OpenAlexBudgetExceeded("OpenAlex daily budget is spent")
+            raise self._budget or OpenAlexBudgetExceeded(
+                "OpenAlex daily budget is spent"
+            )
         return None
 
     def works_by_dois(
@@ -458,7 +472,9 @@ class OpenAlexClient:
             api_rows: list[dict[str, Any]] = []
             try:
                 for start in range(0, len(ids), 50):
-                    api_rows.extend(self._doi_batch(ids[start : start + 50], select=select))
+                    api_rows.extend(
+                        self._doi_batch(ids[start : start + 50], select=select)
+                    )
             except OpenAlexBudgetExceeded as exc:
                 need_store = True
                 if not self._store_ready():
@@ -497,7 +513,9 @@ class OpenAlexClient:
         if self._api_blocked() and self.store is not None:
             return []
         if self._api_blocked():
-            raise self._budget or OpenAlexBudgetExceeded("OpenAlex daily budget is spent")
+            raise self._budget or OpenAlexBudgetExceeded(
+                "OpenAlex daily budget is spent"
+            )
         return merged
 
     def _doi_batch(self, batch: list[str], *, select: str) -> list[dict[str, Any]]:
@@ -521,7 +539,9 @@ class OpenAlexClient:
             if len(batch) == 1:
                 return []
             mid = len(batch) // 2
-            return self._doi_batch(batch[:mid], select=select) + self._doi_batch(batch[mid:], select=select)
+            return self._doi_batch(batch[:mid], select=select) + self._doi_batch(
+                batch[mid:], select=select
+            )
         return list(payload.get("results") or [])
 
     def _store_works_by_ids(self, openalex_ids: list[str]) -> dict[str, dict[str, Any]]:
@@ -644,7 +664,9 @@ class OpenAlexClient:
         return out
 
     def _store_can_cite(self) -> bool:
-        return self._store_ready() and bool(getattr(self.store, "has_cites_index", False))
+        return self._store_ready() and bool(
+            getattr(self.store, "has_cites_index", False)
+        )
 
     def _store_works_citing(
         self,
@@ -953,7 +975,6 @@ class OpenAlexClient:
         )
 
 
-
 def keyless_limit_message(*, has_key: bool, reset_at: str | None = None) -> str:
     """Shown when the no-key allowance for this public address is spent."""
     if has_key:
@@ -1021,8 +1042,8 @@ def _author_fields(work: dict[str, Any]) -> tuple[list[str], list[dict[str, str]
         oa_id = short_id(str(author.get("id") or ""))
         orcid = normalize_orcid(str(author.get("orcid") or ""))
         parts = [p for p in name.split() if p]
-        last = (parts[-1].lower() if parts else "")
-        initial = (parts[0][:1].lower() if parts else "")
+        last = parts[-1].lower() if parts else ""
+        initial = parts[0][:1].lower() if parts else ""
         fingerprint = f"{last}|{initial}" if last else ""
         if name:
             names.append(name)
@@ -1095,7 +1116,11 @@ def work_to_candidate(
         },
         why=why,
         status="new",
-        provenance={"backend": "openalex", "endpoint": "/works", "retrieved_at": _now()},
+        provenance={
+            "backend": "openalex",
+            "endpoint": "/works",
+            "retrieved_at": _now(),
+        },
         gate=gate,
         score=float(work.get("cited_by_count") or 0),
     )
@@ -1197,7 +1222,10 @@ def normalize_orcid(raw: str) -> str:
     if len(text) == 19 and text.count("-") == 3:
         return text
     digits = text.replace("-", "")
-    if len(digits) == 16 and digits[:15].isdigit() and (digits[15].isdigit() or digits[15] == "X"):
+    if (
+        len(digits) == 16
+        and digits[:15].isdigit()
+        and (digits[15].isdigit() or digits[15] == "X")
+    ):
         return f"{digits[0:4]}-{digits[4:8]}-{digits[8:12]}-{digits[12:16]}"
     return ""
-

@@ -87,9 +87,7 @@ def probe_cites(
         if oa_id:
             seeds.append((oa_id, doi, title))
     if not seeds:
-        raise KeepupCitesError(
-            f"OpenAlex resolved 0 of {len(dois)} DOIs in {dest!r}."
-        )
+        raise KeepupCitesError(f"OpenAlex resolved 0 of {len(dois)} DOIs in {dest!r}.")
 
     by_id: dict[str, Candidate] = {}
     seed_titles: dict[str, list[str]] = {}
@@ -140,9 +138,7 @@ def probe_cites(
     apply_overlap(rows)
     for row in rows:
         overlap = int(
-            row.biblio.get("overlap")
-            or len(row.biblio.get("seed_keys") or [])
-            or 1
+            row.biblio.get("overlap") or len(row.biblio.get("seed_keys") or []) or 1
         )
         row.why = _why_line(overlap, seed_titles.get(row.identity) or [])
         row.keep = True

@@ -147,7 +147,9 @@ def parse_map_categories(raw: Any) -> tuple[str, ...]:
     if raw is None:
         return DEFAULT_MAP_CATEGORIES
     if isinstance(raw, str):
-        parts = [part.strip() for part in raw.replace(";", ",").split(",") if part.strip()]
+        parts = [
+            part.strip() for part in raw.replace(";", ",").split(",") if part.strip()
+        ]
         return tuple(_norm_id(part) for part in parts)
     if isinstance(raw, (list, tuple)):
         return tuple(_norm_id(str(part)) for part in raw if str(part).strip())
@@ -229,7 +231,9 @@ def _strs(raw: Any) -> tuple[str, ...]:
     if raw is None:
         return ()
     if isinstance(raw, str):
-        return tuple(part.strip() for part in raw.replace(";", ",").split(",") if part.strip())
+        return tuple(
+            part.strip() for part in raw.replace(";", ",").split(",") if part.strip()
+        )
     if isinstance(raw, (list, tuple)):
         return tuple(str(part).strip() for part in raw if str(part).strip())
     return ()

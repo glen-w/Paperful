@@ -591,7 +591,9 @@ def run_job(
     lookup: Lookup | None = None,
 ) -> RunResult:
     body = load_job(cfg, name)
-    interval = int(body.get("interval_days") or getattr(cfg, "keepup_interval_days", 7) or 7)
+    interval = int(
+        body.get("interval_days") or getattr(cfg, "keepup_interval_days", 7) or 7
+    )
     if not force and body.get("last_run_at"):
         left = days_until_due(str(body.get("last_run_at") or ""), interval)
         if left > 0:
@@ -740,7 +742,9 @@ def apply_job(
 
             finder = _library_lookup(lib, scope="library", collection=collection)
         except Exception as exc:
-            raise KeepupError(f"Library was not read. Refusing to create items. {exc}") from exc
+            raise KeepupError(
+                f"Library was not read. Refusing to create items. {exc}"
+            ) from exc
     _mark_exists(pending, finder)
     creatable = [row for row in pending if row.status == "new"]
     skipped_exists = sum(1 for row in pending if row.status in {"exists", "version"})

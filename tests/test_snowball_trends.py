@@ -52,7 +52,9 @@ def test_snowball_trends_cli_json(tmp_path, monkeypatch):
         return {"group_by": [{"key": 2020, "count": 2}, {"key": 2021, "count": 3}]}
 
     def patched(cfg, **kwargs):
-        return OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+        return OpenAlexClient(
+            email="t@example.org", api_key="", sleep_s=0, getter=getter
+        )
 
     monkeypatch.setattr("paperful.snowball.trends._openalex_client", patched)
 

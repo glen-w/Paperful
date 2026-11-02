@@ -59,13 +59,23 @@ def recover_referenced_works(
         return []
     doi = normalize_doi(str(work.get("doi") or "")) or ""
     getter = s2_getter if s2_getter is not None else getattr(client, "s2_getter", None)
-    fetcher = pdf_fetcher if pdf_fetcher is not None else getattr(client, "pdf_fetcher", None)
-    landing = html_fetcher if html_fetcher is not None else getattr(client, "html_fetcher", None)
-    cache = cache_dir if cache_dir is not None else getattr(client, "s2_cache_dir", None)
+    fetcher = (
+        pdf_fetcher if pdf_fetcher is not None else getattr(client, "pdf_fetcher", None)
+    )
+    landing = (
+        html_fetcher
+        if html_fetcher is not None
+        else getattr(client, "html_fetcher", None)
+    )
+    cache = (
+        cache_dir if cache_dir is not None else getattr(client, "s2_cache_dir", None)
+    )
 
     if getter is None and cache is not None:
         key = s2_api_key()
-        getter = lambda d, _cache=cache, _key=key: s2_paper(d, cache_dir=_cache, api_key=_key)
+        getter = lambda d, _cache=cache, _key=key: s2_paper(
+            d, cache_dir=_cache, api_key=_key
+        )
 
     if doi and getter is not None:
         try:
@@ -149,7 +159,11 @@ def dehyphenate(text: str) -> str:
 
 def landing_url(work: dict[str, Any]) -> str:
     """Best public landing URL for bibliography scraping."""
-    loc = work.get("primary_location") if isinstance(work.get("primary_location"), dict) else {}
+    loc = (
+        work.get("primary_location")
+        if isinstance(work.get("primary_location"), dict)
+        else {}
+    )
     for key in ("landing_page_url",):
         url = str(loc.get(key) or "").strip()
         if url.startswith("http"):
@@ -192,7 +206,9 @@ def parse_landing_bibliography(html: str) -> list[dict[str, Any]]:
 
     items = section.find_all("li")
     if items:
-        entries = [entry for entry in map(_li_entry, items) if entry["doi"] or entry["title"]]
+        entries = [
+            entry for entry in map(_li_entry, items) if entry["doi"] or entry["title"]
+        ]
     else:
         text = section.get_text("\n", strip=True)
         entries = parse_bibliography_entries(text) if text else []
@@ -204,7 +220,9 @@ def parse_landing_bibliography(html: str) -> list[dict[str, Any]]:
         if len(dois) >= LANDING_DOI_CAP:
             break
 
-    out: list[dict[str, Any]] = [{"doi": doi, "title": "", "year": None} for doi in dois]
+    out: list[dict[str, Any]] = [
+        {"doi": doi, "title": "", "year": None} for doi in dois
+    ]
     # Keep title-only entries that lacked a DOI for the title-match path.
     for entry in entries:
         if entry.get("doi"):
@@ -250,9 +268,7 @@ def _best_biblio_section(soup: BeautifulSoup) -> Any | None:
             sibling = sibling.find_next_sibling()
         if not parts:
             continue
-        wrapper = BeautifulSoup(
-            "<div>" + "".join(parts) + "</div>", "html.parser"
-        ).div
+        wrapper = BeautifulSoup("<div>" + "".join(parts) + "</div>", "html.parser").div
         if wrapper is None:
             continue
         text = wrapper.get_text(" ", strip=True)
@@ -336,7 +352,9 @@ def _parse_entry(raw: str) -> dict[str, Any]:
     return {"doi": doi, "title": title, "year": year, "raw": text}
 
 
-def _works_from_s2(client: OpenAlexClient, payload: dict[str, Any] | None) -> list[dict[str, Any]]:
+def _works_from_s2(
+    client: OpenAlexClient, payload: dict[str, Any] | None
+) -> list[dict[str, Any]]:
     if not isinstance(payload, dict):
         return []
     dois: list[str] = []
@@ -407,7 +425,9 @@ def _works_from_entries(
     return out
 
 
-def _resolve_dois(client: OpenAlexClient, dois: list[str], *, source: str) -> list[dict[str, Any]]:
+def _resolve_dois(
+    client: OpenAlexClient, dois: list[str], *, source: str
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for doi in dois:
@@ -427,7 +447,9 @@ def _resolve_dois(client: OpenAlexClient, dois: list[str], *, source: str) -> li
     return out
 
 
-def _match_title(client: OpenAlexClient, title: str, year: int | None) -> dict[str, Any] | None:
+def _match_title(
+    client: OpenAlexClient, title: str, year: int | None
+) -> dict[str, Any] | None:
     query = (title or "").strip()
     if len(query) < 8:
         return None
@@ -455,7 +477,9 @@ def _match_title(client: OpenAlexClient, title: str, year: int | None) -> dict[s
     return best
 
 
-def _pdf_bibliography_text(work: dict[str, Any], fetcher: PdfFetcher | None) -> tuple[str, str]:
+def _pdf_bibliography_text(
+    work: dict[str, Any], fetcher: PdfFetcher | None
+) -> tuple[str, str]:
     url = open_pdf_url(work)
     if not url:
         return "", ""
@@ -470,7 +494,11 @@ def open_pdf_url(work: dict[str, Any]) -> str:
         url = str(oa.get(key) or "").strip()
         if url.startswith("http") and looks_like_pdf_url(url):
             return url
-    loc = work.get("primary_location") if isinstance(work.get("primary_location"), dict) else {}
+    loc = (
+        work.get("primary_location")
+        if isinstance(work.get("primary_location"), dict)
+        else {}
+    )
     for key in ("pdf_url",):
         url = str(loc.get(key) or "").strip()
         if url.startswith("http") and looks_like_pdf_url(url):
@@ -495,7 +523,11 @@ def pdf_payload_for_row(row: Any) -> dict[str, Any] | None:
         return None
     payload: dict[str, Any] = {
         "references": [
-            {"doi": entry.get("doi") or "", "title": entry.get("title") or "", "year": entry.get("year")}
+            {
+                "doi": entry.get("doi") or "",
+                "title": entry.get("title") or "",
+                "year": entry.get("year"),
+            }
             for entry in parse_bibliography_entries(text)
         ]
     }
@@ -511,7 +543,11 @@ def pdf_payload(doi: str, *, cache_dir: Path | None = None) -> dict[str, Any] | 
     if not text:
         return None
     refs = [
-        {"doi": entry.get("doi") or "", "title": entry.get("title") or "", "year": entry.get("year")}
+        {
+            "doi": entry.get("doi") or "",
+            "title": entry.get("title") or "",
+            "year": entry.get("year"),
+        }
         for entry in parse_bibliography_entries(text)
     ]
     payload: dict[str, Any] = {"references": refs}
@@ -530,7 +566,9 @@ def _download_html(url: str) -> str:
         with httpx.Client(follow_redirects=True, timeout=30.0) as client:
             resp = client.get(
                 url,
-                headers={"User-Agent": "paperful-snowball/0.1 (mailto:paperful@example.org)"},
+                headers={
+                    "User-Agent": "paperful-snowball/0.1 (mailto:paperful@example.org)"
+                },
             )
             if resp.status_code >= 400:
                 return ""

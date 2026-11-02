@@ -59,14 +59,22 @@ def probe_url(url: str, *, getter: Any = None) -> dict[str, Any]:
             head = client.head(url)
             ctype = str(head.headers.get("content-type") or "").lower()
             if "pdf" in ctype or looks_like_pdf_url(str(head.url)):
-                return {"kind": "pdf", "content_type": ctype, "status": head.status_code}
+                return {
+                    "kind": "pdf",
+                    "content_type": ctype,
+                    "status": head.status_code,
+                }
             get = client.get(url, headers={"Range": "bytes=0-15"})
             body = get.content[:8]
             ctype = str(get.headers.get("content-type") or ctype).lower()
             if body.startswith(b"%PDF") or "pdf" in ctype:
                 return {"kind": "pdf", "content_type": ctype, "status": get.status_code}
             if "html" in ctype or body[:1] in {b"<", b"\xef"}:
-                return {"kind": "landing", "content_type": ctype, "status": get.status_code}
+                return {
+                    "kind": "landing",
+                    "content_type": ctype,
+                    "status": get.status_code,
+                }
             return {"kind": "unknown", "content_type": ctype, "status": get.status_code}
     except httpx.HTTPError:
         return {"kind": "unknown"}
@@ -174,7 +182,9 @@ def run_search(
                 source_url=url,
             )
         )
-    hits.sort(key=lambda row: (-int(row.get("score") or 0), str(row.get("title") or "")))
+    hits.sort(
+        key=lambda row: (-int(row.get("score") or 0), str(row.get("title") or ""))
+    )
 
     candidates: list[dict[str, Any]] = []
     for row in hits:

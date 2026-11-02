@@ -191,7 +191,9 @@ class GrobidClient:
         return text
 
 
-def grobid_client_from_config(cfg, *, client: httpx.Client | None = None) -> GrobidClient:
+def grobid_client_from_config(
+    cfg, *, client: httpx.Client | None = None
+) -> GrobidClient:
     url = validate_grobid_url(cfg.grobid_base_url, cfg.grobid_allow_remote)
     return GrobidClient(
         url,

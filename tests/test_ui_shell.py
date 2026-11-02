@@ -28,7 +28,11 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ops,
         "collections_tree",
-        lambda _cfg: {"ok": False, "error": "Zotero is not reachable", "collections": []},
+        lambda _cfg: {
+            "ok": False,
+            "error": "Zotero is not reachable",
+            "collections": [],
+        },
     )
     client = TestClient(create_app(cfg))
     assert client.get("/", follow_redirects=False).status_code == 302
@@ -80,7 +84,7 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert 'name="file"' in stuff.text
     assert 'name="lane"' in stuff.text
     assert ">Stuff</a>" in res.text
-    assert "name=\"pack_dir\"" not in rewrite.text
+    assert 'name="pack_dir"' not in rewrite.text
     assert ">Rewrite</a>" not in res.text
     assert ">Suggest edits</a>" in res.text
     assert "drop-zone" in critique.text
@@ -357,7 +361,13 @@ def test_library_nests_collections(tmp_path, monkeypatch):
         lambda _cfg: {
             "ok": True,
             "collections": [
-                {"path": "AO", "name": "AO", "key": "1", "items": 267, "missing_pdf": 10},
+                {
+                    "path": "AO",
+                    "name": "AO",
+                    "key": "1",
+                    "items": 267,
+                    "missing_pdf": 10,
+                },
                 {
                     "path": "AO/Mini meta studies",
                     "name": "Mini meta studies",
@@ -449,7 +459,7 @@ def test_pages_include_beginner_help(tmp_path, monkeypatch):
     assert 'class="page-lede"' in wanted.text
     assert "Missing</strong> means no file yet" in wanted.text
     assert 'class="help-tip"' in wanted.text
-    assert "class=\"help-tip-bubble\"" in wanted.text
+    assert 'class="help-tip-bubble"' in wanted.text
     assert "Zotero collection currently in scope" in wanted.text
     assert "Leave this off until you know what a control does" in wanted.text
 

@@ -56,7 +56,7 @@ def grim_possible(mean: float, n: int, decimals: int) -> bool:
     """True when ``mean`` can arise as a mean of ``n`` granular observations."""
     if n < 1 or decimals < 0:
         return False
-    scale = 10 ** decimals
+    scale = 10**decimals
     reported = round(mean * scale)
     lo = math.floor(mean * n) - 2
     hi = math.ceil(mean * n) + 2
@@ -225,7 +225,9 @@ def _parse_p(op: str | None, raw: str | None) -> float | None:
         return None
 
 
-def _p_matches(reported: float, computed: float, *, decimals: int | None = None) -> bool:
+def _p_matches(
+    reported: float, computed: float, *, decimals: int | None = None
+) -> bool:
     """statcheck-ish: allow rounding of the reported p."""
     if math.isnan(computed):
         return True
@@ -239,7 +241,7 @@ def _p_matches(reported: float, computed: float, *, decimals: int | None = None)
     else:
         tol = 0.0005
     if decimals is not None:
-        tol = 0.5 / (10 ** decimals) + 1e-12
+        tol = 0.5 / (10**decimals) + 1e-12
     return abs(computed - reported) <= max(tol, abs(computed) * 0.05 + 1e-9)
 
 
@@ -352,7 +354,10 @@ def scan_stats(text: str) -> list[StatHit]:
         if _N_OR_CI.search(window):
             continue
         # Skip p-values already attached to a test statistic we parsed.
-        if any(h.quote and h.quote in window and h.kind in {"t", "F", "chi2", "z"} for h in hits):
+        if any(
+            h.quote and h.quote in window and h.kind in {"t", "F", "chi2", "z"}
+            for h in hits
+        ):
             continue
         hits.append(
             StatHit(

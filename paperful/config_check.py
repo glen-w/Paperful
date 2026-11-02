@@ -106,7 +106,9 @@ def check_config(path: Path | None = None) -> list[str]:
     """Return human-readable problems (empty when OK)."""
     source, raw = load_raw(path)
     if source is None:
-        return ["config.toml not found (copy config.minimal.toml or config.example.toml)"]
+        return [
+            "config.toml not found (copy config.minimal.toml or config.example.toml)"
+        ]
     issues: list[str] = []
     for key, val in raw.items():
         if isinstance(val, dict):
@@ -128,5 +130,7 @@ def check_config(path: Path | None = None) -> list[str]:
             suffix = f" (did you mean {hint[0]!r}?)" if hint else ""
             issues.append(f"unknown top-level key {key!r}{suffix}")
     if raw.get("core_api_key"):
-        issues.append("core_api_key is set in config.toml; use CORE_API_KEY in the environment")
+        issues.append(
+            "core_api_key is set in config.toml; use CORE_API_KEY in the environment"
+        )
     return issues

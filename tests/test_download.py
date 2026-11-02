@@ -130,7 +130,9 @@ def test_fetch_pdf_rejects_javascript_void_instead_of_crashing():
     """Cookie merging turns javascript:void(0) into urllib ValueError: '/void(0)'."""
     client = httpx.Client(
         cookies={"sid": "secret"},
-        transport=httpx.MockTransport(lambda req: httpx.Response(200, content=PDF_BYTES)),
+        transport=httpx.MockTransport(
+            lambda req: httpx.Response(200, content=PDF_BYTES)
+        ),
     )
     assert not is_fetchable_url("javascript:void(0)")
     assert not is_fetchable_url("/void(0)")
@@ -142,7 +144,9 @@ def test_is_fetchable_url_blocks_loopback_and_metadata():
     assert not is_fetchable_url("http://127.0.0.1/a.pdf", resolve=False)
     assert not is_fetchable_url("http://localhost/a.pdf", resolve=False)
     assert not is_fetchable_url("http://[::1]/a.pdf", resolve=False)
-    assert not is_fetchable_url("http://169.254.169.254/latest/meta-data", resolve=False)
+    assert not is_fetchable_url(
+        "http://169.254.169.254/latest/meta-data", resolve=False
+    )
     assert not is_fetchable_url("http://10.0.0.5/secret.pdf", resolve=False)
     assert not is_fetchable_url("http://192.168.1.1/a.pdf", resolve=False)
     assert not is_fetchable_url("http://metadata.google.internal/", resolve=False)

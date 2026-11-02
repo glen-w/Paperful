@@ -151,7 +151,7 @@ def test_missing_rows_have_visible_reason_line(wanted_client):
     assert len(reasons) == 2
     assert "No DOI or identifier to search" in reasons
     assert "No PDF yet — not fetched" in reasons
-    assert 'data-stamp=' not in page.text
+    assert "data-stamp=" not in page.text
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
@@ -198,17 +198,40 @@ def _seed_discover_state(cfg: Config) -> None:
     _write_jsonl(
         snow / "run1" / "candidates.jsonl",
         [
-            {"ids": {"doi": "10.5/kept"}, "biblio": {"title": "Kept paper"}, "keep": True, "status": "new", "why": "cited by 2 of your seeds"},
-            {"ids": {"doi": "10.5/skipped"}, "biblio": {"title": "Skipped"}, "keep": False, "status": "new"},
-            {"ids": {"doi": "10.5/undecided"}, "biblio": {"title": "Undecided"}, "status": "new"},
-            {"ids": {"doi": "10.1/e"}, "biblio": {"title": "Already here"}, "keep": True, "status": "new"},
+            {
+                "ids": {"doi": "10.5/kept"},
+                "biblio": {"title": "Kept paper"},
+                "keep": True,
+                "status": "new",
+                "why": "cited by 2 of your seeds",
+            },
+            {
+                "ids": {"doi": "10.5/skipped"},
+                "biblio": {"title": "Skipped"},
+                "keep": False,
+                "status": "new",
+            },
+            {
+                "ids": {"doi": "10.5/undecided"},
+                "biblio": {"title": "Undecided"},
+                "status": "new",
+            },
+            {
+                "ids": {"doi": "10.1/e"},
+                "biblio": {"title": "Already here"},
+                "keep": True,
+                "status": "new",
+            },
         ],
     )
     _write_jsonl(
         snow / "watches" / "w1" / "inbox.jsonl",
         [
             {"ids": {"doi": "10.5/watch"}, "biblio": {"title": "Watch hit"}},
-            {"ids": {"doi": "10.5/KEPT"}, "biblio": {"title": "Same as kept, other case"}},
+            {
+                "ids": {"doi": "10.5/KEPT"},
+                "biblio": {"title": "Same as kept, other case"},
+            },
         ],
     )
     _write_jsonl(
@@ -258,14 +281,17 @@ def test_pending_fill_tolerates_corrupt_ledgers_and_skips_blank_rows(tmp_path):
         "\n"
         "{not-json}\n"
         + json.dumps(
-            {"ids": {"doi": "10.9/ok"}, "biblio": {"title": "Good"}, "keep": True, "status": "new"}
+            {
+                "ids": {"doi": "10.9/ok"},
+                "biblio": {"title": "Good"},
+                "keep": True,
+                "status": "new",
+            }
         )
         + "\n"
         + json.dumps({"keep": True, "status": "new"})  # no title, no DOI
         + "\n"
-        + json.dumps(
-            {"biblio": {"title": "Title only"}, "keep": True, "status": "new"}
-        )
+        + json.dumps({"biblio": {"title": "Title only"}, "keep": True, "status": "new"})
         + "\n",
         encoding="utf-8",
     )
@@ -298,7 +324,10 @@ def test_wanted_page_lists_pending_fill_without_second_desk(tmp_path, monkeypatc
     text = client.get("/wanted").text
     assert 'id="pending-fill"' in text
     assert text.count("data-pending-source=") == 4
-    assert "Kept paper" in text and "Skipped" not in text.split('id="pending-fill"')[1].split("</section>")[0]
+    assert (
+        "Kept paper" in text
+        and "Skipped" not in text.split('id="pending-fill"')[1].split("</section>")[0]
+    )
     # Same fill desk: Preview add / Apply add live on Wanted (no Grab/Attach here).
     panel = text.split('id="pending-fill"')[1].split("</section>")[0]
     assert 'id="pending-fill-form"' in panel
@@ -339,7 +368,8 @@ def test_hand_ticks_on_missing_and_held_are_enabled(wanted_client):
         assert all("disabled" not in b for b in boxes)
         assert all("checked" not in b for b in boxes)  # hand-ticks start unticked
     have = re.findall(
-        r'<input type="checkbox" name="keys"[^>]*>', wanted_client.get("/wanted?tab=have").text
+        r'<input type="checkbox" name="keys"[^>]*>',
+        wanted_client.get("/wanted?tab=have").text,
     )
     assert len(have) == 1 and "checked" in have[0]
 
@@ -423,7 +453,10 @@ def test_missing_tab_renders_each_reason_line(tmp_path, monkeypatch):
     client.cookies.set("pf_collection", "ocean")
     text = client.get("/wanted?tab=missing").text
     found = dict(
-        re.findall(r'<span class="miss-reason" data-miss-surface="([a-z_]+)">([^<]+)</span>', text)
+        re.findall(
+            r'<span class="miss-reason" data-miss-surface="([a-z_]+)">([^<]+)</span>',
+            text,
+        )
     )
     assert found == {
         "paywalled": "Paywalled or login required",
@@ -456,10 +489,18 @@ def test_misses_csv_carries_reason_codes_for_checks_and_misses(tmp_path):
     cfg, items, manifest = _mixed(tmp_path)
     report = report_cards(wanted_rows(cfg, items, manifest), collection="ocean")
     rows = {r["key"]: r for r in csv.DictReader(io.StringIO(render_misses_csv(report)))}
-    assert rows["MISM"]["stamp"] == "check" and rows["MISM"]["reason_code"] == "doi_differs"
-    assert rows["UNVER"]["stamp"] == "check" and rows["UNVER"]["reason_code"] == "no_doi_in_file"
+    assert (
+        rows["MISM"]["stamp"] == "check"
+        and rows["MISM"]["reason_code"] == "doi_differs"
+    )
+    assert (
+        rows["UNVER"]["stamp"] == "check"
+        and rows["UNVER"]["reason_code"] == "no_doi_in_file"
+    )
     assert rows["SNAP"]["stamp"] == "check" and rows["SNAP"]["reason_code"] == "htmlpdf"
-    assert rows["NODOI"]["stamp"] == "missing" and rows["NODOI"]["reason_code"] == "no_doi"
+    assert (
+        rows["NODOI"]["stamp"] == "missing" and rows["NODOI"]["reason_code"] == "no_doi"
+    )
     # Never attempted: not_fetched with a one-line reason.
     assert rows["MISS"]["stamp"] == "missing"
     assert rows["MISS"]["reason_code"] == "not_fetched"
@@ -474,15 +515,21 @@ def test_report_counts_agree_across_json_markdown_and_csv(tmp_path):
     report = report_cards(data, collection="ocean")
     counts = card_counts(data)
     assert report["counts"] == counts
-    assert counts["found"] == sum(1 for c in report["cards"] if c["stamp"] == "found") == 1
-    assert counts["check"] == sum(1 for c in report["cards"] if c["stamp"] == "check") == 3
+    assert (
+        counts["found"] == sum(1 for c in report["cards"] if c["stamp"] == "found") == 1
+    )
+    assert (
+        counts["check"] == sum(1 for c in report["cards"] if c["stamp"] == "check") == 3
+    )
     csv_rows = list(csv.DictReader(io.StringIO(render_misses_csv(report))))
     assert len(csv_rows) == counts["total"] - counts["found"]
     assert f"{counts['found']} found" in render_markdown(report)
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
-def test_report_route_400_without_collection_and_502_on_loader_error(tmp_path, monkeypatch):
+def test_report_route_400_without_collection_and_502_on_loader_error(
+    tmp_path, monkeypatch
+):
     from fastapi.testclient import TestClient
 
     cfg = _cfg(tmp_path)
@@ -511,7 +558,11 @@ def test_held_mismatch_needs_explicit_override_to_attach(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path)
     manifest = Manifest(cfg.manifest_path)
-    for key, reason in (("OK", ""), ("MISM", REASON_STRICT_PDF_DOI), ("SHORT", REASON_SHORT_PDF)):
+    for key, reason in (
+        ("OK", ""),
+        ("MISM", REASON_STRICT_PDF_DOI),
+        ("SHORT", REASON_SHORT_PDF),
+    ):
         manifest.write(
             Record(
                 itemKey=key,
@@ -524,8 +575,13 @@ def test_held_mismatch_needs_explicit_override_to_attach(tmp_path, monkeypatch):
             )
         )
     assert {r.itemKey for r in manifest.pending_attach()} == {"OK"}
-    assert {r.itemKey for r in manifest.pending_attach(allow_pdf_doi_mismatch=True)} == {"OK", "MISM"}
-    assert {r.itemKey for r in manifest.pending_attach(allow_short_pdf=True)} == {"OK", "SHORT"}
+    assert {
+        r.itemKey for r in manifest.pending_attach(allow_pdf_doi_mismatch=True)
+    } == {"OK", "MISM"}
+    assert {r.itemKey for r in manifest.pending_attach(allow_short_pdf=True)} == {
+        "OK",
+        "SHORT",
+    }
 
     items = [_Item(k, k, "10.1/a", True) for k in ("OK", "MISM", "SHORT")]
     monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: (items, manifest))
@@ -563,7 +619,9 @@ def test_advanced_override_attaches_ticked_mismatch(tmp_path, monkeypatch):
         )
     )
     items = [_Item("MISM", "Mismatched", "10.1/b", True)]
-    monkeypatch.setattr(wanted_jobs, "_load_items", lambda _c, _col: (object(), items, manifest))
+    monkeypatch.setattr(
+        wanted_jobs, "_load_items", lambda _c, _col: (object(), items, manifest)
+    )
     calls: list[dict] = []
     monkeypatch.setattr(
         wanted_jobs,
@@ -576,11 +634,23 @@ def test_advanced_override_attaches_ticked_mismatch(tmp_path, monkeypatch):
     commands_mod = __import__("paperful.ui.commands", fromlist=["x"])
     commands_mod.write_command(
         cfg,
-        {"id": cmd_id, "verb": "attach", "status": "running", "review_token": "", "error": "",
-         "report_path": "", "created": time.time()},
+        {
+            "id": cmd_id,
+            "verb": "attach",
+            "status": "running",
+            "review_token": "",
+            "error": "",
+            "report_path": "",
+            "created": time.time(),
+        },
     )
     token = wanted_jobs.attach_preview(
-        cfg, cmd_id, collection="ocean", keys=["MISM"], allow_mismatch=True, allow_short=False
+        cfg,
+        cmd_id,
+        collection="ocean",
+        keys=["MISM"],
+        allow_mismatch=True,
+        allow_short=False,
     )
     review = commands_mod.load_review(cfg, token)
     assert review["keys"] == ["MISM"]
@@ -590,12 +660,19 @@ def test_advanced_override_attaches_ticked_mismatch(tmp_path, monkeypatch):
     assert calls and calls[0]["keys"] == ["MISM"] and calls[0]["allow_mismatch"] is True
     # Without the override the same tick previews no pending rows.
     plain = wanted_jobs.attach_preview(
-        cfg, cmd_id, collection="ocean", keys=["MISM"], allow_mismatch=False, allow_short=False
+        cfg,
+        cmd_id,
+        collection="ocean",
+        keys=["MISM"],
+        allow_mismatch=False,
+        allow_short=False,
     )
     assert commands_mod.load_review(cfg, plain)["flags"]["allow_mismatch"] is False
 
 
-def test_ticked_missing_rows_scope_grab_and_unticked_uses_missing_list(tmp_path, monkeypatch):
+def test_ticked_missing_rows_scope_grab_and_unticked_uses_missing_list(
+    tmp_path, monkeypatch
+):
     cfg, items, manifest = _mixed(tmp_path)
     monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: (items, manifest))
     ticked, _ = jobs.scope_for_fetch(cfg, "ocean", ["MISS"], None)
@@ -680,12 +757,19 @@ def test_pending_add_preview_and_apply(tmp_path, monkeypatch):
 
     class _Batch:
         def counts(self):
-            return {"rows": 1, "created": 1, "exists": 0, "unresolved": 0, "held": 0, "failed": 0}
+            return {
+                "rows": 1,
+                "created": 1,
+                "exists": 0,
+                "unresolved": 0,
+                "held": 0,
+                "failed": 0,
+            }
 
-    monkeypatch.setattr(wanted_jobs, "open_library", lambda _c: _Backend(), raising=False)
     monkeypatch.setattr(
-        "paperful.catalogue.open_library", lambda _c: _Backend()
+        wanted_jobs, "open_library", lambda _c: _Backend(), raising=False
     )
+    monkeypatch.setattr("paperful.catalogue.open_library", lambda _c: _Backend())
     monkeypatch.setattr(
         "paperful.ingest_dois.classify_rows",
         lambda dois, *_a, **_k: _Batch(),
@@ -695,18 +779,14 @@ def test_pending_add_preview_and_apply(tmp_path, monkeypatch):
         lambda *_a, **_k: cfg.state_dir / "ingest-summary.json",
     )
     monkeypatch.setattr(
-        "paperful.ingest_dois.default_resolver", lambda _email: (lambda doi: None)
+        "paperful.ingest_dois.default_resolver", lambda _email: lambda doi: None
     )
     monkeypatch.setattr(
         "paperful.ingest_dois.apply_creates",
         lambda _b, _batch, coll, **_k: created.append(coll),
     )
-    monkeypatch.setattr(
-        "paperful.ingest_dois.ingest_tags", lambda **_k: []
-    )
-    monkeypatch.setattr(
-        "paperful.acronyms.load_acronym_allowlist", lambda _p: set()
-    )
+    monkeypatch.setattr("paperful.ingest_dois.ingest_tags", lambda **_k: [])
+    monkeypatch.setattr("paperful.acronyms.load_acronym_allowlist", lambda _p: set())
     monkeypatch.setattr(
         "paperful.identity.LibraryFingerprint.from_items",
         lambda *_a, **_k: object(),

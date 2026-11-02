@@ -43,9 +43,7 @@ def test_proxify_and_login_detection():
 def test_ensure_proxied_rewrites_publisher_host_onto_landing_proxy():
     landing = "https://www-sciencedirect-com.scpo.idm.oclc.org/science/article/pii/S1"
     bare = "https://www.sciencedirect.com/science/article/pii/S1/pdfft"
-    out = ezproxy._ensure_proxied(
-        bare, "https://scpo.idm.oclc.org/login?url=", landing
-    )
+    out = ezproxy._ensure_proxied(bare, "https://scpo.idm.oclc.org/login?url=", landing)
     assert out.startswith("https://www-sciencedirect-com.scpo.idm.oclc.org/")
     assert "pdfft" in out
     already = "https://www-sciencedirect-com.scpo.idm.oclc.org/pdfft"
@@ -432,7 +430,10 @@ def test_scholar_session_ok_browser_profile(cfg, tmp_path, ctx_factory):
             return True
 
         def fetch_html(self, url, timeout_ms=45_000):
-            return '<div class="gs_r">results</div>', "https://scholar.google.com/scholar"
+            return (
+                '<div class="gs_r">results</div>',
+                "https://scholar.google.com/scholar",
+            )
 
     class CaptchaBrowser:
         def available(self) -> bool:
@@ -454,9 +455,7 @@ def test_scholar_find_http_error_and_sorry_captcha(ctx_factory):
     def handler_429(req):
         return httpx.Response(429, text="rate limited", request=req)
 
-    assert (
-        scholar.find(make_item(), ctx_factory(handler_429)).outcome is Outcome.ERROR
-    )
+    assert scholar.find(make_item(), ctx_factory(handler_429)).outcome is Outcome.ERROR
 
     def handler_sorry(req):
         return httpx.Response(

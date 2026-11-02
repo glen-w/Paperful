@@ -376,37 +376,45 @@ def resolve_run_config(
         request_rg=request_rg,
         re_request=re_request,
     )
-    if collection or library is not None or (item_type or []) or year_from is not None or year_to is not None or any(
-        flag is not None
-        for flag in (
-            try_all,
-            retry_failed,
-            upgrade_linked,
-            upgrade_snapshot,
-            no_attach,
-            strict_pdf_doi,
-            scihub,
-            apply,
-            overwrite,
-            limit,
-            sources,
-            preset,
-            steps,
-            require_summarize,
-            focus,
-            handoff,
-            gaps_handoff,
-            include_doi_tabs,
-            downloads_dir,
-            promote,
-            htmlpdf,
-            keep_snapshot,
-            ezproxy_relogin,
-            twenty_writeback,
-            request_rg,
-            re_request,
+    if (
+        collection
+        or library is not None
+        or (item_type or [])
+        or year_from is not None
+        or year_to is not None
+        or any(
+            flag is not None
+            for flag in (
+                try_all,
+                retry_failed,
+                upgrade_linked,
+                upgrade_snapshot,
+                no_attach,
+                strict_pdf_doi,
+                scihub,
+                apply,
+                overwrite,
+                limit,
+                sources,
+                preset,
+                steps,
+                require_summarize,
+                focus,
+                handoff,
+                gaps_handoff,
+                include_doi_tabs,
+                downloads_dir,
+                promote,
+                htmlpdf,
+                keep_snapshot,
+                ezproxy_relogin,
+                twenty_writeback,
+                request_rg,
+                re_request,
+            )
         )
-    ) or (skip or []):
+        or (skip or [])
+    ):
         origins.append("cli")
 
     resolved = _finalize(body, for_all=for_all)
@@ -728,7 +736,9 @@ def _apply_cli(body: dict[str, Any], **flags: Any) -> None:
     skip = _coerce_steps(flags["skip"]) or []
     if skip and (parsed_steps is not None or "steps" in body):
         dropping = set(skip)
-        body["steps"] = [step for step in body.get("steps") or [] if step not in dropping]
+        body["steps"] = [
+            step for step in body.get("steps") or [] if step not in dropping
+        ]
 
 
 def _finalize(body: dict[str, Any], *, for_all: bool) -> ResolvedRunConfig:
@@ -754,9 +764,7 @@ def _finalize(body: dict[str, Any], *, for_all: bool) -> ResolvedRunConfig:
     unknown = [step for step in steps if step not in KNOWN_STEPS]
     if unknown:
         known = ", ".join(KNOWN_STEPS)
-        raise RunConfigError(
-            f"Unknown step(s): {', '.join(unknown)}. Known: {known}"
-        )
+        raise RunConfigError(f"Unknown step(s): {', '.join(unknown)}. Known: {known}")
     if len(steps) != len(set(steps)):
         raise RunConfigError("Duplicate steps in the run config.")
     preset = body.get("preset")

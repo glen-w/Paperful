@@ -86,7 +86,9 @@ def test_handoff_rg_when_enabled(cfg):
     assert rows[0].hint == HINT_AUTHOR_REQUEST
     assert rows[0].request_url == RG
     opened: list[str] = []
-    n = open_tabs(rows, scholar=False, opener=lambda u: opened.append(u) or True, cfg=cfg)
+    n = open_tabs(
+        rows, scholar=False, opener=lambda u: opened.append(u) or True, cfg=cfg
+    )
     assert n == 1 and opened == [RG]
     assert already_requested(cfg, "RG000001")
 

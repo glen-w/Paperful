@@ -65,7 +65,10 @@ def test_inbox_watch_defaults_to_whole_library_and_reports(cfg_file, monkeypatch
         return WatchStats(attached=2, unmatched=1, skipped=3, quit_reason="idle")
 
     monkeypatch.setattr("paperful.inbox.process_candidates", fake_process)
-    res = runner.invoke(cli.app, ["inbox", "watch", "--idle", "1.5", "--tag", "inbox", "-c", str(cfg_file)])
+    res = runner.invoke(
+        cli.app,
+        ["inbox", "watch", "--idle", "1.5", "--tag", "inbox", "-c", str(cfg_file)],
+    )
     assert res.exit_code == 0, res.output
     assert "watching" in res.output and "library" in res.output
     assert "Inbox attached 2, unmatched 1" in res.output and "(idle)" in res.output
@@ -89,7 +92,8 @@ def test_inbox_watch_passes_first_collection_and_requires_write(cfg_file, monkey
     backend._write = True
     seen: dict = {}
     monkeypatch.setattr(
-        "paperful.inbox.process_candidates", lambda *a, **k: seen.update(k) or WatchStats()
+        "paperful.inbox.process_candidates",
+        lambda *a, **k: seen.update(k) or WatchStats(),
     )
     res = runner.invoke(cli.app, ["inbox", "watch", "-C", "Ocean", "-c", str(cfg_file)])
     assert res.exit_code == 0, res.output
@@ -108,7 +112,9 @@ def test_inbox_watch_reports_bad_inbox_dir(cfg_file, monkeypatch):
 
 
 def _apply(cfg_file, *extra):
-    return runner.invoke(cli.app, ["inbox", "proposals", "apply", "P1", "-c", str(cfg_file), *extra])
+    return runner.invoke(
+        cli.app, ["inbox", "proposals", "apply", "P1", "-c", str(cfg_file), *extra]
+    )
 
 
 def test_inbox_proposals_apply_success_json_and_human(cfg_file, monkeypatch):
@@ -133,7 +139,9 @@ def test_inbox_proposals_apply_success_json_and_human(cfg_file, monkeypatch):
     assert body["summary"] == {"id": "P1", "item_key": "K9", "action": "attach"}
 
 
-@pytest.mark.parametrize("exc", [FileNotFoundError("no proposal P1"), ValueError("not pending")])
+@pytest.mark.parametrize(
+    "exc", [FileNotFoundError("no proposal P1"), ValueError("not pending")]
+)
 def test_inbox_proposals_apply_errors_exit_1(cfg_file, monkeypatch, exc):
     _wire(monkeypatch, Backend())
     monkeypatch.setattr(
@@ -146,4 +154,7 @@ def test_inbox_proposals_apply_errors_exit_1(cfg_file, monkeypatch, exc):
 def test_inbox_proposals_apply_needs_write_support(cfg_file, monkeypatch):
     _wire(monkeypatch, Backend(write=False))
     res = _apply(cfg_file)
-    assert res.exit_code == 2 and "inbox proposals apply needs library write support" in res.output
+    assert (
+        res.exit_code == 2
+        and "inbox proposals apply needs library write support" in res.output
+    )

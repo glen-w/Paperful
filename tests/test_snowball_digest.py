@@ -46,7 +46,12 @@ def _row(
 
 
 def _queue(cfg, run_id: str, rows, *, deferred: bool = False):
-    client = SimpleNamespace(requests=0, status_429=0, retries=0, deferred={"reset_at": "soon"} if deferred else None)
+    client = SimpleNamespace(
+        requests=0,
+        status_429=0,
+        retries=0,
+        deferred={"reset_at": "soon"} if deferred else None,
+    )
     write_queue(cfg.state_dir, run_id, rows, client, library_unread=False)
 
 
@@ -173,7 +178,9 @@ def test_watch_digest_uses_last_run_queue(tmp_path):
     watch["baseline_at"] = "2026-01-01T00:00:00Z"
     watch["last_run_id"] = "R9"
     (dest / "watch.json").write_text(json.dumps(watch) + "\n", encoding="utf-8")
-    summary = json.loads((cfg.state_dir / "snowball" / "R9" / "summary.json").read_text())
+    summary = json.loads(
+        (cfg.state_dir / "snowball" / "R9" / "summary.json").read_text()
+    )
     summary["already_seen"] = 4
     (cfg.state_dir / "snowball" / "R9" / "summary.json").write_text(
         json.dumps(summary) + "\n", encoding="utf-8"
@@ -222,7 +229,9 @@ def test_watch_digest_before_baseline(tmp_path):
 
 def test_run_digest_includes_version_and_grey_stamp(tmp_path):
     cfg = _cfg(tmp_path)
-    row = _row(status="version", doi="10.1000/v", title="Next edition", why="version of seed")
+    row = _row(
+        status="version", doi="10.1000/v", title="Next edition", why="version of seed"
+    )
     row.provenance["lane"] = "grey:author_site"
     _queue(cfg, "R1", [row])
     text = write_run_digest(cfg, "R1").markdown
@@ -233,7 +242,10 @@ def test_run_digest_includes_version_and_grey_stamp(tmp_path):
 
 
 def digest_has_no_exists(text: str) -> bool:
-    return "## Exists" in text and "\nNone.\n" in text.split("## Exists", 1)[1].split("##", 1)[0]
+    return (
+        "## Exists" in text
+        and "\nNone.\n" in text.split("## Exists", 1)[1].split("##", 1)[0]
+    )
 
 
 def test_watch_digest_profile_collection_beats_config(tmp_path):
@@ -276,8 +288,12 @@ def test_watch_digest_deferred_points_at_resume(tmp_path):
     from paperful.snowball.watch import save_watch
 
     dest = save_watch(cfg, "bbnj", "keyword-scout").parent
-    _queue(cfg, "R4", [_row(status="new", doi="10.1000/d", title="Held")], deferred=True)
-    summary = json.loads((cfg.state_dir / "snowball" / "R4" / "summary.json").read_text())
+    _queue(
+        cfg, "R4", [_row(status="new", doi="10.1000/d", title="Held")], deferred=True
+    )
+    summary = json.loads(
+        (cfg.state_dir / "snowball" / "R4" / "summary.json").read_text()
+    )
     summary["already_seen"] = 2
     (cfg.state_dir / "snowball" / "R4" / "summary.json").write_text(
         json.dumps(summary) + "\n", encoding="utf-8"
@@ -312,7 +328,11 @@ def test_cli_digest_writes_markdown(tmp_path):
     from paperful.snowball.watch import save_watch
 
     dest = save_watch(cfg, "bbnj", "keyword-scout").parent
-    _queue(cfg, "R1", [_row(status="new", doi="10.1000/a", title="Alpha", score=2, why="hit")])
+    _queue(
+        cfg,
+        "R1",
+        [_row(status="new", doi="10.1000/a", title="Alpha", score=2, why="hit")],
+    )
     watch = json.loads((dest / "watch.json").read_text(encoding="utf-8"))
     watch["last_run_id"] = "R1"
     watch["baseline_at"] = "2026-01-01T00:00:00Z"
@@ -323,7 +343,9 @@ def test_cli_digest_writes_markdown(tmp_path):
     assert run.exit_code == 0, run.output
     assert "new 1" in run.output
     assert (cfg.state_dir / "snowball" / "R1" / "digest.md").is_file()
-    watch_res = runner.invoke(app, ["snowball", "watch", "digest", "bbnj", "-c", config])
+    watch_res = runner.invoke(
+        app, ["snowball", "watch", "digest", "bbnj", "-c", config]
+    )
     assert watch_res.exit_code == 0, watch_res.output
     assert "inbox 0" in watch_res.output
     assert (dest / "digest.md").is_file()

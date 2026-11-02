@@ -83,7 +83,9 @@ def test_apply_consumes_token_once(tmp_path, monkeypatch):
         deadline = time.time() + 2
         token = ""
         while time.time() < deadline:
-            cmds = __import__("paperful.ui.commands", fromlist=["list_commands"]).list_commands(cfg)
+            cmds = __import__(
+                "paperful.ui.commands", fromlist=["list_commands"]
+            ).list_commands(cfg)
             for rec in cmds:
                 if rec.get("review_token"):
                     token = rec["review_token"]

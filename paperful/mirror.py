@@ -143,7 +143,9 @@ def _same_bytes(a: Path, b: Path) -> bool:
             return True
         if a.stat().st_size != b.stat().st_size:
             return False
-        return hashlib.md5(a.read_bytes()).digest() == hashlib.md5(b.read_bytes()).digest()
+        return (
+            hashlib.md5(a.read_bytes()).digest() == hashlib.md5(b.read_bytes()).digest()
+        )
     except OSError:
         return False
 
@@ -219,9 +221,7 @@ def place_item_dirs(
 
     def spare() -> list[Path]:
         return [
-            d
-            for d in index.dirs(item.key)
-            if not any(same_place(d, w) for w in wanted)
+            d for d in index.dirs(item.key) if not any(same_place(d, w) for w in wanted)
         ]
 
     for target in wanted:
@@ -393,7 +393,9 @@ def _record_paths(
 ) -> list[str]:
     rows = [r for r in (record.get("collections") or []) if isinstance(r, dict)]
     if selected is not None and any(r.get("key") for r in rows):
-        paths = [str(r["path"]) for r in rows if r.get("key") in selected and r.get("path")]
+        paths = [
+            str(r["path"]) for r in rows if r.get("key") in selected and r.get("path")
+        ]
         return sorted(paths) or [UNCOLLECTED]
     paths = record.get("collection_paths")
     if isinstance(paths, list) and any(paths):

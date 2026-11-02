@@ -70,7 +70,10 @@ def test_extract_orcids_from_author_records(tmp_path: Path):
         {
             "biblio": {
                 "author_records": [
-                    {"orcid": "https://orcid.org/0000-0002-1825-0097", "display_name": "A"},
+                    {
+                        "orcid": "https://orcid.org/0000-0002-1825-0097",
+                        "display_name": "A",
+                    },
                     {"orcid": "", "display_name": "B"},
                 ]
             }
@@ -84,9 +87,7 @@ def test_extract_orcids_from_author_records(tmp_path: Path):
             }
         },
     ]
-    queue.write_text(
-        "\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8"
-    )
+    queue.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
     got = extract_orcids_from_candidates(queue, limit=3)
     assert got[0] == "0000-0002-1825-0097"
     assert "0000-0001-2345-6789" in got
@@ -108,9 +109,12 @@ def test_soft_skip_matrix():
     assert "searxng" in skips
     assert "summarize" in skips
     assert "handoff_tabs" in skips
-    assert soft_skip_matrix(
-        twenty_ready=True, searx_ready=True, llm_enabled=True, tabs_live=True
-    ) == {}
+    assert (
+        soft_skip_matrix(
+            twenty_ready=True, searx_ready=True, llm_enabled=True, tabs_live=True
+        )
+        == {}
+    )
 
 
 def test_main_refuses_without_env(monkeypatch):
@@ -175,13 +179,7 @@ def test_report_schema_and_resume(tmp_path: Path, monkeypatch):
             run_dir.mkdir(parents=True)
             (run_dir / "candidates.jsonl").write_text(
                 json.dumps(
-                    {
-                        "biblio": {
-                            "author_records": [
-                                {"orcid": "0000-0002-1825-0097"}
-                            ]
-                        }
-                    }
+                    {"biblio": {"author_records": [{"orcid": "0000-0002-1825-0097"}]}}
                 )
                 + "\n",
                 encoding="utf-8",
@@ -207,7 +205,12 @@ def test_report_schema_and_resume(tmp_path: Path, monkeypatch):
             return CompletedProcess(args, 0, "{}", "")
         if args[0] == "doctor":
             return CompletedProcess(args, 0, "ok\n", "")
-        return CompletedProcess(args, 0, '{"ok": true, "exit": 0, "summary": {}, "paths": {}, "items": [], "flags": {}, "schema": "paperful.agent.json.v1", "command": "x", "partial": false}', "")
+        return CompletedProcess(
+            args,
+            0,
+            '{"ok": true, "exit": 0, "summary": {}, "paths": {}, "items": [], "flags": {}, "schema": "paperful.agent.json.v1", "command": "x", "partial": false}',
+            "",
+        )
 
     # Point runner state + snowball under tmp
     state = tmp_path / "e2e"
@@ -233,6 +236,7 @@ def test_report_schema_and_resume(tmp_path: Path, monkeypatch):
     # Redirect snowball path lookups
     monkeypatch.setattr(runner, "root", tmp_path)
     (tmp_path / "state" / "snowball").mkdir(parents=True, exist_ok=True)
+
     # fake writes under tmp_path/snowball — also mirror under state/snowball for artifacts
     def paperful_with_state(args, **kwargs):
         proc = fake_paperful(args, **kwargs)

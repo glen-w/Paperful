@@ -14,7 +14,9 @@ from tests.conftest import make_item
 
 def test_fingerprint_doi_then_title_year():
     items = [
-        make_item(key="A", doi="10.1000/a", title="Alpha paper about oceans", year=2020),
+        make_item(
+            key="A", doi="10.1000/a", title="Alpha paper about oceans", year=2020
+        ),
         make_item(key="B", doi=None, title="Beta paper about oceans", year=2021),
     ]
     fp = LibraryFingerprint.from_items(items)
@@ -43,6 +45,8 @@ def test_merge_tags_stable_unique():
 
 def test_seed_slug_and_from_seed_tag(tmp_path):
     assert seed_slug("BBNJ ocean") == "bbnj-ocean"
-    assert from_seed_tag({"type": "doi", "value": "10.1000/seed"}) == "from-10-1000-seed"
+    assert (
+        from_seed_tag({"type": "doi", "value": "10.1000/seed"}) == "from-10-1000-seed"
+    )
     assert from_seed_tag(tmp_path / "bbnj-seed.txt") == "from-bbnj-seed"
     assert inbox_dir_tag("~/Documents/paperful_inbox") == "inbox:paperful-inbox"

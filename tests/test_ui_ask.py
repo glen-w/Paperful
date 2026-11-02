@@ -27,7 +27,9 @@ def _ops(monkeypatch) -> None:
         "collections_tree",
         lambda _cfg: {"ok": True, "collections": []},
     )
-    monkeypatch.setattr(ui_app, "collections_tree", lambda _cfg: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ui_app, "collections_tree", lambda _cfg: {"ok": True, "collections": []}
+    )
 
 
 def _fresh_index(monkeypatch) -> None:
@@ -137,7 +139,10 @@ def test_index_ask_enqueues_and_writes_thread(tmp_path, monkeypatch):
         gated = client.get("/ask")
         assert 'action="/ask"' in gated.text
         assert 'name="ask_mode"' in gated.text
-        assert 'value="simple" selected' in gated.text or 'value="simple"  selected' in gated.text
+        assert (
+            'value="simple" selected' in gated.text
+            or 'value="simple"  selected' in gated.text
+        )
         res = client.post(
             "/ask",
             data={"question": "What is BBNJ?", "focus": "default"},
@@ -232,7 +237,13 @@ def test_ask_batch_shows_running_status(tmp_path, monkeypatch):
 
     def fake(cfg, cmd_id, **kw):
         gate.wait(timeout=2)
-        return {"stamp": "batch01", "questions": 1, "answered": 1, "skipped": 0, "failed": 0}
+        return {
+            "stamp": "batch01",
+            "questions": 1,
+            "answered": 1,
+            "skipped": 0,
+            "failed": 0,
+        }
 
     jobs.ask_batch_fn = fake
     try:
@@ -480,7 +491,10 @@ def test_ask_mode_select_follows_config_not_last_run(tmp_path, monkeypatch):
     try:
         client = TestClient(create_app(cfg))
         page = client.get("/ask")
-        assert 'value="advanced" selected' in page.text or 'value="advanced"  selected' in page.text
+        assert (
+            'value="advanced" selected' in page.text
+            or 'value="advanced"  selected' in page.text
+        )
         simple = client.post(
             "/ask",
             data={"question": "What is BBNJ?", "ask_mode": "simple"},

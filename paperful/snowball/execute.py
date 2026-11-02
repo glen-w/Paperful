@@ -149,6 +149,7 @@ def _snowball_crawl_rows(
         rows = produced
     return rows, failed
 
+
 def _snowball_prepare_queue(
     cfg: Config,
     request: SnowballRequest,
@@ -302,6 +303,7 @@ def _snowball_prepare_queue(
     )
     return rows, dest, library_unread, lib, unread_error, paused
 
+
 def _execute_preflight(
     cfg: Config,
     request: SnowballRequest,
@@ -352,6 +354,7 @@ def _execute_preflight(
                 "(need TWENTY_API_KEY and [twenty].base_url)"
             )
 
+
 def _execute_gate_exit(
     cfg: Config,
     request: SnowballRequest,
@@ -396,6 +399,7 @@ def _execute_gate_exit(
         exit_code = batch_exit(ok=ok_n, failed=crawl_fail_n)
     tally.stop()
     return PathResult(dest, exit_code)
+
 
 def _execute_create_and_fill(
     cfg: Config,
@@ -468,6 +472,7 @@ def _execute_create_and_fill(
     tally.stop()
     return PathResult(dest, exit_code)
 
+
 def _execute(
     cfg: Config,
     request: SnowballRequest,
@@ -503,9 +508,7 @@ def _execute(
         else request.study_designs
     )
     oa.study_designs = tuple(designs or ())
-    lists = (
-        cfg.snowball_listed_in if request.listed_in is None else request.listed_in
-    )
+    lists = cfg.snowball_listed_in if request.listed_in is None else request.listed_in
     oa.listed_in = tuple(lists or ())
     if oa.progress is None:
         oa.progress = lambda message: console.print(paint(message))

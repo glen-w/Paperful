@@ -41,7 +41,9 @@ def _entry(*, abstract: str = "An abstract.", pdfs=(), **record) -> MirrorEntry:
         "abstract": abstract,
     }
     rec.update(record)
-    return MirrorEntry(key="ABCD1234", dirs=[f"ocean/{NAME}"], record=rec, pdfs=list(pdfs))
+    return MirrorEntry(
+        key="ABCD1234", dirs=[f"ocean/{NAME}"], record=rec, pdfs=list(pdfs)
+    )
 
 
 PDF = PdfStat(path=Path("/mirror/a.pdf"), size=100, mtime_ns=5)
@@ -63,7 +65,9 @@ def _pdf_row(entry, **over) -> LedgerRow:
 
 
 def _stub_row(entry, **over) -> LedgerRow:
-    base = dict(status=STATUS_STUB, source="abstract", abstract_sha=text_sha("An abstract."))
+    base = dict(
+        status=STATUS_STUB, source="abstract", abstract_sha=text_sha("An abstract.")
+    )
     base.update(over)
     return _row(entry, **base)
 
@@ -119,9 +123,9 @@ def test_stub_is_upgraded_when_a_pdf_arrives():
 
 def test_settings_change_and_force_reindex():
     entry = _entry()
-    assert _plan(entry, _pdf_row(entry), pdf=PDF, params="light1/c1/1000/100").reason == (
-        "settings changed"
-    )
+    assert _plan(
+        entry, _pdf_row(entry), pdf=PDF, params="light1/c1/1000/100"
+    ).reason == ("settings changed")
     assert _plan(entry, _pdf_row(entry), pdf=PDF, force=True).action == ACTION_PDF
     assert _plan(entry, _stub_row(entry), force=True).action == ACTION_STUB
 

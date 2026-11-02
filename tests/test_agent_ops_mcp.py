@@ -64,7 +64,9 @@ def test_run_refs_gap_missing_collection(cfg):
 def test_doctor_payload_shape(cfg, monkeypatch):
     monkeypatch.setattr(
         "paperful.agent_ops.doctor_checks",
-        lambda *a, **k: [SimpleNamespace(name="x", status="green", code="", detail="ok")],
+        lambda *a, **k: [
+            SimpleNamespace(name="x", status="green", code="", detail="ok")
+        ],
     )
     rows = doctor_payload(cfg)
     assert rows[0]["name"] == "x"

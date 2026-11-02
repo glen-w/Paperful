@@ -549,9 +549,7 @@ def merge_index(out_dir: Path, rows: list[dict[str, Any]]) -> None:
     by_key = read_index(out_dir)
     for row in rows:
         _index_put(by_key, row)
-    lines = [
-        json.dumps(by_key[k], ensure_ascii=False) for k in sorted(by_key)
-    ]
+    lines = [json.dumps(by_key[k], ensure_ascii=False) for k in sorted(by_key)]
     path.write_text(("\n".join(lines) + ("\n" if lines else "")), encoding="utf-8")
 
 

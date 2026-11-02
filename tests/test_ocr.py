@@ -305,7 +305,11 @@ def test_no_text_uses_skip_text(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path)
     cfg.ocr_languages = "eng fra"
     batch = ocr_items(
-        cfg, [_item(pdf)], Manifest(tmp_path / "state" / "manifest.jsonl"), None, apply=True
+        cfg,
+        [_item(pdf)],
+        Manifest(tmp_path / "state" / "manifest.jsonl"),
+        None,
+        apply=True,
     )
     assert batch.ocr == 1
     assert "--skip-text" in seen[0]
@@ -321,6 +325,7 @@ def test_one_failure_does_not_stop_the_batch(tmp_path, monkeypatch):
 
     def fake_run(cmd, **kwargs):
         if "bad.pdf" in cmd[-2]:
+
             class Proc:
                 returncode = 1
                 stderr = b"page failed"

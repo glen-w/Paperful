@@ -42,7 +42,9 @@ def test_dist_only_rejects_stale_artifacts(tmp_path: Path) -> None:
 
 
 def test_dist_only_accepts_matching_version(tmp_path: Path) -> None:
-    version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]["version"]
     dist = tmp_path / "dist"
     dist.mkdir()
     (dist / f"paperful-{version}-py3-none-any.whl").write_bytes(b"x")

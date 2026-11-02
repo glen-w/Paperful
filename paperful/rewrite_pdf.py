@@ -9,6 +9,7 @@ from .pdfid import page_count
 from .rewrite_plan import RewriteEdit
 from .rewrite_render import apply_to_text
 
+
 def pdf_structural_issues(path: Path) -> list[str]:
     """Catch unreadable PDF output. Not a full PDF/A validator."""
     if not path.is_file():
@@ -44,7 +45,9 @@ def comment_marks(
         if not quote or quote not in blob:
             continue
         idx = blob.find(quote)
-        while idx >= 0 and any(not (idx + len(quote) <= a or idx >= b) for a, b in taken):
+        while idx >= 0 and any(
+            not (idx + len(quote) <= a or idx >= b) for a, b in taken
+        ):
             idx = blob.find(quote, idx + 1)
         if idx < 0:
             continue

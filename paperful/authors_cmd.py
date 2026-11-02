@@ -112,9 +112,7 @@ def run_authors(
             console.print(f"Wrote report [bold]{report_file}[/]")
         if pack_file is not None:
             console.print(f"Proposed pack [bold]{pack_file}[/]")
-            console.print(
-                f"Next: paperful twenty lookup -C {pack_collection} --apply"
-            )
+            console.print(f"Next: paperful twenty lookup -C {pack_collection} --apply")
             console.print(
                 f"Next: paperful snowball packs promote {pack_slug(pack_collection)}"
             )
@@ -154,4 +152,3 @@ def run_authors(
         },
     )
     cli_mod._emit_agent(payload, json_out=json_out, human=_human)
-

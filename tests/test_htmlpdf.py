@@ -47,7 +47,11 @@ def test_htmlpdf_uses_embedded_render(ctx_factory, monkeypatch):
     monkeypatch.setattr(
         htmlpdf,
         "_render_pdf",
-        lambda url, ua, title="", require_article=False, **_k: (PDF_BYTES, url, "chromium print"),
+        lambda url, ua, title="", require_article=False, **_k: (
+            PDF_BYTES,
+            url,
+            "chromium print",
+        ),
     )
     ctx = ctx_factory(lambda r: None)
     cand = htmlpdf.find(
@@ -84,7 +88,11 @@ def test_htmlpdf_allows_report_without_doi(ctx_factory, monkeypatch):
     monkeypatch.setattr(
         htmlpdf,
         "_render_pdf",
-        lambda url, ua, title="", require_article=False, **_k: (PDF_BYTES, url, "chromium print"),
+        lambda url, ua, title="", require_article=False, **_k: (
+            PDF_BYTES,
+            url,
+            "chromium print",
+        ),
     )
     ctx = ctx_factory(lambda r: None)
     cand = htmlpdf.find(

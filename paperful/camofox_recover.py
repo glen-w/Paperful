@@ -48,7 +48,9 @@ def camofox_server_ready(cfg: Config) -> bool:
         return client.health()
 
 
-def run_camofox_recover(cfg: Config, item: Item, url: str | None = None) -> CamofoxResult:
+def run_camofox_recover(
+    cfg: Config, item: Item, url: str | None = None
+) -> CamofoxResult:
     start = (url or recover_start_url(item) or "").strip()
     if not start:
         return CamofoxResult(None, "no DOI or URL")
@@ -138,9 +140,7 @@ def _try_inline_or_downloads(
     return None
 
 
-def _largest_pdf(
-    client: CamofoxClient, tab_id: str, min_bytes: int
-) -> bytes | None:
+def _largest_pdf(client: CamofoxClient, tab_id: str, min_bytes: int) -> bytes | None:
     try:
         rows = client.downloads(
             tab_id, user_id=_USER_ID, include_data=True, consume=True

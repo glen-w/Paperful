@@ -76,9 +76,7 @@ def is_author_site_skip_host(host: str) -> bool:
         host = host[4:]
     skips = DIRECT_SKIP_HOSTS + AUTHOR_SITE_EXTRA_HOSTS
     return any(
-        host == skip
-        or host.endswith("." + skip)
-        or host.startswith(skip + ".")
+        host == skip or host.endswith("." + skip) or host.startswith(skip + ".")
         for skip in skips
     )
 

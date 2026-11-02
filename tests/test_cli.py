@@ -421,9 +421,7 @@ def test_reconcile_jobs_parks_orphans_and_rejects_stale():
     from paperful import cli as cli_mod
 
     utility = cli_mod.JOBS["utility"]
-    cli_mod.JOBS["utility"] = tuple(
-        v for v in utility if v != "run-report-counts"
-    )
+    cli_mod.JOBS["utility"] = tuple(v for v in utility if v != "run-report-counts")
     try:
         cli_mod._reconcile_jobs()
         assert "run-report-counts" in cli_mod.JOBS["utility"]
@@ -686,6 +684,7 @@ def test_run_handoff_tabs_open_after_ezproxy_browser_closes(
         return orig_close(self)
 
     monkeypatch.setattr(BrowserSession, "close", tracking_close)
+
     def _track_handoff(*args, **kwargs):
         events.append("handoff")
 
@@ -1464,9 +1463,7 @@ def test_lint_drives_progress_callbacks(cfg_file, stub_zotero, monkeypatch):
     assert "2 findings" in res.stdout
 
 
-def test_lint_json_stdout_stays_json_with_callbacks(
-    cfg_file, stub_zotero, monkeypatch
-):
+def test_lint_json_stdout_stays_json_with_callbacks(cfg_file, stub_zotero, monkeypatch):
     from paperful.lint import Finding
 
     def fake(client, cfg, items, *, on_start, on_item, **k):
@@ -1937,6 +1934,7 @@ def test_summarize_remote_egress_notice(tmp_path, stub_zotero, monkeypatch):
     monkeypatch.setattr(
         "paperful.llm.preflight.validate_llm_for_verb", lambda cfg, **k: cfg.llm_model
     )
+
     def _backend(cfg, zl):
         return type(
             "B", (), {"get_item": lambda self, k: make_item(key=k, has_pdf=False)}
@@ -2154,7 +2152,9 @@ def test_pack_show_human_table_and_empty(cfg_file, stub_zotero, tmp_path):
     assert not (tmp_path / "state" / "last-run.json").exists()
 
 
-def test_refs_gap_cli_writes_pack_without_creates(cfg_file, stub_zotero, tmp_path, monkeypatch):
+def test_refs_gap_cli_writes_pack_without_creates(
+    cfg_file, stub_zotero, tmp_path, monkeypatch
+):
     pdf = tmp_path / "seed.pdf"
     pdf.write_bytes(b"%PDF-1.4")
     monkeypatch.setattr(
@@ -2187,7 +2187,9 @@ def test_refs_gap_format_json(cfg_file, stub_zotero, tmp_path, monkeypatch):
     pdf.write_bytes(b"%PDF-1.4")
     monkeypatch.setattr(
         "paperful.refs_gap.text_from_pdf",
-        lambda *_a, **_k: "https://doi.org/10.1000/json-gap\nA cited title about oceans.\n",
+        lambda *_a, **_k: (
+            "https://doi.org/10.1000/json-gap\nA cited title about oceans.\n"
+        ),
     )
     res = runner.invoke(
         cli.app,
@@ -2212,7 +2214,9 @@ def test_refs_gap_format_json(cfg_file, stub_zotero, tmp_path, monkeypatch):
     assert "Pack:" not in res.stdout
 
 
-def test_ingest_dois_cli_dry_run_does_not_create(cfg_file, stub_zotero, tmp_path, monkeypatch):
+def test_ingest_dois_cli_dry_run_does_not_create(
+    cfg_file, stub_zotero, tmp_path, monkeypatch
+):
     from paperful.resolve import WorkMeta
 
     dois = tmp_path / "dois.txt"
@@ -2335,7 +2339,16 @@ def test_inbox_proposals_list_cli(cfg_file, stub_zotero, tmp_path):
     assert body["summary"]["count"] == 1
     rejected = runner.invoke(
         cli.app,
-        ["inbox", "proposals", "reject", "abc123", "-c", str(cfg_file), "--format", "json"],
+        [
+            "inbox",
+            "proposals",
+            "reject",
+            "abc123",
+            "-c",
+            str(cfg_file),
+            "--format",
+            "json",
+        ],
     )
     assert rejected.exit_code == 0, rejected.stdout
     rej = json.loads(rejected.stdout)
@@ -2352,7 +2365,17 @@ def test_notes_delete_requires_filter(cfg_file, stub_zotero):
 def test_notes_delete_refuses_all_with_type(cfg_file, stub_zotero):
     res = runner.invoke(
         cli.app,
-        ["notes", "delete", "-c", str(cfg_file), "-C", "BBNJ", "--all", "--type", "summary"],
+        [
+            "notes",
+            "delete",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--all",
+            "--type",
+            "summary",
+        ],
     )
     assert res.exit_code == 1
     assert "--all" in res.stdout
@@ -2481,7 +2504,8 @@ def test_notes_delete_mixed_apply_exits_3(cfg_file, stub_zotero, monkeypatch):
     monkeypatch.setattr("paperful.notes.collect", lambda *a, **k: hits)
     monkeypatch.setattr("paperful.notes.select", lambda *a, **k: hits)
     monkeypatch.setattr(
-        "paperful.notes.apply_delete", lambda *a, **k: (1, ["N2 is a journalArticle, not a note."])
+        "paperful.notes.apply_delete",
+        lambda *a, **k: (1, ["N2 is a journalArticle, not a note."]),
     )
     res = runner.invoke(
         cli.app,
@@ -2563,7 +2587,16 @@ def test_recover_dry_run_format_json(tmp_path, stub_zotero, monkeypatch):
     )
     res = runner.invoke(
         cli.app,
-        ["recover", "-c", str(cfg_file), "--item", "I1", "--dry-run", "--format", "json"],
+        [
+            "recover",
+            "-c",
+            str(cfg_file),
+            "--item",
+            "I1",
+            "--dry-run",
+            "--format",
+            "json",
+        ],
     )
     assert res.exit_code == 0, res.stdout
     body = json.loads(res.stdout)
@@ -2683,7 +2716,9 @@ def test_dedupe_apply_mixed_exits_3(cfg_file, stub_zotero, monkeypatch):
         lambda *a, **k: (cfg_file.parent / "p.json", cfg_file.parent / "p.md"),
     )
     monkeypatch.setattr("paperful.dedupe.attach_merge_previews", lambda *a, **k: None)
-    monkeypatch.setattr("paperful.dedupe.apply_merge", lambda *a, **k: (1, ["merge failed"]))
+    monkeypatch.setattr(
+        "paperful.dedupe.apply_merge", lambda *a, **k: (1, ["merge failed"])
+    )
     monkeypatch.setattr("paperful.remarks.remark_duplicates", lambda *a, **k: None)
     res = runner.invoke(
         cli.app,
@@ -2707,9 +2742,7 @@ def test_inbox_drain_mixed_exits_3(cfg_file, stub_zotero, tmp_path, monkeypatch)
 
     drop = tmp_path / "drop"
     drop.mkdir()
-    cfg_file.write_text(
-        cfg_file.read_text() + f'\n[inbox]\ndir = "{drop}"\n'
-    )
+    cfg_file.write_text(cfg_file.read_text() + f'\n[inbox]\ndir = "{drop}"\n')
     stats = WatchStats(attached=1, errors=1)
     monkeypatch.setattr("paperful.inbox.process_candidates", lambda *a, **k: stats)
     res = runner.invoke(
@@ -2803,7 +2836,9 @@ def test_ingest_dois_apply_mixed_exits_3(cfg_file, stub_zotero, tmp_path, monkey
     assert body["summary"]["failed"] == 1
 
 
-def test_snowball_apply_format_json_partial(cfg_file, stub_zotero, tmp_path, monkeypatch):
+def test_snowball_apply_format_json_partial(
+    cfg_file, stub_zotero, tmp_path, monkeypatch
+):
     from paperful.snowball.command import PathResult
 
     run_dir = tmp_path / "state" / "snowball" / "r1"
@@ -2912,6 +2947,7 @@ def test_ask_format_json(cfg_file, monkeypatch):
     monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_ask", lambda cfg: None)
     monkeypatch.setattr("paperful.llm.get_client", lambda cfg: object())
     monkeypatch.setattr("paperful.rag.retrieve.scope_keys", lambda *a, **k: None)
+
     def _fake_ask(*a, **k):
         return {
             "question": "What is BBNJ?",
@@ -2954,7 +2990,9 @@ def test_all_format_json_one_envelope(cfg_file, stub_zotero, monkeypatch):
     body = _one_json(res.stdout)
     assert body["command"] == "all"
     assert "Pack" not in res.stdout
-    assert all(row["status"] == "ok" or row["status"] == "skipped" for row in body["items"])
+    assert all(
+        row["status"] == "ok" or row["status"] == "skipped" for row in body["items"]
+    )
 
 
 def test_collections_list_alias(cfg_file, stub_zotero):
@@ -3042,7 +3080,9 @@ def test_collections_add_format_json(cfg_file, stub_zotero, tmp_path, monkeypatc
     assert body["items"][0]["key"] == "I1"
 
 
-def test_collections_add_apply_mixed_exits_3(cfg_file, stub_zotero, tmp_path, monkeypatch):
+def test_collections_add_apply_mixed_exits_3(
+    cfg_file, stub_zotero, tmp_path, monkeypatch
+):
     from paperful.collections_add import AddBatch, AddRow
     from paperful.library import LibraryError
 

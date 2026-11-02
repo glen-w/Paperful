@@ -178,7 +178,9 @@ def create_new(
                 run_id=str(row.run_id or ""),
             )
             backend.create_or_update_note(key, note, prefix)
-        staged_note = str((row.operator or {}).get("note") or operator_note or "").strip()
+        staged_note = str(
+            (row.operator or {}).get("note") or operator_note or ""
+        ).strip()
         if staged_note:
             from ..notehtml import wrap as wrap_note
 
@@ -218,14 +220,22 @@ def create_new(
                 first_author=first,
                 collection_paths=[collection],
                 doi_source="crossref" if record["doi"] else "none",
-                creator_surnames=[c.get("lastName") or c.get("name") or "" for c in creators],
+                creator_surnames=[
+                    c.get("lastName") or c.get("name") or "" for c in creators
+                ],
                 creator_people=person_creators(creators),
             )
         )
-    return created_items, {"created": created, "skipped_exists": skipped_exists, "failed": failed}
+    return created_items, {
+        "created": created,
+        "skipped_exists": skipped_exists,
+        "failed": failed,
+    }
 
 
-def pending_pdf_items(rows: list[Any], created: list[Item], manifest: Any) -> list[Item]:
+def pending_pdf_items(
+    rows: list[Any], created: list[Item], manifest: Any
+) -> list[Item]:
     """Created items plus library rows that still need a PDF. Successes stay put."""
     pending: list[Item] = []
     seen: set[str] = set()
@@ -255,7 +265,9 @@ def pending_pdf_items(rows: list[Any], created: list[Item], manifest: Any) -> li
                 year=int(year) if isinstance(year, int) else None,
                 first_author=authors[0].split()[-1] if authors else None,
                 collection_paths=[],
-                creator_surnames=[c.get("lastName") or c.get("name") or "" for c in creators],
+                creator_surnames=[
+                    c.get("lastName") or c.get("name") or "" for c in creators
+                ],
                 creator_people=person_creators(creators),
             )
         )

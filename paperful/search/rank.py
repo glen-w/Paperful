@@ -60,7 +60,9 @@ def _person_names(terms: list[str]) -> list[str]:
     ]
 
 
-def _host_clusters(hosts: list[str], *, size: int = _CLUSTER, limit: int = _CLUSTER_MAX) -> list[list[str]]:
+def _host_clusters(
+    hosts: list[str], *, size: int = _CLUSTER, limit: int = _CLUSTER_MAX
+) -> list[list[str]]:
     clean: list[str] = []
     for host in hosts:
         h = str(host).strip().lower().removeprefix("www.")
@@ -115,7 +117,9 @@ def fanout_queries(
     return out
 
 
-def build_query(terms: list[str], *, filetype: str = "pdf", hosts: list[str] | None = None) -> str:
+def build_query(
+    terms: list[str], *, filetype: str = "pdf", hosts: list[str] | None = None
+) -> str:
     bits = [str(t).strip() for t in terms if str(t).strip()]
     q = " ".join(bits).strip()
     kind = (filetype or "pdf").strip().lower()
@@ -149,7 +153,9 @@ def doi_from_text(*parts: str) -> str:
 def _author_token(query: str) -> str:
     words = [w.strip("\"'") for w in (query or "").split() if w.strip("\"'")]
     skip = {"or", "and", "the", "of", "filetype:pdf", "site:"}
-    names = [w for w in words if w.lower() not in skip and w[:1].isupper() and len(w) > 2]
+    names = [
+        w for w in words if w.lower() not in skip and w[:1].isupper() and len(w) > 2
+    ]
     return names[-1] if names else ""
 
 

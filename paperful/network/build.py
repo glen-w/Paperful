@@ -254,7 +254,9 @@ def _topic_names(topics: list[Any]) -> list[str]:
         if not isinstance(row, dict):
             continue
         sub = row.get("subfield") if isinstance(row.get("subfield"), dict) else {}
-        name = str((sub or {}).get("display_name") or row.get("display_name") or "").strip()
+        name = str(
+            (sub or {}).get("display_name") or row.get("display_name") or ""
+        ).strip()
         if name:
             names.append(name)
     return names

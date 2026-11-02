@@ -60,11 +60,19 @@ def test_hop_cites_adds_citing_work():
 def test_hop_keywords_adds_overlap_work():
     seed = _work("WSEED", "10.1000/seed", "Seed", 2020, 3)
     seed["keywords"] = [
-        {"id": "https://openalex.org/keywords/kelp", "display_name": "kelp", "score": 0.9}
+        {
+            "id": "https://openalex.org/keywords/kelp",
+            "display_name": "kelp",
+            "score": 0.9,
+        }
     ]
     child = _work("WKEY", "10.1000/key", "Key", 2021, 2)
     child["keywords"] = [
-        {"id": "https://openalex.org/keywords/kelp", "display_name": "kelp", "score": 0.8}
+        {
+            "id": "https://openalex.org/keywords/kelp",
+            "display_name": "kelp",
+            "score": 0.8,
+        }
     ]
 
     def getter(path: str, params: dict) -> dict:
@@ -132,7 +140,9 @@ def test_hop_similar_delegates_to_similar_neighbours(monkeypatch):
     monkeypatch.setattr("paperful.snowball.crawl._similar_neighbours", fake)
     from paperful.snowball.openalex import OpenAlexClient
 
-    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=lambda p, q: {})
+    client = OpenAlexClient(
+        email="t@example.org", api_key="", sleep_s=0, getter=lambda p, q: {}
+    )
     stop = hop_similar(client, [], [], set(), **_kw(direction="similar"))
     assert stop is False
     assert called["yes"]

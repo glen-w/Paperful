@@ -59,10 +59,16 @@ def test_read_frame_round_trips_a_message(stdio):
         (b"\x01\x00", {"type": "invalid"}),  # truncated length prefix
         (struct.pack("<I", 0), {"type": "oversize"}),
         (struct.pack("<I", host.MAX_MSG + 1), {"type": "oversize"}),
-        (struct.pack("<I", 10) + b"abc", {"type": "invalid"}),  # body shorter than declared
+        (
+            struct.pack("<I", 10) + b"abc",
+            {"type": "invalid"},
+        ),  # body shorter than declared
         (struct.pack("<I", 4) + b"\xff\xfe\xfd\xfc", {"type": "invalid"}),  # not UTF-8
         (struct.pack("<I", 5) + b"{nope", {"type": "invalid"}),  # not JSON
-        (struct.pack("<I", 7) + b"[1,2,3]", {"type": "invalid"}),  # JSON but not an object
+        (
+            struct.pack("<I", 7) + b"[1,2,3]",
+            {"type": "invalid"},
+        ),  # JSON but not an object
     ],
 )
 def test_read_frame_flags_bad_input_instead_of_raising(stdio, raw, expected):
@@ -96,8 +102,18 @@ def test_write_frame_replaces_oversize_payloads(stdio):
 
 @pytest.mark.parametrize(
     ("req_id", "echoed"),
-    [(7, True), (1, True), (999_999_999, True), (0, False), (-1, False), (1_000_000_000, False),
-     (True, False), ("7", False), (None, False), (1.5, False)],
+    [
+        (7, True),
+        (1, True),
+        (999_999_999, True),
+        (0, False),
+        (-1, False),
+        (1_000_000_000, False),
+        (True, False),
+        ("7", False),
+        (None, False),
+        (1.5, False),
+    ],
 )
 def test_echo_id_only_for_small_positive_ints(req_id, echoed):
     reply = host._echo_id({"id": req_id}, {"ok": True})
@@ -113,18 +129,43 @@ def test_clip_message_bounds_every_untrusted_field():
     huge = "x" * 50_000
     msg = {
         "type": "capture.plan",
-        "doi": huge, "url": huge, "title": huge, "abstract": huge, "note": huge,
-        "collection": huge, "confirm_key": huge, "key": huge, "target": huge,
+        "doi": huge,
+        "url": huge,
+        "title": huge,
+        "abstract": huge,
+        "note": huge,
+        "collection": huge,
+        "confirm_key": huge,
+        "key": huge,
+        "target": huge,
         "authors": [huge] * 50,
         "tags": [huge] * 500,
         "keys": [huge] * 1000,
-        "page": {"doi": huge, "url": huge, "title": huge, "authors": [huge] * 50, "abstract": huge},
+        "page": {
+            "doi": huge,
+            "url": huge,
+            "title": huge,
+            "authors": [huge] * 50,
+            "abstract": huge,
+        },
         "unrelated": "kept",
     }
     out = host._clip_message(msg)
-    for key in ("doi", "url", "title", "abstract", "note", "collection", "confirm_key", "key", "target"):
+    for key in (
+        "doi",
+        "url",
+        "title",
+        "abstract",
+        "note",
+        "collection",
+        "confirm_key",
+        "key",
+        "target",
+    ):
         assert len(out[key]) < len(huge), key
-    assert len(out["authors"]) == 20 and all(len(a) <= host.AUTHOR_MAX + 5 for a in out["authors"])
+    assert len(out["authors"]) == 20 and all(
+        len(a) <= host.AUTHOR_MAX + 5 for a in out["authors"]
+    )
     assert len(out["keys"]) == 200 and all(len(k) <= 64 + 5 for k in out["keys"])
     assert len(out["tags"]) < 500
     page = out["page"]
@@ -149,7 +190,11 @@ def cfg(tmp_path):
 
 @pytest.mark.parametrize("kind", ["invalid", "oversize"])
 def test_handle_message_rejects_framing_errors(cfg, kind):
-    assert host.handle_message(cfg, {"type": kind, "id": 4}, []) == {"ok": False, "reason": "invalid", "id": 4}
+    assert host.handle_message(cfg, {"type": kind, "id": 4}, []) == {
+        "ok": False,
+        "reason": "invalid",
+        "id": 4,
+    }
 
 
 def test_handle_message_unknown_type_is_not_executed(cfg):
@@ -160,7 +205,9 @@ def test_handle_message_unknown_type_is_not_executed(cfg):
 
 def test_handle_message_mark_ignores_non_list_keys(cfg, monkeypatch):
     seen: list = []
-    monkeypatch.setattr(host, "mark_session_saved", lambda c, keys: seen.append(keys) or {"ok": True})
+    monkeypatch.setattr(
+        host, "mark_session_saved", lambda c, keys: seen.append(keys) or {"ok": True}
+    )
     host.handle_message(cfg, {"type": "handoff.mark", "keys": "K1"}, [])
     host.handle_message(cfg, {"type": "handoff.mark", "keys": ["K1"]}, [])
     assert seen == [[], ["K1"]]
@@ -177,7 +224,11 @@ def test_handle_message_plan_prepares_the_index_once_and_clips(cfg, monkeypatch)
 
     monkeypatch.setattr(host, "plan_page", fake_plan)
     index: list = []
-    msg = {"type": "capture.plan", "doi": "10.1/x", "page": {"url": "https://p.test", "title": "T", "year": "2021"}}
+    msg = {
+        "type": "capture.plan",
+        "doi": "10.1/x",
+        "page": {"url": "https://p.test", "title": "T", "year": "2021"},
+    }
     host.handle_message(cfg, msg, index)
     host.handle_message(cfg, msg, index)
     assert prepared == [1] and index == ["INDEX"]
@@ -187,7 +238,9 @@ def test_handle_message_plan_prepares_the_index_once_and_clips(cfg, monkeypatch)
 
 def test_serve_stdio_answers_each_frame_and_stops_at_eof(cfg, stdio, monkeypatch):
     monkeypatch.setattr(host, "hello_payload", lambda c: {"ok": True, "hello": True})
-    out, _err = stdio(_frame({"type": "hello", "id": 1}) + _frame({"type": "nope", "id": 2}))
+    out, _err = stdio(
+        _frame({"type": "hello", "id": 1}) + _frame({"type": "nope", "id": 2})
+    )
     host.serve_stdio(cfg)
     assert _replies(out.getvalue()) == [
         {"ok": True, "hello": True, "id": 1},
@@ -195,7 +248,9 @@ def test_serve_stdio_answers_each_frame_and_stops_at_eof(cfg, stdio, monkeypatch
     ]
 
 
-def test_serve_stdio_keeps_handler_prints_off_the_protocol_stream(cfg, stdio, monkeypatch):
+def test_serve_stdio_keeps_handler_prints_off_the_protocol_stream(
+    cfg, stdio, monkeypatch
+):
     def chatty(c, msg, index):
         print("LOG LINE THAT MUST NOT REACH FIREFOX")
         return {"ok": True}
@@ -211,4 +266,6 @@ def test_serve_stdio_keeps_handler_prints_off_the_protocol_stream(cfg, stdio, mo
 def test_serve_stdio_ends_the_session_on_an_oversize_frame(cfg, stdio):
     out, _err = stdio(struct.pack("<I", host.MAX_MSG + 1) + _frame({"type": "hello"}))
     host.serve_stdio(cfg)
-    assert _replies(out.getvalue()) == [{"ok": False, "reason": "invalid"}]  # later frames are never read
+    assert _replies(out.getvalue()) == [
+        {"ok": False, "reason": "invalid"}
+    ]  # later frames are never read

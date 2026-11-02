@@ -150,7 +150,9 @@ def _ocr_cli(tmp_path, monkeypatch, *, apply: bool):
         "_rag_auto",
         lambda cfg, since, keys=(): calls.append((since, list(keys))),
     )
-    args = ["ocr", "--library", "--config", str(config)] + (["--apply"] if apply else [])
+    args = ["ocr", "--library", "--config", str(config)] + (
+        ["--apply"] if apply else []
+    )
     res = runner.invoke(cli.app, args)
     assert res.exit_code == 0, res.stdout
     return calls
@@ -212,7 +214,9 @@ def test_doctor_ambers_missing_lancedb(cfg, monkeypatch):
     cfg.rag_enabled = True
     real = importlib.util.find_spec
     monkeypatch.setattr(
-        importlib.util, "find_spec", lambda name, *a: None if name == "lancedb" else real(name, *a)
+        importlib.util,
+        "find_spec",
+        lambda name, *a: None if name == "lancedb" else real(name, *a),
     )
     (check,) = _rag_checks(cfg)
     assert check.status == "amber" and "--extra rag" in check.detail
@@ -244,7 +248,9 @@ def test_doctor_greens_a_built_index(rag_cfg, monkeypatch):
         parser=TextFileParser(),
         ocr_available=lambda: False,
     )
-    monkeypatch.setattr("paperful.llm.preflight.validate_embedder", lambda cfg: embedder)
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_embedder", lambda cfg: embedder
+    )
     embeddings, index = _rag_checks(rag_cfg)
     assert embeddings.status == "green" and "nomic-embed-text" in embeddings.detail
     assert index.status == "green" and index.detail.startswith("1 items, ")
@@ -264,7 +270,9 @@ def test_doctor_ambers_stale_index(rag_cfg, monkeypatch):
         ocr_available=lambda: False,
     )
     add_item(rag_cfg, "BBBB2222", pdf=BODY)
-    monkeypatch.setattr("paperful.llm.preflight.validate_embedder", lambda cfg: embedder)
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_embedder", lambda cfg: embedder
+    )
     embeddings, index = _rag_checks(rag_cfg)
     assert embeddings.status == "green"
     assert index.status == "amber" and "behind the mirror" in index.detail

@@ -11,9 +11,7 @@ from pathlib import Path
 
 from .snowball.openalex import normalize_orcid
 
-_ORCID_RE = re.compile(
-    r"\b(\d{4}-\d{4}-\d{4}-\d{3}[\dX])\b", re.IGNORECASE
-)
+_ORCID_RE = re.compile(r"\b(\d{4}-\d{4}-\d{4}-\d{3}[\dX])\b", re.IGNORECASE)
 _RG_PROFILE = re.compile(
     r"researchgate\.net/profile/([^/\">\s]+)",
     re.IGNORECASE,

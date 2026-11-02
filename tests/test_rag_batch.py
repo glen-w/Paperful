@@ -42,7 +42,9 @@ def no_reference_manager(monkeypatch):
 def fakes(monkeypatch):
     embedder, chat = FakeEmbedder(), StubChat()
     monkeypatch.setattr("paperful.llm.validate_embedder", lambda cfg: embedder)
-    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_ask", lambda cfg: "stub")
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_ask", lambda cfg: "stub"
+    )
     monkeypatch.setattr("paperful.llm.get_client", lambda cfg: chat)
     monkeypatch.setattr("paperful.rag.ingest.get_parser", lambda cfg: TextFileParser())
     monkeypatch.setattr("paperful.rag.ingest.ocrmypdf_available", lambda: False)
@@ -100,14 +102,20 @@ def test_resolve_system_prompt_inline_overrides_focus():
 def test_batch_resume_key_depends_on_inline_prompt():
     from paperful.rag.batch import resume_key
 
-    a = resume_key(question="q", focus="default", prompt_label="inline:aaa", index_fp="x")
-    b = resume_key(question="q", focus="default", prompt_label="inline:bbb", index_fp="x")
+    a = resume_key(
+        question="q", focus="default", prompt_label="inline:aaa", index_fp="x"
+    )
+    b = resume_key(
+        question="q", focus="default", prompt_label="inline:bbb", index_fp="x"
+    )
     assert a != b
 
 
 def test_ask_focus_changes_system_prompt(mirror):
     _ingest(mirror)
-    res = _run(["ask", "What gaps remain?", "--focus", "gaps", "--no-stream"], mirror["config"])
+    res = _run(
+        ["ask", "What gaps remain?", "--focus", "gaps", "--no-stream"], mirror["config"]
+    )
     assert res.exit_code == 0, plain_text(res.stdout)
     system = mirror["chat"].requests[0].messages[0]["content"]
     assert "gaps" in system.lower()
@@ -262,4 +270,9 @@ def test_profile_focus_applies_to_ask(mirror, tmp_path):
     assert "gaps" in system.lower()
     # Scope from profile: only law (BBBB2222 abstract), not ocean PDF alone.
     user = mirror["chat"].requests[0].messages[-1]["content"]
-    assert "Seabed" in user or "Silva" in user or "BBBB2222" in user or "royalties" in user.lower()
+    assert (
+        "Seabed" in user
+        or "Silva" in user
+        or "BBBB2222" in user
+        or "royalties" in user.lower()
+    )

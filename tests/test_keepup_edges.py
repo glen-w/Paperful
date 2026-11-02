@@ -25,13 +25,20 @@ from paperful.keepup import (
 
 @pytest.fixture
 def cfg(tmp_path) -> Config:
-    c = Config(email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state", keepup_interval_days=5)
+    c = Config(
+        email="t@example.org",
+        out_dir=tmp_path / "out",
+        state_dir=tmp_path / "state",
+        keepup_interval_days=5,
+    )
     c.state_dir.mkdir(parents=True)
     return c
 
 
 def _stamp(days_ago: float) -> str:
-    return (datetime.now(timezone.utc) - timedelta(days=days_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return (datetime.now(timezone.utc) - timedelta(days=days_ago)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
 
 
 def _show(cfg, name) -> str:
@@ -40,7 +47,9 @@ def _show(cfg, name) -> str:
     return buf.getvalue()
 
 
-@pytest.mark.parametrize("bad", ["", "../x", "a/b", ".hidden", "-lead", "has space", "tab\t"])
+@pytest.mark.parametrize(
+    "bad", ["", "../x", "a/b", ".hidden", "-lead", "has space", "tab\t"]
+)
 def test_job_names_are_validated_before_touching_disk(cfg, bad):
     with pytest.raises(KeepupError, match="Invalid keepup name"):
         job_dir(cfg, bad)
@@ -67,23 +76,43 @@ def test_save_job_validation(cfg):
 
 def test_save_job_normalises_and_keeps_state_on_resave(cfg):
     path = save_job(
-        cfg, "j", collection=" Ocean ",
+        cfg,
+        "j",
+        collection=" Ocean ",
         sources=[Source(" CITES "), Source("Watch", " w1 ")],
-        per_seed_limit=0, max_candidates=-5,
+        per_seed_limit=0,
+        max_candidates=-5,
     )
     body = json.loads(path.read_text(encoding="utf-8"))
-    assert body["collection"] == "Ocean" and body["interval_days"] == 5  # config default
+    assert (
+        body["collection"] == "Ocean" and body["interval_days"] == 5
+    )  # config default
     assert body["per_seed_limit"] == 1 and body["max_candidates"] == 0
-    assert body["sources"] == [{"type": "cites", "name": ""}, {"type": "watch", "name": "w1"}]
+    assert body["sources"] == [
+        {"type": "cites", "name": ""},
+        {"type": "watch", "name": "w1"},
+    ]
 
-    body["baseline_at"], body["last_run_at"] = "2025-01-01T00:00:00Z", "2025-02-01T00:00:00Z"
+    body["baseline_at"], body["last_run_at"] = (
+        "2025-01-01T00:00:00Z",
+        "2025-02-01T00:00:00Z",
+    )
     path.write_text(json.dumps(body), encoding="utf-8")
-    (job_dir(cfg, "j") / "seen.json").write_text(json.dumps({"identities": ["doi:x"]}), encoding="utf-8")
+    (job_dir(cfg, "j") / "seen.json").write_text(
+        json.dumps({"identities": ["doi:x"]}), encoding="utf-8"
+    )
     save_job(cfg, "j", collection="Ocean", sources=[Source("cites")], interval_days=0)
     again = load_job(cfg, "j")
-    assert again["baseline_at"] == "2025-01-01T00:00:00Z" and again["last_run_at"] == "2025-02-01T00:00:00Z"
-    assert again["interval_days"] == 0 and again["sources"] == [{"type": "cites", "name": ""}]
-    assert json.loads((job_dir(cfg, "j") / "seen.json").read_text())["identities"] == ["doi:x"]
+    assert (
+        again["baseline_at"] == "2025-01-01T00:00:00Z"
+        and again["last_run_at"] == "2025-02-01T00:00:00Z"
+    )
+    assert again["interval_days"] == 0 and again["sources"] == [
+        {"type": "cites", "name": ""}
+    ]
+    assert json.loads((job_dir(cfg, "j") / "seen.json").read_text())["identities"] == [
+        "doi:x"
+    ]
 
 
 def test_save_job_recovers_from_a_corrupt_non_object_job_file(cfg):
@@ -112,9 +141,13 @@ def test_load_job_unknown(cfg):
 
 
 def test_show_job_before_any_run(cfg):
-    save_job(cfg, "j", collection="Ocean", sources=[Source("cites"), Source("watch", "w1")])
+    save_job(
+        cfg, "j", collection="Ocean", sources=[Source("cites"), Source("watch", "w1")]
+    )
     out = _show(cfg, "j")
-    assert "keepup j" in out and "collection · Ocean" in out and "interval_days · 5" in out
+    assert (
+        "keepup j" in out and "collection · Ocean" in out and "interval_days · 5" in out
+    )
     assert "baseline · not yet" in out and "last run" not in out
     assert "source · cites" in out and "source · watch w1" in out
     assert "inbox pending · 0" in out
@@ -151,9 +184,15 @@ def test_days_until_due_edge_inputs(last, interval, due):
 
 
 def test_days_until_due_accepts_naive_timestamps_and_floors_to_one_day():
-    naive = (datetime.now(timezone.utc) - timedelta(hours=1)).replace(tzinfo=None).isoformat()
+    naive = (
+        (datetime.now(timezone.utc) - timedelta(hours=1))
+        .replace(tzinfo=None)
+        .isoformat()
+    )
     assert days_until_due(naive, 7) >= 6
-    almost = (datetime.now(timezone.utc) - timedelta(days=1) + timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    almost = (
+        datetime.now(timezone.utc) - timedelta(days=1) + timedelta(minutes=5)
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
     assert days_until_due(almost, 1) == 1  # never reports 0 days while still not due
 
 

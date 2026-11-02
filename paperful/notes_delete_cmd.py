@@ -47,10 +47,13 @@ def run_notes_delete(
         if unknown:
             console.print(f"[red]Unknown --type: {', '.join(sorted(unknown))}[/]")
             raise typer.Exit(1)
-    if not all_owned and types is None and not model.strip() and not except_model.strip():
-        console.print(
-            "[red]Give --type, --model / --except-model, or --all.[/]"
-        )
+    if (
+        not all_owned
+        and types is None
+        and not model.strip()
+        and not except_model.strip()
+    ):
+        console.print("[red]Give --type, --model / --except-model, or --all.[/]")
         raise typer.Exit(1)
     cfg = cli_mod._cfg(config)
     json_out = cli_mod._agent_json(fmt)
@@ -125,7 +128,9 @@ def run_notes_delete(
             "matched": len(matched),
             "trashed": trashed,
             "errors": len(errors),
-            "skipped_not_paperful": max(0, len(hits) - len(matched)) if all_owned else 0,
+            "skipped_not_paperful": max(0, len(hits) - len(matched))
+            if all_owned
+            else 0,
         },
         items=[
             {
@@ -157,7 +162,9 @@ def run_notes_delete(
             table.add_column("Type")
             table.add_column("Model")
             for h in matched[:100]:
-                table.add_row(h.note_key, h.parent_key or "(collection)", h.note_type, h.model)
+                table.add_row(
+                    h.note_key, h.parent_key or "(collection)", h.note_type, h.model
+                )
             console.print(table)
         if apply:
             console.print(f"Trashed {trashed}. Errors {len(errors)}.")
@@ -167,4 +174,3 @@ def run_notes_delete(
             console.print("Dry-run. Pass [bold]--apply[/] to trash these notes.")
 
     cli_mod._emit_agent(payload, json_out=json_out, human=_human_notes)
-

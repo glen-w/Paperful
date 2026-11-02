@@ -97,7 +97,6 @@ from .app import (
 )
 
 
-
 from .discover_graph_routes import (
     handle_discover_graph,
     handle_discover_graph_add,
@@ -244,9 +243,24 @@ def _discover_page(
                 )
                 for name in (
                     (
-                        ("explore", "topic", "grow", "people", "web", "queue", "following")
+                        (
+                            "explore",
+                            "topic",
+                            "grow",
+                            "people",
+                            "web",
+                            "queue",
+                            "following",
+                        )
                         if web_on
-                        else ("explore", "topic", "grow", "people", "queue", "following")
+                        else (
+                            "explore",
+                            "topic",
+                            "grow",
+                            "people",
+                            "queue",
+                            "following",
+                        )
                     )
                     if prefs.advanced
                     else (
@@ -309,8 +323,12 @@ def _discover_page(
             coauthor_network=ui.cfg.ui_coauthor_network,
             web_search=ui.cfg.ui_web_search,
             searxng_configured=_searxng_configured(ui.cfg),
-            search_bundle=newest_search_run(ui.cfg) if tab_name == "web" and web_on else None,
-            search_watches=_search_watches(ui.cfg) if tab_name == "web" and web_on else [],
+            search_bundle=newest_search_run(ui.cfg)
+            if tab_name == "web" and web_on
+            else None,
+            search_watches=_search_watches(ui.cfg)
+            if tab_name == "web" and web_on
+            else [],
             search_token=_last_review_token(ui, "search_apply"),
         ),
         status_code=status_code,

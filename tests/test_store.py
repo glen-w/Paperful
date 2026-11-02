@@ -132,10 +132,14 @@ def test_manifest_latest_record_wins_and_resume_logic(tmp_path):
     path = tmp_path / "manifest.jsonl"
     m = Manifest(path)
     m.write(Record(itemKey="K1", status=STATUS_ERROR))
-    m.write(Record(itemKey="K1", status=STATUS_OK, path="/tmp/a.pdf", source="unpaywall"))
+    m.write(
+        Record(itemKey="K1", status=STATUS_OK, path="/tmp/a.pdf", source="unpaywall")
+    )
     m.write(Record(itemKey="K2", status=STATUS_NOT_FOUND))
     m.write(Record(itemKey="K3", status=STATUS_ERROR))
-    m.write(Record(itemKey="K4", status=STATUS_ATTACHED, path="/tmp/b.pdf", source="scihub"))
+    m.write(
+        Record(itemKey="K4", status=STATUS_ATTACHED, path="/tmp/b.pdf", source="scihub")
+    )
     m.write(
         Record(
             itemKey="AF",
@@ -196,15 +200,24 @@ def test_manifest_retries_captcha_and_holds_no_identifier(tmp_path):
 
 def test_pending_attach_skips_gated_reasons(tmp_path):
     m = Manifest(tmp_path / "m.jsonl")
-    m.write(Record(itemKey="DOI", status=STATUS_OK, path="a.pdf", reason=REASON_STRICT_PDF_DOI))
-    m.write(Record(itemKey="SHORT", status=STATUS_OK, path="b.pdf", reason=REASON_SHORT_PDF))
+    m.write(
+        Record(
+            itemKey="DOI", status=STATUS_OK, path="a.pdf", reason=REASON_STRICT_PDF_DOI
+        )
+    )
+    m.write(
+        Record(itemKey="SHORT", status=STATUS_OK, path="b.pdf", reason=REASON_SHORT_PDF)
+    )
     m.write(Record(itemKey="OK", status=STATUS_OK, path="c.pdf"))
     assert [r.itemKey for r in m.pending_attach()] == ["OK"]
     assert [r.itemKey for r in m.pending_attach(allow_pdf_doi_mismatch=True)] == [
         "DOI",
         "OK",
     ]
-    assert [r.itemKey for r in m.pending_attach(allow_short_pdf=True)] == ["SHORT", "OK"]
+    assert [r.itemKey for r in m.pending_attach(allow_short_pdf=True)] == [
+        "SHORT",
+        "OK",
+    ]
     assert [
         r.itemKey
         for r in m.pending_attach(allow_pdf_doi_mismatch=True, allow_short_pdf=True)
@@ -267,7 +280,6 @@ def test_resolve_pdf_path_rewrites_docker_data_prefix(tmp_path):
 
 
 # ---- items_from_mirror: the catalogue `run` uses when the manager is offline ---
-
 
 
 def _mirror_item(out, collection, key, *, pdf=True, **record):
@@ -354,7 +366,9 @@ def test_write_fetch_fills_missing_required_keys(tmp_path):
     item = _item()
     primary, _extras = save_pdf(tmp_path, item, content, md5)
     dest = record_path(primary.parent)
-    dest.write_text(json.dumps({"schema": "paperful.item.v1", "item_key": item.key, "kept": 1}))
+    dest.write_text(
+        json.dumps({"schema": "paperful.item.v1", "item_key": item.key, "kept": 1})
+    )
     write_fetch_records(
         [primary],
         item,

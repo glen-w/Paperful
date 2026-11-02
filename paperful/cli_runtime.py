@@ -50,8 +50,10 @@ from .zot import ZoteroLocal, resolve_item_types
 
 console = Console(highlight=False)
 
+
 def _stdin_is_tty() -> bool:
     return sys.stdin.isatty()
+
 
 def _bind_run(cfg: Config, **kwargs: Any) -> ResolvedRunConfig:
     try:
@@ -59,6 +61,7 @@ def _bind_run(cfg: Config, **kwargs: Any) -> ResolvedRunConfig:
     except RunConfigError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
+
 
 def _scope_unset(
     collection: list[str],
@@ -68,9 +71,11 @@ def _scope_unset(
 ) -> bool:
     return not profile and run_config is None and not collection and library is None
 
+
 def _refuse_missing_scope() -> None:
     console.print("[red]Give --collection PATH (repeatable) or --library.[/]")
     raise typer.Exit(1)
+
 
 def _inbox_library_when_unscoped(
     collection: list[str],
@@ -82,6 +87,7 @@ def _inbox_library_when_unscoped(
     if _scope_unset(collection, library, profile, run_config):
         return True
     return library
+
 
 def _take_scope(
     bound: ResolvedRunConfig,
@@ -182,6 +188,7 @@ def _connect_scope(
         items = items[: scoped.limit]
     return backend, loaded, items
 
+
 def _item_progress(*, json_out: bool = False, transient: bool = False):
     """Live bar that stays below scrolling per-item logs.
 
@@ -195,13 +202,13 @@ def _item_progress(*, json_out: bool = False, transient: bool = False):
     quiet = (json_out or transient) and not live.is_terminal and not e2e
     return item_progress(live, disable=quiet, transient=transient)
 
+
 def _track(progress, description: str) -> Track:
     return tracker(progress, description)
 
+
 @contextmanager
-def _spinner(
-    text: str, *, json_out: bool = False
-) -> Iterator[Callable[[str], None]]:
+def _spinner(text: str, *, json_out: bool = False) -> Iterator[Callable[[str], None]]:
     """Spinner and clock for one slow call that has no item count.
 
     Yields a function that replaces the text. The line clears when done.
@@ -212,19 +219,19 @@ def _spinner(
     stream = sys.stderr if json_out else sys.stdout
     # Pytest capture + Rich Live on a TTY deadlocks. Piped CLI has no spinner
     # anyway; phase print lines still go through on_status.
-    if os.environ.get("PYTEST_CURRENT_TEST") or (
-        not e2e and not stream.isatty()
-    ):
+    if os.environ.get("PYTEST_CURRENT_TEST") or (not e2e and not stream.isatty()):
         yield lambda _msg: None
         return
     with _item_progress(json_out=json_out, transient=True) as progress:
         task_id = progress.add_task(text, total=None)
         yield lambda msg: progress.update(task_id, description=msg)
 
+
 def _load_scope(backend: LibraryBackend, *, json_out: bool = False, **scope: Any):
     """``_loaded_scope`` behind a spinner that shows the loader's own status."""
     with _spinner("Connecting to library scope…", json_out=json_out) as say:
         return _loaded_scope(backend, status=say, **scope)
+
 
 def _cfg(path: Path | None) -> Config:
     try:
@@ -235,6 +242,7 @@ def _cfg(path: Path | None) -> Config:
     cfg.out_dir.mkdir(parents=True, exist_ok=True)
     cfg.state_dir.mkdir(parents=True, exist_ok=True)
     return cfg
+
 
 def _typer_opt(value: Any, default: Any = None) -> Any:
     """Unwrap Typer OptionInfo/ArgumentInfo when a command is called as a function.
@@ -251,12 +259,14 @@ def _typer_opt(value: Any, default: Any = None) -> Any:
         return raw
     return value
 
+
 def _typer_enum_value(value: Any) -> str | None:
     """``Enum.value`` after ``_typer_opt``, or None."""
     value = _typer_opt(value)
     if value is None:
         return None
     return value.value if hasattr(value, "value") else str(value)
+
 
 def _resolve_source_names(sources: str | None, preset: str | None) -> list[str] | None:
     """Return explicit source names from --sources or --preset, or None to use config."""
@@ -275,6 +285,7 @@ def _resolve_source_names(sources: str | None, preset: str | None) -> list[str] 
         return list(SOURCE_PRESETS[token])
     return [s.strip() for s in sources.split(",") if s.strip()]
 
+
 def _source_list(
     cfg: Config, sources: str | None, enable_scihub: bool, preset: str | None = None
 ) -> list[str]:
@@ -284,6 +295,7 @@ def _source_list(
     if enable_scihub and "scihub" not in listed:
         listed.append("scihub")
     return listed
+
 
 def _zotero(*, quiet: bool = False) -> ZoteroLocal:
     zl = ZoteroLocal()
@@ -301,6 +313,7 @@ def _zotero(*, quiet: bool = False) -> ZoteroLocal:
             f"{'yes' if info['supports_write'] else 'no (Zotero 10+ needed)'}[/]"
         )
     return zl
+
 
 def _env_code(message: str) -> str:
     low = message.lower()
@@ -327,6 +340,7 @@ def _env_code(message: str) -> str:
     ):
         return "zotero_down"
     return ""
+
 
 def _zotero_next_steps(code: str, *, in_doctor: bool) -> list[str]:
     host = os.environ.get("PAPERFUL_ZOTERO_HOST", "").strip()
@@ -375,6 +389,7 @@ def _zotero_next_steps(code: str, *, in_doctor: bool) -> list[str]:
         )
     return steps
 
+
 def _print_exit_ladder(
     cfg: Config | None = None, *, code: str = "", in_doctor: bool = False
 ) -> None:
@@ -402,22 +417,27 @@ def _print_exit_ladder(
     body = "\n".join(f"  {i}. {step}" for i, step in enumerate(steps, start=1))
     console.print(f"\n[bold]Next steps[/]\n{body}\n")
 
+
 def _exit_env(message: str, cfg: Config | None = None, *, code: str = "") -> None:
     console.print(f"[red]{message}[/]")
     _print_exit_ladder(cfg, code=code or _env_code(message))
     raise typer.Exit(2)
 
+
 def _warn_if_scihub(source_list: list[str]) -> None:
     if "scihub" in source_list:
         console.print(f"[red]{SCIHUB_DISCLAIMER}[/]")
+
 
 def _warn_if_recover(source_list: list[str]) -> None:
     if "browser_agent" in source_list:
         console.print(f"[orange3]{RECOVER_DISCLAIMER}[/]")
 
+
 def _warn_if_camofox(source_list: list[str]) -> None:
     if "camofox" in source_list:
         console.print(f"[orange3]{CAMOFOX_DISCLAIMER}[/]")
+
 
 def _require_manager(cfg: Config) -> None:
     manager = (cfg.manager or "zotero").strip().lower()
@@ -427,10 +447,13 @@ def _require_manager(cfg: Config) -> None:
         )
         raise typer.Exit(1)
 
+
 def _manager_name(cfg: Config) -> str:
     return (cfg.manager or "zotero").strip().lower() or "zotero"
 
+
 _OFFLINE = False
+
 
 def _offline() -> bool:
     """``--offline`` or ``PAPERFUL_OFFLINE=1``: leave the manager alone."""
@@ -439,6 +462,7 @@ def _offline() -> bool:
         "true",
         "yes",
     }
+
 
 def _try_live(cfg: Config, *, quiet: bool = False) -> tuple[LibraryBackend | None, str]:
     """The manager itself, or (None, reason) when it is not reachable."""
@@ -469,6 +493,7 @@ def _try_live(cfg: Config, *, quiet: bool = False) -> tuple[LibraryBackend | Non
     except Exception as exc:
         return None, str(exc)
 
+
 def _mirror_first(cfg: Config, live: LibraryBackend, *, quiet: bool) -> LibraryBackend:
     """Refresh the mirror from ``live`` and read from it."""
 
@@ -481,7 +506,10 @@ def _mirror_first(cfg: Config, live: LibraryBackend, *, quiet: bool) -> LibraryB
     except LibraryError as exc:
         _exit_env(str(exc), cfg)
 
-def _open_library(cfg: Config, *, quiet: bool = False) -> tuple[LibraryBackend | None, str]:
+
+def _open_library(
+    cfg: Config, *, quiet: bool = False
+) -> tuple[LibraryBackend | None, str]:
     """The library, or (None, reason) when the manager is not reachable.
 
     A missing manager does not stop work that can stay on the local mirror.
@@ -492,6 +520,7 @@ def _open_library(cfg: Config, *, quiet: bool = False) -> tuple[LibraryBackend |
     if live is None:
         return None, reason
     return _mirror_first(cfg, live, quiet=quiet), ""
+
 
 def _live_backend(cfg: Config, *, quiet: bool = False) -> LibraryBackend:
     """The manager itself, for verbs that compare it with the mirror. Exits 2 when it is down."""
@@ -519,6 +548,7 @@ def _live_backend(cfg: Config, *, quiet: bool = False) -> LibraryBackend:
             )
     return backend
 
+
 def _connect(cfg: Config, *, quiet: bool = False) -> LibraryBackend:
     """The library for a command: the mirror, refreshed when the manager answers.
 
@@ -545,10 +575,12 @@ def _connect(cfg: Config, *, quiet: bool = False) -> LibraryBackend:
         return MirrorFirstBackend(cfg, catalogue, None)
     return _mirror_first(cfg, live, quiet=quiet)
 
+
 def _no_write(backend: LibraryBackend) -> str:
     if getattr(backend, "live", backend) is None:
         return "The library is not reachable, so nothing can be written to it."
     return "This library has no write support."
+
 
 def _flush(backend: LibraryBackend) -> None:
     behind = getattr(backend, "unrefreshed", None)
@@ -570,9 +602,11 @@ def _flush(backend: LibraryBackend) -> None:
         "(import option: EndNote Generated XML).[/]"
     )
 
+
 def _scope_error(exc: ScopeError) -> None:
     console.print(f"[red]{exc}[/]")
     raise typer.Exit(1) from exc
+
 
 def _scope_keys(
     backend: LibraryBackend, collection: list[str], library: bool
@@ -582,12 +616,14 @@ def _scope_keys(
     except ScopeError as exc:
         _scope_error(exc)
 
+
 def _resolve_types(item_type: list[str]) -> frozenset[str] | None:
     try:
         return resolve_item_types(item_type)
     except ValueError as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1)
+
 
 def _apply_item_filters(
     items: list,
@@ -610,6 +646,7 @@ def _apply_item_filters(
         )
     except ScopeError as exc:
         _scope_error(exc)
+
 
 def _loaded_scope(
     backend: LibraryBackend,
@@ -638,8 +675,10 @@ def _loaded_scope(
     except ScopeError as exc:
         _scope_error(exc)
 
+
 def _opt_bool(flag: bool | None, configured: bool) -> bool:
     return configured if flag is None else flag
+
 
 def _child_bytes(backend: Any, child: dict[str, Any]) -> bool:
     data = child.get("data") or {}
@@ -654,6 +693,7 @@ def _child_bytes(backend: Any, child: dict[str, Any]) -> bool:
         return bool(probe(key))
     except Exception:
         return False
+
 
 def _print_attachment_table(counts: dict[str, int]) -> None:
     table = Table(title="Attachments")
@@ -679,6 +719,7 @@ def _print_attachment_table(counts: dict[str, int]) -> None:
             table.add_row(kind, str(count))
     console.print(table)
 
+
 def _print_version_table(proposals: list) -> None:
     if not proposals:
         console.print("[green]No preprint / published pairs.[/]")
@@ -697,6 +738,7 @@ def _print_version_table(proposals: list) -> None:
             note,
         )
     console.print(table)
+
 
 def _print_dedupe_table(groups: list) -> None:
     if not groups:
@@ -719,8 +761,10 @@ def _print_dedupe_table(groups: list) -> None:
         table.add_row(group.phase, keep, trash, note)
     console.print(table)
 
+
 def _ezproxy_headed_login_and_probe(cfg: Config, pipe: Pipeline) -> bool:
     return ezproxy_headed_login_and_probe(console, cfg, pipe)
+
 
 def _ensure_ezproxy_session(
     cfg: Config,
@@ -729,9 +773,8 @@ def _ensure_ezproxy_session(
     enabled: bool,
     prompt: str,
 ) -> bool:
-    return ensure_ezproxy_session(
-        console, cfg, pipe, enabled=enabled, prompt=prompt
-    )
+    return ensure_ezproxy_session(console, cfg, pipe, enabled=enabled, prompt=prompt)
+
 
 def _preflight_ezproxy_session(
     cfg: Config,
@@ -742,10 +785,12 @@ def _preflight_ezproxy_session(
 ) -> None:
     preflight_ezproxy_session(console, cfg, pipe, source_list, enabled=enabled)
 
+
 def _mid_run_ezproxy_hook(
     cfg: Config, pipe: Pipeline, *, enabled: bool
 ) -> Callable[[], bool] | None:
     return mid_run_ezproxy_hook(console, cfg, pipe, enabled=enabled)
+
 
 def _maybe_ezproxy_relogin(
     cfg: Config,
@@ -755,6 +800,7 @@ def _maybe_ezproxy_relogin(
     enabled: bool,
 ) -> None:
     maybe_ezproxy_relogin(console, cfg, pipe, todo, enabled=enabled)
+
 
 def _run_session_handoff(
     cfg: Config,
@@ -781,6 +827,7 @@ def _run_session_handoff(
         re_request=re_request,
     )
 
+
 def _inbox_handoff_session(
     cfg: Config,
     backend: LibraryBackend,
@@ -806,6 +853,7 @@ def _inbox_handoff_session(
         use_fifo=use_fifo,
     )
 
+
 def _mirror_deferred(cfg: Config) -> None:
     manager = _manager_name(cfg)
     console.print(
@@ -814,14 +862,17 @@ def _mirror_deferred(cfg: Config) -> None:
         f"When it is, run paperful attach.[/]"
     )
 
+
 def _library_write_api(backend: LibraryBackend) -> bool | None:
     try:
         return bool(backend.supports_write())
     except Exception:
         return None
 
+
 def _run_flags(**kwargs) -> dict:
     return {k: v for k, v in kwargs.items() if v}
+
 
 def _agent_json(fmt: str) -> bool:
     if not isinstance(fmt, str):
@@ -832,7 +883,10 @@ def _agent_json(fmt: str) -> bool:
         raise typer.Exit(1)
     return kind == "json"
 
-def _emit_agent(payload: dict[str, Any], *, json_out: bool, human: Callable[[], None]) -> None:
+
+def _emit_agent(
+    payload: dict[str, Any], *, json_out: bool, human: Callable[[], None]
+) -> None:
     from .agent_json import emit_stdout, stdout_suppressed
 
     if json_out:
@@ -843,10 +897,12 @@ def _emit_agent(payload: dict[str, Any], *, json_out: bool, human: Callable[[], 
     if code:
         raise typer.Exit(code)
 
+
 def _agent_wins(fmt: str, as_json: bool = False) -> tuple[bool, bool]:
     """``--format json`` wins over legacy ``--json``."""
     json_out = _agent_json(fmt)
     return json_out, bool(as_json) and not json_out
+
 
 def _finish_run(
     cfg: Config,
@@ -882,6 +938,7 @@ def _finish_run(
 
     _emit_agent(payload, json_out=json_out, human=_human)
 
+
 def _load_last_run(cfg: Config) -> dict | None:
     path = cfg.state_dir / "last-run.json"
     try:
@@ -889,10 +946,12 @@ def _load_last_run(cfg: Config) -> dict | None:
     except (OSError, ValueError):
         return None
 
+
 def _rag_require(cfg: Config) -> None:
     if not cfg.rag_enabled:
         console.print("[red]rag.enabled is false in config.toml[/]")
         raise typer.Exit(1)
+
 
 def _rag_embedder(cfg: Config):
     """A checked embedder, or exit 1 with the reason."""
@@ -910,6 +969,7 @@ def _rag_embedder(cfg: Config):
         )
     return embedder
 
+
 def _rag_open(cfg: Config):
     """The index and its ledger, or exit 1 when there is nothing to search."""
     from .rag.index import (
@@ -926,6 +986,7 @@ def _rag_open(cfg: Config):
     except (RagUnavailable, IndexMissing, IndexMismatch) as exc:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
+
 
 def _rag_auto(cfg: Config, since: float, keys: Any = ()) -> None:
     """Index PDFs this command just landed, when ``[rag].auto_ingest`` is on.
@@ -963,6 +1024,7 @@ def _rag_auto(cfg: Config, since: float, keys: Any = ()) -> None:
             f"[dim]Index: {done} item(s) updated, {batch.chunks} passages.[/]"
         )
 
+
 def _print_hits(hits: list) -> None:
     from .rag.prompt import Source
 
@@ -978,6 +1040,7 @@ def _print_hits(hits: list) -> None:
         if len(snippet) > 320:
             snippet = snippet[:317] + "…"
         console.print(f"   {snippet}", markup=False, highlight=False, style="dim")
+
 
 def _ask_once(
     cfg: Config,
@@ -1051,6 +1114,7 @@ def _ask_once(
         "evidence": getattr(reply, "evidence", {}) or {},
     }
 
+
 def _ask_questions(first: str | None) -> Iterator[str]:
     """The question given, or a prompt loop. Piped input is one question per line."""
     if first is not None:
@@ -1069,4 +1133,3 @@ def _ask_questions(first: str | None) -> Iterator[str]:
             return
         if line:
             yield line
-

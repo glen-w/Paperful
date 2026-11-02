@@ -11,6 +11,7 @@ from rich.console import Console
 import time
 from rich.table import Table
 
+
 def run_ocr(
     console: Console,
     *,
@@ -85,7 +86,9 @@ def run_ocr(
         items = items[:limit]
     started = time.time()
     deadline = (
-        started + max_minutes * 60.0 if max_minutes is not None and max_minutes > 0 else None
+        started + max_minutes * 60.0
+        if max_minutes is not None and max_minutes > 0
+        else None
     )
     if not items:
         write_command_report(
@@ -119,7 +122,9 @@ def run_ocr(
                 backend,
                 apply=apply,
                 attach=attach,
-                track=cli_mod._track(progress, "Running OCR" if apply else "Checking PDFs"),
+                track=cli_mod._track(
+                    progress, "Running OCR" if apply else "Checking PDFs"
+                ),
                 deadline=deadline,
                 ignore_list=ignores,
                 force_retry=force_retry,
@@ -195,11 +200,7 @@ def run_ocr(
             console.print(
                 f"OCR {batch.ocr}, skipped {batch.skipped}, ignored {batch.ignored}, "
                 f"failed {batch.failed}."
-                + (
-                    f" Not checked: {batch.not_reached}."
-                    if batch.not_reached
-                    else ""
-                )
+                + (f" Not checked: {batch.not_reached}." if batch.not_reached else "")
             )
         else:
             console.print(
@@ -213,4 +214,3 @@ def run_ocr(
         cli_mod._rag_auto(
             cfg, started, keys=[row.key for row in batch.rows if row.status == "ocr"]
         )
-

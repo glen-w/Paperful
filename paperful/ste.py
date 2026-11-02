@@ -89,10 +89,14 @@ class STEValidator:
                 paragraphs.append(text.strip())
 
         # Extract <ul>/<ol> blocks as paragraphs (each <li> is a sentence)
-        list_matches = re.finditer(r"<(?:ul|ol)[^>]*>(.*?)</(?:ul|ol)>", html, re.IGNORECASE | re.DOTALL)
+        list_matches = re.finditer(
+            r"<(?:ul|ol)[^>]*>(.*?)</(?:ul|ol)>", html, re.IGNORECASE | re.DOTALL
+        )
         for match in list_matches:
             list_content = match.group(1)
-            items = re.findall(r"<li[^>]*>(.*?)</li>", list_content, re.IGNORECASE | re.DOTALL)
+            items = re.findall(
+                r"<li[^>]*>(.*?)</li>", list_content, re.IGNORECASE | re.DOTALL
+            )
             for item in items:
                 item_text = re.sub(r"<[^>]+>", "", item).strip()
                 if item_text:
@@ -142,7 +146,9 @@ class STEValidator:
     def _check_passive_voice(self, paragraphs: list[str]) -> list[STEViolation]:
         """Heuristic check for passive voice (prefer active voice)."""
         violations: list[STEViolation] = []
-        passive_pattern = re.compile(r"\b(was|were|is|are|be|been|being)\s+\w+(?:ed|en)\b", re.IGNORECASE)
+        passive_pattern = re.compile(
+            r"\b(was|were|is|are|be|been|being)\s+\w+(?:ed|en)\b", re.IGNORECASE
+        )
 
         for para_idx, para in enumerate(paragraphs):
             if passive_pattern.search(para):
@@ -156,7 +162,9 @@ class STEValidator:
 
         return violations
 
-    def _check_vocabulary(self, text: str, domain_words: set[str]) -> list[STEViolation]:
+    def _check_vocabulary(
+        self, text: str, domain_words: set[str]
+    ) -> list[STEViolation]:
         """Check that words are approved or from domain."""
         violations: list[STEViolation] = []
 

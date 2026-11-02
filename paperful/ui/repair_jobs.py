@@ -70,14 +70,22 @@ def repair_preview(
 ) -> str:
     flags = dict(flags or {})
     if repair_run_fn is not None:
-        result = repair_run_fn(cfg, verb=verb, collection=collection, apply=False, flags=flags)
+        result = repair_run_fn(
+            cfg, verb=verb, collection=collection, apply=False, flags=flags
+        )
         _attach_result(cfg, cmd_id, result)
         fp = queue_fingerprint(cfg, verb)
-        return _mint(cfg, cmd_id, verb=verb, collection=collection, fingerprint=fp, flags=flags)
-    result = _repair_run(cfg, verb=verb, collection=collection, apply=False, flags=flags)
+        return _mint(
+            cfg, cmd_id, verb=verb, collection=collection, fingerprint=fp, flags=flags
+        )
+    result = _repair_run(
+        cfg, verb=verb, collection=collection, apply=False, flags=flags
+    )
     _attach_result(cfg, cmd_id, result)
     fp = queue_fingerprint(cfg, verb)
-    return _mint(cfg, cmd_id, verb=verb, collection=collection, fingerprint=fp, flags=flags)
+    return _mint(
+        cfg, cmd_id, verb=verb, collection=collection, fingerprint=fp, flags=flags
+    )
 
 
 def repair_apply(
@@ -107,7 +115,9 @@ def repair_apply(
     return True, ""
 
 
-def mirror_fingerprint(cfg: Config, verb: str, collection: str, flags: dict[str, Any]) -> str:
+def mirror_fingerprint(
+    cfg: Config, verb: str, collection: str, flags: dict[str, Any]
+) -> str:
     payload = json.dumps(
         {"verb": verb, "collection": collection, "flags": flags},
         sort_keys=True,
@@ -134,13 +144,19 @@ def mirror_preview(
 ) -> str:
     flags = dict(flags or {})
     if mirror_run_fn is not None:
-        result = mirror_run_fn(cfg, verb=verb, collection=collection, apply=False, flags=flags)
+        result = mirror_run_fn(
+            cfg, verb=verb, collection=collection, apply=False, flags=flags
+        )
         _attach_result(cfg, cmd_id, result)
     else:
-        result = _mirror_run(cfg, verb=verb, collection=collection, apply=False, flags=flags)
+        result = _mirror_run(
+            cfg, verb=verb, collection=collection, apply=False, flags=flags
+        )
         _attach_result(cfg, cmd_id, result)
     fp = mirror_fingerprint(cfg, verb, collection, flags)
-    return _mint(cfg, cmd_id, verb=verb, collection=collection, fingerprint=fp, flags=flags)
+    return _mint(
+        cfg, cmd_id, verb=verb, collection=collection, fingerprint=fp, flags=flags
+    )
 
 
 def mirror_apply(
@@ -182,7 +198,9 @@ def _repair_run(
     if verb == "screen":
         return _screen(cfg, collection, apply=apply)
     if verb == "fix-metadata":
-        return _fix_metadata(cfg, collection, apply=apply, overwrite=bool(flags.get("overwrite")))
+        return _fix_metadata(
+            cfg, collection, apply=apply, overwrite=bool(flags.get("overwrite"))
+        )
     if verb == "dedupe":
         return _dedupe(
             cfg,
@@ -232,7 +250,9 @@ def _mirror_run(
             accept_gone=bool(flags.get("accept_gone")),
         )
     if verb == "snapshot":
-        return _snapshot(cfg, collection, apply=apply, pdfs=str(flags.get("pdfs") or "") or None)
+        return _snapshot(
+            cfg, collection, apply=apply, pdfs=str(flags.get("pdfs") or "") or None
+        )
     if verb == "restore":
         return _restore(cfg, collection, apply=apply)
     if verb == "cache clean":
@@ -261,7 +281,11 @@ def _lint(cfg: Config, collection: str) -> dict[str, Any]:
         cfg,
         command="lint",
         scope=scope,
-        summary={"items": len(items), "findings": len(findings), "findings_by_code": by_code},
+        summary={
+            "items": len(items),
+            "findings": len(findings),
+            "findings_by_code": by_code,
+        },
         items=[
             {"itemKey": f.itemKey, "code": f.code, "detail": f.detail, "title": f.title}
             for f in findings[:200]
@@ -269,7 +293,12 @@ def _lint(cfg: Config, collection: str) -> dict[str, Any]:
         flags={"apply": False},
         started=started,
     )
-    return {"verb": "lint", "scope": scope, "findings": len(findings), "items": len(items)}
+    return {
+        "verb": "lint",
+        "scope": scope,
+        "findings": len(findings),
+        "items": len(items),
+    }
 
 
 def _screen(cfg: Config, collection: str, *, apply: bool) -> dict[str, Any]:
@@ -357,7 +386,8 @@ def _fix_metadata(
             "errors": len(errors),
         },
         items=[
-            {"itemKey": p.itemKey, "title": p.title, "after": p.after} for p in patches[:200]
+            {"itemKey": p.itemKey, "title": p.title, "after": p.after}
+            for p in patches[:200]
         ],
         flags={"apply": apply, "overwrite": overwrite},
         started=started,
@@ -524,7 +554,9 @@ def _attachments(
             unread.append(item.key)
             continue
         present = {
-            str(ch.get("key") or (ch.get("data") or {}).get("key") or ""): _child_bytes(ch)
+            str(ch.get("key") or (ch.get("data") or {}).get("key") or ""): _child_bytes(
+                ch
+            )
             for ch in raw
             if isinstance(ch, dict)
         }
@@ -727,7 +759,12 @@ def _snapshot(
 
 def _restore(cfg: Config, collection: str, *, apply: bool) -> dict[str, Any]:
     from ..catalogue import open_library
-    from ..restore import apply_restore, dedupe_restore_records, iter_records, plan_restore
+    from ..restore import (
+        apply_restore,
+        dedupe_restore_records,
+        iter_records,
+        plan_restore,
+    )
 
     backend = open_library(cfg)
     coll = (collection or "").strip()
@@ -742,7 +779,9 @@ def _restore(cfg: Config, collection: str, *, apply: bool) -> dict[str, Any]:
         if isinstance(data, dict):
             records.append((path, data))
     records = dedupe_restore_records(records)
-    library_items = list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else []
+    library_items = (
+        list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else []
+    )
     if not library_items and coll:
         from ..scope import load_scope
 

@@ -1,4 +1,5 @@
 """Hop expansion steps for snowball crawl."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -53,7 +54,6 @@ def hop_refs(
     sample_ids = c.sample_ids
     select_works_by_citations = c.select_works_by_citations
 
-
     query = _cites_query(client)
     per_work_ids: list[list[str]] = []
     fetch_ids: list[str] = []
@@ -90,7 +90,9 @@ def hop_refs(
                 _emit(client, rows)
                 return True
             if recovered:
-                recovered_by_index[index] = _refs_matching_search(client, recovered, query)
+                recovered_by_index[index] = _refs_matching_search(
+                    client, recovered, query
+                )
             per_work_ids.append([])
             continue
         if rank == "random" and per_hop_limit > 0:
@@ -139,7 +141,9 @@ def hop_refs(
             if index in recovered_by_index:
                 resolved = list(recovered_by_index[index])
                 if rank == "random":
-                    resolved = select_works_by_citations(resolved, per_hop_limit, "random")
+                    resolved = select_works_by_citations(
+                        resolved, per_hop_limit, "random"
+                    )
                 else:
                     resolved = select_works_by_citations(
                         resolved,
@@ -163,7 +167,9 @@ def hop_refs(
                         seed=seed,
                         hop=hop,
                         direction="refs",
-                        why=source_why.get(recovery, _with_query(f"ref of {why_prefix}", query)),
+                        why=source_why.get(
+                            recovery, _with_query(f"ref of {why_prefix}", query)
+                        ),
                         gate=gate,
                     )
                     _remember(row, frontier[index], "refs")
@@ -245,7 +251,6 @@ def hop_cites(
     sample_ids = c.sample_ids
     select_works_by_citations = c.select_works_by_citations
 
-
     citing_seeds = [
         work
         for work in frontier
@@ -268,7 +273,9 @@ def hop_cites(
         cite_sort = _cite_sort(rank)
         for index, work in enumerate(citing_seeds, start=1):
             oa = short_id(str(work.get("id") or ""))
-            client.stage = f"hop {hop}/{depth} cited-by {index}/{len(citing_seeds)} {oa}"
+            client.stage = (
+                f"hop {hop}/{depth} cited-by {index}/{len(citing_seeds)} {oa}"
+            )
             client.touch()
             try:
                 citing = client.works_citing(
@@ -357,4 +364,3 @@ def hop_similar(
     from . import crawl as c
 
     return c._similar_neighbours(client, frontier, rows, seen_oa, **kwargs)
-

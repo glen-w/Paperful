@@ -46,7 +46,9 @@ def _reviews_dir(cfg: Config) -> Path:
 
 def _atomic_write(path: Path, data: dict[str, Any]) -> None:
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     tmp.replace(path)
 
 
@@ -125,7 +127,9 @@ def _ensure_worker() -> None:
         if _worker_started:
             return
         _worker_started = True
-        thread = threading.Thread(target=_worker_loop, name="paperful-gui-worker", daemon=True)
+        thread = threading.Thread(
+            target=_worker_loop, name="paperful-gui-worker", daemon=True
+        )
         thread.start()
 
 

@@ -24,7 +24,12 @@ class ApiKeyRejected(RuntimeError):
 class FillPaused(RuntimeError):
     """A fill API asked us to stop and resume the remaining DOIs later."""
 
-    def __init__(self, backend: str, remaining: list[str] | None = None, added: list | None = None):
+    def __init__(
+        self,
+        backend: str,
+        remaining: list[str] | None = None,
+        added: list | None = None,
+    ):
         super().__init__(backend)
         self.backend = backend
         self.remaining = list(remaining or [])
@@ -62,7 +67,9 @@ def fill_crossref(
             if tally is not None:
                 tally.advance(1)
             continue
-        filled = _fill_empty(row, payload, backend="crossref") if not _complete(row) else 0
+        filled = (
+            _fill_empty(row, payload, backend="crossref") if not _complete(row) else 0
+        )
         if expand_neighbors:
             added.extend(
                 _neighbor_rows(
@@ -230,7 +237,11 @@ def _neighbor_rows(
                 },
                 why=f"{prefix} {parent}".strip(),
                 status="new",
-                provenance={"backend": backend, "endpoint": backend, "retrieved_at": ""},
+                provenance={
+                    "backend": backend,
+                    "endpoint": backend,
+                    "retrieved_at": "",
+                },
                 gate=row.gate,
             )
         )
@@ -241,7 +252,12 @@ def _neighbor_rows(
 
 def _complete(row: Candidate) -> bool:
     biblio = row.biblio
-    return bool(biblio.get("title") and biblio.get("year") and biblio.get("venue") and biblio.get("authors"))
+    return bool(
+        biblio.get("title")
+        and biblio.get("year")
+        and biblio.get("venue")
+        and biblio.get("authors")
+    )
 
 
 def _fill_empty(row: Candidate, payload: dict[str, Any], *, backend: str) -> int:
@@ -303,7 +319,9 @@ def crossref_work(doi: str, *, email: str = "") -> dict[str, Any] | None:
 
     params = {"mailto": email} if email else None
     try:
-        resp = httpx.get(f"https://api.crossref.org/works/{doi}", params=params, timeout=30)
+        resp = httpx.get(
+            f"https://api.crossref.org/works/{doi}", params=params, timeout=30
+        )
         if resp.status_code == 404:
             return None
         if resp.status_code == 429 or resp.status_code >= 500:
@@ -325,7 +343,9 @@ def crossref_work(doi: str, *, email: str = "") -> dict[str, Any] | None:
     for author in message.get("author") or []:
         if not isinstance(author, dict):
             continue
-        name = " ".join(part for part in (author.get("given"), author.get("family")) if part)
+        name = " ".join(
+            part for part in (author.get("given"), author.get("family")) if part
+        )
         if name:
             authors.append(name)
     return {
@@ -392,7 +412,9 @@ def s2_paper(doi: str, *, cache_dir: Path, api_key: str) -> dict[str, Any] | Non
 
     headers = {"x-api-key": api_key} if api_key else None
     url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{doi}"
-    params = {"fields": "title,year,venue,authors,references.externalIds,references.title,references.year"}
+    params = {
+        "fields": "title,year,venue,authors,references.externalIds,references.title,references.year"
+    }
     for attempt in range(_S2_MAX_RETRIES + 1):
         _s2_pace()
         try:
@@ -411,7 +433,11 @@ def s2_paper(doi: str, *, cache_dir: Path, api_key: str) -> dict[str, Any] | Non
             if wait is not None and wait >= 60:
                 raise FillPaused("semanticscholar")
             if attempt < _S2_MAX_RETRIES:
-                delay = wait if wait is not None and wait >= 0 else min(_S2_BACKOFF_CAP_S, 1.0 * (2**attempt))
+                delay = (
+                    wait
+                    if wait is not None and wait >= 0
+                    else min(_S2_BACKOFF_CAP_S, 1.0 * (2**attempt))
+                )
                 time.sleep(min(_S2_BACKOFF_CAP_S, delay))
                 continue
             raise FillPaused("semanticscholar")
@@ -465,7 +491,9 @@ def _gap_rows(
     return [row for row in pending if not _complete(row)]
 
 
-def _raise_paused(added: list[Candidate], remaining: list[str], cause: BaseException) -> NoReturn:
+def _raise_paused(
+    added: list[Candidate], remaining: list[str], cause: BaseException
+) -> NoReturn:
     raise FillPaused("europepmc", remaining, added) from cause
 
 
@@ -474,7 +502,9 @@ def _has_outgoing(row: Candidate, rows: list[Candidate]) -> bool:
     if not doi:
         return False
     needle = f"ref of {doi}"
-    return any(needle in (child.why or "").lower() for child in rows if child is not row)
+    return any(
+        needle in (child.why or "").lower() for child in rows if child is not row
+    )
 
 
 def fill_payload_backend(
@@ -548,7 +578,13 @@ def fill_europepmc(
 
     A spread of that queue that misses the index skips the rest.
     """
-    from .europepmc import BATCH_SIZE, PROBE_SIZE, cached_payload, lookup_dois, spread_dois
+    from .europepmc import (
+        BATCH_SIZE,
+        PROBE_SIZE,
+        cached_payload,
+        lookup_dois,
+        spread_dois,
+    )
 
     pending = _gap_rows(rows, only_dois, expand_neighbors=expand_neighbors)
     if tally is not None and pending:
@@ -609,13 +645,17 @@ def fill_europepmc(
     ]
     if in_index == 0 and rest:
         if tally is not None:
-            tally.emit(f"europepmc · {len(probe)} searched · 0 in index · skipped {len(rest)}")
+            tally.emit(
+                f"europepmc · {len(probe)} searched · 0 in index · skipped {len(rest)}"
+            )
             tally.advance(len(rest))
         return added
     for index in range(0, len(rest), BATCH_SIZE):
         chunk = rest[index : index + BATCH_SIZE]
         try:
-            found = lookup_dois([row.ids.get("doi") or "" for row in chunk], cache_dir=cache_dir)
+            found = lookup_dois(
+                [row.ids.get("doi") or "" for row in chunk], cache_dir=cache_dir
+            )
         except FillPaused as exc:
             _raise_paused(added, _remaining_dois(uncached, chunk[0]), exc)
         if tally is not None:
@@ -687,7 +727,11 @@ def run_fill_pass(
 ) -> dict[str, list[str]]:
     """Walk citation backends in order. A pause continues the pass, then one retry."""
     paused: dict[str, list[str]] = {}
-    order = [name for name in backends if name in {"crossref", "semanticscholar", "europepmc", "pdf"}]
+    order = [
+        name
+        for name in backends
+        if name in {"crossref", "semanticscholar", "europepmc", "pdf"}
+    ]
 
     def once(names: list[str], *, retry: bool) -> None:
         for name in names:

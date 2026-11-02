@@ -9,7 +9,14 @@ import pytest
 import typer
 from rich.console import Console
 
-from paperful import cache_cmd, collections_cmd, doctor_cmd, mirrors_cmd, pack_cmd, session_cmd
+from paperful import (
+    cache_cmd,
+    collections_cmd,
+    doctor_cmd,
+    mirrors_cmd,
+    pack_cmd,
+    session_cmd,
+)
 from paperful.doctor import Check
 from tests.conftest import patch_cli_runtime
 
@@ -76,7 +83,9 @@ def test_run_pack_show_json(cfg_paths, monkeypatch):
     monkeypatch.setattr("paperful.pack.latest_pack", lambda cfg: pack)
     monkeypatch.setattr(
         "paperful.pack.show_payload",
-        lambda cfg, p: {"steps": [{"command": "run", "duration_s": 1.5, "summary": {}}]},
+        lambda cfg, p: {
+            "steps": [{"command": "run", "duration_s": 1.5, "summary": {}}]
+        },
     )
     c = _console()
     pack_cmd.run_pack_show(c, as_json=True, config=cfg_paths)
@@ -124,9 +133,13 @@ def test_run_doctor_prints_remediations_non_tty(cfg_paths, monkeypatch):
     monkeypatch.setattr("paperful.doctor_cmd.run_checks", lambda *a, **k: checks)
     monkeypatch.setattr("paperful.doctor_cmd._in_docker", lambda: True)
     monkeypatch.setattr("paperful.cli_runtime._stdin_is_tty", lambda: False)
-    patch_cli_runtime(monkeypatch, ZoteroLocal=lambda: object(), _cfg=lambda p: __import__(
-        "paperful.config", fromlist=["load_config"]
-    ).load_config(cfg_paths))
+    patch_cli_runtime(
+        monkeypatch,
+        ZoteroLocal=lambda: object(),
+        _cfg=lambda p: __import__(
+            "paperful.config", fromlist=["load_config"]
+        ).load_config(cfg_paths),
+    )
     c = _console()
     doctor_cmd.run_doctor(
         c,
@@ -154,9 +167,9 @@ def test_run_collections_show_table(cfg_paths, monkeypatch):
 
     patch_cli_runtime(
         monkeypatch,
-        _cfg=lambda p: __import__("paperful.config", fromlist=["load_config"]).load_config(
-            cfg_paths
-        ),
+        _cfg=lambda p: __import__(
+            "paperful.config", fromlist=["load_config"]
+        ).load_config(cfg_paths),
         _require_manager=lambda cfg: None,
         _connect=lambda cfg: Backend(),
         _spinner=lambda msg: __import__("contextlib").contextmanager(lambda: (yield))(),
@@ -189,8 +202,12 @@ def test_session_status_quiet(cfg_paths, monkeypatch):
     monkeypatch.setattr(sess, "chromium_dir", lambda cfg: cfg_paths.parent / "chromium")
     monkeypatch.setattr(sess, "profile_ready", lambda cfg: False)
     monkeypatch.setattr(sess, "load_meta", lambda cfg: {})
-    monkeypatch.setattr(sess, "vault_cookies_path", lambda cfg: cfg_paths.parent / "vault.txt")
-    monkeypatch.setattr(sess, "storage_state_path", lambda cfg: cfg_paths.parent / "state.json")
+    monkeypatch.setattr(
+        sess, "vault_cookies_path", lambda cfg: cfg_paths.parent / "vault.txt"
+    )
+    monkeypatch.setattr(
+        sess, "storage_state_path", lambda cfg: cfg_paths.parent / "state.json"
+    )
     c = _console()
     session_cmd.run_session_status(c, config=cfg_paths, probe=False)
     assert "Vault:" in c.export_text()

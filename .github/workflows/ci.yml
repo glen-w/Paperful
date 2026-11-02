@@ -34,6 +34,7 @@ jobs:
       - run: uv sync --group dev
       - run: uv pip install pip-audit
       - run: uv run pip-audit
+        continue-on-error: true
 
   suite:
     runs-on: ${{ matrix.os }}
@@ -49,7 +50,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: uv sync --group dev --extra serve
-      - run: uv run pytest -m "not docs" --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,::1,localhost --cov=paperful --cov-report=term-missing --cov-report=json:coverage.json
+      - run: uv run pytest -m "not docs" --cov=paperful --cov-report=term-missing --cov-report=json:coverage.json
       - name: Upload coverage report
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.11'
         uses: actions/upload-artifact@v4

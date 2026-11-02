@@ -25,7 +25,9 @@ def test_cache_clean_dry_run_and_apply(tmp_path):
     absorbed.write_bytes(PDF)
     orphan = cache / "ORPHAN01.pdf"
     orphan.write_bytes(b"%PDF orphan")
-    stale = cache / "ITEM0001.pdf"  # already absorbed name; rewrite with wrong md5 after?
+    stale = (
+        cache / "ITEM0001.pdf"
+    )  # already absorbed name; rewrite with wrong md5 after?
     # A second key that has a record MD5 but wrong cache bytes.
     zot.put("ITEM0002", title="Other", collections=["COLA"])
     zot.attach("ITEM0002", "ATT00002", bytes_=PDF)
@@ -55,9 +57,7 @@ def test_cache_clean_cli_dry_run(tmp_path):
     state = tmp_path / "state"
     out.mkdir()
     state.mkdir()
-    cfg_path.write_text(
-        f'out_dir = "{out}"\nstate_dir = "{state}"\n', encoding="utf-8"
-    )
+    cfg_path.write_text(f'out_dir = "{out}"\nstate_dir = "{state}"\n', encoding="utf-8")
     cache = state / "pdf-cache"
     cache.mkdir()
     (cache / "ORPHAN01.pdf").write_bytes(b"%PDF orphan")

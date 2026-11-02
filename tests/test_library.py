@@ -243,11 +243,16 @@ def test_create_or_update_note_updates_existing(cfg):
 
 
 def test_collection_note_payload_has_no_parent():
-    payload = collection_note_payload("<p>r</p>", ["paperful-report", "paperful-report:bbnj"], "COL1")
+    payload = collection_note_payload(
+        "<p>r</p>", ["paperful-report", "paperful-report:bbnj"], "COL1"
+    )
     assert payload["itemType"] == "note"
     assert "parentItem" not in payload
     assert payload["collections"] == ["COL1"]
-    assert payload["tags"] == [{"tag": "paperful-report"}, {"tag": "paperful-report:bbnj"}]
+    assert payload["tags"] == [
+        {"tag": "paperful-report"},
+        {"tag": "paperful-report:bbnj"},
+    ]
 
 
 def test_read_child_note_returns_html(cfg):
@@ -271,7 +276,9 @@ def test_read_child_note_returns_html(cfg):
             self.zot = FakeZot()
 
     backend = ZoteroBackend(cfg, ZL())
-    assert backend.read_child_note("ITEM0001", "paperful-summary") == "<p>from zotero</p>"
+    assert (
+        backend.read_child_note("ITEM0001", "paperful-summary") == "<p>from zotero</p>"
+    )
     assert backend.read_child_note("ITEM0001", "other") is None
 
 
@@ -305,7 +312,10 @@ def test_create_collection_note_then_update(cfg):
             return {"success": {"0": "R1"}}
 
         def item(self, key):
-            return {"key": key, "data": {"note": "<p>old</p>", "tags": [], "version": 1}}
+            return {
+                "key": key,
+                "data": {"note": "<p>old</p>", "tags": [], "version": 1},
+            }
 
         def update_item(self, raw):
             self.updated = raw
@@ -384,6 +394,8 @@ def test_replace_prefixed_tag_keeps_other_tags(cfg):
 
     backend = ZoteroBackend(cfg, ZL())
     backend._ensure_write = lambda: None
-    backend.replace_prefixed_tag("ITEM1", "paperful found:", "paperful found: Free copy from Unpaywall.")
+    backend.replace_prefixed_tag(
+        "ITEM1", "paperful found:", "paperful found: Free copy from Unpaywall."
+    )
     tags = [row["tag"] for row in backend.zl.zot.raw["data"]["tags"]]
     assert tags == ["reading", "paperful found: Free copy from Unpaywall."]

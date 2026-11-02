@@ -118,7 +118,10 @@ def attach_apply(cfg: Config, *, token: str) -> tuple[bool, str]:
     if not pending:
         return True, ""
     pipe = Pipeline(
-        cfg, Manifest(cfg.manifest_path), Console(quiet=True, file=None), attacher=backend
+        cfg,
+        Manifest(cfg.manifest_path),
+        Console(quiet=True, file=None),
+        attacher=backend,
     )
     for rec in pending:
         pipe.attach_record(rec)
@@ -394,9 +397,7 @@ def pending_add_preview(
         raise ValueError("Select at least one Waiting row that has a DOI.")
     backend = open_library(cfg)
     all_items = (
-        list(backend.items_in_scope(None))
-        if hasattr(backend, "items_in_scope")
-        else []
+        list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else []
     )
     fingerprint = LibraryFingerprint.from_items(
         all_items,
@@ -432,9 +433,7 @@ def pending_add_preview(
     return token
 
 
-def pending_add_apply(
-    cfg: Config, *, token: str, collection: str
-) -> tuple[bool, str]:
+def pending_add_apply(cfg: Config, *, token: str, collection: str) -> tuple[bool, str]:
     """Create metadata parents for a reviewed Waiting-from-Discover selection."""
     from ..acronyms import load_acronym_allowlist
     from ..catalogue import open_library
@@ -458,14 +457,14 @@ def pending_add_apply(
     fingerprint_hex = hashlib.sha256(
         f"{coll}|pending_fill|{','.join(dois)}".encode("utf-8")
     ).hexdigest()
-    ok, msg = commands.consume_review(cfg, token, fingerprint=fingerprint_hex, keys=None)
+    ok, msg = commands.consume_review(
+        cfg, token, fingerprint=fingerprint_hex, keys=None
+    )
     if not ok:
         return False, msg
     backend = open_library(cfg)
     all_items = (
-        list(backend.items_in_scope(None))
-        if hasattr(backend, "items_in_scope")
-        else []
+        list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else []
     )
     fingerprint = LibraryFingerprint.from_items(
         all_items,

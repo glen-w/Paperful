@@ -314,7 +314,9 @@ def _agent_after_playwright(items: list[dict[str, Any]]) -> int:
     return n
 
 
-def low_download_advice(*, downloaded: int, sought: int, collection: str = "") -> str | None:
+def low_download_advice(
+    *, downloaded: int, sought: int, collection: str = ""
+) -> str | None:
     """What to do next when a fetch saved few PDFs for the items it tried.
 
     Small runs stay quiet. Under a quarter saved, on eight or more items, is low.
@@ -686,7 +688,10 @@ def print_run_summary(
     )
     if advice:
         console.print(f"[yellow]{advice}[/]")
-    if int(misses.get("ezproxy") or 0) > 0 or int(missed.get("session_expired") or 0) > 0:
+    if (
+        int(misses.get("ezproxy") or 0) > 0
+        or int(missed.get("session_expired") or 0) > 0
+    ):
         console.print(
             "EZProxy misses: run `uv run paperful session login ezproxy` on the host "
             "(not inside the container), then retry."
@@ -782,9 +787,7 @@ def nightshift_counts_line(report: dict[str, Any]) -> str:
 
     s, items = report["summary"], report["items"]
     why = collections.Counter(
-        i.get("reason", "")[:60]
-        for i in items
-        if i["status"] in ("failed", "missing")
+        i.get("reason", "")[:60] for i in items if i["status"] in ("failed", "missing")
     )
     top = "; ".join("%d× %s" % (n, t) for t, n in why.most_common(2))
     failed = "%s%s" % (s["failed"], " (%s)" % top if top else "")
@@ -798,7 +801,14 @@ def nightshift_counts_line(report: dict[str, Any]) -> str:
     if cmd == "rag-ingest":
         return (
             "indexed: %s PDFs, %s abstracts · passages: %s · removed: %s · failed: %s · unchanged: %s"
-            % (s["pdf"] + s["ocr"], s["abstract"], s["chunks"], s["removed"], failed, s["unchanged"])
+            % (
+                s["pdf"] + s["ocr"],
+                s["abstract"],
+                s["chunks"],
+                s["removed"],
+                failed,
+                s["unchanged"],
+            )
         )
     if cmd == "fix-metadata":
         applied = s.get("patches_applied", 0)
@@ -829,7 +839,9 @@ def nightshift_counts_line(report: dict[str, Any]) -> str:
         )
     done = [i.get("reason", "") for i in items if i["status"] == "summarized"]
     new = sum(1 for how in done if not how)
-    notes = sum(1 for how in done if not how or how.startswith(("attached", "synced note")))
+    notes = sum(
+        1 for how in done if not how or how.startswith(("attached", "synced note"))
+    )
     if s.get("dest") == "disk":
         notes = 0
     no_text = int(s.get("skipped_no_text") or 0)

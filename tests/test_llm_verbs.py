@@ -346,9 +346,7 @@ def test_summarize_items_skips_no_text_and_writes_miss(llm_cfg, monkeypatch):
     stub = StubLLM(text="<p>should not run</p>")
     monkeypatch.setattr(summarize, "get_client", lambda cfg: stub)
     empty = make_item(key="EMPTY001", has_pdf=True, title="Scan only")
-    batch = summarize.summarize_items(
-        llm_cfg, [empty], None, None, dest="disk"
-    )
+    batch = summarize.summarize_items(llm_cfg, [empty], None, None, dest="disk")
     assert batch.summarized == 0 and batch.failed == 0
     assert batch.skipped == 1 and batch.skipped_no_text == 1
     assert batch.rows[0].status == "skipped"
@@ -359,9 +357,7 @@ def test_summarize_items_skips_no_text_and_writes_miss(llm_cfg, monkeypatch):
     assert miss is not None and miss.is_file()
     assert "EMPTY001" in miss.read_text()
 
-    again = summarize.summarize_items(
-        llm_cfg, [empty], None, None, dest="disk"
-    )
+    again = summarize.summarize_items(llm_cfg, [empty], None, None, dest="disk")
     assert again.skipped_no_text == 1 and not stub.calls
 
 
@@ -379,7 +375,9 @@ def test_summarize_custom_prompt_changes_sha(llm_cfg, monkeypatch, tmp_path):
     assert sha_default != sha_custom
 
 
-def test_summarize_items_records_failures_and_stops_on_library_error(llm_cfg, monkeypatch):
+def test_summarize_items_records_failures_and_stops_on_library_error(
+    llm_cfg, monkeypatch
+):
     from paperful.library import LibraryError
 
     _ground(monkeypatch, summarize)
@@ -413,15 +411,11 @@ def test_summarize_items_skips_existing_without_force(llm_cfg, monkeypatch):
     monkeypatch.setattr(summarize, "get_client", lambda cfg: stub)
     item = make_item(key="SKIPME01", has_pdf=True)
     backend = NoteBackend()
-    first = summarize.summarize_items(
-        llm_cfg, [item], None, backend, dest="both"
-    )
+    first = summarize.summarize_items(llm_cfg, [item], None, backend, dest="both")
     assert first.summarized == 1 and first.skipped == 0 and stub.calls
     calls_after_first = len(stub.calls)
 
-    again = summarize.summarize_items(
-        llm_cfg, [item], None, backend, dest="both"
-    )
+    again = summarize.summarize_items(llm_cfg, [item], None, backend, dest="both")
     assert again.summarized == 0 and again.skipped == 1
     assert again.rows[0].status == "skipped"
     assert len(stub.calls) == calls_after_first
@@ -446,9 +440,7 @@ def test_summarize_items_rewrites_when_model_changes(llm_cfg, monkeypatch):
 
     llm_cfg.llm_model = "other-model:9b"
     stub.text = "<p>v2</p>"
-    batch = summarize.summarize_items(
-        llm_cfg, [item], None, backend, dest="both"
-    )
+    batch = summarize.summarize_items(llm_cfg, [item], None, backend, dest="both")
     assert batch.summarized == 1 and batch.skipped == 0
     assert len(stub.calls) == calls_before + 1
     html = (llm_cfg.summaries_dir / f"{item.key}.html").read_text()
@@ -470,9 +462,7 @@ def test_summarize_items_attaches_existing_disk_without_llm(llm_cfg, monkeypatch
     )
     backend = NoteBackend()
 
-    batch = summarize.summarize_items(
-        llm_cfg, [item], None, backend, dest="both"
-    )
+    batch = summarize.summarize_items(llm_cfg, [item], None, backend, dest="both")
     assert batch.summarized == 1 and batch.skipped == 0
     assert batch.rows[0].reason == "attached existing disk summary"
     assert backend.created == 1 and not stub.calls
@@ -712,7 +702,9 @@ def test_note_text_and_pack_and_citations():
     )
 
     text = note_text("<h2>Objective</h2><p>Hello</p><ul><li>one</li><li>two</li></ul>")
-    assert "Objective" in text and "- one" in text and "- two" in text and "<" not in text
+    assert (
+        "Objective" in text and "- one" in text and "- two" in text and "<" not in text
+    )
     assert len(pack_chunks(["a" * 10, "b" * 10], 15)) == 2
     truncated = pack_chunks(["x" * 100], 20)[0]
     assert truncated.endswith("[… truncated]") and len(truncated) <= 20
@@ -759,7 +751,11 @@ def test_load_sources_prefers_disk_then_note(llm_cfg):
 
 
 def test_synthesize_one_pass_and_sidecar(llm_cfg):
-    from paperful.synthesize import render_synthesis, report_is_current, write_report_files
+    from paperful.synthesize import (
+        render_synthesis,
+        report_is_current,
+        write_report_files,
+    )
 
     loaded = _two_sources(llm_cfg)
     stub = StubLLM(text="<h2>Themes</h2><p>See [Smith 2019] and [Nobody 1999].</p>")
@@ -911,4 +907,3 @@ def _two_sources(cfg):
         B(),
     )
     return sources, missing
-

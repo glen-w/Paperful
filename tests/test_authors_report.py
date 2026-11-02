@@ -207,9 +207,7 @@ def test_authors_cli_dry_run_and_apply(tmp_path, monkeypatch):
     monkeypatch.setattr(cli_runtime, "_connect", lambda cfg, quiet=False: object())
     monkeypatch.setattr(cli_runtime, "_load_scope", lambda backend, **scope: loaded)
 
-    dry = runner.invoke(
-        cli.app, ["authors", "-C", "BBNJ", "--config", str(config)]
-    )
+    dry = runner.invoke(cli.app, ["authors", "-C", "BBNJ", "--config", str(config)])
     assert dry.exit_code == 0, dry.output
     assert "Ada Lovelace" in dry.output
     assert "FAO" in dry.output

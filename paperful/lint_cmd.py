@@ -14,6 +14,7 @@ from rich.table import Table
 from .runreport import write_command_report
 from .store import Manifest
 
+
 def run_lint(
     console: Console,
     *,

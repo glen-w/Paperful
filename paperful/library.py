@@ -207,7 +207,9 @@ class MirroredBackend:
                 return False
             children = self._inner.children(key)
             build = getattr(self._inner, "item_from_raw", None)
-            item = build(raw, children) if callable(build) else self._inner.get_item(key)
+            item = (
+                build(raw, children) if callable(build) else self._inner.get_item(key)
+            )
             if item is None:
                 raise LibraryReadError(f"item {key} could not be read")
             *_counts, row = write_item(

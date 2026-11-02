@@ -93,7 +93,9 @@ def test_source_applicable_by_metadata(cfg):
         "arxiv",
     )
     assert not source_applicable(
-        make_item(doi="10.1000/x", arxiv_id=None, title="short", item_type="journalArticle"),
+        make_item(
+            doi="10.1000/x", arxiv_id=None, title="short", item_type="journalArticle"
+        ),
         cfg,
         "arxiv",
     )
@@ -128,25 +130,30 @@ def test_filter_sources_for_item_types_drops_htmlpdf_on_journals():
     sources = ["unpaywall", "direct", "ezproxy", "htmlpdf", "scihub"]
     assert filter_sources_for_item_types(sources, None) == sources
     assert filter_sources_for_item_types(sources, frozenset()) == sources
-    assert filter_sources_for_item_types(
-        sources, frozenset({"journalArticle"})
-    ) == ["unpaywall", "direct", "ezproxy", "scihub"]
-    assert filter_sources_for_item_types(
-        sources, frozenset({"journalArticle", "report"})
-    ) == sources
-    assert filter_sources_for_item_types(
-        sources, frozenset({"webpage"})
-    ) == sources
+    assert filter_sources_for_item_types(sources, frozenset({"journalArticle"})) == [
+        "unpaywall",
+        "direct",
+        "ezproxy",
+        "scihub",
+    ]
+    assert (
+        filter_sources_for_item_types(sources, frozenset({"journalArticle", "report"}))
+        == sources
+    )
+    assert filter_sources_for_item_types(sources, frozenset({"webpage"})) == sources
 
 
 def test_filter_sources_for_year_scope_drops_scihub_past_coverage():
     sources = ["unpaywall", "ezproxy", "scihub"]
     assert filter_sources_for_year_scope(sources, None) == sources
-    assert filter_sources_for_year_scope(sources, SCIHUB_COVERAGE_THROUGH_YEAR) == sources
+    assert (
+        filter_sources_for_year_scope(sources, SCIHUB_COVERAGE_THROUGH_YEAR) == sources
+    )
     assert filter_sources_for_year_scope(sources, 2019) == sources
-    assert filter_sources_for_year_scope(
-        sources, SCIHUB_COVERAGE_THROUGH_YEAR + 1
-    ) == ["unpaywall", "ezproxy"]
+    assert filter_sources_for_year_scope(sources, SCIHUB_COVERAGE_THROUGH_YEAR + 1) == [
+        "unpaywall",
+        "ezproxy",
+    ]
     assert filter_sources_for_year_scope(sources, 2023) == ["unpaywall", "ezproxy"]
 
 
@@ -250,9 +257,10 @@ def test_circuit_breaker_ignores_rate_limits_and_probes_after_cooldown():
 
 
 def test_publisher_host_groups_rewritten_ezproxy_hosts():
-    assert publisher_host(
-        "https://www.sciencedirect.com/science/article/pii/S1/pdfft"
-    ) == "sciencedirect.com"
+    assert (
+        publisher_host("https://www.sciencedirect.com/science/article/pii/S1/pdfft")
+        == "sciencedirect.com"
+    )
     assert (
         publisher_host(
             "https://www-sciencedirect-com.scpo.idm.oclc.org/science/article/pii/S1/pdfft"
@@ -284,9 +292,7 @@ def test_biorxiv_doi_helpers_are_shared(cfg):
     )
     assert doi_from_biorxiv_url("https://example.org/not-biorxiv") is None
     assert source_applicable(make_item(doi=None, url=url), cfg, "biorxiv")
-    assert not source_applicable(
-        make_item(doi="10.1000/x", url=None), cfg, "biorxiv"
-    )
+    assert not source_applicable(make_item(doi="10.1000/x", url=None), cfg, "biorxiv")
 
 
 def test_browser_lane_failed_ignores_not_applicable():

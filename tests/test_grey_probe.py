@@ -49,7 +49,9 @@ def test_pdf_link_outranks_section_and_other_host():
     </body></html>
     """
     sprfmo = extract_pdf_urls(
-        html, "https://www.sprfmo.int/fisheries/conservation-and-management-measures", books
+        html,
+        "https://www.sprfmo.int/fisheries/conservation-and-management-measures",
+        books,
     )
     assert sprfmo[0] == "https://cdn.example.org/reports/cmm-02.pdf"
     assert any(u.endswith("/meetings/2024/comm") for u in sprfmo)
@@ -165,9 +167,7 @@ def test_snapshot_replay_prefers_pdf():
             {"href": "/assets/cmm.pdf", "text": "CMM"},
         ]
     )
-    urls = extract_pdf_urls(
-        html, "https://www.sprfmo.int/fisheries/cmm", books
-    )
+    urls = extract_pdf_urls(html, "https://www.sprfmo.int/fisheries/cmm", books)
     assert urls[0] == "https://www.sprfmo.int/assets/cmm.pdf"
 
 
@@ -237,7 +237,9 @@ def test_grey_live_corpus_has_a_pass_per_playbook():
     targets = load_corpus(_CORPUS)
     timeout = httpx.Timeout(20.0, connect=15.0)
     with httpx.Client(follow_redirects=True, timeout=timeout) as client:
-        rows = probe_corpus(targets, books, client, check=3, min_bytes=10_000, delay_s=0.4)
+        rows = probe_corpus(
+            targets, books, client, check=3, min_bytes=10_000, delay_s=0.4
+        )
     by_name: dict[str, list] = {}
     for row in rows:
         by_name.setdefault(row.playbook, []).append(row)
@@ -246,7 +248,9 @@ def test_grey_live_corpus_has_a_pass_per_playbook():
         for name, group in sorted(by_name.items())
         if not any(row.status == "pass" for row in group)
     ]
-    assert missing == [], [(row.playbook, row.status, row.detail, row.url) for row in rows]
+    assert missing == [], [
+        (row.playbook, row.status, row.detail, row.url) for row in rows
+    ]
 
 
 def test_redact_save_and_snapshot_dict(tmp_path):
@@ -292,7 +296,9 @@ def test_redact_save_and_snapshot_dict(tmp_path):
         detail="ok",
         checked=[{"url": "https://ex.org/p.pdf?fbclid=1"}],
         anchors=[{"href": "https://ex.org/a?utm_campaign=z", "text": "A"}],
-        metas=[{"name": "citation_pdf_url", "content": "https://ex.org/p.pdf?utm_id=1"}],
+        metas=[
+            {"name": "citation_pdf_url", "content": "https://ex.org/p.pdf?utm_id=1"}
+        ],
         probed_at="now",
     )
     snap = row.to_dict(with_snapshot=True)

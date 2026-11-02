@@ -66,7 +66,9 @@ def test_file_verification_buckets():
 
 
 def test_import_ok_not_miss_row():
-    code = project_miss_surface(doi="10.1/x", has_pdf=True, status=STATUS_OK, source="unpaywall")
+    code = project_miss_surface(
+        doi="10.1/x", has_pdf=True, status=STATUS_OK, source="unpaywall"
+    )
     assert code == "import_ok"
 
 
@@ -205,7 +207,13 @@ def test_nest_collection_rows_groups_paths():
                 "items": 0,
                 "missing_pdf": 0,
             },
-            {"path": "degrowth", "name": "degrowth", "key": "4", "items": 683, "missing_pdf": 1},
+            {
+                "path": "degrowth",
+                "name": "degrowth",
+                "key": "4",
+                "items": 683,
+                "missing_pdf": 1,
+            },
         ],
         active="AO/Mini meta studies/Coffee",
     )
@@ -224,7 +232,13 @@ def test_nest_collection_rows_groups_paths():
 def test_wanted_items_page_filters_sorts_and_slices():
     rows = [
         {"key": "C", "title": "Charlie", "year": 2020, "doi": "", "has_summary": False},
-        {"key": "A", "title": "Alpha", "year": 2024, "doi": "10.1/a", "has_summary": True},
+        {
+            "key": "A",
+            "title": "Alpha",
+            "year": 2024,
+            "doi": "10.1/a",
+            "has_summary": True,
+        },
         {"key": "B", "title": "Bravo", "year": 2022, "doi": "", "has_summary": False},
         {"key": "D", "title": "Delta", "year": 2018, "doi": "", "has_summary": True},
         {"key": "E", "title": "Echo", "year": None, "doi": "", "has_summary": False},
@@ -238,7 +252,13 @@ def test_wanted_items_page_filters_sorts_and_slices():
     assert [row["title"] for row in page] == ["Charlie", "Delta"]
 
     newest, *_rest = wanted_items_page(rows, page=1, per_page=10, order="year_new")
-    assert [row["title"] for row in newest] == ["Alpha", "Bravo", "Charlie", "Delta", "Echo"]
+    assert [row["title"] for row in newest] == [
+        "Alpha",
+        "Bravo",
+        "Charlie",
+        "Delta",
+        "Echo",
+    ]
 
     summaries, total_sum, _, _ = wanted_items_page(
         rows, page=1, per_page=10, filt="summary"
@@ -246,9 +266,7 @@ def test_wanted_items_page_filters_sorts_and_slices():
     assert total_sum == 2
     assert [row["key"] for row in summaries] == ["A", "D"]
 
-    search, total_q, _, _ = wanted_items_page(
-        rows, page=1, per_page=10, query="10.1/a"
-    )
+    search, total_q, _, _ = wanted_items_page(rows, page=1, per_page=10, query="10.1/a")
     assert total_q == 1
     assert search[0]["key"] == "A"
 
@@ -256,10 +274,7 @@ def test_wanted_items_page_filters_sorts_and_slices():
 def test_library_items_page_slices(tmp_path):
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     manifest = Manifest(cfg.manifest_path)
-    items = [
-        _Item(f"K{i}", f"Title {i:02d}", None, False)
-        for i in range(5)
-    ]
+    items = [_Item(f"K{i}", f"Title {i:02d}", None, False) for i in range(5)]
     rows, total, page, page_count = library_items_page(
         cfg, items, manifest, page=2, per_page=2
     )
@@ -380,10 +395,16 @@ def test_keep_matches_legacy_top_level_doi(tmp_path):
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     run = cfg.state_dir / "snowball" / "run1"
     run.mkdir(parents=True)
-    row = {"schema": "paperful.snowball.candidate.v1", "title": "One", "doi": "10.1/legacy"}
+    row = {
+        "schema": "paperful.snowball.candidate.v1",
+        "title": "One",
+        "doi": "10.1/legacy",
+    }
     (run / "candidates.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
     set_snowball_keep(cfg, "run1", ["10.1/legacy"], False)
-    saved = json.loads((run / "candidates.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    saved = json.loads(
+        (run / "candidates.jsonl").read_text(encoding="utf-8").splitlines()[0]
+    )
     assert saved["keep"] is False
     assert saved["ids"]["doi"] == "10.1/legacy"
     assert saved["biblio"]["title"] == "One"
@@ -401,11 +422,23 @@ def test_last_job_result_prefers_matching_run(tmp_path):
     )
     commands.write_command(
         cfg,
-        {"id": "ingest", "verb": "rag_ingest", "status": "queued", "created": 20, "result": {}},
+        {
+            "id": "ingest",
+            "verb": "rag_ingest",
+            "status": "queued",
+            "created": 20,
+            "result": {},
+        },
     )
     commands.write_command(
         cfg,
-        {"id": "old", "verb": "ask", "status": "done", "created": 10, "result": {"answer": "old"}},
+        {
+            "id": "old",
+            "verb": "ask",
+            "status": "done",
+            "created": 10,
+            "result": {"answer": "old"},
+        },
     )
     by_run = last_job_result(cfg, "ask", run="old")
     assert by_run["id"] == "old"
@@ -459,7 +492,11 @@ def test_discover_queue_rows_carry_the_why_line(tmp_path):
     run = cfg.state_dir / "snowball" / "run-why"
     run.mkdir(parents=True)
     rows = [
-        {"biblio": {"title": "Cited"}, "ids": {"doi": "10.1/c"}, "why": "cited by 3 of your seeds"},
+        {
+            "biblio": {"title": "Cited"},
+            "ids": {"doi": "10.1/c"},
+            "why": "cited by 3 of your seeds",
+        },
         {"biblio": {"title": "Bare"}, "ids": {"doi": "10.1/b"}},
     ]
     (run / "candidates.jsonl").write_text(
@@ -468,4 +505,6 @@ def test_discover_queue_rows_carry_the_why_line(tmp_path):
     _run_id, candidates = newest_snowball_queue(cfg)
     assert candidates[0]["why"] == "cited by 3 of your seeds"
     assert candidates[1]["why"] == ""
-    assert "Why suggested" in Path("paperful/ui/templates/discover.html").read_text(encoding="utf-8")
+    assert "Why suggested" in Path("paperful/ui/templates/discover.html").read_text(
+        encoding="utf-8"
+    )

@@ -117,7 +117,9 @@ def test_a_note_that_matches_the_disk_summary_keeps_its_key(cfg):
 def test_merge_preview_from_the_mirror_matches_the_manager(cfg):
     zot = _library()
     zot.put("KEEP0001", title="A duplicated paper", DOI="10.1000/dup")
-    zot.put("DROP0001", title="A duplicated paper", abstractNote="Only the copy has one.")
+    zot.put(
+        "DROP0001", title="A duplicated paper", abstractNote="Only the copy has one."
+    )
     zot.attach("KEEP0001", "ATTK0001")
     zot.attach("DROP0001", "ATTD0001")  # same bytes: the copy's file is redundant
     zot.note("DROP0001", "NOTED001")
@@ -219,9 +221,12 @@ def test_export_pdf_prefers_the_mirror(cfg, tmp_path):
     dest = tmp_path / "bundle" / "x.pdf"
     assert backend.export_pdf(item, dest) == dest and dest.read_bytes() == PDF
     assert zot.calls["export_pdf"] == 0
-    assert MirrorFirstBackend(cfg, MirrorCatalogue(cfg.out_dir), None).export_pdf(
-        backend.get_item("ITEM0002"), tmp_path / "none.pdf"
-    ) is None
+    assert (
+        MirrorFirstBackend(cfg, MirrorCatalogue(cfg.out_dir), None).export_pdf(
+            backend.get_item("ITEM0002"), tmp_path / "none.pdf"
+        )
+        is None
+    )
 
 
 # ---- the commands -----------------------------------------------------------------------
@@ -300,7 +305,9 @@ def test_read_verbs_work_with_the_manager_closed(
     monkeypatch.setattr(
         "paperful.lint.prepare_identifiers", lambda *a, **k: [], raising=False
     )
-    first = runner.invoke(cli.app, ["gaps", "-C", "BBNJ", "--json", "-c", str(cfg_file)])
+    first = runner.invoke(
+        cli.app, ["gaps", "-C", "BBNJ", "--json", "-c", str(cfg_file)]
+    )
     assert first.exit_code == 0, first.stdout
     _close_manager(monkeypatch)
     forget_index()
@@ -320,21 +327,29 @@ WRITE_VERBS = [
 ]
 
 
-@pytest.mark.parametrize("argv", WRITE_VERBS, ids=[" ".join(a[:1] + a[3:]) for a in WRITE_VERBS])
+@pytest.mark.parametrize(
+    "argv", WRITE_VERBS, ids=[" ".join(a[:1] + a[3:]) for a in WRITE_VERBS]
+)
 def test_verbs_that_need_the_manager_exit_2_when_it_is_closed(
     argv, cfg_file, library, monkeypatch
 ):
     monkeypatch.setattr(
         "paperful.lint.prepare_identifiers", lambda *a, **k: [], raising=False
     )
-    assert runner.invoke(cli.app, ["gaps", "-C", "BBNJ", "-c", str(cfg_file)]).exit_code == 0
+    assert (
+        runner.invoke(cli.app, ["gaps", "-C", "BBNJ", "-c", str(cfg_file)]).exit_code
+        == 0
+    )
     _close_manager(monkeypatch)
     res = runner.invoke(cli.app, [*argv, "-c", str(cfg_file)])
     assert res.exit_code == 2, res.stdout
 
 
 def test_offline_flag_never_contacts_the_manager(cfg_file, library, monkeypatch):
-    assert runner.invoke(cli.app, ["gaps", "-C", "BBNJ", "-c", str(cfg_file)]).exit_code == 0
+    assert (
+        runner.invoke(cli.app, ["gaps", "-C", "BBNJ", "-c", str(cfg_file)]).exit_code
+        == 0
+    )
 
     def forbidden(*a, **k):
         raise AssertionError("--offline contacted the manager")
@@ -353,14 +368,18 @@ def test_offline_flag_never_contacts_the_manager(cfg_file, library, monkeypatch)
 
 
 def test_offline_with_no_mirror_exits_2(cfg_file, library):
-    res = runner.invoke(cli.app, ["--offline", "gaps", "-C", "BBNJ", "-c", str(cfg_file)])
+    res = runner.invoke(
+        cli.app, ["--offline", "gaps", "-C", "BBNJ", "-c", str(cfg_file)]
+    )
     assert res.exit_code == 2
     assert "no mirror" in res.stdout
 
 
 def test_a_command_reads_scope_from_the_mirror_not_the_manager(cfg_file, library):
     for _ in range(2):
-        res = runner.invoke(cli.app, ["gaps", "-C", "BBNJ", "--json", "-c", str(cfg_file)])
+        res = runner.invoke(
+            cli.app, ["gaps", "-C", "BBNJ", "--json", "-c", str(cfg_file)]
+        )
         assert res.exit_code == 0, res.stdout
     # One change listing per command; never the manager's own scoped listing.
     assert library.listings == 2
@@ -449,7 +468,9 @@ def test_attachments_children_and_bytes_come_from_the_mirror(cfg):
     raw = backend.children("ITEM0001")
     mirrors = mirror_pdfs_for(cfg.out_dir, item)
     present = {
-        ch["key"]: mirror_has_bytes(ch, mirrors) for ch in raw if ch["data"]["itemType"] == "attachment"
+        ch["key"]: mirror_has_bytes(ch, mirrors)
+        for ch in raw
+        if ch["data"]["itemType"] == "attachment"
     }
     assert present == {"ATT00001": True}
     kids = pdf_children("ITEM0001", raw, present=present)
@@ -462,7 +483,10 @@ def test_attachments_children_and_bytes_come_from_the_mirror(cfg):
 def test_attachments_report_only_never_asks_the_manager_for_children(
     cfg_file, library, monkeypatch
 ):
-    assert runner.invoke(cli.app, ["gaps", "-C", "BBNJ", "-c", str(cfg_file)]).exit_code == 0
+    assert (
+        runner.invoke(cli.app, ["gaps", "-C", "BBNJ", "-c", str(cfg_file)]).exit_code
+        == 0
+    )
 
     def forbidden(*a, **k):
         raise AssertionError("attachments read children from the manager")
@@ -470,6 +494,8 @@ def test_attachments_report_only_never_asks_the_manager_for_children(
     monkeypatch.setattr(type(library), "children", forbidden, raising=False)
     _close_manager(monkeypatch)
     forget_index()
-    res = runner.invoke(cli.app, ["attachments", "-C", "BBNJ", "--json", "-c", str(cfg_file)])
+    res = runner.invoke(
+        cli.app, ["attachments", "-C", "BBNJ", "--json", "-c", str(cfg_file)]
+    )
     assert res.exit_code == 0, res.stdout
     assert json.loads(res.stdout)["items"] == 2

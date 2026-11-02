@@ -138,7 +138,12 @@ class LibraryFingerprint:
         url: str | None = None,
         host: str | None = None,
     ) -> LookupHit | None:
-        from .greyid import grey_key, normalize_isbn, normalize_report_number, registrable_host
+        from .greyid import (
+            grey_key,
+            normalize_isbn,
+            normalize_report_number,
+            registrable_host,
+        )
 
         found = normalize_doi(doi) if doi else None
         if found and found in self.by_doi:
@@ -173,9 +178,7 @@ def library_lookup(backend: Any, *, scope: str, collection: str) -> Lookup:
         except Exception:
             items = None
     if items is not None:
-        fp = LibraryFingerprint.from_items(
-            items, scope=scope, collection=collection
-        )
+        fp = LibraryFingerprint.from_items(items, scope=scope, collection=collection)
 
         def indexed(
             doi: str | None,

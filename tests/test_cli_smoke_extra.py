@@ -42,9 +42,7 @@ def _smoke_patches(monkeypatch):
     )
     monkeypatch.setattr(
         "paperful.sync.run_sync",
-        lambda *a, **k: __import__(
-            "paperful.sync", fromlist=["SyncStats"]
-        ).SyncStats(),
+        lambda *a, **k: __import__("paperful.sync", fromlist=["SyncStats"]).SyncStats(),
     )
     monkeypatch.setattr(
         "paperful.mirrors_cmd.ping_mirrors",

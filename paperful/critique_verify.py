@@ -23,9 +23,7 @@ from .critique_units import LIGHT_FAMILIES, Unit, family_of, paper_units
 from .grounding import budget_slice
 from .zot import Item
 
-_HEAVY = re.compile(
-    r"\b(lemma|theorem|proposition|corollary|proof|conjecture)\b", re.I
-)
+_HEAVY = re.compile(r"\b(lemma|theorem|proposition|corollary|proof|conjecture)\b", re.I)
 _MATH = re.compile(r"\$|\\\[|\\begin\{eq")
 _METHODS = re.compile(
     r"\b(n\s*=|p\s*[<>=]|regression|protocol|we measured|sample size)\b", re.I
@@ -372,9 +370,7 @@ def suggested_from_verify(
         row["calls"] = 1
         meta["calls"] = int(meta["calls"]) + 1
         data = parse_llm_json(raw) or {}
-        comments = [
-            c for c in (data.get("comments") or []) if isinstance(c, dict)
-        ]
+        comments = [c for c in (data.get("comments") or []) if isinstance(c, dict)]
         if turns > 1 and time.monotonic() < deadline:
             attack_user = (
                 f"Previous comments: {json.dumps(comments, ensure_ascii=False)}\n"
@@ -436,9 +432,7 @@ def suggested_from_verify(
             )
             meta["calls"] = int(meta["calls"]) + 1
             data = parse_llm_json(raw) or {}
-            refined = [
-                c for c in (data.get("comments") or []) if isinstance(c, dict)
-            ]
+            refined = [c for c in (data.get("comments") or []) if isinstance(c, dict)]
             if refined:
                 all_comments = refined
         except Exception:

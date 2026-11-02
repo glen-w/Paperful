@@ -80,7 +80,9 @@ class _Lib:
     def get_item(self, key: str) -> Item | None:
         return self.items.get(key)
 
-    def attach(self, key: str, path: Path, title: str | None = None, note: str | None = None):
+    def attach(
+        self, key: str, path: Path, title: str | None = None, note: str | None = None
+    ):
         del note
         assert path.is_file()
         self.attached.append((key, title))
@@ -262,7 +264,9 @@ def test_version_pack_schema(tmp_path: Path):
 
     preprint = _item()
     rows = classify_versions([preprint], lambda _doi: _link())
-    json_path, md_path = write_pack(tmp_path, "BBNJ", rows, n_items=1, stamp="20260925T120000Z")
+    json_path, md_path = write_pack(
+        tmp_path, "BBNJ", rows, n_items=1, stamp="20260925T120000Z"
+    )
     pack = json.loads(json_path.read_text())
     assert pack["schema"] == SCHEMA == "paperful.version_pack.v1"
     row = pack["proposals"][0]
@@ -277,7 +281,9 @@ def test_version_pack_schema(tmp_path: Path):
 
 
 def test_merge_preprint_extra_is_idempotent():
-    once = merge_preprint_extra("", arxiv_id="1706.03762", preprint_doi="10.1101/2020.01.01.123456")
+    once = merge_preprint_extra(
+        "", arxiv_id="1706.03762", preprint_doi="10.1101/2020.01.01.123456"
+    )
     twice = merge_preprint_extra(
         once, arxiv_id="1706.03762", preprint_doi="10.1101/2020.01.01.123456"
     )

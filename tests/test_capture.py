@@ -195,9 +195,7 @@ def test_zotero_down_blocks_create(tmp_path):
 def test_mirror_doi_updates_without_zotero(tmp_path):
     cfg = _cfg(tmp_path)
     _mirror(cfg, "ABCD1234", doi="10.1000/example", title="Kept")
-    result = plan_page(
-        cfg, doi="10.1000/example", opener=_down, run_sync_fn=_quiet
-    )
+    result = plan_page(cfg, doi="10.1000/example", opener=_down, run_sync_fn=_quiet)
     assert result["action"] == "update"
     assert result["key"] == "ABCD1234"
     assert result["reason"] != "zotero_unread"
@@ -272,7 +270,11 @@ def test_refused_host(tmp_path):
     assert result["reason"] == "refused_host"
     applied = apply_page(
         cfg,
-        {"url": "https://sci-hub.se/10.1000/example", "apply": True, "allow_unread": True},
+        {
+            "url": "https://sci-hub.se/10.1000/example",
+            "apply": True,
+            "allow_unread": True,
+        },
         opener=_down,
         run_sync_fn=_quiet,
     )
@@ -526,7 +528,10 @@ def test_host_hello_unknown_and_install(tmp_path, monkeypatch):
     assert hello["snapshot"] == "off"
     assert hello["collection"] == "Capture"
     assert hello["tags"] == []
-    assert handle_message(cfg, {"type": "nope"}, []) == {"ok": False, "reason": "unknown"}
+    assert handle_message(cfg, {"type": "nope"}, []) == {
+        "ok": False,
+        "reason": "unknown",
+    }
     session = handle_message(cfg, {"type": "handoff.session"}, [])
     assert session["ok"] is True and session["items"] == []
 
@@ -584,7 +589,9 @@ def test_walk_writes_handoff_session(tmp_path):
 
 
 def test_capture_does_not_call_zotero_writes():
-    source = (Path(__file__).resolve().parents[1] / "paperful" / "capture.py").read_text()
+    source = (
+        Path(__file__).resolve().parents[1] / "paperful" / "capture.py"
+    ).read_text()
     assert "create_items" not in source
     assert "attach_pdf_file" not in source
 
@@ -674,9 +681,7 @@ def test_stage_copies_from_allowed_parent(tmp_path, monkeypatch):
     incoming_dir.mkdir()
     src = incoming_dir / "paper.pdf"
     src.write_bytes(b"%PDF-1.4\nstaged\n")
-    monkeypatch.setattr(
-        "paperful.capture.stage_parents", lambda _cfg: [incoming_dir]
-    )
+    monkeypatch.setattr("paperful.capture.stage_parents", lambda _cfg: [incoming_dir])
     staged = stage_incoming(cfg, str(src))
     assert staged["ok"] is True
     assert staged["staged"] is True
@@ -730,8 +735,16 @@ def test_mark_session_saved(tmp_path):
         {
             "schema": "paperful.handoff.session.v1",
             "items": [
-                {"key": "ABCD1234", "doi": "10.1000/example", "url": "https://x.example/a"},
-                {"key": "KEEPME01", "doi": "10.1000/other", "url": "https://x.example/b"},
+                {
+                    "key": "ABCD1234",
+                    "doi": "10.1000/example",
+                    "url": "https://x.example/a",
+                },
+                {
+                    "key": "KEEPME01",
+                    "doi": "10.1000/other",
+                    "url": "https://x.example/b",
+                },
             ],
         },
     )
@@ -747,11 +760,15 @@ def test_windows_install_writes_bat(tmp_path, monkeypatch):
 
     monkeypatch.setattr(capture_host.sys, "platform", "win32")
     monkeypatch.setitem(capture_host.os.environ, "APPDATA", str(tmp_path / "app"))
-    monkeypatch.setitem(capture_host.os.environ, "LOCALAPPDATA", str(tmp_path / "local"))
+    monkeypatch.setitem(
+        capture_host.os.environ, "LOCALAPPDATA", str(tmp_path / "local")
+    )
     cfg = _cfg(tmp_path)
     dest = capture_host.install_host(cfg, tmp_path / "config.toml")
     assert dest.endswith("paperful.json")
-    script = (tmp_path / "local" / "Paperful" / "capture" / "paperful-host.bat").read_text()
+    script = (
+        tmp_path / "local" / "Paperful" / "capture" / "paperful-host.bat"
+    ).read_text()
     assert script.startswith("@echo off")
     assert "--stdio" in script
     assert "-u" in script
@@ -809,7 +826,10 @@ def test_open_target_item_out_and_invalid(tmp_path):
     assert opened[-1] == folder.resolve()
     out = open_target(cfg, "out", opener=opened.append)
     assert Path(out["path"]) == cfg.out_dir.resolve()
-    assert open_target(cfg, "item", "NOPEKEY1", opener=opened.append)["reason"] == "missing_item"
+    assert (
+        open_target(cfg, "item", "NOPEKEY1", opener=opened.append)["reason"]
+        == "missing_item"
+    )
     assert open_target(cfg, "wanted", opener=opened.append)["reason"] == "invalid"
 
 
@@ -935,19 +955,37 @@ def test_suggest_tags_uses_openalex(tmp_path, monkeypatch):
             assert doi == "10.1000/example"
             return {
                 "keywords": [
-                    {"display_name": "Marine Policy", "score": 0.9, "id": "https://openalex.org/keywords/marine-policy"},
-                    {"display_name": "Law of the Sea", "score": 0.5, "id": "https://openalex.org/keywords/law-of-the-sea"},
+                    {
+                        "display_name": "Marine Policy",
+                        "score": 0.9,
+                        "id": "https://openalex.org/keywords/marine-policy",
+                    },
+                    {
+                        "display_name": "Law of the Sea",
+                        "score": 0.5,
+                        "id": "https://openalex.org/keywords/law-of-the-sea",
+                    },
                 ],
                 "study_designs": [
-                    {"id": "https://openalex.org/study-designs/literature-review", "display_name": "Literature review"},
+                    {
+                        "id": "https://openalex.org/study-designs/literature-review",
+                        "display_name": "Literature review",
+                    },
                 ],
             }
 
         def search_keywords(self, query, limit=5):
             assert query == "ocean"
-            return [{"display_name": "Ocean governance", "id": "https://openalex.org/keywords/ocean-governance"}]
+            return [
+                {
+                    "display_name": "Ocean governance",
+                    "id": "https://openalex.org/keywords/ocean-governance",
+                }
+            ]
 
-    monkeypatch.setattr("paperful.capture._openalex_client_for_capture", lambda _cfg: Client())
+    monkeypatch.setattr(
+        "paperful.capture._openalex_client_for_capture", lambda _cfg: Client()
+    )
     hints = suggest_tag_names(cfg, doi="10.1000/example")
     assert "Marine Policy" in hints
     assert any("literature" in row.lower() for row in hints)
@@ -959,7 +997,12 @@ def test_suggest_tags_uses_openalex(tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.capture_host._open_live", lambda _cfg: None)
     reply = handle_message(
         cfg,
-        {"type": "capture.tag_suggest", "id": 3, "query": "ocean", "doi": "10.1000/example"},
+        {
+            "type": "capture.tag_suggest",
+            "id": 3,
+            "query": "ocean",
+            "doi": "10.1000/example",
+        },
         [],
     )
     assert reply["id"] == 3

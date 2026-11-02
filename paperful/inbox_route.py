@@ -67,7 +67,9 @@ _SKIP_SNOWBALL_DIRS = frozenset({"cache", "watches"})
 @dataclass
 class RouteResult:
     collection: str = ""
-    how: str = "none"  # snowball | watch | last_scope | doi_library | title | llm | none
+    how: str = (
+        "none"  # snowball | watch | last_scope | doi_library | title | llm | none
+    )
     confidence: float = 0.0
     reason: str = ""
     candidates: list[tuple[str, float, str]] = field(default_factory=list)
@@ -326,11 +328,7 @@ def _doi_library_votes(
     doi = normalize_doi(matched.doi)
     if not doi:
         return []
-    hits = [
-        item
-        for item in items
-        if normalize_doi(item.doi) == doi
-    ]
+    hits = [item for item in items if normalize_doi(item.doi) == doi]
     if len(hits) != 1:
         return []
     paths = [
@@ -352,7 +350,9 @@ def _title_votes(
     existing: dict[str, Collection],
 ) -> list[tuple[str, float, str]]:
     stem = Path(filename).stem.replace("_", " ").replace("-", " ")
-    query = _tokens(" ".join(part for part in (matched.title, stem, matched.host) if part))
+    query = _tokens(
+        " ".join(part for part in (matched.title, stem, matched.host) if part)
+    )
     body = _tokens((text or matched.text or "")[:2000])
     if not query and not body:
         return []
@@ -479,7 +479,9 @@ def _llm_route(
         )
     path = _resolve_existing(str(data.get("collection") or ""), existing)
     if not path:
-        return RouteResult(how="none", reason="llm path not in library", candidates=candidates)
+        return RouteResult(
+            how="none", reason="llm path not in library", candidates=candidates
+        )
     return RouteResult(
         collection=path,
         how="llm",

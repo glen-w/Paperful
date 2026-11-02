@@ -67,6 +67,7 @@ def run_keepup_save(
     )
     console.print(f"Wrote [bold]{path}[/]")
 
+
 def run_keepup_list(
     console: Console,
     config: Any,
@@ -84,6 +85,7 @@ def run_keepup_list(
     for name in names:
         console.print(name)
 
+
 def run_keepup_show(
     console: Console,
     name: Any,
@@ -96,6 +98,7 @@ def run_keepup_show(
 
     cfg = cli_mod._cfg(config)
     _keepup_call(lambda: show_job(cfg, name, console=console))
+
 
 def run_keepup_delete(
     console: Console,
@@ -114,6 +117,7 @@ def run_keepup_delete(
         raise typer.Exit(1)
     path = _keepup_call(lambda: delete_job(cfg, name))
     console.print(f"Deleted {path}")
+
 
 def run_keepup_run(
     console: Console,
@@ -149,6 +153,7 @@ def run_keepup_run(
     if result.created and getattr(result, "created", 0):
         pass
 
+
 def run_keepup_digest(
     console: Console,
     name: Any,
@@ -162,6 +167,7 @@ def run_keepup_digest(
     cfg = cli_mod._cfg(config)
     path = _keepup_call(lambda: write_digest(cfg, name))
     console.print(f"Wrote [bold]{path}[/]")
+
 
 def run_keepup_apply(
     console: Console,
@@ -197,6 +203,7 @@ def run_keepup_apply(
     if result.failed and result.created:
         raise typer.Exit(3)
 
+
 def run_keepup_dismiss(
     console: Console,
     name: Any,
@@ -210,8 +217,5 @@ def run_keepup_dismiss(
     from .keepup import dismiss
 
     cfg = cli_mod._cfg(config)
-    key = _keepup_call(
-        lambda: dismiss(cfg, name, identity=identity, doi=doi)
-    )
+    key = _keepup_call(lambda: dismiss(cfg, name, identity=identity, doi=doi))
     console.print(f"Muted {key}")
-

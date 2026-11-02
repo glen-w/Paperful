@@ -25,6 +25,8 @@ def _in_docker() -> bool:
     import importlib
 
     return importlib.import_module("paperful.cli").in_docker()
+
+
 def _collect_doctor_checks(cfg: Config, *, probe: bool = False) -> list[Check]:
     from . import cli_runtime as cli_mod
 
@@ -173,8 +175,7 @@ def run_doctor(
             )
         else:
             console.print(
-                "[dim]Step-by-step re-check:[/] "
-                "[bold]paperful doctor --guide[/]"
+                "[dim]Step-by-step re-check:[/] [bold]paperful doctor --guide[/]"
             )
 
     if has_red(checks):

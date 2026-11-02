@@ -124,7 +124,11 @@ def run_search_list(console: Console, *, config: Path | None, fmt: str) -> None:
     table.add_column("query")
     table.add_column("kept")
     for row in rows:
-        table.add_row(str(row.get("run_id") or ""), str(row.get("query") or "")[:60], str(row.get("kept") or 0))
+        table.add_row(
+            str(row.get("run_id") or ""),
+            str(row.get("query") or "")[:60],
+            str(row.get("kept") or 0),
+        )
     console.print(table)
 
 
@@ -361,7 +365,11 @@ def run_search_watch_list(
     table.add_column("due")
     table.add_column("inbox")
     for row in rows:
-        due = "now" if int(row.get("days_until_due") or 0) == 0 else f"{row['days_until_due']}d"
+        due = (
+            "now"
+            if int(row.get("days_until_due") or 0) == 0
+            else f"{row['days_until_due']}d"
+        )
         table.add_row(
             str(row.get("name") or ""),
             str(row.get("query") or "")[:50],

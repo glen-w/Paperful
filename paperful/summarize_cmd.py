@@ -16,6 +16,7 @@ from .config import wants_disk
 from .runreport import write_command_report
 from .store import Manifest
 
+
 def run_summarize(
     console: Console,
     *,
@@ -70,7 +71,9 @@ def run_summarize(
     if collections_file is not None:
         extra = [
             ln.strip()
-            for ln in collections_file.expanduser().read_text(encoding="utf-8").splitlines()
+            for ln in collections_file.expanduser()
+            .read_text(encoding="utf-8")
+            .splitlines()
             if ln.strip()
         ]
         collection = list(collection) + extra
@@ -115,7 +118,9 @@ def run_summarize(
         items = items[:limit]
     started = time.time()
     deadline = (
-        started + max_minutes * 60.0 if max_minutes is not None and max_minutes > 0 else None
+        started + max_minutes * 60.0
+        if max_minutes is not None and max_minutes > 0
+        else None
     )
     agent_box: list[dict[str, Any]] = []
 
@@ -234,7 +239,9 @@ def run_summarize(
         where = cfg.summaries_dir if wants_disk(dest) else "Zotero"
         console.print(f"Summarized {batch.summarized}/{len(items)} items under {where}")
         if batch.not_reached:
-            console.print(f"Not reached: {batch.not_reached} (time or --max-new limit).")
+            console.print(
+                f"Not reached: {batch.not_reached} (time or --max-new limit)."
+            )
         already = batch.skipped - batch.skipped_no_text
         if already:
             console.print(

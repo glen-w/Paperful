@@ -27,7 +27,16 @@ from paperful.library import LibraryError
 from tests.conftest import PDF_BYTES
 
 
-def _library(root: Path, *, name: str = "Lib", refs=(), groups=(), members=(), files=(), group_cols=None):
+def _library(
+    root: Path,
+    *,
+    name: str = "Lib",
+    refs=(),
+    groups=(),
+    members=(),
+    files=(),
+    group_cols=None,
+):
     """Hand-built sdb.eni. ``refs`` rows: (id, title, trash_state)."""
     enl = root / f"{name}.enl"
     enl.write_bytes(b"enl")
@@ -43,12 +52,17 @@ def _library(root: Path, *, name: str = "Lib", refs=(), groups=(), members=(), f
         "VALUES (?, ?, ?, 'Doe, Jo', '2020', 17, NULL)",
         refs,
     )
-    conn.execute(group_cols or "CREATE TABLE groups (group_id INTEGER, group_name TEXT, parent_id INTEGER, group_type INTEGER)")
+    conn.execute(
+        group_cols
+        or "CREATE TABLE groups (group_id INTEGER, group_name TEXT, parent_id INTEGER, group_type INTEGER)"
+    )
     for g in groups:
         conn.execute(f"INSERT INTO groups VALUES ({','.join('?' * len(g))})", g)
     conn.execute("CREATE TABLE group_refs (refs_id INTEGER, group_id INTEGER)")
     conn.executemany("INSERT INTO group_refs VALUES (?, ?)", members)
-    conn.execute("CREATE TABLE file_res (refs_id INTEGER, file_path TEXT, file_type INTEGER)")
+    conn.execute(
+        "CREATE TABLE file_res (refs_id INTEGER, file_path TEXT, file_type INTEGER)"
+    )
     conn.executemany("INSERT INTO file_res VALUES (?, ?, ?)", files)
     conn.commit()
     conn.close()
@@ -67,7 +81,10 @@ def _backend(cfg, enl: Path) -> EndNoteBackend:
     ("raw", "expected"),
     [
         ("Smith, Jane", [("Smith", "Jane")]),
-        ("Jane Smith; Doe, Jo / Single", [("Smith", "Jane"), ("Doe", "Jo"), ("Single", "")]),
+        (
+            "Jane Smith; Doe, Jo / Single",
+            [("Smith", "Jane"), ("Doe", "Jo"), ("Single", "")],
+        ),
         ("A, B\x00C, D", [("A", "B"), ("C", "D")]),
         ("Line, One\r\nLine, Two", [("Line", "One"), ("Line", "Two")]),
         ("*Starred, Name*", [("Starred", "Name")]),
@@ -105,7 +122,10 @@ def test_ref_get_is_case_insensitive_and_skips_blank_values():
         ("<group><broken", {}),
         ("<group><rule>TYPE;6</rule></group>", {"skip": True}),
         (b"TYPE;6 online search", {"skip": True}),
-        ('<ns:group xmlns:ns="urn:x"><ns:name>Namespaced</ns:name></ns:group>', {"name": "Namespaced"}),
+        (
+            '<ns:group xmlns:ns="urn:x"><ns:name>Namespaced</ns:name></ns:group>',
+            {"name": "Namespaced"},
+        ),
     ],
 )
 def test_parse_group_spec(blob, expected):
@@ -119,7 +139,9 @@ def test_member_blob_decodes_both_endians_and_rejects_bad_sizes():
     assert _endnote_member_ids(little) == [7, 8]
     assert _endnote_member_ids(b"") == [] and _endnote_member_ids(b"short") == []
     assert _endnote_member_ids(struct.pack(">II", 2, 0)) == []
-    assert _endnote_member_ids(struct.pack(">II", 2, 5) + b"\x00" * 4) == []  # count/length mismatch
+    assert (
+        _endnote_member_ids(struct.pack(">II", 2, 5) + b"\x00" * 4) == []
+    )  # count/length mismatch
     assert _endnote_member_ids(struct.pack(">II", 2, 2_000_000)) == []
 
 
@@ -132,10 +154,15 @@ def test_resolve_data_file_search_order(tmp_path):
     assert _resolve_data_file(data, "rooted.pdf") == data / "rooted.pdf"
     assert _resolve_data_file(data, "top.pdf") == data / "PDF" / "top.pdf"
     assert _resolve_data_file(data, "123/deep.pdf") == data / "PDF" / "123" / "deep.pdf"
-    assert _resolve_data_file(data, "internal-pdf://top.pdf") == data / "PDF" / "top.pdf"
+    assert (
+        _resolve_data_file(data, "internal-pdf://top.pdf") == data / "PDF" / "top.pdf"
+    )
     assert _resolve_data_file(data, "file:///top.pdf") == data / "PDF" / "top.pdf"
     # Wrong sub-folder in the stored path still finds the file by name under PDF/.
-    assert _resolve_data_file(data, "elsewhere/deep.pdf") == data / "PDF" / "123" / "deep.pdf"
+    assert (
+        _resolve_data_file(data, "elsewhere/deep.pdf")
+        == data / "PDF" / "123" / "deep.pdf"
+    )
     assert _resolve_data_file(data, "nothing.pdf") is None
     assert _resolve_data_file(data, "") is None
 
@@ -145,7 +172,11 @@ def test_library_paths_accepts_enl_data_folder_or_bare_stem(tmp_path, variant):
     enl = _library(tmp_path, refs=[])
     arg = {"enl": enl, "data": tmp_path / "Lib.Data", "bare": tmp_path / "Lib"}[variant]
     got_enl, data, eni = library_paths(arg)
-    assert data == tmp_path / "Lib.Data" and eni == data / "sdb" / "sdb.eni" and eni.is_file()
+    assert (
+        data == tmp_path / "Lib.Data"
+        and eni == data / "sdb" / "sdb.eni"
+        and eni.is_file()
+    )
     if variant != "bare":
         assert got_enl == enl
 
@@ -158,11 +189,15 @@ def test_connect_readonly_missing_database(tmp_path):
         connect_readonly(tmp_path / "nope" / "sdb.eni")
 
 
-def test_unlocked_database_is_opened_in_place_without_a_temp_copy(tmp_path, monkeypatch):
+def test_unlocked_database_is_opened_in_place_without_a_temp_copy(
+    tmp_path, monkeypatch
+):
     enl = _library(tmp_path, refs=[(1, "T", 0)])
     _e, _d, eni = library_paths(enl)
     monkeypatch.setattr(
-        tempfile, "mkdtemp", lambda *a, **k: (_ for _ in ()).throw(AssertionError("copied an unlocked db"))
+        tempfile,
+        "mkdtemp",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("copied an unlocked db")),
     )
     conn = connect_readonly(eni)
     assert conn.execute("SELECT COUNT(*) FROM refs").fetchone()[0] == 1
@@ -183,7 +218,9 @@ def test_library_in_a_folder_with_uri_special_characters_still_reads(tmp_path):
 
 
 def test_trashed_refs_are_hidden_but_countable(cfg, tmp_path):
-    enl = _library(tmp_path, refs=[(1, "Live", 0), (2, "Null trash", None), (3, "Trashed", 1)])
+    enl = _library(
+        tmp_path, refs=[(1, "Live", 0), (2, "Null trash", None), (3, "Trashed", 1)]
+    )
     backend = _backend(cfg, enl)
     assert backend._ref_ids() == {"1", "2"}
     assert backend._ref_ids(live_only=False) == {"1", "2", "3"}
@@ -240,7 +277,9 @@ def test_nested_groups_build_slash_paths_and_sanitise_names(cfg, tmp_path):
     items = {i.key: i for i in backend.items_in_scope(None)}
     assert items["1"].collection_paths == ["BBNJ/EIA_ scope_ratio_/Deep"]
     assert items["2"].collection_paths == ["BBNJ"]
-    assert items["3"].collection_paths == ["Uncollected"] or items["3"].collection_paths  # never empty
+    assert (
+        items["3"].collection_paths == ["Uncollected"] or items["3"].collection_paths
+    )  # never empty
 
 
 def test_group_parent_cycle_does_not_recurse_forever(cfg, tmp_path):
@@ -261,7 +300,9 @@ def test_group_members_from_blob_when_no_member_table(cfg, tmp_path):
     data = tmp_path / "Lib.Data"
     (data / "sdb").mkdir(parents=True)
     conn = sqlite3.connect(str(data / "sdb" / "sdb.eni"))
-    conn.execute("CREATE TABLE refs (id INTEGER PRIMARY KEY, title TEXT, trash_state INTEGER)")
+    conn.execute(
+        "CREATE TABLE refs (id INTEGER PRIMARY KEY, title TEXT, trash_state INTEGER)"
+    )
     conn.executemany("INSERT INTO refs VALUES (?, ?, 0)", [(1, "One"), (2, "Two")])
     conn.execute("CREATE TABLE groups (group_id INTEGER, spec BLOB, members BLOB)")
     spec = b"<group><ids><name>Blob</name></ids></group>"
@@ -270,7 +311,9 @@ def test_group_members_from_blob_when_no_member_table(cfg, tmp_path):
     conn.commit()
     conn.close()
     backend = _backend(cfg, enl)
-    items = backend.items_in_scope(backend.subtree_keys(backend.resolve_collection("Blob")))
+    items = backend.items_in_scope(
+        backend.subtree_keys(backend.resolve_collection("Blob"))
+    )
     assert [i.title for i in items] == ["Two"]
 
 
@@ -284,7 +327,10 @@ def test_groups_table_without_id_column_yields_no_collections(cfg, tmp_path):
 
 
 def test_pdf_lookup_prefers_primary_file_type_then_falls_back(cfg, tmp_path):
-    enl = _library(tmp_path, refs=[(1, "With files", 0), (2, "Name match only", 0), (3, "No pdf", 0)])
+    enl = _library(
+        tmp_path,
+        refs=[(1, "With files", 0), (2, "Name match only", 0), (3, "No pdf", 0)],
+    )
     pdfs = tmp_path / "Lib.Data" / "PDF"
     pdfs.mkdir()
     (pdfs / "supplement.pdf").write_bytes(PDF_BYTES)
@@ -293,13 +339,20 @@ def test_pdf_lookup_prefers_primary_file_type_then_falls_back(cfg, tmp_path):
     conn = sqlite3.connect(str(tmp_path / "Lib.Data" / "sdb" / "sdb.eni"))
     conn.executemany(
         "INSERT INTO file_res VALUES (?, ?, ?)",
-        [(1, "supplement.pdf", 2), (1, "main.pdf", 1), (1, "", 1), (1, "vanished.pdf", 1)],
+        [
+            (1, "supplement.pdf", 2),
+            (1, "main.pdf", 1),
+            (1, "", 1),
+            (1, "vanished.pdf", 1),
+        ],
     )
     conn.commit()
     conn.close()
     backend = _backend(cfg, enl)
     assert backend._pdf_for("1").name == "main.pdf"
-    assert backend._pdf_for("2") is None or backend._pdf_for("2").name  # not matched through file_res
+    assert (
+        backend._pdf_for("2") is None or backend._pdf_for("2").name
+    )  # not matched through file_res
     assert backend._pdf_for("3") is None
     assert backend._pdf_for("404") is None
 

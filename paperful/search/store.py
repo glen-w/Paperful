@@ -51,7 +51,9 @@ def cache_dir(cfg: Config) -> Path:
 def run_dir(cfg: Config, run_id: str) -> Path:
     cleaned = (run_id or "").strip()
     if not _SAFE_RUN.match(cleaned):
-        raise SearchError("Run id must be 4–80 letters, digits, dots, underscores, or hyphens.")
+        raise SearchError(
+            "Run id must be 4–80 letters, digits, dots, underscores, or hyphens."
+        )
     return search_root(cfg) / cleaned
 
 
@@ -104,7 +106,11 @@ def load_run(cfg: Config, run_id: str, *, dest: Path | None = None) -> dict[str,
     if not meta_path.is_file():
         raise SearchError(f"No search run at {folder}.", code=1)
     meta = _read_json(meta_path)
-    summary = _read_json(folder / "summary.json") if (folder / "summary.json").is_file() else {}
+    summary = (
+        _read_json(folder / "summary.json")
+        if (folder / "summary.json").is_file()
+        else {}
+    )
     return {
         "schema": str(meta.get("schema") or SCHEMA),
         "run_id": str(meta.get("run_id") or run_id),

@@ -150,7 +150,10 @@ def marginal_yield(history: list[IterationStat], params: StopParams) -> StopDeci
         rate,
         params.eps,
         rationale,
-        {"k": params.k, "streak": [None if item is None else round(item, 6) for item in rates]},
+        {
+            "k": params.k,
+            "streak": [None if item is None else round(item, 6) for item in rates],
+        },
     )
 
 
@@ -180,7 +183,9 @@ def _fit_asymptote(cumulative: list[int]) -> tuple[float, float] | None:
     return best
 
 
-def asymptotic_coverage(history: list[IterationStat], params: StopParams) -> StopDecision:
+def asymptotic_coverage(
+    history: list[IterationStat], params: StopParams
+) -> StopDecision:
     cumulative: list[int] = []
     total = 0
     for stat in history:
@@ -280,7 +285,9 @@ def exhaustion(*, frontier_empty: bool, iteration: int) -> StopDecision:
     )
 
 
-def depth_ceiling_decision(*, next_hop: int, ceiling: int, iteration: int) -> StopDecision:
+def depth_ceiling_decision(
+    *, next_hop: int, ceiling: int, iteration: int
+) -> StopDecision:
     fired = next_hop > ceiling
     if fired:
         rationale = (
@@ -340,7 +347,9 @@ def evaluate(
         asymptotic_coverage(history, params),
         budget_rule(history, params),
         exhaustion(frontier_empty=frontier_empty, iteration=iteration),
-        depth_ceiling_decision(next_hop=next_hop, ceiling=depth_ceiling, iteration=iteration),
+        depth_ceiling_decision(
+            next_hop=next_hop, ceiling=depth_ceiling, iteration=iteration
+        ),
         candidate_ceiling_decision(room=candidate_room, iteration=iteration),
     ]
 

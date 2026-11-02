@@ -6,7 +6,9 @@ from paperful.rag.chunk import Chunk, chunk_pages, embed_text
 
 
 def _sentences(n: int, word: str = "krill") -> str:
-    return " ".join(f"Sentence {i} is about {word} and the open ocean." for i in range(n))
+    return " ".join(
+        f"Sentence {i} is about {word} and the open ocean." for i in range(n)
+    )
 
 
 def test_short_document_is_one_chunk_on_its_page():

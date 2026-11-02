@@ -8,7 +8,12 @@ from typing import Any, Mapping
 from ..config import Config
 from ..snowball.command import SnowballError, SnowballRequest
 from ..snowball.expand import compose_keyword_query
-from ..snowball.seeds import dois_from_seeds, merge_tokens, orcids_from_seeds, parse_seed_lines
+from ..snowball.seeds import (
+    dois_from_seeds,
+    merge_tokens,
+    orcids_from_seeds,
+    parse_seed_lines,
+)
 
 
 KINDS = frozenset({"search", "hybrid", "doi", "orcid", "collection"})
@@ -106,7 +111,9 @@ def _parse_map_categories(raw: object) -> tuple[str, ...] | None:
     return parse_map_categories(text)
 
 
-def parse_discover_topic(form: Mapping[str, Any], *, advanced: bool) -> DiscoverTopicPayload:
+def parse_discover_topic(
+    form: Mapping[str, Any], *, advanced: bool
+) -> DiscoverTopicPayload:
     kind = "search"
     if advanced:
         kind = str(form.get("kind") or "search").strip().lower()
@@ -164,7 +171,9 @@ def parse_discover_topic(form: Mapping[str, Any], *, advanced: bool) -> Discover
         tags=_opt_tuple(form.get("tags")) or (),
         dedupe_scope=_opt_str(form.get("dedupe_scope")),
         dedupe_after=_opt_str(form.get("dedupe_after")),
-        author_site_preflight=True if form.get("author_site_preflight") == "1" else None,
+        author_site_preflight=True
+        if form.get("author_site_preflight") == "1"
+        else None,
         twenty_writeback=True if form.get("twenty_writeback") == "1" else None,
         stop_rule=_opt_str(form.get("stop_rule")),
         stop_eps=_opt_float(form.get("stop_eps")),
@@ -173,7 +182,9 @@ def parse_discover_topic(form: Mapping[str, Any], *, advanced: bool) -> Discover
     )
 
 
-def build_request(cfg: Config, payload: DiscoverTopicPayload, collection: str) -> SnowballRequest:
+def build_request(
+    cfg: Config, payload: DiscoverTopicPayload, collection: str
+) -> SnowballRequest:
     return SnowballRequest(
         gate="dry-run",
         collection=collection or "",
@@ -216,7 +227,9 @@ def compose_query(payload: DiscoverTopicPayload) -> str:
     if not parts:
         return ""
     notices: list[str] = []
-    return compose_keyword_query(parts, op="or" if payload.or_mode else "and", notices=notices)
+    return compose_keyword_query(
+        parts, op="or" if payload.or_mode else "and", notices=notices
+    )
 
 
 def doi_list(payload: DiscoverTopicPayload) -> list[str]:
@@ -274,7 +287,9 @@ def profile_body_from_payload(
     elif payload.kind == "orcid":
         body["orcid"] = orcid_list(payload)
     elif payload.kind == "collection":
-        body["seed_collection"] = collection or (payload.seeds[0] if payload.seeds else None)
+        body["seed_collection"] = collection or (
+            payload.seeds[0] if payload.seeds else None
+        )
     if payload.languages:
         body["languages"] = list(payload.languages)
     if payload.study_designs:

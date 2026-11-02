@@ -49,7 +49,9 @@ class UrlFinding:
         }
 
 
-def targets_for_item(item: Item, children: list[dict[str, Any]] | None = None) -> list[UrlTarget]:
+def targets_for_item(
+    item: Item, children: list[dict[str, Any]] | None = None
+) -> list[UrlTarget]:
     out: list[UrlTarget] = []
     url = (item.url or "").strip()
     if url.lower().startswith(("http://", "https://")):

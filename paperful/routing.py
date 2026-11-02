@@ -72,6 +72,8 @@ class SerialStep:
     name: str
     partner: str | None = None
     htmlpdf_scope: str = "all"  # all | web | academic
+
+
 _BIORXIV_DOI = re.compile(r"^10\.1101/", re.IGNORECASE)
 _BIORXIV_URL = re.compile(
     r"(?:bio|med)rxiv\.org/content/(?:[^/\s]+/)*(10\.1101/\d+(?:\.\d+)*)(?:v\d+)?",
@@ -475,7 +477,9 @@ def source_applicable(item: Item, cfg: Config, name: str) -> bool:
         return True
     if name == "browser_agent":
         url = (item.url or "").strip().lower()
-        return bool(cfg.llm_enabled and (item.doi or url.startswith(("http://", "https://"))))
+        return bool(
+            cfg.llm_enabled and (item.doi or url.startswith(("http://", "https://")))
+        )
     return True
 
 

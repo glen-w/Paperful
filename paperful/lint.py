@@ -132,9 +132,7 @@ _TITLE_SMALL = frozenset(
 _LEAD_TRAIL = re.compile(r"^(\W*)(.*?)(\W*)$", re.UNICODE)
 
 
-def title_to_title_case(
-    title: str, allowlist: Iterable[str] | None = None
-) -> str:
+def title_to_title_case(title: str, allowlist: Iterable[str] | None = None) -> str:
     """Recase an ALL CAPS (or mostly-caps) scholarly title.
 
     Deterministic: same words, Chicago-ish Title Case. Two-letter tokens that
@@ -216,9 +214,7 @@ def title_looks_like_filename(title: str) -> bool:
     return False
 
 
-def normalize_saved_title(
-    title: str, allowlist: Iterable[str] | None = None
-) -> str:
+def normalize_saved_title(title: str, allowlist: Iterable[str] | None = None) -> str:
     """Strip HTML and Title-Case uniform ALL CAPS or all-lowercase titles.
 
     Filename-shaped titles are left alone (same rule as ``fix-metadata``).

@@ -113,7 +113,8 @@ def run_orcid(
         "run_id": rid,
         "orcid": cleaned,
         "openalex": ego.openalex,
-        "display_name": ego.display_name or str((graph.get("ego") or {}).get("display_name") or ""),
+        "display_name": ego.display_name
+        or str((graph.get("ego") or {}).get("display_name") or ""),
         "built_at": stamp,
         "phases": [p.to_dict() for p in phase_list],
         "partition": part,
@@ -145,7 +146,9 @@ def run_orcid(
         )
         figure_paths = [str(p) for p in written]
         meta["figures"] = figure_paths
-        (out / "meta.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+        (out / "meta.json").write_text(
+            json.dumps(meta, indent=2) + "\n", encoding="utf-8"
+        )
     return {
         "run_id": rid,
         "path": str(out),
@@ -170,7 +173,9 @@ def refresh_metrics(
 
     bundle = load_run(cfg, run_id)
     dest = Path(bundle["path"])
-    attrs = read_attributes_csv(dest / "attributes.csv") or bundle.get("attributes") or []
+    attrs = (
+        read_attributes_csv(dest / "attributes.csv") or bundle.get("attributes") or []
+    )
     graph = apply_attributes(bundle["graph"], attrs)
     part = (partition or bundle["meta"].get("partition") or "none").strip().lower()
     advanced = networkx_available()
@@ -186,7 +191,11 @@ def refresh_metrics(
         )
         sliced = apply_attributes(slice_graph(graph, phase), attrs)
         metrics = compute_graph_metrics(sliced, partition=part, advanced=advanced)
-        phase_payloads[phase.id] = {"schema": SCHEMA, "graph": sliced, "metrics": metrics}
+        phase_payloads[phase.id] = {
+            "schema": SCHEMA,
+            "graph": sliced,
+            "metrics": metrics,
+        }
         ego_series.append(
             {
                 "phase": phase.id,

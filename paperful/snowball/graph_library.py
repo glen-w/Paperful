@@ -11,7 +11,12 @@ from ..config import Config
 from ..library import LibraryError
 from ..mirror import pdf_for_key
 from .candidate import Candidate
-from .citation_graph import CitationGraphError, build_graph, valid_run_id, write_graph_file
+from .citation_graph import (
+    CitationGraphError,
+    build_graph,
+    valid_run_id,
+    write_graph_file,
+)
 from .queue import load_queue
 
 
@@ -127,7 +132,9 @@ def _apply_live_operator(cfg: Config, item_key: str, op: dict[str, Any]) -> None
                 # Best-effort: many backends only set tags at create time.
                 pass
     except LibraryError as exc:
-        raise CitationGraphError(str(exc) or "Could not update the library item.") from exc
+        raise CitationGraphError(
+            str(exc) or "Could not update the library item."
+        ) from exc
 
 
 def add_one_to_library(
@@ -156,7 +163,9 @@ def add_one_to_library(
     op = row.operator or {}
     target = str(op.get("collection") or "").strip() or collection.strip()
     if not target:
-        raise CitationGraphError("Set a collection chip (or stage a collection on this paper).")
+        raise CitationGraphError(
+            "Set a collection chip (or stage a collection on this paper)."
+        )
     extra = list(op.get("tags") or [])
     try:
         backend = get_backend(cfg)

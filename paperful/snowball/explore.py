@@ -14,7 +14,12 @@ from ..resolve import normalize_doi
 from .candidate import Candidate
 from .citation_graph import CitationGraphError, expand_queue, work_node_id
 from .command import _library_lookup, _mark_exists, get_backend
-from .openalex import OpenAlexBudgetExceeded, OpenAlexClient, OpenAlexError, work_to_candidate
+from .openalex import (
+    OpenAlexBudgetExceeded,
+    OpenAlexClient,
+    OpenAlexError,
+    work_to_candidate,
+)
 from .queue import write_queue
 
 PICK_LIMIT = 8

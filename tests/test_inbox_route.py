@@ -19,9 +19,7 @@ def _cols(*paths: str) -> dict[str, Collection]:
     out: dict[str, Collection] = {}
     for i, path in enumerate(paths):
         key = f"K{i}"
-        out[key] = Collection(
-            key=key, name=path.split("/")[-1], parent=None, path=path
-        )
+        out[key] = Collection(key=key, name=path.split("/")[-1], parent=None, path=path)
     return out
 
 
@@ -44,9 +42,7 @@ def _write_snowball(cfg, *, run_id: str, collection: str, doi: str = "") -> Path
             "ids": {"doi": doi},
             "biblio": {"title": "A queued BBNJ paper about marine biodiversity"},
         }
-        (dest / "candidates.jsonl").write_text(
-            json.dumps(row) + "\n", encoding="utf-8"
-        )
+        (dest / "candidates.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
     return dest
 
 

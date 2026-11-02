@@ -17,7 +17,10 @@ from typing import Any
 
 from .config import Config
 from .critique import Finding, make_finding
-from .critique_direct_quotes import line_column_span_in_direct_quote, snippet_in_direct_quote
+from .critique_direct_quotes import (
+    line_column_span_in_direct_quote,
+    snippet_in_direct_quote,
+)
 from .critique_extract import ExtractedDoc, loc_of_span
 
 MAX_VALE_FINDINGS = 100
@@ -171,9 +174,7 @@ def _finding_from_alert(doc: ExtractedDoc, alert: dict[str, Any]) -> Finding | N
     span = alert.get("Span")
     if line and isinstance(span, (list, tuple)) and len(span) >= 2:
         try:
-            if line_column_span_in_direct_quote(
-                text, line, int(span[0]), int(span[1])
-            ):
+            if line_column_span_in_direct_quote(text, line, int(span[0]), int(span[1])):
                 return None
         except (TypeError, ValueError):
             pass

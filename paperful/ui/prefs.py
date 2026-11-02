@@ -35,7 +35,9 @@ def prefs_from_request(request: Any) -> WorkbenchPrefs:
     )
 
 
-def set_cookie(response: Any, name: str, value: str, *, max_age: int = 31536000) -> None:
+def set_cookie(
+    response: Any, name: str, value: str, *, max_age: int = 31536000
+) -> None:
     response.set_cookie(
         key=name,
         value=value,

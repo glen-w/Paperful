@@ -89,7 +89,9 @@ def test_refs_gap_and_ask_use_agent_ops(tmp_path, monkeypatch):
     assert gbody["command"] == "refs gap"
     assert gbody["ok"] is True
     assert gbody["flags"]["dry_run"] is True
-    ask = client.post("/v1/ask", json={"question": "What is BBNJ?", "collection": "BBNJ"})
+    ask = client.post(
+        "/v1/ask", json={"question": "What is BBNJ?", "collection": "BBNJ"}
+    )
     assert ask.status_code == 200
     abody = ask.json()
     assert abody["schema"] == "paperful.agent.json.v1"

@@ -40,7 +40,11 @@ def run_refs_gap(
         write_pack,
     )
 
-    if cli_mod._scope_unset(collection, library, profile, run_config) and not item and not pdf:
+    if (
+        cli_mod._scope_unset(collection, library, profile, run_config)
+        and not item
+        and not pdf
+    ):
         cli_mod._refuse_missing_scope()
     cfg = cli_mod._cfg(config)
     json_out = cli_mod._agent_json(fmt)
@@ -74,7 +78,9 @@ def run_refs_gap(
             console.print("[red]No matching --item keys in scope.[/]")
             raise typer.Exit(1)
     fingerprint = LibraryFingerprint.from_items(
-        list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else items,
+        list(backend.items_in_scope(None))
+        if hasattr(backend, "items_in_scope")
+        else items,
         scope=dedupe_scope,
         collection=collection[0] if collection else "",
     )
@@ -86,7 +92,9 @@ def run_refs_gap(
     extra_sources = []
     for path in pdf:
         entries, finding = scan_pdf_citations(path)
-        findings.append(ScanFinding(item_key=f"pdf:{path.name}", path=str(path), finding=finding))
+        findings.append(
+            ScanFinding(item_key=f"pdf:{path.name}", path=str(path), finding=finding)
+        )
         if finding == "ok":
             extra_sources.append((f"pdf:{path.name}", entries))
     if extra_sources:
@@ -141,7 +149,9 @@ def run_refs_gap(
         table.add_column("DOI")
         table.add_column("Title")
         table.add_column("Action")
-        for row in sorted(missing, key=lambda r: (-len(r.citing_keys), r.doi or r.title))[:50]:
+        for row in sorted(
+            missing, key=lambda r: (-len(r.citing_keys), r.doi or r.title)
+        )[:50]:
             table.add_row(
                 str(len(row.citing_keys)),
                 row.doi or "",

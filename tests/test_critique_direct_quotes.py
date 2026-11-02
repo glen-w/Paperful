@@ -19,7 +19,9 @@ from tests.test_critique import build_critique
 
 
 def test_span_in_smart_quotes():
-    text = 'She said \u201cwe might perhaps utilize this approach\u201d in the interview.'
+    text = (
+        "She said \u201cwe might perhaps utilize this approach\u201d in the interview."
+    )
     start = text.index("utilize")
     assert span_in_direct_quote(text, start, start + len("utilize"))
     assert not span_in_direct_quote(text, 0, 3)
@@ -32,7 +34,7 @@ def test_block_quote_line():
 
 
 def test_elide_preserves_newlines():
-    text = 'Before \u201cutilize\u201d after.'
+    text = "Before \u201cutilize\u201d after."
     out = elide_direct_quotes(text)
     assert "\n" not in text or "\n" in out
     assert "utilize" not in out.replace(" ", "")
@@ -40,17 +42,17 @@ def test_elide_preserves_newlines():
 
 
 def test_snippet_only_in_quote():
-    text = 'He wrote \u201cutilize\u201d and we prefer use.'
+    text = "He wrote \u201cutilize\u201d and we prefer use."
     assert snippet_in_direct_quote(text, "utilize")
-    both = 'We utilize tools. They said \u201cutilize\u201d again.'
+    both = "We utilize tools. They said \u201cutilize\u201d again."
     assert not snippet_in_direct_quote(both, "utilize")
-    text2 = 'He wrote \u201cwe utilize this\u201d only.'
+    text2 = "He wrote \u201cwe utilize this\u201d only."
     assert snippet_in_direct_quote(text2, "utilize")
 
 
 def test_vale_alert_inside_quote_dropped():
     doc = ExtractedDoc(
-        text='Intro \u201cplease utilize this\u201d end.',
+        text="Intro \u201cplease utilize this\u201d end.",
         format="txt",
     )
     alert = {
@@ -86,7 +88,7 @@ def test_line_column_span_in_direct_quote():
 
 
 def test_llm_drops_comments_on_quoted_span():
-    hay = 'Methods: \u201cwe might perhaps utilize the old kit\u201d was noted.'
+    hay = "Methods: \u201cwe might perhaps utilize the old kit\u201d was noted."
     rows = findings_from_comments(
         [{"quote": "utilize the old kit", "detail": "Tighten wording here."}],
         hay=hay,
@@ -97,7 +99,7 @@ def test_llm_drops_comments_on_quoted_span():
 
 def test_prose_skips_long_sentence_in_quote(cfg, tmp_path: Path):
     words = " ".join(["word"] * 45)
-    body = f'Introduction.\n\n\u201c{words}.\u201d\n\nShort closing.'
+    body = f"Introduction.\n\n\u201c{words}.\u201d\n\nShort closing."
     path = tmp_path / "quote.txt"
     path.write_text(body, encoding="utf-8")
     pack = build_critique(cfg, file_path=path, offline=True)
@@ -130,7 +132,7 @@ def test_vale_integration_skips_quoted_match(cfg, tmp_path: Path, monkeypatch):
     monkeypatch.setattr("paperful.critique_vale.subprocess.run", fake_run)
     path = tmp_path / "vale.txt"
     path.write_text(
-        f'Note \u201cplease utilize this\u201d here.\n',
+        f"Note \u201cplease utilize this\u201d here.\n",
         encoding="utf-8",
     )
     pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)

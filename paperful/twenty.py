@@ -72,9 +72,10 @@ class PersonHit:
     raw: dict[str, Any] = field(default_factory=dict)
 
     def identity_name(self) -> str:
-        return self.display_name or " ".join(
-            p for p in (self.first_name, self.last_name) if p
-        ).strip()
+        return (
+            self.display_name
+            or " ".join(p for p in (self.first_name, self.last_name) if p).strip()
+        )
 
 
 @dataclass
@@ -161,11 +162,7 @@ def _dedupe_emails(emails: list[str]) -> list[str]:
 
 def work_emails(emails: list[str]) -> list[str]:
     cleaned = _dedupe_emails(emails)
-    work = [
-        e
-        for e in cleaned
-        if e.rsplit("@", 1)[-1].lower() not in _PERSONAL
-    ]
+    work = [e for e in cleaned if e.rsplit("@", 1)[-1].lower() not in _PERSONAL]
     return work or cleaned
 
 
@@ -185,10 +182,7 @@ def _website_from(row: dict[str, Any]) -> str:
             return text
     company = row.get("company")
     if isinstance(company, dict):
-        domain = _text(
-            company.get("domainName")
-            or (company.get("domainName") or {})
-        )
+        domain = _text(company.get("domainName") or (company.get("domainName") or {}))
         if isinstance(company.get("domainName"), dict):
             domain = _text(company["domainName"].get("primaryLinkUrl")) or _text(
                 company["domainName"].get("url")
@@ -211,7 +205,9 @@ def parse_person(row: dict[str, Any]) -> PersonHit | None:
     pid = str(row.get("id") or "").strip()
     if not pid and not last:
         return None
-    emails = _dedupe_emails(_emails_from(row.get("emails")) + _emails_from(row.get("email")))
+    emails = _dedupe_emails(
+        _emails_from(row.get("emails")) + _emails_from(row.get("email"))
+    )
     company = ""
     raw_co = row.get("company")
     if isinstance(raw_co, dict):
@@ -288,7 +284,9 @@ def _default_send(
         return {}
 
 
-Sender = Callable[[str, str, dict[str, str], dict[str, str], dict[str, Any] | None], Any]
+Sender = Callable[
+    [str, str, dict[str, str], dict[str, str], dict[str, Any] | None], Any
+]
 
 
 def twenty_request(
@@ -491,7 +489,9 @@ def write_contact(
     prior = load_contact(cfg, author.fingerprint or hit.last_name) or {}
     listing = classify_listing_url(hit.website)
     kept_note = note_id or str(prior.get("note_id") or "")
-    kept_collections = list(collections if collections is not None else prior.get("collections") or [])
+    kept_collections = list(
+        collections if collections is not None else prior.get("collections") or []
+    )
     body = {
         "schema": CONTACT_SCHEMA,
         "fingerprint": author.fingerprint,
@@ -615,7 +615,9 @@ class SyncAction:
 
 
 def _provenance_tokens(cfg: Config, collection: str) -> list[str]:
-    keyword = (getattr(cfg, "twenty_provenance_keyword", "") or "paperful").strip() or "paperful"
+    keyword = (
+        getattr(cfg, "twenty_provenance_keyword", "") or "paperful"
+    ).strip() or "paperful"
     slug = pack_slug(collection) if collection else ""
     out = [keyword]
     if slug and slug.casefold() != keyword.casefold():
@@ -624,7 +626,9 @@ def _provenance_tokens(cfg: Config, collection: str) -> list[str]:
 
 
 def merge_keywords(existing: str, extra: list[str]) -> str:
-    tokens = [part.strip() for part in re.split(r"[,;]", existing or "") if part.strip()]
+    tokens = [
+        part.strip() for part in re.split(r"[,;]", existing or "") if part.strip()
+    ]
     seen = {part.casefold() for part in tokens}
     for part in extra:
         text = (part or "").strip()
@@ -676,7 +680,9 @@ def _link_patch(existing: Any, new_url: str) -> dict[str, Any] | None:
     secondary = []
     for row in raw.get("secondaryLinks") or []:
         if isinstance(row, dict) and row.get("url"):
-            secondary.append({"url": str(row["url"]), "label": str(row.get("label") or "")})
+            secondary.append(
+                {"url": str(row["url"]), "label": str(row.get("label") or "")}
+            )
         elif isinstance(row, str) and row.strip():
             secondary.append({"url": row.strip(), "label": ""})
     secondary.append({"url": new_url, "label": ""})
@@ -693,7 +699,9 @@ def _email_patch(hit: PersonHit, emails: list[str]) -> dict[str, Any] | None:
     if not primary and hit.emails:
         primary = hit.emails[0]
     additional = [str(item) for item in (raw.get("additionalEmails") or []) if item]
-    known = {item.strip().lower() for item in [primary, *additional, *hit.emails] if item}
+    known = {
+        item.strip().lower() for item in [primary, *additional, *hit.emails] if item
+    }
     fresh = [item for item in work_emails(emails) if item.strip().lower() not in known]
     if not fresh:
         return None
@@ -750,7 +758,11 @@ def owned_emails(items: list[Item], author: PackAuthor) -> list[str]:
         people = list(getattr(item, "creator_people", None) or [])
         if not people:
             surnames = [s for s in (item.creator_surnames or []) if s]
-            if len(surnames) == 1 and len(emails) == 1 and name_fingerprint(surnames[0]) == fp:
+            if (
+                len(surnames) == 1
+                and len(emails) == 1
+                and name_fingerprint(surnames[0]) == fp
+            ):
                 found.extend(emails)
             continue
         for index, person in enumerate(people):
@@ -787,7 +799,9 @@ def _done_fingerprints(path: Path) -> set[str]:
             body = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if body.get("action") in {"create", "enrich", "unchanged"} and body.get("fingerprint"):
+        if body.get("action") in {"create", "enrich", "unchanged"} and body.get(
+            "fingerprint"
+        ):
             done.add(str(body["fingerprint"]))
     return done
 
@@ -874,7 +888,9 @@ def corporate_skips(items: list[Item]) -> list[SyncAction]:
                 continue
             seen.add(key)
             rows.append(
-                SyncAction(name=text, fingerprint="", action="skip-corporate", note="org")
+                SyncAction(
+                    name=text, fingerprint="", action="skip-corporate", note="org"
+                )
             )
     return rows
 
@@ -936,7 +952,11 @@ def plan_sync(
                     )
                     continue
                 if hit is None and hits:
-                    one = unique_match(hits, split_display_name(author.name)[0], split_display_name(author.name)[1])
+                    one = unique_match(
+                        hits,
+                        split_display_name(author.name)[0],
+                        split_display_name(author.name)[1],
+                    )
                     hit = one
             if hit is None:
                 rows.append(
@@ -980,7 +1000,9 @@ def plan_sync(
     return rows
 
 
-def _create_body(author: PackAuthor, emails: list[str], urls: list[str], keywords: str) -> dict[str, Any]:
+def _create_body(
+    author: PackAuthor, emails: list[str], urls: list[str], keywords: str
+) -> dict[str, Any]:
     last, first = split_display_name(author.name)
     body: dict[str, Any] = {
         "name": {"firstName": first, "lastName": last},
@@ -1009,7 +1031,9 @@ def upsert_paperful_note(
     sender: Sender | None = None,
     sleeper: Callable[[float], None] | None = None,
 ) -> str:
-    title = (getattr(cfg, "twenty_sync_note_title", "") or "Paperful").strip() or "Paperful"
+    title = (
+        getattr(cfg, "twenty_sync_note_title", "") or "Paperful"
+    ).strip() or "Paperful"
     line = f"- {_now()} · {action} · {collection or '-'} · {source}"
     if note_id:
         try:
@@ -1082,7 +1106,9 @@ def apply_sync_actions(
                     cfg,
                     "POST",
                     "rest/people",
-                    body=_create_body(action.author, action.emails, action.urls, keyword_text),
+                    body=_create_body(
+                        action.author, action.emails, action.urls, keyword_text
+                    ),
                     sender=sender,
                     sleeper=sleeper,
                 )
@@ -1127,7 +1153,8 @@ def apply_sync_actions(
             write_contact(
                 cfg,
                 action.author,
-                action.hit or PersonHit(twenty_id=action.twenty_id, display_name=action.name),
+                action.hit
+                or PersonHit(twenty_id=action.twenty_id, display_name=action.name),
                 note_id=action.note_id,
                 collections=[collection] if collection else None,
             )
@@ -1148,7 +1175,9 @@ def cache_listing_url(cfg: Config, author: PackAuthor) -> str:
 
 def listing_budget_left(cfg: Config) -> int:
     if not hasattr(cfg, "_twenty_listing_left"):
-        cfg._twenty_listing_left = int(getattr(cfg, "twenty_fetch_listing_max", 20) or 0)
+        cfg._twenty_listing_left = int(
+            getattr(cfg, "twenty_fetch_listing_max", 20) or 0
+        )
     return int(getattr(cfg, "_twenty_listing_left", 0) or 0)
 
 

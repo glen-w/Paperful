@@ -154,9 +154,7 @@ class EndNoteBackend(ExcludeMixin):
         else:
             item = self.get_item(item_key)
             if item is not None:
-                paths.extend(
-                    p for p in item.collection_paths if p and p != UNCOLLECTED
-                )
+                paths.extend(p for p in item.collection_paths if p and p != UNCOLLECTED)
         keys: list[str] = []
         seen: set[str] = set()
         for path in paths:
@@ -216,9 +214,7 @@ class EndNoteBackend(ExcludeMixin):
                 library_id=library_id,
                 track_child_keys=False,
             )
-        rows = [
-            _raw_from_ref(row, self) for row in self._iter_refs()
-        ]
+        rows = [_raw_from_ref(row, self) for row in self._iter_refs()]
         trashed = [
             _raw_from_ref(row, self) for row in self._iter_refs(trashed_only=True)
         ]

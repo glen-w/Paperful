@@ -119,7 +119,9 @@ def load_watch(cfg: Config, name: str) -> dict[str, Any]:
     _check_watch_name(name)
     path = watch_dir(cfg, name) / "watch.json"
     if not path.is_file():
-        raise SnowballError(f"Unknown watch {name!r}. Save one with snowball watch save.")
+        raise SnowballError(
+            f"Unknown watch {name!r}. Save one with snowball watch save."
+        )
     body = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(body, dict):
         raise SnowballError(f"Corrupt watch ledger at {path}.")
@@ -268,7 +270,9 @@ def apply_watch(
     from .ingest import create_new
 
     if not cfg.snowball_enabled:
-        raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
+        raise SnowballError(
+            "Snowball is off. Set [snowball] enabled = true in config.toml."
+        )
     dest = collection.strip()
     if not dest:
         raise SnowballError("snowball watch apply needs a target collection (-C).")
@@ -298,7 +302,9 @@ def apply_watch(
 
             finder = _library_lookup(lib, scope="library", collection=dest)
         except Exception as exc:
-            raise SnowballError(f"Library was not read. Refusing to create items. {exc}") from exc
+            raise SnowballError(
+                f"Library was not read. Refusing to create items. {exc}"
+            ) from exc
     _mark_exists(pending, finder)
     creatable = [row for row in pending if row.status == "new"]
     skipped_exists = sum(1 for row in pending if row.status in {"exists", "version"})
@@ -438,7 +444,12 @@ def rebaseline_watch(
     """
     _check_watch_name(name)
     body = load_watch(cfg, name)
-    result: dict[str, Any] = {"watch": name, "action": "skip", "reason": "", "applied": False}
+    result: dict[str, Any] = {
+        "watch": name,
+        "action": "skip",
+        "reason": "",
+        "applied": False,
+    }
     if not watch_is_keyword_based(cfg, body):
         result["reason"] = "not keyword-based"
         return result
@@ -453,7 +464,9 @@ def rebaseline_watch(
         if not predates_migration(str(baseline_at)):
             result["reason"] = "baseline is after the topic change"
             return result
-    result.update(action="rebaseline", reason=f"baseline {baseline_at} predates {TOPIC_MIGRATION}")
+    result.update(
+        action="rebaseline", reason=f"baseline {baseline_at} predates {TOPIC_MIGRATION}"
+    )
     if apply:
         body.update(
             {
@@ -594,7 +607,9 @@ def run_watch(
     refresh: bool = False,
 ) -> WatchResult:
     if not cfg.snowball_enabled:
-        raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
+        raise SnowballError(
+            "Snowball is off. Set [snowball] enabled = true in config.toml."
+        )
     _check_watch_name(name)
     body = load_watch(cfg, name)
     profile = str(body.get("profile") or "").strip()
@@ -606,7 +621,9 @@ def run_watch(
         request.dedupe_scope = str(dedupe_scope).strip()
     is_baseline = not body.get("baseline_at")
     if not is_baseline and not refresh:
-        request.from_created_date = _cursor_date(body.get("last_run_at") or body.get("baseline_at"))
+        request.from_created_date = _cursor_date(
+            body.get("last_run_at") or body.get("baseline_at")
+        )
     else:
         request.from_created_date = None
 

@@ -69,15 +69,13 @@ def test_versions_dry_run_writes_pack(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr(
         "paperful.versions.write_pack", lambda *_a, **_k: (json_path, md_path)
     )
-    monkeypatch.setattr(
-        "paperful.versions.pack_counts", lambda *_a, **_k: {"pairs": 0}
-    )
+    monkeypatch.setattr("paperful.versions.pack_counts", lambda *_a, **_k: {"pairs": 0})
     monkeypatch.setattr("paperful.versions.resolver_for", lambda *_a, **_k: lambda x: x)
     monkeypatch.setattr(
         "paperful.cli_runtime._item_progress",
         lambda **_k: __import__("contextlib").nullcontext(SimpleNamespace()),
     )
-    monkeypatch.setattr("paperful.cli_runtime._track", lambda *_a, **_k: (lambda xs: xs))
+    monkeypatch.setattr("paperful.cli_runtime._track", lambda *_a, **_k: lambda xs: xs)
     monkeypatch.setattr("paperful.cli_runtime._print_version_table", lambda _p: None)
     console = Console(record=True)
     _run(console, cfg, dry_run=True, apply=False)
@@ -103,9 +101,7 @@ def test_versions_json_and_apply_errors(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr(
         "paperful.versions.write_pack", lambda *_a, **_k: (json_path, md_path)
     )
-    monkeypatch.setattr(
-        "paperful.versions.pack_counts", lambda *_a, **_k: {"pairs": 1}
-    )
+    monkeypatch.setattr("paperful.versions.pack_counts", lambda *_a, **_k: {"pairs": 1})
     monkeypatch.setattr("paperful.versions.resolver_for", lambda *_a, **_k: lambda x: x)
     monkeypatch.setattr(
         "paperful.versions.http_fetch_published", lambda *_a, **_k: None
@@ -114,7 +110,7 @@ def test_versions_json_and_apply_errors(cfg, tmp_path, monkeypatch):
         "paperful.cli_runtime._item_progress",
         lambda **_k: __import__("contextlib").nullcontext(SimpleNamespace()),
     )
-    monkeypatch.setattr("paperful.cli_runtime._track", lambda *_a, **_k: (lambda xs: xs))
+    monkeypatch.setattr("paperful.cli_runtime._track", lambda *_a, **_k: lambda xs: xs)
 
     def apply_ok(*_a, **_k):
         return 1, ["oops"]

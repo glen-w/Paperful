@@ -41,7 +41,10 @@ class LocalCites:
         """Resolve DOI-only candidates so ``count`` can see their OpenAlex id."""
         missing: list[str] = []
         for row in rows:
-            if getattr(row, "status", None) != "new" or getattr(row, "keep", None) is False:
+            if (
+                getattr(row, "status", None) != "new"
+                or getattr(row, "keep", None) is False
+            ):
                 continue
             ids = getattr(row, "ids", None) or {}
             if ids.get("openalex"):

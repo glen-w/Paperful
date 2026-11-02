@@ -103,7 +103,9 @@ def _sections(
     return spans
 
 
-def _split(text: str, start: int, end: int, limit: int, depth: int = 0) -> list[tuple[int, int]]:
+def _split(
+    text: str, start: int, end: int, limit: int, depth: int = 0
+) -> list[tuple[int, int]]:
     """Contiguous spans of at most ``limit`` chars, cut at the coarsest separator that fits."""
     if end - start <= limit:
         return [(start, end)]

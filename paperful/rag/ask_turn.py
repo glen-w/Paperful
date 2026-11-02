@@ -68,7 +68,9 @@ def run_ask_turn(
         k=top_k,
         keys=keys,
         focus=focus_name,
-        prompt_path=prompt_path if prompt_path is not None else (cfg.rag_prompt or None),
+        prompt_path=prompt_path
+        if prompt_path is not None
+        else (cfg.rag_prompt or None),
         prompt_text=prompt_text,
         client=get_client(cfg),
         embedder=embedder,

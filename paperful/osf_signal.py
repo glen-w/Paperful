@@ -37,7 +37,9 @@ def _mentions_osf(text: str) -> bool:
     return any(host in low for host in _HOSTS)
 
 
-def osf_signal(manifest: Manifest, *, days: int = RECENT_DAYS, now: float | None = None) -> OsfSignal:
+def osf_signal(
+    manifest: Manifest, *, days: int = RECENT_DAYS, now: float | None = None
+) -> OsfSignal:
     cutoff = (now if now is not None else time.time()) - days * 86400
     misses = osf = 0
     for rec in manifest.records.values():

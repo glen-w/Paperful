@@ -53,7 +53,9 @@ def test_ingest_indexes_pdfs_abstracts_and_skips_empty_items(rag_cfg, tools):
     }
     ledger = Ledger(ledger_path(rag_cfg))
     pdf_row, stub_row = ledger.get("AAAA1111"), ledger.get("BBBB2222")
-    assert pdf_row.status == STATUS_OK and pdf_row.source == "pdf" and pdf_row.chunks >= 1
+    assert (
+        pdf_row.status == STATUS_OK and pdf_row.source == "pdf" and pdf_row.chunks >= 1
+    )
     assert pdf_row.pdf == "ocean/Chen - 2019 - Krill in winter -- AAAA1111/paper.pdf"
     assert pdf_row.authors == ["Chen"] and pdf_row.year == 2019 and pdf_row.pdf_sha256
     assert stub_row.status == STATUS_STUB and stub_row.chunks == 1
@@ -86,7 +88,10 @@ def test_dry_run_reports_the_plan_and_writes_nothing(rag_cfg, tools):
     _add(rag_cfg, "AAAA1111", pdf=BODY)
     _add(rag_cfg, "BBBB2222", abstract="Whales eat krill.")
     batch = _ingest(rag_cfg, tools, dry_run=True)
-    assert batch.dry_run and _statuses(batch) == {"AAAA1111": "pdf", "BBBB2222": "abstract"}
+    assert batch.dry_run and _statuses(batch) == {
+        "AAAA1111": "pdf",
+        "BBBB2222": "abstract",
+    }
     assert not rag_cfg.rag_dir.exists()
     assert tools["embedder"].documents == [] and tools["parser"].parsed == []
 
@@ -175,7 +180,9 @@ def test_unreadable_pdf_is_recorded_and_not_retried(rag_cfg, tools):
     row = Ledger(ledger_path(rag_cfg)).get("AAAA1111")
     assert row.status == STATUS_FAILED and row.pdf_sha256 and row.error
     again = _ingest(rag_cfg, tools)
-    assert again.rows[0].status == "unchanged" and "failed earlier" in again.rows[0].reason
+    assert (
+        again.rows[0].status == "unchanged" and "failed earlier" in again.rows[0].reason
+    )
     assert tools["parser"].parsed == ["paper.pdf"]
     retried = _ingest(rag_cfg, tools, retry_failed=True)
     assert retried.rows[0].status == "failed" and len(tools["parser"].parsed) == 2
@@ -184,8 +191,12 @@ def test_unreadable_pdf_is_recorded_and_not_retried(rag_cfg, tools):
 def test_select_entries_filters_by_collection_key_year_and_type(rag_cfg):
     _add(rag_cfg, "AAAA1111", collection="ocean/BBNJ", abstract="a")
     _add(rag_cfg, "BBBB2222", collection="law", abstract="b")
-    assert [e.key for e in select_entries(rag_cfg, collections=["ocean"])] == ["AAAA1111"]
-    assert [e.key for e in select_entries(rag_cfg, item_keys=["BBBB2222"])] == ["BBBB2222"]
+    assert [e.key for e in select_entries(rag_cfg, collections=["ocean"])] == [
+        "AAAA1111"
+    ]
+    assert [e.key for e in select_entries(rag_cfg, item_keys=["BBBB2222"])] == [
+        "BBBB2222"
+    ]
     assert select_entries(rag_cfg, year_from=2020) == []
     assert len(select_entries(rag_cfg, year_to=2019)) == 2
     assert select_entries(rag_cfg, item_types=frozenset({"book"})) == []
@@ -199,8 +210,12 @@ def _fake_ocr(monkeypatch, *, succeed=True):
     """Stand-in for OCRmyPDF: rewrites each scan with a text layer."""
     calls = []
 
-    def ocr_items(cfg, items, manifest, backend, *, apply, track=None, classify=None, **kw):
-        calls.append({"keys": [i.key for i in items], "backend": backend, "apply": apply})
+    def ocr_items(
+        cfg, items, manifest, backend, *, apply, track=None, classify=None, **kw
+    ):
+        calls.append(
+            {"keys": [i.key for i in items], "backend": backend, "apply": apply}
+        )
         batch = OcrBatch()
         for item in items:
             path = Path(item.pdf_path)
@@ -211,7 +226,9 @@ def _fake_ocr(monkeypatch, *, succeed=True):
                 batch.rows.append(OcrRow(item.key, item.title, str(path), "ocr", why))
             else:
                 batch.rows.append(
-                    OcrRow(item.key, item.title, str(path), "failed", "ocrmypdf timed out")
+                    OcrRow(
+                        item.key, item.title, str(path), "failed", "ocrmypdf timed out"
+                    )
                 )
         return batch
 
@@ -222,7 +239,9 @@ def _fake_ocr(monkeypatch, *, succeed=True):
 def test_only_scans_are_sent_to_ocr(rag_cfg, tools, monkeypatch):
     _add(rag_cfg, "AAAA1111", pdf=BODY)  # born digital
     _add(rag_cfg, "BBBB2222", title="Old survey", pdf="\f\f")  # three blank pages
-    _add(rag_cfg, "CCCC3333", title="Typed cover", pdf=BODY + "\f\f\f")  # 1 of 4 has text
+    _add(
+        rag_cfg, "CCCC3333", title="Typed cover", pdf=BODY + "\f\f\f"
+    )  # 1 of 4 has text
     calls = _fake_ocr(monkeypatch)
     batch = _ingest(rag_cfg, tools, ocr_available=lambda: True)
     assert calls == [{"keys": ["BBBB2222", "CCCC3333"], "backend": None, "apply": True}]
@@ -230,9 +249,9 @@ def test_only_scans_are_sent_to_ocr(rag_cfg, tools, monkeypatch):
     row = Ledger(ledger_path(rag_cfg)).get("BBBB2222")
     assert row.source == "ocr" and not row.ocr_pending and not row.error
     # The ledger describes the rewritten file, so the next run sees nothing to do.
-    assert set(_statuses(_ingest(rag_cfg, tools, ocr_available=lambda: True)).values()) == {
-        "unchanged"
-    }
+    assert set(
+        _statuses(_ingest(rag_cfg, tools, ocr_available=lambda: True)).values()
+    ) == {"unchanged"}
     assert len(calls) == 1
 
 
@@ -321,5 +340,8 @@ def test_embedding_failure_stops_the_run_and_keeps_what_was_done(rag_cfg, tools)
         _ingest(rag_cfg, tools)
     assert Ledger(ledger_path(rag_cfg)).keys() == {"AAAA1111"}
     embedder.embed_documents = real
-    assert _statuses(_ingest(rag_cfg, tools)) == {"AAAA1111": "unchanged", "BBBB2222": "pdf"}
+    assert _statuses(_ingest(rag_cfg, tools)) == {
+        "AAAA1111": "unchanged",
+        "BBBB2222": "pdf",
+    }
     assert index_dir(rag_cfg).name == "ollama__nomic-embed-text"

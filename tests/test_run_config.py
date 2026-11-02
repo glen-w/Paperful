@@ -407,7 +407,9 @@ def test_all_joins_open_pack(stubbed, tmp_path):
     )
     assert res.exit_code == 0, res.stdout
     assert "joined" in res.stdout
-    current = (tmp_path / "state" / "packs" / "current").read_text(encoding="utf-8").strip()
+    current = (
+        (tmp_path / "state" / "packs" / "current").read_text(encoding="utf-8").strip()
+    )
     pack = json.loads(
         (tmp_path / "state" / "packs" / f"{current}.json").read_text(encoding="utf-8")
     )

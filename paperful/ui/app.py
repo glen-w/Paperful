@@ -206,7 +206,6 @@ def _patch_config_field(cfg: Config, section: str, key: str, value: str) -> None
     path.write_text(text, encoding="utf-8")
 
 
-
 def mount_ui(app: FastAPI, cfg: Config) -> None:
     from .context import UiContext
     from .wanted_routes import register_wanted

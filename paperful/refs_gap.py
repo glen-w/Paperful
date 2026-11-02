@@ -139,7 +139,9 @@ def write_pack(
             "cited": len(refs),
             "already_exists": sum(1 for r in refs if r.already_exists),
             "missing": len(missing),
-            "ingest_dois": sum(1 for r in missing if r.suggested_action == "ingest-dois"),
+            "ingest_dois": sum(
+                1 for r in missing if r.suggested_action == "ingest-dois"
+            ),
             "needs_ocr": sum(1 for f in findings if f.finding == "needs_ocr"),
             "no_pdf": sum(1 for f in findings if f.finding == "no_pdf"),
         },
@@ -162,7 +164,9 @@ def write_pack(
         ),
         encoding="utf-8",
     )
-    (folder / "pack.md").write_text(_markdown(scope, payload["counts"], refs), encoding="utf-8")
+    (folder / "pack.md").write_text(
+        _markdown(scope, payload["counts"], refs), encoding="utf-8"
+    )
     return folder
 
 

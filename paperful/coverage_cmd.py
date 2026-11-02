@@ -62,9 +62,7 @@ def run_coverage(
 
     mentions = extract_mentions(text)
     all_items = (
-        list(backend.items_in_scope(None))
-        if hasattr(backend, "items_in_scope")
-        else []
+        list(backend.items_in_scope(None)) if hasattr(backend, "items_in_scope") else []
     )
     collection_fp = LibraryFingerprint.from_items(
         all_items, scope="collection", collection=collection[0]

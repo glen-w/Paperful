@@ -34,7 +34,7 @@ def llm_suggester(cfg: Any) -> Suggester:
     def suggest(query: str) -> list[str]:
         prompt = (
             "Suggest up to 5 short scholarly search queries that refine this seed. "
-            "Return a JSON object {\"queries\": [\"...\"]}. Seed: "
+            'Return a JSON object {"queries": ["..."]}. Seed: '
             f"{query}"
         )
         try:

@@ -196,7 +196,9 @@ def _render(
     inbox_pending: int | None = None,
 ) -> Digest:
     grouped = _group(rows)
-    grouped["new"] = sorted(grouped.get("new") or [], key=lambda row: row.score, reverse=True)
+    grouped["new"] = sorted(
+        grouped.get("new") or [], key=lambda row: row.score, reverse=True
+    )
     counts = {key: len(grouped.get(key) or []) for key in (*_SECTIONS, "other")}
     if deferred_flag:
         counts["deferred"] = max(counts["deferred"], 1)
@@ -223,7 +225,9 @@ def _render(
     path.write_text(markdown, encoding="utf-8")
     return Digest(
         markdown=markdown,
-        html=_html(title, intro, collection_lines, actions, grouped, counts, deferred_flag),
+        html=_html(
+            title, intro, collection_lines, actions, grouped, counts, deferred_flag
+        ),
         path=path,
         counts=counts,
     )
@@ -318,7 +322,11 @@ def _html(
             continue
         items = []
         for index, row in enumerate(rows):
-            text = _detail_line(row) if key == "new" and index < TOP_NEW else _row_line(row)
+            text = (
+                _detail_line(row)
+                if key == "new" and index < TOP_NEW
+                else _row_line(row)
+            )
             items.append(f"<li>{html.escape(text)}</li>")
         parts.append(f"<ul>{''.join(items)}</ul>")
     from ..notehtml import wrap

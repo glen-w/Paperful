@@ -68,7 +68,9 @@ def test_toctree_has_no_duplicate_entries():
         if entry in seen:
             dupes.append(entry)
         seen.add(entry)
-    assert not dupes, f"duplicate toctree entries in docs/index.md: {', '.join(sorted(set(dupes)))}"
+    assert not dupes, (
+        f"duplicate toctree entries in docs/index.md: {', '.join(sorted(set(dupes)))}"
+    )
 
 
 def test_gui_md_documents_discover_and_wanted_routes():
@@ -104,7 +106,9 @@ def test_gui_md_documents_discover_and_wanted_routes():
         "After Grab",
     )
     missing = [path for path in required if path not in text]
-    assert not missing, f"docs/gui.md missing workbench routes/surfaces: {', '.join(missing)}"
+    assert not missing, (
+        f"docs/gui.md missing workbench routes/surfaces: {', '.join(missing)}"
+    )
     assert "gui profile" not in text
 
 

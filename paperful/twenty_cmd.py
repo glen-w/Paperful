@@ -18,6 +18,7 @@ from .library import LibraryError
 from .runreport import write_command_report, write_run_report
 from .store import Manifest
 
+
 def run_twenty_lookup(
     console: Console,
     collection: Any,
@@ -119,7 +120,10 @@ def run_twenty_lookup(
             "and contacts under state/author-contacts/. Paperful does not send mail."
         )
     else:
-        console.print("[dim]Dry-run. Pass --apply to write proposed packs and contacts.[/]")
+        console.print(
+            "[dim]Dry-run. Pass --apply to write proposed packs and contacts.[/]"
+        )
+
 
 def run_twenty_sync(
     console: Console,
@@ -237,16 +241,22 @@ def run_twenty_sync(
             "create": sum(1 for row in actions if row.action == "create"),
             "enrich": sum(1 for row in actions if row.action == "enrich"),
             "ambiguous": sum(1 for row in actions if row.action == "ambiguous"),
-            "skip_corporate": sum(1 for row in actions if row.action == "skip-corporate"),
+            "skip_corporate": sum(
+                1 for row in actions if row.action == "skip-corporate"
+            ),
             "http_errors": failed,
             "items": len(loaded.items),
         },
         items=[
-            {"name": row.name, "action": row.action, "note": row.note, "twenty_id": row.twenty_id}
+            {
+                "name": row.name,
+                "action": row.action,
+                "note": row.note,
+                "twenty_id": row.twenty_id,
+            }
             for row in actions
         ],
         flags={"apply": apply, "collection": label, "limit": limit},
         exit_code=code,
     )
     cli_mod._emit_agent(payload, json_out=json_out, human=_human)
-

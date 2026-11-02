@@ -6,7 +6,9 @@ from paperful.ui.snowball_form import parse_discover_topic
 
 
 def test_simple_mode_is_search_only():
-    payload = parse_discover_topic({"query": "BBNJ", "kind": "doi", "seeds": "10.1/x"}, advanced=False)
+    payload = parse_discover_topic(
+        {"query": "BBNJ", "kind": "doi", "seeds": "10.1/x"}, advanced=False
+    )
     assert payload.kind == "search"
     assert payload.seeds == []
 
@@ -77,7 +79,9 @@ def test_compose_query_and_lists(cfg):
         profile_body_from_payload,
     )
 
-    search = parse_discover_topic({"query": "krill diet", "or_mode": "1"}, advanced=True)
+    search = parse_discover_topic(
+        {"query": "krill diet", "or_mode": "1"}, advanced=True
+    )
     assert "krill" in compose_query(search).lower() or compose_query(search)
     seeded = parse_discover_topic(
         {"kind": "search", "seeds": "ocean treaty"}, advanced=True

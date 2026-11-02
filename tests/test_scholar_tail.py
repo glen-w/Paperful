@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from paperful.config import Config, load_config
-from paperful.handoff import HINT_DOI, HINT_OPENABLE, MissingPdf, handoff_targets, open_tabs
+from paperful.handoff import (
+    HINT_DOI,
+    HINT_OPENABLE,
+    MissingPdf,
+    handoff_targets,
+    open_tabs,
+)
 from paperful.routing import (
     SerialStep,
     order_run,
@@ -30,9 +36,7 @@ def test_policy_moves_early_scholar_after_campus(cfg):
 
 
 def test_order_run_policy_interleaves_when_agent_present(cfg):
-    steps = order_run(
-        cfg, ["ezproxy", "scholar", "htmlpdf", "browser_agent", "scihub"]
-    )
+    steps = order_run(cfg, ["ezproxy", "scholar", "htmlpdf", "browser_agent", "scihub"])
     assert steps[0] == SerialStep("ezproxy")
     assert SerialStep("scholar", partner="browser_agent") in steps
     assert steps[-1] == SerialStep("scihub")
@@ -114,7 +118,9 @@ def test_serpapi_find_quota_is_error(ctx_factory, monkeypatch):
     def handler(req):
         import httpx
 
-        return httpx.Response(200, json={"error": "Your account has run out of searches."})
+        return httpx.Response(
+            200, json={"error": "Your account has run out of searches."}
+        )
 
     cand = serpapi_find(make_item(), ctx_factory(handler))
     assert cand.outcome is Outcome.ERROR

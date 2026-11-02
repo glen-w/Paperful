@@ -26,7 +26,9 @@ def is_rate_limit(outcome: Outcome, note: str = "") -> bool:
 
 
 class CircuitBreaker:
-    def __init__(self, threshold: int, cooldown_items: int = DEFAULT_COOLDOWN_ITEMS) -> None:
+    def __init__(
+        self, threshold: int, cooldown_items: int = DEFAULT_COOLDOWN_ITEMS
+    ) -> None:
         self.threshold = max(1, threshold)
         self.cooldown_items = max(1, cooldown_items)
         self._counts: dict[str, int] = {}

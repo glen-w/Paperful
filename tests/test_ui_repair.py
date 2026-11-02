@@ -31,9 +31,7 @@ def test_repair_preview_enqueues_lint_hook(tmp_path):
         cmd_id = commands.enqueue(
             cfg,
             "repair_lint",
-            lambda cid: jobs.repair_preview(
-                cfg, cid, verb="lint", collection="BBNJ"
-            ),
+            lambda cid: jobs.repair_preview(cfg, cid, verb="lint", collection="BBNJ"),
         )
         import time
 
@@ -72,7 +70,12 @@ def test_repair_preview_apply_calls_hook(tmp_path, monkeypatch):
 
     def fake_run(cfg, *, verb, collection, apply, flags):
         calls.append(
-            {"verb": verb, "collection": collection, "apply": apply, "flags": dict(flags)}
+            {
+                "verb": verb,
+                "collection": collection,
+                "apply": apply,
+                "flags": dict(flags),
+            }
         )
         return {"verb": verb, "ok": True}
 
@@ -150,7 +153,9 @@ def test_repair_apply_http_409(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ops,
         "doctor_payload",
-        lambda _cfg, probe=False: [{"name": "x", "status": "green", "code": "", "detail": ""}],
+        lambda _cfg, probe=False: [
+            {"name": "x", "status": "green", "code": "", "detail": ""}
+        ],
     )
     client = TestClient(create_app(cfg))
     res = client.post("/repair/apply", data={"review_token": "missing"})
@@ -170,7 +175,9 @@ def test_repair_preview_shows_running_status(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ops,
         "doctor_payload",
-        lambda _cfg, probe=False: [{"name": "x", "status": "green", "code": "", "detail": ""}],
+        lambda _cfg, probe=False: [
+            {"name": "x", "status": "green", "code": "", "detail": ""}
+        ],
     )
     gate = threading.Event()
 
@@ -219,7 +226,9 @@ def test_mirror_get_does_not_write(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ops,
         "doctor_payload",
-        lambda _cfg, probe=False: [{"name": "x", "status": "green", "code": "", "detail": ""}],
+        lambda _cfg, probe=False: [
+            {"name": "x", "status": "green", "code": "", "detail": ""}
+        ],
     )
     client = TestClient(create_app(cfg))
     client.cookies.set("pf_advanced", "1")

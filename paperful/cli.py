@@ -915,7 +915,9 @@ def config_check(
 
 @sr_app.command("init")
 def sr_init(
-    slug: str = typer.Option(..., "--slug", "-s", help="Review id (folder under state/sr/)"),
+    slug: str = typer.Option(
+        ..., "--slug", "-s", help="Review id (folder under state/sr/)"
+    ),
     title: str = typer.Option("", "--title", help="Short review title"),
     question: str = typer.Option("", "--question", "-q", help="Review question"),
     config: Path | None = ConfigOpt,
@@ -933,9 +935,13 @@ def sr_screen(
     identity: str = typer.Option(
         ..., "--identity", "-i", help="Work identity (OpenAlex id or DOI)"
     ),
-    decision: str = typer.Option(..., "--decision", "-d", help="include | exclude | maybe"),
+    decision: str = typer.Option(
+        ..., "--decision", "-d", help="include | exclude | maybe"
+    ),
     reason: str = typer.Option("", "--reason", "-r", help="Reason code or note"),
-    reviewer: str = typer.Option("", "--reviewer", help="Reviewer id (default operator)"),
+    reviewer: str = typer.Option(
+        "", "--reviewer", help="Reviewer id (default operator)"
+    ),
     config: Path | None = ConfigOpt,
 ) -> None:
     """Append one screening decision to the review ledger."""
@@ -1763,7 +1769,9 @@ def search_cmd(
 
 @search_watch_app.command("save")
 def search_watch_save(
-    name: str = typer.Argument(..., help="Watch name under state/search/watches/<name>/."),
+    name: str = typer.Argument(
+        ..., help="Watch name under state/search/watches/<name>/."
+    ),
     query: str = typer.Option(
         "",
         "--query",
@@ -1773,7 +1781,9 @@ def search_watch_save(
     filetype: str = typer.Option("pdf", "--filetype", help="pdf (default) or none."),
     max_hits: int | None = typer.Option(None, "--max", help="Max kept hits."),
     probe: bool | None = typer.Option(
-        None, "--probe/--no-probe", help="HEAD/GET first bytes (default: [search].probe)."
+        None,
+        "--probe/--no-probe",
+        help="HEAD/GET first bytes (default: [search].probe).",
     ),
     interval_days: int = typer.Option(
         7,
@@ -1781,7 +1791,9 @@ def search_watch_save(
         help="Days between polls. 0 = every run. You still cron search watch run.",
     ),
     from_run: str | None = typer.Option(
-        None, "--from-run", help="Copy query/hosts from a saved state/search/<run-id>/ pack."
+        None,
+        "--from-run",
+        help="Copy query/hosts from a saved state/search/<run-id>/ pack.",
     ),
     config: Path | None = ConfigOpt,
 ) -> None:
@@ -5667,7 +5679,9 @@ def network_orcid_cmd(
 @network_app.command("show")
 def network_show_cmd(
     run_id: str = typer.Argument(..., help="Run id under state/network/."),
-    phase: str = typer.Option("", "--phase", help="Restrict the table to one phase id."),
+    phase: str = typer.Option(
+        "", "--phase", help="Restrict the table to one phase id."
+    ),
     fmt: str = AgentFormatOpt,
     config: Path | None = ConfigOpt,
 ) -> None:
@@ -5692,18 +5706,20 @@ def network_list_cmd(
 def network_export_cmd(
     run_id: str = typer.Argument(..., help="Run id under state/network/."),
     fmt: str = typer.Option(
-        "csv", "--format", help="csv (default), gexf, or graphml (gexf/graphml need NetworkX)."
+        "csv",
+        "--format",
+        help="csv (default), gexf, or graphml (gexf/graphml need NetworkX).",
     ),
-    dest: Path | None = typer.Option(None, "--dest", help="Output path. Default: the run dir."),
+    dest: Path | None = typer.Option(
+        None, "--dest", help="Output path. Default: the run dir."
+    ),
     phase: str = typer.Option("", "--phase", help="Export one phase subgraph."),
     config: Path | None = ConfigOpt,
 ) -> None:
     """Write edges as CSV, or a GEXF/GraphML graph."""
     from .network.command import run_network_export
 
-    run_network_export(
-        console, run_id, fmt=fmt, dest=dest, phase=phase, config=config
-    )
+    run_network_export(console, run_id, fmt=fmt, dest=dest, phase=phase, config=config)
 
 
 @network_app.command("attributes")

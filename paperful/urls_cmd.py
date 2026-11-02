@@ -55,7 +55,9 @@ def run_urls(
                     patch_key = (
                         finding.attachment_key
                         if finding.role == "linked_pdf" and finding.attachment_key
-                        else item.key if finding.role == "parent" else ""
+                        else item.key
+                        if finding.role == "parent"
+                        else ""
                     )
                     if (
                         not finding.rewrite

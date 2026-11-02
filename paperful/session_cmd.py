@@ -10,6 +10,8 @@ from rich.console import Console
 from .config import Config
 from .pipeline import make_client
 from .sources import Context
+
+
 def _confirm_session_login(console: Console) -> None:
     console.print("Complete login or CAPTCHA in the browser window, then press Enter.")
     try:
@@ -18,7 +20,9 @@ def _confirm_session_login(console: Console) -> None:
         pass
 
 
-def _netscape_fallback_hint(console: Console, cookie_path: Path, *, scholar: bool) -> None:
+def _netscape_fallback_hint(
+    console: Console, cookie_path: Path, *, scholar: bool
+) -> None:
     extra = (
         "Include [bold].google.com[/] and [bold]scholar.google.com[/]. "
         if scholar

@@ -30,6 +30,7 @@ def _authorwatch_call(action: Any) -> Any:
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
 
+
 def run_authorwatch_save(
     console: Console,
     name: Any,
@@ -43,6 +44,7 @@ def run_authorwatch_save(
     cfg = cli_mod._cfg(config)
     path = _authorwatch_call(lambda: save_list(cfg, name))
     console.print(f"Wrote [bold]{path}[/]")
+
 
 def run_authorwatch_add(
     console: Console,
@@ -71,6 +73,7 @@ def run_authorwatch_add(
         f"Added {person.display_name or person.id} · {person.status} · {person.identity()}"
     )
 
+
 def run_authorwatch_remove(
     console: Console,
     name: Any,
@@ -89,6 +92,7 @@ def run_authorwatch_remove(
     )
     console.print(f"Removed {person.display_name or person.id}")
 
+
 def run_authorwatch_show(
     console: Console,
     name: Any,
@@ -101,6 +105,7 @@ def run_authorwatch_show(
 
     cfg = cli_mod._cfg(config)
     _authorwatch_call(lambda: show_list(cfg, name, console=console))
+
 
 def run_authorwatch_resolve(
     console: Console,
@@ -118,6 +123,7 @@ def run_authorwatch_resolve(
     held = sum(1 for row in people if row.status == "held")
     unresolved = sum(1 for row in people if row.status == "unresolved")
     console.print(f"ok {ok} · held {held} · unresolved {unresolved}")
+
 
 def run_authorwatch_suggest(
     console: Console,
@@ -143,6 +149,7 @@ def run_authorwatch_suggest(
         )
     )
     console.print(f"Added {len(rows)} suggestion(s)")
+
 
 def run_authorwatch_accept(
     console: Console,
@@ -179,6 +186,7 @@ def run_authorwatch_accept(
             )
         )
 
+
 def run_authorwatch_delete(
     console: Console,
     name: Any,
@@ -194,6 +202,7 @@ def run_authorwatch_delete(
     _authorwatch_call(lambda: delete_list(cfg, name, yes=yes))
     console.print(f"Deleted list {name}")
 
+
 def run_authorwatch_import(
     console: Console,
     name: Any,
@@ -207,10 +216,9 @@ def run_authorwatch_import(
     from .authorwatch import import_file
 
     cfg = cli_mod._cfg(config)
-    added = _authorwatch_call(
-        lambda: import_file(cfg, name, path=path, source=source)
-    )
+    added = _authorwatch_call(lambda: import_file(cfg, name, path=path, source=source))
     console.print(f"Imported {len(added)} row(s)")
+
 
 def run_authorwatch_run(
     console: Console,
@@ -236,6 +244,7 @@ def run_authorwatch_run(
             per_author_limit=per_author_limit,
         )
     )
+
 
 def run_authorwatch_briefing(
     console: Console,
@@ -279,6 +288,7 @@ def run_authorwatch_briefing(
 
     _authorwatch_call(_run)
 
+
 def run_authorwatch_digest(
     console: Console,
     name: Any,
@@ -292,6 +302,7 @@ def run_authorwatch_digest(
     cfg = cli_mod._cfg(config)
     path = _authorwatch_call(lambda: write_digest(cfg, name))
     console.print(f"Wrote [bold]{path}[/]")
+
 
 def run_authorwatch_apply(
     console: Console,
@@ -326,4 +337,3 @@ def run_authorwatch_apply(
     result = _authorwatch_call(_go)
     if result.failed and result.created:
         raise typer.Exit(3)
-

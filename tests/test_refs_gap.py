@@ -6,7 +6,12 @@ import json
 from pathlib import Path
 
 from paperful.identity import LibraryFingerprint
-from paperful.refs_gap import SCHEMA, aggregate_citations, scan_pdf_citations, write_pack
+from paperful.refs_gap import (
+    SCHEMA,
+    aggregate_citations,
+    scan_pdf_citations,
+    write_pack,
+)
 from tests.conftest import make_item
 
 BIBLIO = """
@@ -38,12 +43,18 @@ def test_aggregate_and_pack(tmp_path: Path, monkeypatch):
     dois = {e["doi"] for e in entries}
     assert "10.1000/a" in dois
     fp = LibraryFingerprint.from_items(
-        [make_item(key="OWN", doi="10.1000/owned", title="Owned already title", year=2020)]
+        [
+            make_item(
+                key="OWN", doi="10.1000/owned", title="Owned already title", year=2020
+            )
+        ]
     )
     refs = aggregate_citations([("SEED", entries)], fp)
     missing = [r for r in refs if not r.already_exists]
     owned = [r for r in refs if r.already_exists]
-    assert any(r.doi == "10.1000/a" and r.suggested_action == "ingest-dois" for r in missing)
+    assert any(
+        r.doi == "10.1000/a" and r.suggested_action == "ingest-dois" for r in missing
+    )
     assert owned and owned[0].suggested_action == "skip"
     folder = write_pack(tmp_path, "BBNJ", refs, [])
     pack = folder / "pack.json"

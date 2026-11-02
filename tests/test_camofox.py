@@ -36,16 +36,12 @@ def test_with_camofox_lane_inserts_before_browser_agent(cfg: Config, monkeypatch
 
 def test_with_camofox_lane_cli_off(cfg: Config):
     cfg.camofox_enabled = True
-    listed = with_camofox_lane(
-        cfg, ["unpaywall", "ezproxy"], during_run=False
-    )
+    listed = with_camofox_lane(cfg, ["unpaywall", "ezproxy"], during_run=False)
     assert "camofox" not in listed
 
 
 def test_order_run_places_camofox_before_agent(cfg: Config):
-    steps = order_run(
-        cfg, ["ezproxy", "camofox", "browser_agent", "scihub"]
-    )
+    steps = order_run(cfg, ["ezproxy", "camofox", "browser_agent", "scihub"])
     names = [s.name for s in steps]
     assert names.index("camofox") < names.index("browser_agent")
 
@@ -113,7 +109,10 @@ def test_client_health_and_create_tab():
     http = httpx.Client(transport=transport, base_url="http://camofox.test")
     client = CamofoxClient("http://camofox.test", client=http)
     assert client.health()
-    assert client.create_tab(user_id="paperful", session_key="k", url="https://ex.test") == "t1"
+    assert (
+        client.create_tab(user_id="paperful", session_key="k", url="https://ex.test")
+        == "t1"
+    )
 
 
 def test_run_camofox_recover_hit(cfg: Config, monkeypatch):

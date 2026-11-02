@@ -18,7 +18,11 @@ def detect_format(path: Path, text: str | None = None) -> str:
         return "bibtex"
     if suffix in {".xml"}:
         return "endnote-xml"
-    sample = text if text is not None else path.read_text(encoding="utf-8", errors="replace")[:2000]
+    sample = (
+        text
+        if text is not None
+        else path.read_text(encoding="utf-8", errors="replace")[:2000]
+    )
     head = sample.lstrip("\ufeff")
     if head.lstrip().startswith("@") or "\n@" in head:
         return "bibtex"
@@ -54,7 +58,9 @@ def dump_records(records: list[dict[str, Any]], fmt: str) -> str:
     raise ValueError(f"Unknown format {fmt!r}. Use ris, bibtex, or endnote-xml.")
 
 
-def record_from_item_json(data: dict[str, Any], item_dir: Path | None = None) -> dict[str, Any]:
+def record_from_item_json(
+    data: dict[str, Any], item_dir: Path | None = None
+) -> dict[str, Any]:
     """``paperful.item.v1`` (or a restore folder) → interchange record."""
     pdfs: list[str] = []
     if item_dir is not None:
@@ -95,7 +101,9 @@ def record_from_item_json(data: dict[str, Any], item_dir: Path | None = None) ->
     }
 
 
-def parent_payload(record: dict[str, Any], collection_keys: list[str]) -> dict[str, Any]:
+def parent_payload(
+    record: dict[str, Any], collection_keys: list[str]
+) -> dict[str, Any]:
     """Zotero-shaped create payload (restore / import)."""
     from ..lint import normalize_saved_title
 

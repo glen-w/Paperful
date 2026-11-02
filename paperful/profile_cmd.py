@@ -26,6 +26,7 @@ from .run_config import (
 from .runreport import write_command_report, write_run_report
 from .store import Manifest
 
+
 def _profile_bind_kwargs(
     *,
     collection: list[str],
@@ -74,6 +75,7 @@ def _profile_bind_kwargs(
         "require_summarize": require_summarize,
     }
 
+
 def run_profile_list(
     console: Console,
     config: Any,
@@ -100,6 +102,7 @@ def run_profile_list(
     console.print(
         "[dim]paperful profile show NAME[/] prints the merge [bold]paperful all[/] would use."
     )
+
 
 def run_profile_show(
     console: Console,
@@ -171,6 +174,7 @@ def run_profile_show(
     if dry_run and "summarize" in bound.steps:
         console.print("[yellow]dry-run skips summarize.[/]")
 
+
 def run_profile_save(
     console: Console,
     name: Any,
@@ -236,4 +240,3 @@ def run_profile_save(
         console.print(f"[red]{exc}[/]")
         raise typer.Exit(1) from exc
     console.print(f"Wrote [bold]{path}[/]")
-

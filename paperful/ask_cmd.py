@@ -96,8 +96,10 @@ def run_ask(
     except ValueError as exc:
         console.print(str(exc), markup=False, style="red")
         raise typer.Exit(1) from exc
-    prompt_path = str(prompt.expanduser().resolve()) if prompt is not None else (
-        cfg.rag_prompt or None
+    prompt_path = (
+        str(prompt.expanduser().resolve())
+        if prompt is not None
+        else (cfg.rag_prompt or None)
     )
     types = cli_mod._resolve_types(item_type)
     embedder = cli_mod._rag_embedder(cfg)

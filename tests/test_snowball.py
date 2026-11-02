@@ -35,14 +35,21 @@ from paperful.snowball.expand import (
     truncate,
 )
 from paperful.snowball.candidate import Candidate
-from paperful.snowball.openalex import OpenAlexBudgetExceeded, OpenAlexClient, _is_budget, keyless_limit_message
+from paperful.snowball.openalex import (
+    OpenAlexBudgetExceeded,
+    OpenAlexClient,
+    _is_budget,
+    keyless_limit_message,
+)
 from paperful.zot import Item
 from tests.textutil import plain_text
 
 runner = CliRunner()
 
 
-def _work(oa: str, doi: str, title: str, year: int, cites: int, refs: list[str] | None = None) -> dict:
+def _work(
+    oa: str, doi: str, title: str, year: int, cites: int, refs: list[str] | None = None
+) -> dict:
     return {
         "id": f"https://openalex.org/{oa}",
         "doi": f"https://doi.org/{doi}",
@@ -52,7 +59,10 @@ def _work(oa: str, doi: str, title: str, year: int, cites: int, refs: list[str] 
         "cited_by_count": cites,
         "referenced_works": [f"https://openalex.org/{ref}" for ref in (refs or [])],
         "authorships": [{"author": {"display_name": "Ada Lovelace"}}],
-        "primary_location": {"source": {"display_name": "Marine Policy"}, "landing_page_url": "https://example.test/a"},
+        "primary_location": {
+            "source": {"display_name": "Marine Policy"},
+            "landing_page_url": "https://example.test/a",
+        },
     }
 
 
@@ -111,7 +121,11 @@ def _cfg(tmp_path: Path, **extra: str) -> Config:
 
 
 def _apply_filter_row(**biblio: object) -> Candidate:
-    base: dict[str, object] = {"type": "article", "venue": "marine policy", "language": "en"}
+    base: dict[str, object] = {
+        "type": "article",
+        "venue": "marine policy",
+        "language": "en",
+    }
     base.update(biblio)
     return Candidate(
         "r",
@@ -268,7 +282,9 @@ def test_apply_filters_listed_in_keeps_error_and_exists():
 
 
 def test_apply_filters_study_designs():
-    keep = _apply_filter_row(study_designs=["randomized-controlled-trial", "clinical-trial"])
+    keep = _apply_filter_row(
+        study_designs=["randomized-controlled-trial", "clinical-trial"]
+    )
     drop = _apply_filter_row(study_designs=["observational-study"])
     bare = _apply_filter_row()
     out = apply_filters(
@@ -317,9 +333,45 @@ def test_stop_rules_clamp_and_cap():
     )
     assert len(sample_ids(["a", "b", "c"], 2, rng=random.Random(1))) == 2
     rows = [
-        Candidate("r", {"type": "doi", "value": "x"}, 1, "refs", {"doi": "10.1/b"}, {}, "w", "new", {}, "dry-run", score=1),
-        Candidate("r", {"type": "doi", "value": "x"}, 1, "refs", {"doi": "10.1/a"}, {}, "w", "new", {}, "dry-run", score=5),
-        Candidate("r", {"type": "doi", "value": "x"}, 1, "refs", {"doi": "10.1/c"}, {}, "w", "exists", {}, "dry-run", score=5),
+        Candidate(
+            "r",
+            {"type": "doi", "value": "x"},
+            1,
+            "refs",
+            {"doi": "10.1/b"},
+            {},
+            "w",
+            "new",
+            {},
+            "dry-run",
+            score=1,
+        ),
+        Candidate(
+            "r",
+            {"type": "doi", "value": "x"},
+            1,
+            "refs",
+            {"doi": "10.1/a"},
+            {},
+            "w",
+            "new",
+            {},
+            "dry-run",
+            score=5,
+        ),
+        Candidate(
+            "r",
+            {"type": "doi", "value": "x"},
+            1,
+            "refs",
+            {"doi": "10.1/c"},
+            {},
+            "w",
+            "exists",
+            {},
+            "dry-run",
+            score=5,
+        ),
     ]
     kept = truncate(rows, 2)
     assert [row.ids["doi"] for row in kept] == ["10.1/a", "10.1/c"]
@@ -443,7 +495,11 @@ def test_doi_refs_and_keyword_hits(tmp_path: Path):
     assert result.exit_code == 0
     lines = (result.run_dir / "candidates.jsonl").read_text().splitlines()
     rows = [json.loads(line) for line in lines]
-    assert {row["ids"]["doi"] for row in rows} == {"10.1000/seed", "10.1000/a", "10.1000/b"}
+    assert {row["ids"]["doi"] for row in rows} == {
+        "10.1000/seed",
+        "10.1000/a",
+        "10.1000/b",
+    }
     text = buf.getvalue()
     assert "hop 1/1" in text
     assert "searches" in text and "papers" in text
@@ -466,8 +522,13 @@ def test_doi_refs_and_keyword_hits(tmp_path: Path):
         client=_client(works),
         lookup=lambda doi, title: None,
     )
-    again_rows = [json.loads(line) for line in (again.run_dir / "candidates.jsonl").read_text().splitlines()]
-    assert [row["ids"]["doi"] for row in again_rows] == [row["ids"]["doi"] for row in rows]
+    again_rows = [
+        json.loads(line)
+        for line in (again.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
+    assert [row["ids"]["doi"] for row in again_rows] == [
+        row["ids"]["doi"] for row in rows
+    ]
 
     search = run_search(
         cfg,
@@ -499,7 +560,10 @@ def test_depth_two_and_cited_by(tmp_path: Path):
         client=_client(works),
         lookup=lambda doi, title: None,
     )
-    dois = {json.loads(line)["ids"]["doi"] for line in (depth2.run_dir / "candidates.jsonl").read_text().splitlines()}
+    dois = {
+        json.loads(line)["ids"]["doi"]
+        for line in (depth2.run_dir / "candidates.jsonl").read_text().splitlines()
+    }
     assert dois == {"10.1000/seed", "10.1000/mid", "10.1000/deep"}
     hops = {
         json.loads(line)["ids"]["doi"]: json.loads(line)["hop"]
@@ -517,7 +581,10 @@ def test_depth_two_and_cited_by(tmp_path: Path):
         client=_client(works, citing={"W1": ["W4"]}),
         lookup=lambda doi, title: None,
     )
-    cite_rows = [json.loads(line) for line in (cites.run_dir / "candidates.jsonl").read_text().splitlines()]
+    cite_rows = [
+        json.loads(line)
+        for line in (cites.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     by_doi = {row["ids"]["doi"]: row for row in cite_rows}
     assert set(by_doi) == {"10.1000/seed", "10.1000/cite"}
     assert by_doi["10.1000/seed"]["hop"] == 0
@@ -556,7 +623,9 @@ class _Lib:
         return list(self._items)
 
 
-def test_auto_creates_only_new_and_fetch_pdfs_uses_those_keys(tmp_path: Path, monkeypatch):
+def test_auto_creates_only_new_and_fetch_pdfs_uses_those_keys(
+    tmp_path: Path, monkeypatch
+):
     works = {
         "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, ["W2"]),
         "W2": _work("W2", "10.1000/new", "New paper", 2019, 4),
@@ -590,7 +659,10 @@ def test_auto_creates_only_new_and_fetch_pdfs_uses_those_keys(tmp_path: Path, mo
     assert {row["DOI"] for row in lib.created} == {"10.1000/seed", "10.1000/new"}
     new_item = next(row for row in lib.created if row["DOI"] == "10.1000/new")
     assert new_item["collections"] == ["COL1"]
-    assert {tag["tag"] for tag in new_item["tags"]} >= {"paperful-snowball", "paperful-snowball:openalex"}
+    assert {tag["tag"] for tag in new_item["tags"]} >= {
+        "paperful-snowball",
+        "paperful-snowball:openalex",
+    }
     assert {note[0] for note in lib.notes} == {"ITEM1", "ITEM2"}
     assert all("mailto" not in note[1] for note in lib.notes)
     assert all("OPENALEX" not in note[1] for note in lib.notes)
@@ -601,14 +673,19 @@ def test_auto_creates_only_new_and_fetch_pdfs_uses_those_keys(tmp_path: Path, mo
     assert report["attach_ok"] == 2
 
     lib2 = _Lib()
-    monkeypatch.setattr("paperful.snowball.command.fill_pdfs", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no pdf")))
+    monkeypatch.setattr(
+        "paperful.snowball.command.fill_pdfs",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("no pdf")),
+    )
     run_doi(
         cfg,
         ["10.1000/seed"],
         SnowballRequest(gate="auto", collection="Inbox/Snowball", fetch_pdfs=False),
         console=Console(highlight=False, width=200),
         client=_client(works),
-        lookup=lambda doi, title: "HAVE" if doi in {"10.1000/new", "10.1000/seed"} else None,
+        lookup=lambda doi, title: (
+            "HAVE" if doi in {"10.1000/new", "10.1000/seed"} else None
+        ),
         backend=lib2,
     )
     assert lib2.created == []
@@ -689,7 +766,10 @@ def test_orcid_seeds(tmp_path: Path):
                         {
                             "external-ids": {
                                 "external-id": [
-                                    {"external-id-type": "doi", "external-id-value": "10.1000/ego"}
+                                    {
+                                        "external-id-type": "doi",
+                                        "external-id-value": "10.1000/ego",
+                                    }
                                 ]
                             }
                         }
@@ -707,7 +787,10 @@ def test_orcid_seeds(tmp_path: Path):
         lookup=lambda doi, title: None,
         orcid_getter=getter,
     )
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     dois = {row["ids"]["doi"] for row in rows}
     assert "10.1000/ego" in dois
     assert "10.1000/ref" in dois
@@ -735,7 +818,10 @@ def test_multi_orcid_seeds(tmp_path: Path):
                         {
                             "external-ids": {
                                 "external-id": [
-                                    {"external-id-type": "doi", "external-id-value": doi}
+                                    {
+                                        "external-id-type": "doi",
+                                        "external-id-value": doi,
+                                    }
                                 ]
                             }
                         }
@@ -753,7 +839,10 @@ def test_multi_orcid_seeds(tmp_path: Path):
         lookup=lambda doi, title: None,
         orcid_getter=getter,
     )
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     dois = {row["ids"]["doi"] for row in rows}
     assert dois == {"10.1000/a", "10.1000/b", "10.1000/shared-ref", "10.1000/co"}
     assert sum(1 for row in rows if row["ids"]["doi"] == "10.1000/co") == 1
@@ -768,7 +857,9 @@ def test_orcid_profile_legacy_and_list(tmp_path: Path):
     from paperful.snowball.profile import orcids_from_profile, save_profile
 
     cfg = _cfg(tmp_path)
-    assert orcids_from_profile({"orcid": "0000-0002-9162-9618"}) == ["0000-0002-9162-9618"]
+    assert orcids_from_profile({"orcid": "0000-0002-9162-9618"}) == [
+        "0000-0002-9162-9618"
+    ]
     assert orcids_from_profile(
         {"orcids": ["0000-0002-9162-9618", "0000-0002-1825-0097"]}
     ) == ["0000-0002-9162-9618", "0000-0002-1825-0097"]
@@ -918,7 +1009,10 @@ def test_multi_keyword_search_composes_openalex_query(tmp_path: Path):
     )
     assert result.exit_code == 0
     assert seen == ['"msp" AND "ore"']
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert rows[0]["seed"]["value"] == '"msp" AND "ore"'
 
 
@@ -1059,15 +1153,26 @@ def test_collection_seeds(tmp_path: Path):
         lookup=lambda doi, title: None,
         backend=lib,
     )
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert {row["ids"]["doi"] for row in rows} == {"10.1000/new"}
 
 
 def test_cli_refusals(tmp_path: Path):
     off = tmp_path / "off.toml"
     off.write_text(f'email = "t@example.org"\nstate_dir = "{tmp_path / "state"}"\n')
-    assert runner.invoke(cli.app, ["snowball", "search", "bbnj", "-c", str(off)]).exit_code == 2
-    assert runner.invoke(cli.app, ["snowball", "orcid", "0000-0002-9162-9618", "-c", str(off)]).exit_code == 2
+    assert (
+        runner.invoke(cli.app, ["snowball", "search", "bbnj", "-c", str(off)]).exit_code
+        == 2
+    )
+    assert (
+        runner.invoke(
+            cli.app, ["snowball", "orcid", "0000-0002-9162-9618", "-c", str(off)]
+        ).exit_code
+        == 2
+    )
     on = tmp_path / "on.toml"
     on.write_text(off.read_text() + "\n[snowball]\nenabled = true\n")
     refused = runner.invoke(
@@ -1134,7 +1239,10 @@ def test_failed_seed_exits_nonzero_and_summary(tmp_path: Path):
         lookup=lambda doi, title: None,
     )
     assert result.exit_code == 1
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert rows[0]["status"] == "error"
     summary = json.loads((result.run_dir / "summary.json").read_text())
     assert summary["by_status"]["error"] == 1
@@ -1146,9 +1254,21 @@ def test_bad_direction_and_auto_without_collection_exit(tmp_path: Path):
     cfg = _cfg(tmp_path)
     console = Console(highlight=False, width=120)
     with pytest.raises(SnowballError, match="direction must be"):
-        run_doi(cfg, ["10.1000/seed"], SnowballRequest(direction="sideways"), console=console, client=_client({}))
+        run_doi(
+            cfg,
+            ["10.1000/seed"],
+            SnowballRequest(direction="sideways"),
+            console=console,
+            client=_client({}),
+        )
     with pytest.raises(SnowballError, match="target collection"):
-        run_doi(cfg, ["10.1000/seed"], SnowballRequest(gate="auto"), console=console, client=_client({}))
+        run_doi(
+            cfg,
+            ["10.1000/seed"],
+            SnowballRequest(gate="auto"),
+            console=console,
+            client=_client({}),
+        )
 
 
 def test_dry_run_ignores_fetch_pdfs(tmp_path: Path, monkeypatch):
@@ -1211,7 +1331,9 @@ def test_doctor_snowball_row(monkeypatch):
     assert "key set" in keyed.detail
     assert "secret-key" not in keyed.detail
     assert "a@b.c" not in keyed.detail
-    down = _snowball_check(Config(snowball_enabled=True, email="a@b.c"), probe=lambda email: "unreachable")
+    down = _snowball_check(
+        Config(snowball_enabled=True, email="a@b.c"), probe=lambda email: "unreachable"
+    )
     assert down.status == "amber"
     assert "unreachable" in down.detail
     from paperful.doctor import _openalex_probe_status
@@ -1245,7 +1367,9 @@ def test_s2_paper_sends_key_only_when_set(tmp_path: Path, monkeypatch):
     assert s2_paper("10.1000/live", cache_dir=cache, api_key="")["title"] == "Live"
     assert captured["headers"] is None
     (cache / "10.1000_live.json").unlink()
-    assert s2_paper("10.1000/live", cache_dir=cache, api_key="test-key")["title"] == "Live"
+    assert (
+        s2_paper("10.1000/live", cache_dir=cache, api_key="test-key")["title"] == "Live"
+    )
     assert captured["headers"] == {"x-api-key": "test-key"}
 
 
@@ -1369,7 +1493,10 @@ def test_year_window_and_direction_both(tmp_path: Path):
         client=_client(works),
         lookup=lambda doi, title: None,
     )
-    window = [json.loads(line) for line in (filtered.run_dir / "candidates.jsonl").read_text().splitlines()]
+    window = [
+        json.loads(line)
+        for line in (filtered.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     by_doi = {row["ids"]["doi"]: row for row in window}
     assert by_doi["10.1000/new"]["status"] == "new"
     assert by_doi["10.1000/old"]["status"] == "filtered"
@@ -1382,10 +1509,17 @@ def test_year_window_and_direction_both(tmp_path: Path):
         client=_client(works, citing={"W1": ["W4"]}),
         lookup=lambda doi, title: None,
     )
-    rows = [json.loads(line) for line in (both.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (both.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     dirs = {row["direction"] for row in rows}
     assert dirs >= {"refs", "cites"}
-    assert {row["ids"]["doi"] for row in rows} >= {"10.1000/old", "10.1000/new", "10.1000/cite"}
+    assert {row["ids"]["doi"] for row in rows} >= {
+        "10.1000/old",
+        "10.1000/new",
+        "10.1000/cite",
+    }
 
 
 def test_keyword_depth_expand_and_soft_ceiling(tmp_path: Path):
@@ -1427,7 +1561,10 @@ def test_keyword_depth_expand_and_soft_ceiling(tmp_path: Path):
         client=client,
         lookup=lambda doi, title: None,
     )
-    rows = [json.loads(line) for line in (search.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (search.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert {row["hop"] for row in rows} == {0, 1}
 
     # Soft ceiling: request above MAX_DEPTH still runs at MAX_DEPTH.
@@ -1513,7 +1650,10 @@ def test_orcid_openalex_fill_and_list_payload(tmp_path: Path):
     from paperful.snowball.orcid import orcid_dois
     from paperful.snowball.openalex import normalize_orcid, short_id
 
-    assert normalize_orcid("https://orcid.org/0000-0002-9162-9618") == "0000-0002-9162-9618"
+    assert (
+        normalize_orcid("https://orcid.org/0000-0002-9162-9618")
+        == "0000-0002-9162-9618"
+    )
     assert normalize_orcid("0000000291629618") == "0000-0002-9162-9618"
     assert short_id("https://openalex.org/W1") == "W1"
     assert orcid_dois(
@@ -1524,7 +1664,10 @@ def test_orcid_openalex_fill_and_list_payload(tmp_path: Path):
                     {
                         "external-ids": {
                             "external-id": [
-                                {"external-id-type": "doi", "external-id-value": "10.1000/list"}
+                                {
+                                    "external-id-type": "doi",
+                                    "external-id-value": "10.1000/list",
+                                }
                             ]
                         }
                     }
@@ -1564,7 +1707,10 @@ def test_orcid_openalex_fill_and_list_payload(tmp_path: Path):
         lookup=lambda doi, title: None,
         orcid_getter=lambda _o: {"group": []},
     )
-    dois = {json.loads(line)["ids"]["doi"] for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()}
+    dois = {
+        json.loads(line)["ids"]["doi"]
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    }
     assert "10.1000/oa-only" in dois
 
 
@@ -1573,7 +1719,14 @@ def test_collection_empty_and_apply_skips_exists(tmp_path: Path):
     console = Console(highlight=False, width=120)
     empty = _Lib(items=[])
     with pytest.raises(SnowballError, match="No DOIs"):
-        run_collection(cfg, "Inbox/Seeds", SnowballRequest(), console=console, backend=empty, client=_client({}))
+        run_collection(
+            cfg,
+            "Inbox/Seeds",
+            SnowballRequest(),
+            console=console,
+            backend=empty,
+            client=_client({}),
+        )
 
     works = {
         "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, ["W2"]),
@@ -1587,10 +1740,15 @@ def test_collection_empty_and_apply_skips_exists(tmp_path: Path):
         client=_client(works),
         lookup=lambda doi, title: None,
     )
-    rows = [json.loads(line) for line in (queued.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (queued.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     for row in rows:
         row["keep"] = True
-    (queued.run_dir / "candidates.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    (queued.run_dir / "candidates.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n"
+    )
 
     # First apply creates; second apply sees exists and creates nothing.
     lib = _Lib()
@@ -1647,7 +1805,10 @@ def test_openalex_cites_and_ingest_types(tmp_path: Path):
     assert row.identity == "openalex:W9"
 
     client = _client(
-        {"W1": _work("W1", "10.1000/seed", "Seed", 2020, 1), "W4": _work("W4", "10.1000/c", "C", 2021, 1)},
+        {
+            "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1),
+            "W4": _work("W4", "10.1000/c", "C", 2021, 1),
+        },
         citing={"W1": ["W4"]},
     )
     citing = client.works_citing("W1", limit=5)
@@ -1687,7 +1848,12 @@ def test_openalex_cites_and_ingest_types(tmp_path: Path):
         lookup=lambda doi, title: None,
     )
     assert failed.exit_code == 1
-    assert json.loads((failed.run_dir / "candidates.jsonl").read_text().splitlines()[0])["status"] == "error"
+    assert (
+        json.loads((failed.run_dir / "candidates.jsonl").read_text().splitlines()[0])[
+            "status"
+        ]
+        == "error"
+    )
 
 
 def test_filters_dedupe_scope_and_partial_create(tmp_path: Path):
@@ -1728,12 +1894,17 @@ def test_filters_dedupe_scope_and_partial_create(tmp_path: Path):
     result = run_doi(
         cfg,
         ["https://doi.org/10.1000/seed", "not-a-doi"],
-        SnowballRequest(gate="auto", collection="Inbox/Snowball", dedupe_scope="collection"),
+        SnowballRequest(
+            gate="auto", collection="Inbox/Snowball", dedupe_scope="collection"
+        ),
         console=Console(highlight=False, width=160),
         client=_client(works),
         backend=lib,
     )
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     by = {row["ids"]["doi"]: row for row in rows}
     assert by["not-a-doi"]["status"] == "error"
     assert by["10.1000/book"]["status"] == "filtered"
@@ -1757,15 +1928,30 @@ def test_profile_save_refuses_secrets(tmp_path: Path):
 
     cfg = _cfg(tmp_path)
     with pytest.raises(SnowballError, match="key"):
-        save_profile(cfg, "scout", {"mode": "search", "query": "bbnj", "api_key": "secret"}, force=False)
+        save_profile(
+            cfg,
+            "scout",
+            {"mode": "search", "query": "bbnj", "api_key": "secret"},
+            force=False,
+        )
     with pytest.raises(SnowballError, match="force"):
         save_profile(
             cfg,
             "lib",
-            {"mode": "search", "query": "bbnj", "gate": "auto", "target_collection": "Inbox"},
+            {
+                "mode": "search",
+                "query": "bbnj",
+                "gate": "auto",
+                "target_collection": "Inbox",
+            },
             force=False,
         )
-    path = save_profile(cfg, "scout", {"mode": "search", "query": "bbnj", "description": "Scout"}, force=False)
+    path = save_profile(
+        cfg,
+        "scout",
+        {"mode": "search", "query": "bbnj", "description": "Scout"},
+        force=False,
+    )
     assert "api_key" not in path.read_text()
     assert 'kind = "snowball"' in path.read_text()
 
@@ -1777,14 +1963,36 @@ def test_cli_profile_save_and_per_hop(tmp_path: Path):
     )
     saved = runner.invoke(
         cli.app,
-        ["snowball", "profile", "save", "keyword-scout", "--query", "bbnj", "--description", "Scout", "-c", str(cfg_path)],
+        [
+            "snowball",
+            "profile",
+            "save",
+            "keyword-scout",
+            "--query",
+            "bbnj",
+            "--description",
+            "Scout",
+            "-c",
+            str(cfg_path),
+        ],
     )
     assert saved.exit_code == 0
     text = (tmp_path / "profiles" / "keyword-scout.toml").read_text()
     assert "bbnj" in text
     refused = runner.invoke(
         cli.app,
-        ["snowball", "profile", "save", "lib", "--query", "bbnj", "--gate", "auto", "-c", str(cfg_path)],
+        [
+            "snowball",
+            "profile",
+            "save",
+            "lib",
+            "--query",
+            "bbnj",
+            "--gate",
+            "auto",
+            "-c",
+            str(cfg_path),
+        ],
     )
     assert refused.exit_code == 2
 
@@ -1804,7 +2012,10 @@ def test_language_filter_and_min_seed_citations(tmp_path: Path):
         client=_client(works, citing={"W1": ["C1"]}),
         lookup=lambda doi, title: None,
     )
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     by = {row["ids"]["doi"]: row for row in rows}
     assert by["10.1000/ref"]["status"] == "filtered"
     assert "language" in by["10.1000/ref"]["why"]
@@ -1839,7 +2050,9 @@ def test_note_provenance_off(tmp_path: Path):
     run_doi(
         _cfg(tmp_path),
         ["10.1000/seed"],
-        SnowballRequest(gate="auto", collection="Inbox/Snowball", note_provenance=False),
+        SnowballRequest(
+            gate="auto", collection="Inbox/Snowball", note_provenance=False
+        ),
         console=Console(highlight=False, width=160),
         client=_client(works),
         lookup=lambda doi, title: None,
@@ -1880,7 +2093,10 @@ def test_hybrid_and_overlap(tmp_path: Path):
         client=client,
         lookup=lambda doi, title: None,
     )
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     shared = next(row for row in rows if row["ids"]["doi"] == "10.1000/shared")
     assert shared["hop"] == 1
     assert shared["biblio"]["overlap"] == 2
@@ -1905,11 +2121,21 @@ def test_crossref_fills_empty_and_s2_does_not_overwrite(tmp_path: Path):
     called = {"s2": 0}
 
     def crossref(doi: str) -> dict:
-        return {"title": "Filled", "year": 2018, "venue": "Nature", "authors": ["Ada Lovelace"]}
+        return {
+            "title": "Filled",
+            "year": 2018,
+            "venue": "Nature",
+            "authors": ["Ada Lovelace"],
+        }
 
     def s2(doi: str) -> dict:
         called["s2"] += 1
-        return {"title": "Should not replace", "year": 1999, "venue": "Other", "authors": ["Other"]}
+        return {
+            "title": "Should not replace",
+            "year": 1999,
+            "venue": "Other",
+            "authors": ["Other"],
+        }
 
     run_fill_pass(
         [gap],
@@ -1938,10 +2164,15 @@ def test_crossref_fills_empty_and_s2_does_not_overwrite(tmp_path: Path):
         console=Console(highlight=False, width=160),
         client=_client(works),
         lookup=lambda doi, title: None,
-        crossref_getter=lambda doi: asked.append(f"crossref:{doi}") or {"title": "Filled"},
+        crossref_getter=lambda doi: (
+            asked.append(f"crossref:{doi}") or {"title": "Filled"}
+        ),
         s2_getter=lambda doi: asked.append(f"s2:{doi}") or {},
     )
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     neighbour = next(row for row in rows if row["ids"]["doi"] == "10.1000/new")
     assert neighbour["biblio"]["title"] == ""
     assert asked == []
@@ -1957,7 +2188,9 @@ def test_approve_each_yes_no_and_cap(tmp_path: Path):
     result = run_doi(
         _cfg(tmp_path),
         ["10.1000/seed"],
-        SnowballRequest(gate="approve-each", collection="Inbox/Snowball", approve_each_max=5),
+        SnowballRequest(
+            gate="approve-each", collection="Inbox/Snowball", approve_each_max=5
+        ),
         console=Console(highlight=False, width=160),
         client=_client(works),
         lookup=lambda doi, title: None,
@@ -1965,7 +2198,10 @@ def test_approve_each_yes_no_and_cap(tmp_path: Path):
         decider=lambda row: row.ids.get("doi") == "10.1000/a",
     )
     assert result.exit_code == 0
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     kept = {row["ids"]["doi"]: row.get("keep") for row in rows}
     assert kept["10.1000/a"] is True
     assert kept["10.1000/b"] is False
@@ -1974,7 +2210,9 @@ def test_approve_each_yes_no_and_cap(tmp_path: Path):
         run_doi(
             _cfg(tmp_path),
             ["10.1000/seed"],
-            SnowballRequest(gate="approve-each", collection="Inbox/Snowball", approve_each_max=0),
+            SnowballRequest(
+                gate="approve-each", collection="Inbox/Snowball", approve_each_max=0
+            ),
             console=Console(highlight=False, width=160),
             client=_client(works),
             lookup=lambda doi, title: None,
@@ -2022,12 +2260,26 @@ def test_deep_gates_backends_and_fill(tmp_path: Path, monkeypatch: pytest.Monkey
             ["10.1000/seed"],
             SnowballRequest(gate="approve-batch"),
             console=console,
-            client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=boom),
+            client=OpenAlexClient(
+                email="t@example.org", api_key="", sleep_s=0, getter=boom
+            ),
         )
     with pytest.raises(SnowballError, match="Unknown"):
-        run_doi(cfg, ["10.1000/seed"], SnowballRequest(backends=("nope",)), console=console, client=_client(works))
+        run_doi(
+            cfg,
+            ["10.1000/seed"],
+            SnowballRequest(backends=("nope",)),
+            console=console,
+            client=_client(works),
+        )
     with pytest.raises(SnowballError, match="openalex"):
-        run_doi(cfg, ["10.1000/seed"], SnowballRequest(backends=("crossref",)), console=console, client=_client(works))
+        run_doi(
+            cfg,
+            ["10.1000/seed"],
+            SnowballRequest(backends=("crossref",)),
+            console=console,
+            client=_client(works),
+        )
 
     class Stdin:
         def isatty(self) -> bool:
@@ -2052,13 +2304,21 @@ def test_deep_gates_backends_and_fill(tmp_path: Path, monkeypatch: pytest.Monkey
         client=_client(works, citing={"W1": ["C1"]}),
         lookup=lambda doi, title: None,
     )
-    rows = [json.loads(line) for line in (kept_lang.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (kept_lang.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     by = {row["ids"]["doi"]: row for row in rows}
     assert by["10.1000/new"]["status"] == "new"
     assert by["10.1000/cite"]["direction"] == "cites"
 
     def crossref(doi: str) -> dict:
-        return {"title": "Overwrite", "year": 1999, "venue": "Other", "authors": ["Other"]}
+        return {
+            "title": "Overwrite",
+            "year": 1999,
+            "venue": "Other",
+            "authors": ["Other"],
+        }
 
     filled = run_doi(
         cfg,
@@ -2069,7 +2329,10 @@ def test_deep_gates_backends_and_fill(tmp_path: Path, monkeypatch: pytest.Monkey
         lookup=lambda doi, title: None,
         crossref_getter=crossref,
     )
-    rows = [json.loads(line) for line in (filled.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (filled.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     titles = {row["ids"]["doi"]: row["biblio"]["title"] for row in rows}
     assert titles["10.1000/new"] == "Kept title"
 
@@ -2081,7 +2344,9 @@ def test_deep_gates_backends_and_fill(tmp_path: Path, monkeypatch: pytest.Monkey
         asked.append(doi)
         return {
             "title": "Should not replace",
-            "references": [{"title": "Extra", "year": 2017, "externalIds": {"DOI": "10.1000/s2"}}],
+            "references": [
+                {"title": "Extra", "year": 2017, "externalIds": {"DOI": "10.1000/s2"}}
+            ],
         }
 
     s2_run = run_doi(
@@ -2093,7 +2358,10 @@ def test_deep_gates_backends_and_fill(tmp_path: Path, monkeypatch: pytest.Monkey
         lookup=lambda doi, title: None,
         s2_getter=s2,
     )
-    s2_rows = [json.loads(line) for line in (s2_run.run_dir / "candidates.jsonl").read_text().splitlines()]
+    s2_rows = [
+        json.loads(line)
+        for line in (s2_run.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert all(row["ids"]["doi"] != "10.1000/s2" for row in s2_rows)
     assert asked == []
     assert normalize_direction("all") == "both"
@@ -2101,7 +2369,10 @@ def test_deep_gates_backends_and_fill(tmp_path: Path, monkeypatch: pytest.Monkey
     cache = tmp_path / "cache"
     (cache).mkdir()
     (cache / "10.1000_cached.json").write_text('{"title": "Cached"}', encoding="utf-8")
-    assert s2_paper("10.1000/cached", cache_dir=cache, api_key="test-key")["title"] == "Cached"
+    assert (
+        s2_paper("10.1000/cached", cache_dir=cache, api_key="test-key")["title"]
+        == "Cached"
+    )
 
     lib = _CreateLib()
     noted = run_doi(
@@ -2121,7 +2392,10 @@ def test_deep_gates_backends_and_fill(tmp_path: Path, monkeypatch: pytest.Monkey
 
 
 def test_deep_refine_hybrid_orcid_and_cli(tmp_path: Path):
-    works = {"A": _work("A", "10.1000/a", "Alpha", 2020, 4, refs=["R"]), "R": _work("R", "10.1000/r", "Ref", 2019, 1)}
+    works = {
+        "A": _work("A", "10.1000/a", "Alpha", 2020, 4, refs=["R"]),
+        "R": _work("R", "10.1000/r", "Ref", 2019, 1),
+    }
     console = Console(highlight=False, width=160)
     cfg = _cfg(tmp_path)
     disabled = run_search(
@@ -2161,7 +2435,10 @@ def test_deep_refine_hybrid_orcid_and_cli(tmp_path: Path):
         client=_client(nodoi),
         lookup=lambda doi, title: None,
     )
-    bare_rows = [json.loads(line) for line in (bare.run_dir / "candidates.jsonl").read_text().splitlines()]
+    bare_rows = [
+        json.loads(line)
+        for line in (bare.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert bare_rows
     assert all(row["hop"] == 0 for row in bare_rows)
 
@@ -2182,7 +2459,19 @@ def test_deep_refine_hybrid_orcid_and_cli(tmp_path: Path):
     cfg_path = tmp_path / "config.toml"
     saved = runner.invoke(
         cli.app,
-        ["snowball", "profile", "save", "hy", "--query", "bbnj", "--hybrid", "--hybrid-seeds", "3", "-c", str(cfg_path)],
+        [
+            "snowball",
+            "profile",
+            "save",
+            "hy",
+            "--query",
+            "bbnj",
+            "--hybrid",
+            "--hybrid-seeds",
+            "3",
+            "-c",
+            str(cfg_path),
+        ],
     )
     assert saved.exit_code == 0
     text = (tmp_path / "profiles" / "hy.toml").read_text()
@@ -2220,7 +2509,16 @@ def test_fill_pdfs_full_retries_only_misses(tmp_path: Path, monkeypatch):
     seen: list[tuple[bool, list[str]]] = []
 
     class Pipe:
-        def __init__(self, cfg, manifest, console, sources=None, attacher=None, use_browser=True, progress=None):
+        def __init__(
+            self,
+            cfg,
+            manifest,
+            console,
+            sources=None,
+            attacher=None,
+            use_browser=True,
+            progress=None,
+        ):
             self.use_browser = use_browser
             self._keys: list[str] = []
             self.stats = type("S", (), {"ok": 0, "attached": 0, "attach_failed": 0})()
@@ -2244,13 +2542,18 @@ def test_fill_pdfs_full_retries_only_misses(tmp_path: Path, monkeypatch):
         Item("A", "journalArticle", "Hit", "10.1/a", None, None, 2020, "A"),
         Item("B", "journalArticle", "Miss", "10.1/b", None, None, 2024, "B"),
     ]
-    stats = fill_pdfs(cfg, object(), items, Console(highlight=False, width=120), mode="full")
+    stats = fill_pdfs(
+        cfg, object(), items, Console(highlight=False, width=120), mode="full"
+    )
     assert seen == [(False, ["A", "B"]), (True, ["B"])]
     assert stats.ok == 2
 
 
 def test_auto_full_mode_reaches_fill(tmp_path: Path, monkeypatch):
-    works = {"W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, ["W2"]), "W2": _work("W2", "10.1000/new", "New", 2019, 1)}
+    works = {
+        "W1": _work("W1", "10.1000/seed", "Seed", 2020, 1, ["W2"]),
+        "W2": _work("W2", "10.1000/new", "New", 2019, 1),
+    }
     modes: list[str] = []
 
     def fake_fill(cfg, backend, items, console, **kwargs):
@@ -2294,7 +2597,9 @@ def test_api_error_keeps_a_restorable_queue(tmp_path: Path):
         ["10.1000/seed"],
         SnowballRequest(gate="dry-run", direction="cites", depth=1),
         console=console,
-        client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
+        client=OpenAlexClient(
+            email="t@example.org", api_key="", sleep_s=0, getter=getter
+        ),
         lookup=lambda doi, title: None,
     )
     from paperful.agent_json import EXIT_PARTIAL
@@ -2345,8 +2650,12 @@ def test_openalex_rejected_key_is_not_a_budget_stop():
 def test_budget_stop_keeps_partial_rows_and_resume(tmp_path: Path):
     import httpx
 
-    spent = httpx.Response(429, headers={"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "40000"})
-    burst = httpx.Response(429, headers={"Retry-After": "1", "X-RateLimit-Remaining": "10"})
+    spent = httpx.Response(
+        429, headers={"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "40000"}
+    )
+    burst = httpx.Response(
+        429, headers={"Retry-After": "1", "X-RateLimit-Remaining": "10"}
+    )
     assert _is_budget(spent, 0.0)
     assert not _is_budget(burst, 0.0)
 
@@ -2363,11 +2672,15 @@ def test_budget_stop_keeps_partial_rows_and_resume(tmp_path: Path):
         if "cites:" in filt:
             calls["cites"] += 1
             if calls["cites"] == 1:
-                raise OpenAlexBudgetExceeded("spent", reset_at="2099-01-01T00:00:00+00:00", reset_in_s=999)
+                raise OpenAlexBudgetExceeded(
+                    "spent", reset_at="2099-01-01T00:00:00+00:00", reset_in_s=999
+                )
             return {"results": [works["W2"]]}
         return {"results": []}
 
-    client = OpenAlexClient(email="t@example.org", api_key="k", sleep_s=0, getter=getter)
+    client = OpenAlexClient(
+        email="t@example.org", api_key="k", sleep_s=0, getter=getter
+    )
     client._using_key = True
     console = Console(file=StringIO(), highlight=False, width=120)
     result = run_doi(
@@ -2393,7 +2706,9 @@ def test_budget_stop_keeps_partial_rows_and_resume(tmp_path: Path):
         result.run_dir.name,
         SnowballRequest(gate="dry-run"),
         console=early,
-        client=OpenAlexClient(email="t@example.org", api_key="k", sleep_s=0, getter=getter),
+        client=OpenAlexClient(
+            email="t@example.org", api_key="k", sleep_s=0, getter=getter
+        ),
     )
     assert held.exit_code == 1
     assert "still spent" in early.file.getvalue()
@@ -2406,7 +2721,9 @@ def test_budget_stop_keeps_partial_rows_and_resume(tmp_path: Path):
         result.run_dir.name,
         SnowballRequest(gate="dry-run"),
         console=Console(file=StringIO(), highlight=False, width=120),
-        client=OpenAlexClient(email="t@example.org", api_key="k", sleep_s=0, getter=getter),
+        client=OpenAlexClient(
+            email="t@example.org", api_key="k", sleep_s=0, getter=getter
+        ),
     )
     assert resumed.exit_code == 0
     assert not deferred_path.exists()
@@ -2437,7 +2754,9 @@ def test_cites_query_filters_references_and_cited_by(tmp_path: Path):
             ids = filt.split(":", 1)[1].split("|")
             hits = [works[item] for item in ids if item in works]
             if params.get("search") == "degrowth":
-                hits = [work for work in hits if "degrowth" in work["display_name"].lower()]
+                hits = [
+                    work for work in hits if "degrowth" in work["display_name"].lower()
+                ]
             return {"results": hits, "meta": {"count": len(hits)}}
         if "cites:" in filt:
             searches.append(("cites", params.get("search")))
@@ -2457,13 +2776,18 @@ def test_cites_query_filters_references_and_cited_by(tmp_path: Path):
             cites_query="degrowth",
         ),
         console=Console(file=StringIO(), highlight=False, width=120),
-        client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
+        client=OpenAlexClient(
+            email="t@example.org", api_key="", sleep_s=0, getter=getter
+        ),
         lookup=lambda doi, title: None,
     )
     assert result.exit_code == 0
     assert ("refs", "degrowth") in searches
     assert ("cites", "degrowth") in searches
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     by_direction = {}
     for row in rows:
         by_direction.setdefault(row["direction"], []).append(row["biblio"]["title"])
@@ -2511,18 +2835,28 @@ def test_cites_query_survives_budget_resume(tmp_path: Path):
         if "cites:" in str(params.get("filter") or ""):
             calls["cites"] += 1
             if calls["cites"] == 1:
-                raise OpenAlexBudgetExceeded("spent", reset_at="2000-01-01T00:00:00+00:00", reset_in_s=0)
+                raise OpenAlexBudgetExceeded(
+                    "spent", reset_at="2000-01-01T00:00:00+00:00", reset_in_s=0
+                )
             assert params.get("search") == "degrowth"
             return {"results": [works["W2"]], "meta": {"count": 1}}
         return {"results": []}
 
-    client = OpenAlexClient(email="t@example.org", api_key="k", sleep_s=0, getter=getter)
+    client = OpenAlexClient(
+        email="t@example.org", api_key="k", sleep_s=0, getter=getter
+    )
     client._using_key = True
     cfg = _cfg(tmp_path)
     result = run_doi(
         cfg,
         ["10.1000/seed"],
-        SnowballRequest(gate="dry-run", direction="cites", depth=1, per_hop_limit=10, cites_query="  degrowth "),
+        SnowballRequest(
+            gate="dry-run",
+            direction="cites",
+            depth=1,
+            per_hop_limit=10,
+            cites_query="  degrowth ",
+        ),
         console=Console(file=StringIO(), highlight=False, width=120),
         client=client,
         lookup=lambda doi, title: None,
@@ -2538,7 +2872,9 @@ def test_cites_query_survives_budget_resume(tmp_path: Path):
         result.run_dir.name,
         SnowballRequest(gate="dry-run"),
         console=Console(file=StringIO(), highlight=False, width=120),
-        client=OpenAlexClient(email="t@example.org", api_key="k", sleep_s=0, getter=getter),
+        client=OpenAlexClient(
+            email="t@example.org", api_key="k", sleep_s=0, getter=getter
+        ),
     )
     assert resumed.exit_code == 0
     saved = (resumed.run_dir / "candidates.jsonl").read_text()
@@ -2599,19 +2935,29 @@ def test_cites_query_reaches_the_second_hop(tmp_path: Path):
         if params.get("search") == "degrowth" and matched:
             return {"results": [works[matched]], "meta": {"count": 1}}
         extras = {"W1": ["W2", "W4"], "W2": ["W5", "W6"]}.get(seed, [])
-        return {"results": [works[item] for item in extras], "meta": {"count": len(extras)}}
+        return {
+            "results": [works[item] for item in extras],
+            "meta": {"count": len(extras)},
+        }
 
     result = run_doi(
         _cfg(tmp_path),
         ["10.1000/seed"],
-        SnowballRequest(direction="cites", depth=2, per_hop_limit=10, cites_query="degrowth"),
+        SnowballRequest(
+            direction="cites", depth=2, per_hop_limit=10, cites_query="degrowth"
+        ),
         console=Console(file=StringIO(), highlight=False, width=120),
-        client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
+        client=OpenAlexClient(
+            email="t@example.org", api_key="", sleep_s=0, getter=getter
+        ),
         lookup=lambda doi, title: None,
     )
     assert result.exit_code == 0
     assert calls == [("W1", "degrowth"), ("W2", "degrowth")]
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert [(row["hop"], row["biblio"]["title"]) for row in rows] == [
         (1, "Degrowth policy"),
         (2, "Degrowth and work"),
@@ -2647,7 +2993,9 @@ def test_cites_query_does_not_filter_the_similar_hop(tmp_path: Path):
             return {"results": []}
         searches[seed] = params.get("search")
         if seed == "W1":
-            hits = [works["W2"]] if params.get("search") == "degrowth" else [works["W2"]]
+            hits = (
+                [works["W2"]] if params.get("search") == "degrowth" else [works["W2"]]
+            )
             return {"results": hits, "meta": {"count": len(hits)}}
         if seed == "W3":
             return {"results": [works["W7"]], "meta": {"count": 1}}
@@ -2658,7 +3006,9 @@ def test_cites_query_does_not_filter_the_similar_hop(tmp_path: Path):
     result = run_doi(
         _cfg(tmp_path),
         ["10.1000/seed"],
-        SnowballRequest(direction="cites+similar", depth=1, per_hop_limit=10, cites_query="degrowth"),
+        SnowballRequest(
+            direction="cites+similar", depth=1, per_hop_limit=10, cites_query="degrowth"
+        ),
         console=Console(file=StringIO(), highlight=False, width=120),
         client=client,
         lookup=lambda doi, title: None,
@@ -2738,13 +3088,17 @@ def _keyword_client(works: dict[str, dict]) -> tuple[OpenAlexClient, dict]:
                     for item in (work.get("keywords") or [])
                     if isinstance(item, dict)
                 }
-                if owned & slugs and not str(work.get("doi") or "").endswith("10.1000/seed"):
+                if owned & slugs and not str(work.get("doi") or "").endswith(
+                    "10.1000/seed"
+                ):
                     hits.append(work)
             hits.sort(key=lambda work: -int(work.get("cited_by_count") or 0))
             return {"results": hits}
         return {"results": []}
 
-    return OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter), seen
+    return OpenAlexClient(
+        email="t@example.org", api_key="", sleep_s=0, getter=getter
+    ), seen
 
 
 def test_default_direction_and_search_keywords_config(tmp_path: Path):
@@ -2803,7 +3157,10 @@ def test_search_unions_openalex_keyword_tags(tmp_path: Path):
     assert result.exit_code == 0
     assert any(p.startswith("/keywords") for p in seen["paths"])
     assert seen["filters"] == ["keywords.id:degrowth"]
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     by_doi = {row["ids"]["doi"]: row for row in rows}
     assert set(by_doi) == {"10.1000/text", "10.1000/tag"}
     assert by_doi["10.1000/tag"]["why"].startswith("OpenAlex keywords")
@@ -2833,7 +3190,10 @@ def test_search_keywords_off_skips_tag_fetch(tmp_path: Path):
     assert result.exit_code == 0
     assert not any(p.startswith("/keywords") for p in seen_paths)
     assert not any("keywords.id:" in p for p in seen_paths)
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert [row["ids"]["doi"] for row in rows] == ["10.1000/text"]
     assert rows[0]["why"] == "OpenAlex search"
 
@@ -2856,13 +3216,24 @@ def test_default_doi_direction_expands_keywords(tmp_path: Path):
     )
     assert result.exit_code == 0
     assert seen.get("filter") == "keywords.id:alpha"
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert {row["direction"] for row in rows} >= {"doi", "refs", "keywords"}
-    assert {row["ids"]["doi"] for row in rows} >= {"10.1000/seed", "10.1000/ref", "10.1000/hit"}
+    assert {row["ids"]["doi"] for row in rows} >= {
+        "10.1000/seed",
+        "10.1000/ref",
+        "10.1000/hit",
+    }
 
 
 def test_keyword_hop_uses_top_slugs_and_finite_cap(tmp_path: Path):
-    from paperful.snowball.expand import normalize_direction, parse_keyword_hop_limit, parse_keyword_limit
+    from paperful.snowball.expand import (
+        normalize_direction,
+        parse_keyword_hop_limit,
+        parse_keyword_limit,
+    )
 
     assert normalize_direction("refs+keywords") == "refs+keywords"
     assert normalize_direction("all") == "both"
@@ -2884,7 +3255,11 @@ def test_keyword_hop_uses_top_slugs_and_finite_cap(tmp_path: Path):
         _keyword("delta", 0.2),
     ]
     wide = _work("H1", "10.1000/wide", "Wide", 2021, 1)
-    wide["keywords"] = [_keyword("alpha", 0.5), _keyword("beta", 0.5), _keyword("gamma", 0.5)]
+    wide["keywords"] = [
+        _keyword("alpha", 0.5),
+        _keyword("beta", 0.5),
+        _keyword("gamma", 0.5),
+    ]
     narrow = _work("H2", "10.1000/narrow", "Narrow", 2021, 50)
     narrow["keywords"] = [_keyword("alpha", 0.4)]
     extra = _work("H3", "10.1000/extra", "Extra", 2021, 9)
@@ -2897,7 +3272,9 @@ def test_keyword_hop_uses_top_slugs_and_finite_cap(tmp_path: Path):
     result = run_doi(
         cfg,
         ["10.1000/seed"],
-        SnowballRequest(direction="keywords", depth=1, keyword_limit=3, keyword_hop_limit=2),
+        SnowballRequest(
+            direction="keywords", depth=1, keyword_limit=3, keyword_hop_limit=2
+        ),
         console=console,
         client=client,
         lookup=lambda doi, title: None,
@@ -2905,7 +3282,11 @@ def test_keyword_hop_uses_top_slugs_and_finite_cap(tmp_path: Path):
     assert result.exit_code == 0
     assert seen["filter"] == "keywords.id:alpha|beta|gamma"
     lines = (result.run_dir / "candidates.jsonl").read_text().splitlines()
-    rows = [json.loads(line) for line in lines if json.loads(line)["direction"] == "keywords"]
+    rows = [
+        json.loads(line)
+        for line in lines
+        if json.loads(line)["direction"] == "keywords"
+    ]
     assert len(rows) == 2
     by_doi = {row["ids"]["doi"]: row for row in rows}
     assert set(by_doi) == {"10.1000/narrow", "10.1000/extra"}
@@ -2920,7 +3301,9 @@ def test_keywords_only_empty_seeds_exit(tmp_path: Path):
     seed["keywords"] = []
     cfg = _cfg(tmp_path)
     client, seen = _keyword_client({"W1": seed})
-    with pytest.raises(SnowballError, match="1 of 1 seeds have no OpenAlex keywords") as exc:
+    with pytest.raises(
+        SnowballError, match="1 of 1 seeds have no OpenAlex keywords"
+    ) as exc:
         run_doi(
             cfg,
             ["10.1000/seed"],
@@ -2972,7 +3355,9 @@ def test_keyword_notice_counts_the_whole_doi_list(tmp_path: Path):
     result = run_doi(
         cfg,
         ["10.1000/bare", "10.1000/tagged"],
-        SnowballRequest(direction="keywords", depth=1, keyword_limit=3, keyword_hop_limit=5),
+        SnowballRequest(
+            direction="keywords", depth=1, keyword_limit=3, keyword_hop_limit=5
+        ),
         console=Console(file=buf, highlight=False, width=200, force_terminal=False),
         client=client,
         lookup=lambda doi, title: None,
@@ -2983,8 +3368,15 @@ def test_keyword_notice_counts_the_whole_doi_list(tmp_path: Path):
     assert seen["filter"] == "keywords.id:alpha"
     lines = (result.run_dir / "candidates.jsonl").read_text().splitlines()
     rows = [json.loads(line) for line in lines]
-    assert {row["ids"]["doi"] for row in rows} == {"10.1000/bare", "10.1000/tagged", "10.1000/hit"}
-    assert {row["ids"]["doi"] for row in rows if row["hop"] == 0} == {"10.1000/bare", "10.1000/tagged"}
+    assert {row["ids"]["doi"] for row in rows} == {
+        "10.1000/bare",
+        "10.1000/tagged",
+        "10.1000/hit",
+    }
+    assert {row["ids"]["doi"] for row in rows if row["hop"] == 0} == {
+        "10.1000/bare",
+        "10.1000/tagged",
+    }
     assert {row["ids"]["doi"] for row in rows if row["hop"] == 1} == {"10.1000/hit"}
 
 
@@ -3031,7 +3423,9 @@ def test_works_by_dois_skips_a_filter_that_openalex_rejects():
         if "pmid" in filt and "|" in filt:
             request = httpx.Request("GET", "https://api.openalex.org/works")
             response = httpx.Response(400, request=request)
-            raise httpx.HTTPStatusError("bad filter", request=request, response=response)
+            raise httpx.HTTPStatusError(
+                "bad filter", request=request, response=response
+            )
         if "pmid" in filt:
             return {"results": []}
         doi = filt.split("|", 1)[0].removeprefix("doi:")
@@ -3058,7 +3452,9 @@ def test_works_by_dois_skips_a_filter_that_openalex_rejects():
 def test_works_by_keywords_refuses_unbounded_limit():
     from paperful.snowball.openalex import OpenAlexError
 
-    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=lambda path, params: {})
+    client = OpenAlexClient(
+        email="t@example.org", api_key="", sleep_s=0, getter=lambda path, params: {}
+    )
     with pytest.raises(OpenAlexError, match="keyword_hop_limit"):
         client.works_by_keywords(["alpha"], limit=0)
 
@@ -3075,7 +3471,11 @@ def test_empty_refs_recover_from_semanticscholar(tmp_path: Path):
         return {
             "title": "Seed empty refs",
             "references": [
-                {"title": "S2 neighbour", "year": 2020, "externalIds": {"DOI": "10.1000/s2-ref"}},
+                {
+                    "title": "S2 neighbour",
+                    "year": 2020,
+                    "externalIds": {"DOI": "10.1000/s2-ref"},
+                },
             ],
         }
 
@@ -3092,7 +3492,10 @@ def test_empty_refs_recover_from_semanticscholar(tmp_path: Path):
         s2_getter=s2,
     )
     assert result.exit_code == 0
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     by_doi = {row["ids"]["doi"]: row for row in rows}
     assert "10.1000/s2-ref" in by_doi
     assert by_doi["10.1000/s2-ref"]["provenance"]["backend"] == "semanticscholar"
@@ -3156,7 +3559,10 @@ https://doi.org/10.1000/doi-ref
         s2_getter=lambda doi: {},
     )
     assert result.exit_code == 0
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     by_doi = {row["ids"]["doi"]: row for row in rows}
     assert "10.1000/doi-ref" in by_doi
     assert "10.1000/title-ref" in by_doi
@@ -3166,7 +3572,9 @@ https://doi.org/10.1000/doi-ref
     assert by_doi["10.1000/title-ref"]["provenance"]["backend"] == "pdf"
 
 
-def test_nonempty_openalex_refs_skip_recovery(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_nonempty_openalex_refs_skip_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     seed = _work("W1", "10.1000/seed", "Seed with refs", 2020, 1, refs=["W2"])
     neighbour = _work("W2", "10.1000/oa-ref", "OpenAlex neighbour", 2019, 2)
     works = {"W1": seed, "W2": neighbour}
@@ -3195,7 +3603,10 @@ def test_nonempty_openalex_refs_skip_recovery(tmp_path: Path, monkeypatch: pytes
         lookup=lambda doi, title: None,
     )
     assert result.exit_code == 0
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     dois = {row["ids"]["doi"] for row in rows}
     assert "10.1000/oa-ref" in dois
     assert recover_calls == []
@@ -3252,7 +3663,10 @@ def test_watch_baseline_then_propose(tmp_path: Path):
     assert second.already_seen == 2
     assert lib.created == []
     assert inbox_count(cfg, "bbnj") == 1
-    rows = [json.loads(line) for line in (second.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (second.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert len(rows) == 1
     assert rows[0]["ids"]["doi"] == "10.1000/c"
     assert rows[0]["keep"] is True
@@ -3359,7 +3773,16 @@ def test_cli_watch_save_show(tmp_path: Path):
     )
     result = runner.invoke(
         cli.app,
-        ["snowball", "watch", "save", "bbnj", "--profile", "scout", "--config", str(cfg.config_path)],
+        [
+            "snowball",
+            "watch",
+            "save",
+            "bbnj",
+            "--profile",
+            "scout",
+            "--config",
+            str(cfg.config_path),
+        ],
     )
     assert result.exit_code == 0, result.output
     show = runner.invoke(
@@ -3431,12 +3854,17 @@ def test_watch_hybrid_stays_on_keyword_hits(tmp_path: Path):
         cfg,
         "hy",
         console=console,
-        client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
+        client=OpenAlexClient(
+            email="t@example.org", api_key="", sleep_s=0, getter=getter
+        ),
         lookup=lambda doi, title: None,
         backend=_Lib(),
     )
     assert second.proposed == 1
-    rows = [json.loads(line) for line in (second.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (second.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert {row["ids"]["doi"] for row in rows} == {"10.1000/newhit"}
     assert "10.1000/ref" not in load_seen(cfg, "hy")
 
@@ -3480,7 +3908,10 @@ def test_watch_exists_marked_seen_not_proposed(tmp_path: Path):
     )
     assert second.proposed == 1
     assert inbox_count(cfg, "ex") == 1
-    rows = [json.loads(line) for line in (second.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (second.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert rows[0]["ids"]["doi"] == "10.1000/fresh"
     assert "doi:10.1000/inlib" in load_seen(cfg, "ex")
     assert "doi:10.1000/fresh" in load_seen(cfg, "ex")
@@ -3597,7 +4028,9 @@ def test_watch_apply_from_inbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     assert "doi:10.1000/inbox" in load_applied(cfg, "inbox-ap")
 
 
-def test_fill_pause_continues_and_retries_then_writes_settled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_fill_pause_continues_and_retries_then_writes_settled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     from paperful.snowball.fill import FillPaused, run_fill_pass
     from paperful.snowball.candidate import Candidate
 
@@ -3610,12 +4043,20 @@ def test_fill_pause_continues_and_retries_then_writes_settled(tmp_path: Path, mo
     def epmc(doi: str) -> dict:
         calls.append(f"epmc:{doi}")
         if doi in {"10.1000/seed", "10.1000/new"}:
-            return {"references": [{"doi": "10.1000/from-epmc", "title": "From PMC", "year": 2020}]}
+            return {
+                "references": [
+                    {"doi": "10.1000/from-epmc", "title": "From PMC", "year": 2020}
+                ]
+            }
         return {}
 
     def pdf(doi: str) -> dict:
         calls.append(f"pdf:{doi}")
-        return {"references": [{"doi": "10.1000/from-pdf", "title": "From PDF", "year": 2019}]}
+        return {
+            "references": [
+                {"doi": "10.1000/from-pdf", "title": "From PDF", "year": 2019}
+            ]
+        }
 
     seed = Candidate(
         "r",
@@ -3681,7 +4122,12 @@ def test_fill_pause_continues_and_retries_then_writes_settled(tmp_path: Path, mo
     result = run_doi(
         _cfg(tmp_path),
         ["10.1000/seed"],
-        SnowballRequest(gate="auto", collection="Inbox/Snowball", fetch_pdfs="fast", backends=("openalex", "semanticscholar", "europepmc", "pdf")),
+        SnowballRequest(
+            gate="auto",
+            collection="Inbox/Snowball",
+            fetch_pdfs="fast",
+            backends=("openalex", "semanticscholar", "europepmc", "pdf"),
+        ),
         console=Console(file=StringIO(), highlight=False, width=120),
         client=client,
         lookup=lambda doi, title: None,
@@ -3765,7 +4211,11 @@ def test_crossref_reference_ignores_unstructured_citation():
                     "DOI": "10.1006/jhev.1998.0220",
                     "unstructured": '[1] R.L. Susman: "Hand function and tool behavior in early hominids," J. Hum. Evol.',
                 },
-                {"DOI": "10.1000/real", "article-title": "Grip strength in basketball players", "year": 2024},
+                {
+                    "DOI": "10.1000/real",
+                    "article-title": "Grip strength in basketball players",
+                    "year": 2024,
+                },
                 {
                     "DOI": "10.1000/cite",
                     "article-title": "Huang, A. S., Hirabayashi, K. (2024). Assessment of glaucoma. JAMA Ophthalmology.",
@@ -3821,7 +4271,11 @@ def test_depth_zero_search_does_not_import_references(tmp_path: Path):
             "venue": "Journal of Sports",
             "authors": ["Ada Lovelace"],
             "references": [
-                {"doi": "10.1000/old", "title": '[1] R.L. Susman: "Hand function"', "year": 1998}
+                {
+                    "doi": "10.1000/old",
+                    "title": '[1] R.L. Susman: "Hand function"',
+                    "year": 1998,
+                }
             ],
         }
 
@@ -3836,7 +4290,10 @@ def test_depth_zero_search_does_not_import_references(tmp_path: Path):
     )
     assert result.exit_code == 0
     assert calls == []
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert {row["ids"]["doi"] for row in rows} == {"10.1000/hit"}
     assert rows[0]["status"] == "new"
     assert rows[0]["biblio"]["title"] == "Basketball biomechanics review"
@@ -3844,14 +4301,19 @@ def test_depth_zero_search_does_not_import_references(tmp_path: Path):
 
 def test_depth_zero_fills_a_hole_without_adding_references(tmp_path: Path):
     hit = _work("W1", "10.1000/hit", "Basketball biomechanics review", 2024, 4)
-    hit["primary_location"] = {"source": {"display_name": ""}, "landing_page_url": "https://example.test/a"}
+    hit["primary_location"] = {
+        "source": {"display_name": ""},
+        "landing_page_url": "https://example.test/a",
+    }
     calls: list[str] = []
 
     def crossref(doi: str) -> dict:
         calls.append(doi)
         return {
             "venue": "Journal of Sports Sciences",
-            "references": [{"doi": "10.1000/old", "title": "Some other paper", "year": 2024}],
+            "references": [
+                {"doi": "10.1000/old", "title": "Some other paper", "year": 2024}
+            ],
         }
 
     result = run_search(
@@ -3863,7 +4325,10 @@ def test_depth_zero_fills_a_hole_without_adding_references(tmp_path: Path):
         lookup=lambda doi, title: None,
         crossref_getter=crossref,
     )
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     assert calls == ["10.1000/hit"]
     assert {row["ids"]["doi"] for row in rows} == {"10.1000/hit"}
     assert rows[0]["biblio"]["venue"] == "Journal of Sports Sciences"
@@ -3871,7 +4336,13 @@ def test_depth_zero_fills_a_hole_without_adding_references(tmp_path: Path):
 
 def test_reference_stub_takes_the_openalex_title_inside_the_year_window(tmp_path: Path):
     hit = _work("W1", "10.1000/hit", "Basketball biomechanics review", 2024, 3, refs=[])
-    old = _work("Wold", "10.1000/old", "Hand function and tool behavior in early hominids", 1998, 20)
+    old = _work(
+        "Wold",
+        "10.1000/old",
+        "Hand function and tool behavior in early hominids",
+        1998,
+        20,
+    )
     kept = _work("Wnew", "10.1000/new", "Grip strength in basketball players", 2024, 8)
     catalogue = {"10.1000/hit": hit, "10.1000/old": old, "10.1000/new": kept}
 
@@ -3884,7 +4355,9 @@ def test_reference_stub_takes_the_openalex_title_inside_the_year_window(tmp_path
         filt = str(params.get("filter") or "")
         if filt.startswith("doi:"):
             wanted = set(filt.split(":", 1)[1].split("|"))
-            return {"results": [work for doi, work in catalogue.items() if doi in wanted]}
+            return {
+                "results": [work for doi, work in catalogue.items() if doi in wanted]
+            }
         if path.startswith("/works") and "search" in params:
             return {"results": [hit]}
         return {"results": []}
@@ -3911,19 +4384,30 @@ def test_reference_stub_takes_the_openalex_title_inside_the_year_window(tmp_path
             search_keywords=False,
         ),
         console=Console(file=StringIO(), highlight=False, width=160),
-        client=OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter),
+        client=OpenAlexClient(
+            email="t@example.org", api_key="", sleep_s=0, getter=getter
+        ),
         lookup=lambda doi, title: None,
         crossref_getter=crossref,
     )
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     by_doi = {row["ids"]["doi"]: row for row in rows}
     assert by_doi["10.1000/hit"]["status"] == "new"
     assert by_doi["10.1000/hit"]["hop"] == 0
     assert by_doi["10.1000/old"]["status"] == "filtered"
     assert "(year)" in by_doi["10.1000/old"]["why"]
-    assert by_doi["10.1000/old"]["biblio"]["title"] == "Hand function and tool behavior in early hominids"
+    assert (
+        by_doi["10.1000/old"]["biblio"]["title"]
+        == "Hand function and tool behavior in early hominids"
+    )
     assert by_doi["10.1000/new"]["status"] == "new"
-    assert by_doi["10.1000/new"]["biblio"]["title"] == "Grip strength in basketball players"
+    assert (
+        by_doi["10.1000/new"]["biblio"]["title"]
+        == "Grip strength in basketball players"
+    )
     assert by_doi["10.1000/new"]["biblio"]["authors"] == ["Ada Lovelace"]
     assert by_doi["10.1000/new"]["biblio"]["year"] == 2024
 
@@ -4034,7 +4518,11 @@ def test_create_new_merges_operator_tags_note_and_collection():
         "new",
         {"backend": "openalex"},
         "auto",
-        operator={"tags": ["to-read"], "note": "check methods", "collection": "Inbox/Map"},
+        operator={
+            "tags": ["to-read"],
+            "note": "check methods",
+            "collection": "Inbox/Map",
+        },
     )
     items, counts = create_new(lib, [row], "Inbox", note_provenance=False)
     assert counts["created"] == 1 and items
@@ -4075,9 +4563,14 @@ def test_similar_ranks_coupled_work_above_a_one_off(tmp_path: Path):
         client=client,
         lookup=lambda doi, title: None,
     )
-    rows = [json.loads(line) for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+    ]
     similar = [row for row in rows if row["direction"] == "similar"]
-    order = [row["ids"]["doi"] for row in sorted(similar, key=lambda row: -row["score"])]
+    order = [
+        row["ids"]["doi"] for row in sorted(similar, key=lambda row: -row["score"])
+    ]
     assert order[0] == "10.1000/coupled"
     assert "10.1000/once" in order
     assert order.index("10.1000/coupled") < order.index("10.1000/once")
@@ -4093,12 +4586,16 @@ def test_openalex_search_uses_cursor_past_the_page_cap():
         cursor = params.get("cursor")
         if cursor == "*":
             return {
-                "results": [{"id": "https://openalex.org/W1", "doi": "https://doi.org/10.1/a"}],
+                "results": [
+                    {"id": "https://openalex.org/W1", "doi": "https://doi.org/10.1/a"}
+                ],
                 "meta": {"count": 2, "next_cursor": "abc"},
             }
         if cursor == "abc":
             return {
-                "results": [{"id": "https://openalex.org/W2", "doi": "https://doi.org/10.1/b"}],
+                "results": [
+                    {"id": "https://openalex.org/W2", "doi": "https://doi.org/10.1/b"}
+                ],
                 "meta": {"count": 2, "next_cursor": None},
             }
         return {"results": [], "meta": {"count": 0}}
@@ -4399,7 +4896,9 @@ def test_work_to_candidate_maps_study_designs():
     ]
 
 
-def test_resume_without_deferred_fetches_pdfs_without_search(tmp_path: Path, monkeypatch):
+def test_resume_without_deferred_fetches_pdfs_without_search(
+    tmp_path: Path, monkeypatch
+):
     from paperful.pipeline import RunStats
     from paperful.snowball.ingest import fill_pdfs as real_fill
     from paperful.snowball.queue import write_queue
@@ -4488,7 +4987,13 @@ def test_watch_doi_profile_baselines_then_proposes_new_citers(tmp_path: Path):
     save_profile(
         cfg,
         "seed-watch",
-        {"mode": "doi", "dois": ["10.1000/seed"], "direction": "cites", "depth": 1, "gate": "dry-run"},
+        {
+            "mode": "doi",
+            "dois": ["10.1000/seed"],
+            "direction": "cites",
+            "depth": 1,
+            "gate": "dry-run",
+        },
         force=False,
     )
     save_watch(cfg, "seed", "seed-watch")
@@ -4518,7 +5023,9 @@ def test_watch_doi_profile_baselines_then_proposes_new_citers(tmp_path: Path):
         ({"mode": "tarot"}, "Profile mode must be"),
     ],
 )
-def test_watch_refuses_an_incomplete_profile(tmp_path: Path, profile: dict, message: str):
+def test_watch_refuses_an_incomplete_profile(
+    tmp_path: Path, profile: dict, message: str
+):
     from paperful.snowball.profile import save_profile
     from paperful.snowball.watch import run_watch, save_watch
 
@@ -4527,4 +5034,11 @@ def test_watch_refuses_an_incomplete_profile(tmp_path: Path, profile: dict, mess
     save_profile(cfg, "broken", {**profile, "gate": "dry-run"}, force=False)
     save_watch(cfg, "w", "broken")
     with pytest.raises(SnowballError, match=message):
-        run_watch(cfg, "w", console=Console(file=StringIO()), client=_client({}), lookup=lambda d, t: None, backend=_Lib())
+        run_watch(
+            cfg,
+            "w",
+            console=Console(file=StringIO()),
+            client=_client({}),
+            lookup=lambda d, t: None,
+            backend=_Lib(),
+        )

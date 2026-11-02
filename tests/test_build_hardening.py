@@ -24,7 +24,7 @@ def test_atomic_write_json_roundtrip(tmp_path: Path):
 
 def test_config_check_unknown_section(tmp_path: Path):
     cfg_path = tmp_path / "config.toml"
-    cfg_path.write_text('[typo_llm]\nenabled = true\n', encoding="utf-8")
+    cfg_path.write_text("[typo_llm]\nenabled = true\n", encoding="utf-8")
     issues = check_config(cfg_path)
     assert any("typo_llm" in line for line in issues)
 

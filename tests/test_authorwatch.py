@@ -60,7 +60,9 @@ class FakeOA:
         return list(self.works)
 
 
-def _work(doi: str = "10.1000/new", title: str = "A new paper about whales", year: int = 2025):
+def _work(
+    doi: str = "10.1000/new", title: str = "A new paper about whales", year: int = 2025
+):
     return {
         "id": "https://openalex.org/W1",
         "doi": f"https://doi.org/{doi}",
@@ -85,7 +87,10 @@ def _author(name: str, *, orcid: str = "", openalex: str = "A1", inst: str = "")
     }
     if inst:
         row["last_known_institutions"] = [
-            {"display_name": inst, "homepage_url": f"https://{inst.lower().replace(' ', '')}.edu"}
+            {
+                "display_name": inst,
+                "homepage_url": f"https://{inst.lower().replace(' ', '')}.edu",
+            }
         ]
     return row
 
@@ -93,7 +98,9 @@ def _author(name: str, *, orcid: str = "", openalex: str = "A1", inst: str = "")
 def test_save_add_remove_show(cfg):
     path = save_list(cfg, "ocean-people")
     assert path.is_file()
-    person = add_person(cfg, "ocean-people", orcid=ORCID, display_name="Josiah Carberry")
+    person = add_person(
+        cfg, "ocean-people", orcid=ORCID, display_name="Josiah Carberry"
+    )
     assert person.status == "ok"
     assert person.orcid == ORCID
     people = load_people(cfg, "ocean-people")
@@ -153,12 +160,16 @@ def test_resolve_unique_ambiguous_miss(cfg):
 
 def test_import_csv_json_and_social_without_file(cfg, tmp_path: Path):
     csv_path = tmp_path / "follows.csv"
-    csv_path.write_text("name,orcid\nJosiah Carberry,0000-0002-1825-0097\n", encoding="utf-8")
+    csv_path.write_text(
+        "name,orcid\nJosiah Carberry,0000-0002-1825-0097\n", encoding="utf-8"
+    )
     import_file(cfg, "ocean", path=csv_path, source="csv", resolve=False)
     assert load_people(cfg, "ocean")[0].orcid == ORCID
 
     json_path = tmp_path / "people.json"
-    json_path.write_text('[{"name": "Other", "orcid": "0000-0002-1694-233X"}]\n', encoding="utf-8")
+    json_path.write_text(
+        '[{"name": "Other", "orcid": "0000-0002-1694-233X"}]\n', encoding="utf-8"
+    )
     import_file(cfg, "ocean", path=json_path, source="json", resolve=False)
     assert len(load_people(cfg, "ocean")) == 2
 
@@ -252,7 +263,9 @@ def test_backfill_proposes_and_skips_exists_and_held(cfg):
     assert inbox[0].ids["doi"] == "10.1000/new"
     assert client.work_calls[-1]["from_publication_date"] == "2025-01-01"
 
-    client.works = [_work(doi="10.1000/exists", title="Already in the library about whales")]
+    client.works = [
+        _work(doi="10.1000/exists", title="Already in the library about whales")
+    ]
     third = run_list(
         cfg,
         "ocean",
@@ -284,7 +297,11 @@ def test_apply_dry_run_and_write_with_snowball_off(cfg, monkeypatch):
         hop=0,
         direction="author",
         ids={"doi": "10.1000/new", "openalex": "W1"},
-        biblio={"title": "A new paper about whales", "year": 2025, "authors": ["Josiah"]},
+        biblio={
+            "title": "A new paper about whales",
+            "year": 2025,
+            "authors": ["Josiah"],
+        },
         why="authorwatch:ocean",
         status="new",
         provenance={"backend": "openalex"},
@@ -294,7 +311,14 @@ def test_apply_dry_run_and_write_with_snowball_off(cfg, monkeypatch):
     from paperful.authorwatch import append_inbox
 
     append_inbox(cfg, "ocean", [row])
-    dry = apply_list(cfg, "ocean", "Watch/Ocean", console=console, apply=False, lookup=lambda *a, **k: None)
+    dry = apply_list(
+        cfg,
+        "ocean",
+        "Watch/Ocean",
+        console=console,
+        apply=False,
+        lookup=lambda *a, **k: None,
+    )
     assert dry.dry_run is True
     assert dry.created == 0
 
@@ -374,7 +398,9 @@ def test_cli_help_and_import_rg_without_file(cfg, tmp_path: Path):
         app, ["authorwatch", "import", "ocean", "--source", "rg", "-c", str(cfg_file)]
     )
     assert res.exit_code == 2
-    assert "does not live-scrape" in plain_text(res.stdout) or "does not scrape" in plain_text(res.stdout)
+    assert "does not live-scrape" in plain_text(
+        res.stdout
+    ) or "does not scrape" in plain_text(res.stdout)
 
 
 def test_cli_save_and_add(tmp_path: Path):
@@ -386,12 +412,22 @@ def test_cli_save_and_add(tmp_path: Path):
     assert save.exit_code == 0, save.stdout
     add = runner.invoke(
         app,
-        ["authorwatch", "add", "ocean", "--name", "Jane Researcher", "-c", str(cfg_file)],
+        [
+            "authorwatch",
+            "add",
+            "ocean",
+            "--name",
+            "Jane Researcher",
+            "-c",
+            str(cfg_file),
+        ],
     )
     assert add.exit_code == 0, add.stdout
     show = runner.invoke(app, ["authorwatch", "show", "ocean", "-c", str(cfg_file)])
     assert show.exit_code == 0, show.stdout
-    assert "Jane Researcher" in plain_text(show.stdout) or "unresolved" in plain_text(show.stdout)
+    assert "Jane Researcher" in plain_text(show.stdout) or "unresolved" in plain_text(
+        show.stdout
+    )
 
 
 def test_briefing_and_doctor(cfg):
@@ -447,7 +483,9 @@ def test_seen_records_backfill_identities(cfg):
     seen = load_seen(cfg, "ocean")
     assert "doi:10.1000/new" in seen
     client.works = [_work()]
-    again = run_list(cfg, "ocean", console=console, client=client, backfill_from="2025-01-01")
+    again = run_list(
+        cfg, "ocean", console=console, client=client, backfill_from="2025-01-01"
+    )
     assert again.proposed == 0
 
 
@@ -516,9 +554,7 @@ def test_openalex_client_author_filters():
     client.search_authors("Josiah Carberry", limit=3)
     assert seen[-1][0] == "/authors"
     assert seen[-1][1]["search"] == "Josiah Carberry"
-    client.works_by_author(
-        orcid=ORCID, limit=5, from_publication_date="2025-01-01"
-    )
+    client.works_by_author(orcid=ORCID, limit=5, from_publication_date="2025-01-01")
     filt = seen[-1][1]["filter"]
     assert f"author.orcid:{ORCID}" in filt
     assert "from_publication_date:2025-01-01" in filt
@@ -726,9 +762,7 @@ def test_accept_openalex_only_and_dismiss_rest(cfg):
             ),
         ],
     )
-    accepted = accept_suggestions(
-        cfg, "lab", ids={"sug_oa"}, dismiss_rest=True
-    )
+    accepted = accept_suggestions(cfg, "lab", ids={"sug_oa"}, dismiss_rest=True)
     assert len(accepted) == 1
     assert accepted[0].openalex == "A77"
     assert accepted[0].is_ok()
@@ -758,8 +792,10 @@ def test_cli_accept_seed_from(cfg, monkeypatch):
 
     def fake_run(cfg, name, *, console, backfill_from=None, **kwargs):
         called.append(backfill_from or "")
+
         class R:
             proposed = 0
+
         return R()
 
     monkeypatch.setattr("paperful.authorwatch.run_list", fake_run)
@@ -794,7 +830,9 @@ def test_social_html_import(cfg, tmp_path):
 
 def test_parse_social_csv_orcid(tmp_path):
     path = tmp_path / "follows.csv"
-    path.write_text("name,orcid\nJosiah Carberry,0000-0002-1825-0097\n", encoding="utf-8")
+    path.write_text(
+        "name,orcid\nJosiah Carberry,0000-0002-1825-0097\n", encoding="utf-8"
+    )
     rows = parse_social_file(path, source="rg")
     assert rows[0].orcid == "0000-0002-1825-0097"
 
@@ -802,7 +840,9 @@ def test_parse_social_csv_orcid(tmp_path):
 def test_update_person(cfg):
     save_list(cfg, "lab")
     person = add_person(cfg, "lab", display_name="Jane")
-    update_person(cfg, "lab", person.id, display_name="Jane Q", affiliation_host="mit.edu")
+    update_person(
+        cfg, "lab", person.id, display_name="Jane Q", affiliation_host="mit.edu"
+    )
     refreshed = load_people(cfg, "lab")[0]
     assert refreshed.display_name == "Jane Q"
     assert refreshed.affiliation_host == "mit.edu"

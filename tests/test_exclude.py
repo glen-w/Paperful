@@ -22,7 +22,9 @@ from paperful.zot import Collection, Item
 
 def _cols() -> dict[str, Collection]:
     return {
-        "HAND": Collection("HAND", "Hand curated", None, "Hand curated", "Hand curated"),
+        "HAND": Collection(
+            "HAND", "Hand curated", None, "Hand curated", "Hand curated"
+        ),
         "ARCH": Collection(
             "ARCH", "Archive", "HAND", "Hand curated/Archive", "Hand curated/Archive"
         ),
@@ -351,7 +353,11 @@ def test_doctor_exclude_check(tmp_path: Path):
         exclude_rules=(
             ExcludeRule(path="Hand curated", mode="full"),
             parse_exclude_rule(
-                {"path": "Inbox/Staging", "mode": "add_only", "skip_library_scope": True}
+                {
+                    "path": "Inbox/Staging",
+                    "mode": "add_only",
+                    "skip_library_scope": True,
+                }
             ),
         )
     )
@@ -428,7 +434,9 @@ def test_backend_ensure_path_and_notes_denied(tmp_path: Path):
     with pytest.raises(LibraryError, match="excluded"):
         backend.create_or_update_note("ITEM1", "<p>x</p>", "paperful-summary")
     with pytest.raises(LibraryError, match="excluded"):
-        backend.create_or_update_collection_note("HAND", "<p>x</p>", ["paperful-report"])
+        backend.create_or_update_collection_note(
+            "HAND", "<p>x</p>", ["paperful-report"]
+        )
 
 
 def test_mendeley_add_denied_full(tmp_path: Path):

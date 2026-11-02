@@ -98,7 +98,9 @@ _LEADING_FUNCTION = frozenset(
 )
 
 
-def _acronym_replacement(quote: str, suggested: str, finding: dict[str, Any]) -> str | None:
+def _acronym_replacement(
+    quote: str, suggested: str, finding: dict[str, Any]
+) -> str | None:
     """Keep ``(TOKEN)`` when swapping a parenthetical expansion; refuse over-wide quotes."""
     from .glossary import tokenize
 
@@ -336,9 +338,7 @@ def build_rewrite(
     timeout = float(cfg.rewrite_timeout_s or 0) or max(float(cfg.llm_timeout_s), 600.0)
     for spec in specialists:
         rows = [
-            r
-            for r in pending.get(spec.id, [])
-            if str(r.get("id") or "") not in det_ids
+            r for r in pending.get(spec.id, []) if str(r.get("id") or "") not in det_ids
         ]
         if not rows:
             continue
@@ -370,9 +370,7 @@ def build_rewrite(
     )
     plan.models = models
     plan.worklog = {
-        "addressed": [
-            f"{e.area}:{e.kind}:{e.quote[:60]}" for e in plan.edits
-        ],
+        "addressed": [f"{e.area}:{e.kind}:{e.quote[:60]}" for e in plan.edits],
         "models": models,
     }
 
@@ -418,7 +416,9 @@ def build_rewrite(
         write_json(folder / "pack.json", payload)
         if "sidecar" in output_ids:
             sidecar = apply_to_text(text, plan.edits)
-            suffix = ".md" if manuscript.suffix.lower() in {".md", ".txt", ""} else ".txt"
+            suffix = (
+                ".md" if manuscript.suffix.lower() in {".md", ".txt", ""} else ".txt"
+            )
             (folder / f"sidecar{suffix}").write_text(sidecar, encoding="utf-8")
         paras = _paragraphs(doc, text)
         office: dict[str, tuple[Path, Path | None]] = {}
@@ -450,7 +450,9 @@ def build_rewrite(
             }
             payload["audits"] = audits
             primary = payload.get("tracked") or payload.get("odt") or next(iter(audits))
-            payload["openxml_audit"] = audits.get(str(primary), next(iter(audits.values())))
+            payload["openxml_audit"] = audits.get(
+                str(primary), next(iter(audits.values()))
+            )
             write_json(folder / "pack.json", payload)
             (folder / "pack.md").write_text(
                 render_markdown(payload, plan), encoding="utf-8"

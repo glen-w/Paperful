@@ -82,13 +82,13 @@ def test_write_pack_and_dois(tmp_path: Path):
     mentions = extract_mentions("10.1000/missing\n")
     empty = LibraryFingerprint.from_items([])
     rows = classify_mentions(mentions, empty, empty)
-    folder = write_pack(
-        tmp_path, "BBNJ", rows, {"kind": "file", "ref": "list.txt"}
-    )
+    folder = write_pack(tmp_path, "BBNJ", rows, {"kind": "file", "ref": "list.txt"})
     pack = json.loads((folder / "pack.json").read_text(encoding="utf-8"))
     assert pack["schema"] == SCHEMA
     assert COVERAGE_PACK_KEYS <= pack.keys()
-    assert (folder / "dois.txt").read_text(encoding="utf-8").strip() == "10.1000/missing"
+    assert (folder / "dois.txt").read_text(
+        encoding="utf-8"
+    ).strip() == "10.1000/missing"
     assert dois_from_coverage_pack(folder / "pack.json") == ["10.1000/missing"]
     assert dois_from_refs_pack(folder / "pack.json") == ["10.1000/missing"]
 

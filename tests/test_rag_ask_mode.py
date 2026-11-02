@@ -160,7 +160,11 @@ def built(cfg):
     cfg.rag_chunk_chars, cfg.rag_chunk_overlap = 300, 0
     cfg.rag_summary_concurrency = 1
     cfg.out_dir.mkdir(parents=True)
-    add_item(cfg, "AAAA1111", pdf="Krill swarm under the winter sea ice and feed on algae. " * 12)
+    add_item(
+        cfg,
+        "AAAA1111",
+        pdf="Krill swarm under the winter sea ice and feed on algae. " * 12,
+    )
     add_item(
         cfg,
         "BBBB2222",
@@ -210,7 +214,9 @@ def test_config_advanced_loses_to_per_run_simple(built):
     cfg = built["cfg"]
     cfg.rag_ask_mode = "advanced"
     chat = StubChat()
-    reply = answer(cfg, "What do krill eat?", client=chat, ask_mode="simple", **_tools(built))
+    reply = answer(
+        cfg, "What do krill eat?", client=chat, ask_mode="simple", **_tools(built)
+    )
     reply.read()
     assert reply.ask_mode == "simple"
     assert chat.json_requests == []
@@ -242,7 +248,11 @@ def test_advanced_scores_then_answers(built):
 def test_advanced_follow_up_cites_this_turn_only(built):
     chat = StubChat()
     first = answer(
-        built["cfg"], "What do krill eat?", client=chat, ask_mode="advanced", **_tools(built)
+        built["cfg"],
+        "What do krill eat?",
+        client=chat,
+        ask_mode="advanced",
+        **_tools(built),
     )
     first.read()
     follow = answer(

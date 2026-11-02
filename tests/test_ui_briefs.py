@@ -28,7 +28,9 @@ def test_item_summary_route(tmp_path, monkeypatch):
     cfg.summaries_dir.mkdir(parents=True)
     (cfg.summaries_dir / "K1.html").write_text("<p>hi</p>", encoding="utf-8")
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
     client = TestClient(create_app(cfg))
     res = client.get("/item/K1/summary")
     assert res.status_code == 200
@@ -84,14 +86,20 @@ def test_briefs_summarize_enqueues(tmp_path, monkeypatch):
     cfg.llm_enabled = True
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
     monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
-    monkeypatch.setattr(ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    monkeypatch.setattr(
+        ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
     seen: list[dict] = []
 
     def fake(cfg, cmd_id, **kw):
         seen.append(kw)
         cfg.summaries_dir.mkdir(parents=True, exist_ok=True)
-        (cfg.summaries_dir / "ITEMKEY1.html").write_text("<p>summary</p>", encoding="utf-8")
+        (cfg.summaries_dir / "ITEMKEY1.html").write_text(
+            "<p>summary</p>", encoding="utf-8"
+        )
         return {
             "summarized": 1,
             "failed": 0,
@@ -170,8 +178,12 @@ def test_briefs_lists_cite_and_opens_in_gui(tmp_path, monkeypatch):
     forget_index(cfg.out_dir)
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
     monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
-    monkeypatch.setattr(ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    monkeypatch.setattr(
+        ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
     client = TestClient(create_app(cfg))
     client.cookies.set("pf_advanced", "1")
     page = client.get("/briefs")
@@ -205,12 +217,16 @@ def test_briefs_requires_llm(tmp_path, monkeypatch):
     cfg.llm_enabled = False
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
     monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
     client = TestClient(create_app(cfg))
     page = client.get("/briefs")
     assert 'action="/briefs/summarize"' not in page.text
     assert "[llm]" in page.text
-    off = client.post("/briefs/summarize", data={"dest": "disk"}, follow_redirects=False)
+    off = client.post(
+        "/briefs/summarize", data={"dest": "disk"}, follow_redirects=False
+    )
     assert off.status_code == 303
     assert "error=llm" in (off.headers.get("location") or "")
     assert commands.list_commands(cfg) == []
@@ -228,7 +244,9 @@ def test_briefs_synthesize_dry_run(tmp_path, monkeypatch):
     cfg.llm_enabled = True
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
     monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
     seen: list[bool] = []
 
     def fake(cfg, cmd_id, **kw):
@@ -334,8 +352,12 @@ def test_briefs_write_report_defaults_to_disk_without_collection(tmp_path, monke
     cfg.synthesize_dest = "both"
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
     monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
-    monkeypatch.setattr(ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    monkeypatch.setattr(
+        ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
     seen: list[dict] = []
 
     def fake(cfg, cmd_id, **kw):
@@ -354,10 +376,18 @@ def test_briefs_write_report_defaults_to_disk_without_collection(tmp_path, monke
         client = TestClient(create_app(cfg))
         blank = client.get("/briefs")
         assert blank.status_code == 200
-        assert 'option value="disk" selected' in blank.text or 'value="disk" selected' in blank.text
+        assert (
+            'option value="disk" selected' in blank.text
+            or 'value="disk" selected' in blank.text
+        )
         res = client.post(
             "/briefs/synthesize",
-            data={"dry_run": "0", "limit": "40", "year_from": "2020", "year_to": "2026"},
+            data={
+                "dry_run": "0",
+                "limit": "40",
+                "year_from": "2020",
+                "year_to": "2026",
+            },
             follow_redirects=False,
         )
         assert res.status_code == 303
@@ -386,7 +416,9 @@ def test_briefs_write_report_defaults_to_disk_without_collection(tmp_path, monke
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
-def test_briefs_write_report_keeps_fields_when_collection_required(tmp_path, monkeypatch):
+def test_briefs_write_report_keeps_fields_when_collection_required(
+    tmp_path, monkeypatch
+):
     from fastapi.testclient import TestClient
 
     import paperful.agent_ops as ops
@@ -397,8 +429,12 @@ def test_briefs_write_report_keeps_fields_when_collection_required(tmp_path, mon
     cfg.llm_enabled = True
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
     monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
-    monkeypatch.setattr(ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    monkeypatch.setattr(
+        ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
     client = TestClient(create_app(cfg))
     res = client.post(
         "/briefs/synthesize",
@@ -417,11 +453,17 @@ def test_briefs_write_report_keeps_fields_when_collection_required(tmp_path, mon
     page = client.get(loc)
     assert page.status_code == 200
     assert "Pick a collection in the chip, or set destination to disk." in page.text
-    assert page.text.count("Pick a collection in the chip, or set destination to disk.") >= 2
+    assert (
+        page.text.count("Pick a collection in the chip, or set destination to disk.")
+        >= 2
+    )
     assert 'value="40"' in page.text
     assert 'value="2020"' in page.text
     assert 'value="2026"' in page.text
-    assert 'option value="both" selected' in page.text or 'value="both" selected' in page.text
+    assert (
+        'option value="both" selected' in page.text
+        or 'value="both" selected' in page.text
+    )
     assert commands.list_commands(cfg) == []
 
 
@@ -439,13 +481,24 @@ def test_briefs_write_report_shows_running_status(tmp_path, monkeypatch):
     cfg.llm_enabled = True
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
     monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
-    monkeypatch.setattr(ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    monkeypatch.setattr(
+        ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
     gate = threading.Event()
 
     def fake(cfg, cmd_id, **kw):
         gate.wait(timeout=2)
-        return {"dry_run": False, "slug": "library", "sources_disk": 1, "sources_note": 0, "missing": 0, "chunks": 1}
+        return {
+            "dry_run": False,
+            "slug": "library",
+            "sources_disk": 1,
+            "sources_note": 0,
+            "missing": 0,
+            "chunks": 1,
+        }
 
     jobs.synthesize_fn = fake
     try:
@@ -487,8 +540,12 @@ def test_briefs_write_report_explains_missing_summaries(tmp_path, monkeypatch):
     cfg.llm_enabled = True
     monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
     monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
-    monkeypatch.setattr(ops, "collections_tree", lambda _c: {"ok": True, "collections": []})
-    monkeypatch.setattr(ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    monkeypatch.setattr(
+        ui_app, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
 
     def fake(cfg, cmd_id, **kw):
         return {
@@ -516,7 +573,10 @@ def test_briefs_write_report_explains_missing_summaries(tmp_path, monkeypatch):
                 break
             time.sleep(0.02)
         page = client.get("/briefs")
-        assert "No summaries in this scope. Summarize first, then write the report." in page.text
+        assert (
+            "No summaries in this scope. Summarize first, then write the report."
+            in page.text
+        )
     finally:
         jobs.synthesize_fn = None
 

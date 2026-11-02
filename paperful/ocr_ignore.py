@@ -109,5 +109,7 @@ def latest_ocr_report(state_dir: Path) -> Path | None:
     runs = state_dir / "runs"
     if not runs.is_dir():
         return None
-    files = sorted(runs.glob("*-ocr.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    files = sorted(
+        runs.glob("*-ocr.json"), key=lambda p: p.stat().st_mtime, reverse=True
+    )
     return files[0] if files else None

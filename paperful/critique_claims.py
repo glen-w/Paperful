@@ -252,7 +252,9 @@ def suggested_from_claims(
         f"Title: {title}\nMax claims: {cap}\n\nExcerpt:\n{excerpt}\n\n"
         f"Checked findings:\n{json.dumps(checked, ensure_ascii=False)}"
     )
-    prompt_sha = sha256((_EXTRACT_SYSTEM + user[:2000]).encode("utf-8")).hexdigest()[:12]
+    prompt_sha = sha256((_EXTRACT_SYSTEM + user[:2000]).encode("utf-8")).hexdigest()[
+        :12
+    ]
     meta["prompt_sha"] = prompt_sha
     say("Claims lane…")
     from .llm.client import ChatRequest, chat
@@ -322,9 +324,8 @@ def suggested_from_claims(
         ledger.append(row)
 
     if ledger:
-        adj_user = (
-            f"Excerpt:\n{excerpt[:6000]}\n\nClaims:\n"
-            + json.dumps(ledger, ensure_ascii=False)
+        adj_user = f"Excerpt:\n{excerpt[:6000]}\n\nClaims:\n" + json.dumps(
+            ledger, ensure_ascii=False
         )
         adj_req = ChatRequest(
             model=model,
@@ -362,15 +363,11 @@ def suggested_from_claims(
         status = row["status"]
         if status == "supported":
             continue
-        code = (
-            "claim_thin" if status == "thin" else "claim_unsupported_in_text"
-        )
+        code = "claim_thin" if status == "thin" else "claim_unsupported_in_text"
         claim = row["text"]
         quote = row.get("support_quote") or claim
         if status == "thin":
-            detail = (
-                f"Claim is thinly supported in this extract: {claim}"
-            )
+            detail = f"Claim is thinly supported in this extract: {claim}"
         else:
             detail = f"Claim is not supported in this extract: {claim}"
         extra.append(

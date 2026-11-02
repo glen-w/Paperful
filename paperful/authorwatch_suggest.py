@@ -207,7 +207,9 @@ def _enrich_cited(
                     openalex=cand.openalex,
                     method=method,
                     score=norm[key],
-                    why=cand.why if "cited_by_count" in cand.why else (
+                    why=cand.why
+                    if "cited_by_count" in cand.why
+                    else (
                         f"{cand.why}; cited_by_count={int(cited_by_key[key])}"
                         if cand.why
                         else f"cited_by_count={int(cited_by_key[key])}"
@@ -323,7 +325,9 @@ def _coauthor_candidates(
     return out
 
 
-def _mix_candidates(corpus: list[Suggestion], cited: list[Suggestion]) -> list[Suggestion]:
+def _mix_candidates(
+    corpus: list[Suggestion], cited: list[Suggestion]
+) -> list[Suggestion]:
     by_name: dict[str, tuple[float, float, Suggestion]] = {}
     for row in corpus:
         key = row.display_name.casefold()
@@ -355,7 +359,9 @@ def _mix_candidates(corpus: list[Suggestion], cited: list[Suggestion]) -> list[S
     return out
 
 
-def load_collection_items(cfg: Config, collection: str, backend: Any = None) -> list[Any]:
+def load_collection_items(
+    cfg: Config, collection: str, backend: Any = None
+) -> list[Any]:
     coll = (collection or "").strip()
     if not coll:
         raise AuthorwatchError("authorwatch suggest needs a target collection (-C).")
@@ -391,7 +397,9 @@ def suggest_people(
 
     kind = (method or "corpus").strip().lower()
     if kind not in METHODS:
-        raise AuthorwatchError(f"Unknown method {method!r}. Use corpus, most_cited, coauthor, or mix.")
+        raise AuthorwatchError(
+            f"Unknown method {method!r}. Use corpus, most_cited, coauthor, or mix."
+        )
     cap = max(1, min(int(limit or DEFAULT_SUGGEST_LIMIT), 100))
     save_list(cfg, name)
     people = load_people(cfg, name)

@@ -119,7 +119,9 @@ class FakeLibrary:
 
     def relate_items(self, left, right):
         for a, b in ((left, right), (right, left)):
-            self.items[a]["data"]["relations"] = {"dc:relation": f"http://zotero.org/users/0/items/{b}"}
+            self.items[a]["data"]["relations"] = {
+                "dc:relation": f"http://zotero.org/users/0/items/{b}"
+            }
 
     def create_parent(self, data):
         self._n += 1
@@ -207,7 +209,9 @@ def test_note_tag_and_relation_writes_reach_the_record(cfg):
     rec = load_record(cfg.out_dir, "ITEM0001")
     assert rec["tags"] == [{"tag": "paperful:oa"}]
     assert "ITEM0002" in rec["relations"]["dc:relation"]
-    assert "ITEM0001" in load_record(cfg.out_dir, "ITEM0002")["relations"]["dc:relation"]
+    assert (
+        "ITEM0001" in load_record(cfg.out_dir, "ITEM0002")["relations"]["dc:relation"]
+    )
 
 
 def test_create_parent_makes_a_folder(cfg):
@@ -256,7 +260,9 @@ def test_merge_marks_the_duplicate_and_refreshes_the_keeper(cfg):
 
 def test_a_failed_refresh_keeps_the_write_and_the_old_record(cfg):
     lib, backend = _setup(cfg)
-    path = cfg.out_dir / "BBNJ" / "Smith - 2020 - First title -- ITEM0001" / "record.json"
+    path = (
+        cfg.out_dir / "BBNJ" / "Smith - 2020 - First title -- ITEM0001" / "record.json"
+    )
     before = path.read_bytes()
     lib.fail_reads = True
     backend.apply_patch("ITEM0001", {"title": "Second title"})
@@ -270,7 +276,10 @@ def test_a_failed_refresh_keeps_the_write_and_the_old_record(cfg):
 
 def test_refresh_ignores_child_keys(cfg):
     lib, backend = _setup(cfg)
-    lib.items["ATT00001"] = {"key": "ATT00001", "data": {"itemType": "attachment", "parentItem": "ITEM0001"}}
+    lib.items["ATT00001"] = {
+        "key": "ATT00001",
+        "data": {"itemType": "attachment", "parentItem": "ITEM0001"},
+    }
     assert backend.refresh("ATT00001") is False
     assert backend.unrefreshed == []
 
@@ -278,10 +287,15 @@ def test_refresh_ignores_child_keys(cfg):
 def test_snapshot_skips_an_unreadable_item_and_keeps_its_record(cfg):
     lib, backend = _setup(cfg)
     lib.kids["ITEM0001"].append(
-        {"key": "NOTE0001", "data": {"itemType": "note", "note": "<p>n</p>", "tags": []}}
+        {
+            "key": "NOTE0001",
+            "data": {"itemType": "note", "note": "<p>n</p>", "tags": []},
+        }
     )
     backend.refresh("ITEM0001")
-    path = cfg.out_dir / "BBNJ" / "Smith - 2020 - First title -- ITEM0001" / "record.json"
+    path = (
+        cfg.out_dir / "BBNJ" / "Smith - 2020 - First title -- ITEM0001" / "record.json"
+    )
     before = path.read_bytes()
     item = lib.item_from_raw(lib.items["ITEM0001"], [])
     lib.fail_reads = True
@@ -301,12 +315,22 @@ def test_fetch_for_one_collection_survives_a_refresh_into_two(cfg):
     primary, _ = save_pdf(cfg.out_dir, scoped, b"%PDF-1.4 bytes", "d" * 32)
     from paperful.store import write_fetch_records
 
-    write_fetch_records([primary], scoped, md5="d" * 32, source="unpaywall", fetched_url="u", pdf_doi=None)
+    write_fetch_records(
+        [primary],
+        scoped,
+        md5="d" * 32,
+        source="unpaywall",
+        fetched_url="u",
+        pdf_doi=None,
+    )
     assert backend.refresh("ITEM0001")
     for collection in ("BBNJ", "Zed"):
         folder = cfg.out_dir / collection / "Smith - 2020 - First title -- ITEM0001"
         assert (folder / primary.name).is_file()
-        assert json.loads((folder / "record.json").read_text())["fetch"]["source"] == "unpaywall"
+        assert (
+            json.loads((folder / "record.json").read_text())["fetch"]["source"]
+            == "unpaywall"
+        )
 
 
 def test_attach_finds_the_pdf_after_a_retitle(cfg):
@@ -383,7 +407,10 @@ def test_a_transport_failure_raises(cfg):
         lambda: backend.find_child_note_keys("ITEM0001", "t"),
         lambda: backend.read_child_note("ITEM0001", "t"),
         lambda: backend.find_collection_note_keys("COL1", "t"),
-        lambda: backend.export_pdf(Item("ITEM0001", "journalArticle", "T", None, None, None, None, None), cfg.out_dir / "x.pdf"),
+        lambda: backend.export_pdf(
+            Item("ITEM0001", "journalArticle", "T", None, None, None, None, None),
+            cfg.out_dir / "x.pdf",
+        ),
     ):
         with pytest.raises(LibraryReadError):
             call()
@@ -396,7 +423,9 @@ def test_an_unreadable_parent_never_gets_a_second_note(cfg):
     with pytest.raises(LibraryReadError):
         backend.create_or_update_note("ITEM0001", "<p>x</p>", "paperful-summary")
     with pytest.raises(LibraryReadError):
-        backend.create_or_update_collection_note("COL1", "<p>x</p>", ["paperful-report"])
+        backend.create_or_update_collection_note(
+            "COL1", "<p>x</p>", ["paperful-report"]
+        )
     assert backend.zl.zot.created == []
 
 

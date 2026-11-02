@@ -150,9 +150,7 @@ def parse_rewrite_outputs(raw: Any) -> tuple[str, ...]:
 def parse_rewrite_comments(raw: Any) -> str:
     value = str(raw or "off").strip().lower() or "off"
     if value not in KNOWN_COMMENTS:
-        raise ValueError(
-            f"[rewrite].comments {raw!r} must be off, substantive, or all"
-        )
+        raise ValueError(f"[rewrite].comments {raw!r} must be off, substantive, or all")
     return value
 
 
@@ -197,7 +195,11 @@ def rewrite_areas_for(
     wanted: list[str] | None = None,
 ) -> tuple[RewriteArea, ...]:
     """Configured specialists, or builtin rows for the selected area ids."""
-    selected = tuple(wanted) if wanted else tuple(getattr(cfg, "rewrite_areas", ()) or ("style",))
+    selected = (
+        tuple(wanted)
+        if wanted
+        else tuple(getattr(cfg, "rewrite_areas", ()) or ("style",))
+    )
     selected = parse_rewrite_areas_list(list(selected))
     rows = tuple(getattr(cfg, "rewrite_specialists", ()) or ())
     by_id = {r.id: r for r in rows}

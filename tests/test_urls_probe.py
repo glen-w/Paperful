@@ -57,8 +57,6 @@ def test_probe_target_redirect_with_get_body():
         )
 
     client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
-    finding = probe_target(
-        client, UrlTarget("K1", "https://example.org/old", "parent")
-    )
+    finding = probe_target(client, UrlTarget("K1", "https://example.org/old", "parent"))
     assert finding.code in {"ok", "redirect", "soft_404"}
     client.close()

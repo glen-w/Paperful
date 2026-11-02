@@ -13,9 +13,7 @@ from typing import Any
 
 SCHEMA = "paperful.note.v1"
 # Required keys on every paperful.note.v1 block(). Extra keys may be added.
-NOTE_BLOCK_KEYS = frozenset(
-    {"schema", "type", "verb", "model", "run_id", "prompt_sha"}
-)
+NOTE_BLOCK_KEYS = frozenset({"schema", "type", "verb", "model", "run_id", "prompt_sha"})
 _BLOCK = re.compile(
     r"<!--\s*paperful\.note\.v1\s+(?P<body>\{.*?\})\s*-->",
     re.DOTALL,

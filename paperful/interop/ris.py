@@ -47,6 +47,7 @@ def _from_pairs(pairs: list[tuple[str, str]]) -> dict[str, Any]:
 
     def first(tag: str) -> str:
         return (fields.get(tag) or [""])[0].strip()
+
     item_type = ris_to_zotero(first("TY"))
     title = first("TI") or first("T1") or first("T2")
     year = None
@@ -179,11 +180,7 @@ def _file_url(pdf: Any) -> str:
 
 
 def _escape(text: str) -> str:
-    return (
-        text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _strip_html(html: str) -> str:

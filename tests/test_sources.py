@@ -474,7 +474,11 @@ def test_europepmc_pmc_id_without_pdf_list_still_has_render_url(ctx_factory):
         make_item(),
         ctx_factory(
             lambda r: _json(
-                {"resultList": {"result": [{"pmcid": "PMC1817752", "fullTextUrlList": {}}]}}
+                {
+                    "resultList": {
+                        "result": [{"pmcid": "PMC1817752", "fullTextUrlList": {}}]
+                    }
+                }
             )
         ),
     )
@@ -510,7 +514,10 @@ def test_openaire_keeps_open_repository_pdfs(ctx_factory):
     cand = openaire.find(make_item(), ctx_factory(handler))
     assert cand.urls[0] == "https://zenodo.org/records/1/files/paper.pdf"
     assert "https://publisher.test/closed.pdf" not in cand.urls
-    assert openaire.find(make_item(doi=None), ctx_factory(handler)).outcome is Outcome.SKIPPED
+    assert (
+        openaire.find(make_item(doi=None), ctx_factory(handler)).outcome
+        is Outcome.SKIPPED
+    )
 
 
 # ---- direct ------------------------------------------------------------------
@@ -900,9 +907,7 @@ def test_core_empty_results_and_links(ctx_factory, cfg, monkeypatch):
     assert cand.outcome is Outcome.FOUND
     assert cand.note == "landing"
 
-    monkeypatch.setattr(
-        "paperful.sources.core.resolve_landings", lambda *_a, **_k: []
-    )
+    monkeypatch.setattr("paperful.sources.core.resolve_landings", lambda *_a, **_k: [])
     cand = core.find(make_item(), ctx_factory(landings_only))
     assert cand.outcome is Outcome.NOT_FOUND
     assert "no OA PDF" in (cand.note or "")

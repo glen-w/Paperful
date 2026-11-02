@@ -128,7 +128,9 @@ def test_classify_row_new_unchanged_metadata_reassigned():
     digest = candidate_hash(row)
     assert classify_row(None, row, digest) == DRIFT_NEW
     assert (
-        classify_row({"sha256": digest, "openalex_id": row.ids["openalex"]}, row, digest)
+        classify_row(
+            {"sha256": digest, "openalex_id": row.ids["openalex"]}, row, digest
+        )
         == DRIFT_UNCHANGED
     )
     retitled = _row(title="Alpha (revised)")

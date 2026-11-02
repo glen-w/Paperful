@@ -116,9 +116,9 @@ def test_parse_landing_bibliography_extracts_dois():
 def test_parse_landing_from_fixture_file():
     from pathlib import Path
 
-    html = (Path(__file__).parent / "fixtures" / "springer_chapter_notes.html").read_text(
-        encoding="utf-8"
-    )
+    html = (
+        Path(__file__).parent / "fixtures" / "springer_chapter_notes.html"
+    ).read_text(encoding="utf-8")
     dois = [e["doi"] for e in parse_landing_bibliography(html) if e.get("doi")]
     assert "10.1126/science.aao5646" in dois
     assert "10.4060/cc0461en" in dois
@@ -350,8 +350,7 @@ def test_create_new_recases_all_caps_title():
     items, counts = create_new(Backend(), [row], "Inbox", note_provenance=False)
     assert counts["created"] == 1
     expected = (
-        "Some Practical Guidance for the Implementation of "
-        "Propensity Score Matching"
+        "Some Practical Guidance for the Implementation of Propensity Score Matching"
     )
     assert created[0]["title"] == expected
     assert items[0].title == expected
@@ -435,7 +434,9 @@ def test_propose_patch_book_section_fields(cfg, monkeypatch):
         pages="71-99",
     )
     monkeypatch.setattr(meta, "work_by_doi", lambda *a, **k: work)
-    patch = propose_patch(mock_client(lambda req: _json({})), cfg, item, [], prepared=True)
+    patch = propose_patch(
+        mock_client(lambda req: _json({})), cfg, item, [], prepared=True
+    )
     assert patch is not None
     assert patch.after["bookTitle"] == "Animals in EU Economic Law"
     assert patch.after["seriesTitle"] == "The Palgrave Macmillan Animal Ethics Series"

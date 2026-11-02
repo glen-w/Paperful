@@ -11,7 +11,9 @@ from ..library import LibraryBackend, LibraryError, get_backend
 from ..lint import normalize_saved_title
 
 
-def mark_exists(cfg: Config, candidates: list[dict[str, Any]], backend: Any | None = None) -> None:
+def mark_exists(
+    cfg: Config, candidates: list[dict[str, Any]], backend: Any | None = None
+) -> None:
     items: list[Any] = []
     lib = backend
     if lib is None:
@@ -59,14 +61,18 @@ def apply_candidates(
     ]
     lib = backend if backend is not None else get_backend(cfg)
     if not lib.supports_write():
-        raise LibraryError("Library write API is off. Search apply needs Zotero 10+ (or a writing manager).")
+        raise LibraryError(
+            "Library write API is off. Search apply needs Zotero 10+ (or a writing manager)."
+        )
     collection_key = lib.ensure_collection_path(collection)
     created = 0
     failed = 0
     errors: list[str] = []
     keys: list[str] = []
     for row in rows:
-        title = normalize_saved_title(str(row.get("title") or row.get("url") or "Untitled"))
+        title = normalize_saved_title(
+            str(row.get("title") or row.get("url") or "Untitled")
+        )
         playbook = str(row.get("playbook") or "").strip()
         stamp = f"grey:{playbook}" if playbook else "web:searxng"
         extra = f"paperful {stamp}"

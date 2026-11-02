@@ -86,9 +86,9 @@ def test_probe_collects_on_ezproxy_nav_warning(cfg, monkeypatch):
         new_cdp_session=lambda _p: (_ for _ in ()).throw(RuntimeError("cdp")),
         cookies=lambda: [{"name": "ezproxy", "value": "ticket"}],
     )
-    monkeypatch.setattr("paperful.session.login_url_for", lambda *_a, **_k: "https://ez.example/start")
-    cookies = _probe_and_collect_cookies(
-        ctx, cfg, "ezproxy", on_note=notes.append
+    monkeypatch.setattr(
+        "paperful.session.login_url_for", lambda *_a, **_k: "https://ez.example/start"
     )
+    cookies = _probe_and_collect_cookies(ctx, cfg, "ezproxy", on_note=notes.append)
     assert cookies[0]["name"] == "ezproxy"
     assert any("warning" in n.lower() for n in notes)

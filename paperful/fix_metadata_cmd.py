@@ -15,6 +15,7 @@ from .library import LibraryError
 from .runreport import write_command_report
 from .store import Manifest
 
+
 def run_fix_metadata(
     console: Console,
     *,
@@ -56,7 +57,11 @@ def run_fix_metadata(
     overwrite = scoped.bound.overwrite
     limit = scoped.limit
     backend, loaded, items = cli_mod._connect_scope(
-        scoped, quiet=json_out, json_out=json_out, require_manager=True, apply_limit=False
+        scoped,
+        quiet=json_out,
+        json_out=json_out,
+        require_manager=True,
+        apply_limit=False,
     )
     manifest = Manifest(cfg.manifest_path)
     client = make_client(cfg)
@@ -185,6 +190,7 @@ def run_fix_metadata(
 
     cli_mod._emit_agent(payload, json_out=json_out, human=_human_fix)
 
+
 def _print_fix_summary(
     console: Console,
     proposed: int,
@@ -204,6 +210,7 @@ def _print_fix_summary(
             console.print(f"[yellow]{err}[/]")
         if len(errors) > 20:
             console.print(f"[dim]… and {len(errors) - 20} more[/]")
+
 
 def _write_fix_report(
     cfg: Config,

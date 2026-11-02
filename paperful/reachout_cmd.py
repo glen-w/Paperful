@@ -9,6 +9,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+
 def run_reachout(
     console: Console,
     *,
@@ -215,4 +216,3 @@ def run_reachout(
         f"Walk attached {result.attached}, skipped {result.skipped}"
         + (" (quit early)" if result.quit_early else "")
     )
-

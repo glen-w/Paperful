@@ -125,9 +125,7 @@ def run_repair_preview(
         from ..runreport import write_command_report
 
         client = make_client(cfg)
-        findings = lint_items(
-            client, cfg, items, backend=backend, manifest=manifest
-        )
+        findings = lint_items(client, cfg, items, backend=backend, manifest=manifest)
         by_code: dict[str, int] = {}
         for finding in findings:
             by_code[finding.code] = by_code.get(finding.code, 0) + 1
@@ -229,9 +227,7 @@ def run_repair_preview(
 
         client = httpx.Client(follow_redirects=True, timeout=30)
         try:
-            proposals = classify_versions(
-                items, resolver_for(client, cfg.email)
-            )
+            proposals = classify_versions(items, resolver_for(client, cfg.email))
         finally:
             client.close()
         json_path, _md = write_pack(cfg.state_dir, scope, proposals, n_items=len(items))
@@ -458,9 +454,7 @@ def run_repair_apply(
         from ..versions import VersionProposal, apply_versions, http_fetch_published
 
         payload = json.loads(report.read_text(encoding="utf-8"))
-        proposals = [
-            VersionProposal(**row) for row in payload.get("proposals") or []
-        ]
+        proposals = [VersionProposal(**row) for row in payload.get("proposals") or []]
         if not backend.supports_write():
             return False, "write API not available", {}
         client = httpx.Client(follow_redirects=True, timeout=30)
@@ -572,7 +566,12 @@ def run_mirror_preview(
 ) -> None:
     if mirror_preview_core_fn is not None:
         mirror_preview_core_fn(
-            cfg, cmd_id, verb=verb, collection=collection, pdfs=pdfs, accept_gone=accept_gone
+            cfg,
+            cmd_id,
+            verb=verb,
+            collection=collection,
+            pdfs=pdfs,
+            accept_gone=accept_gone,
         )
         return
 

@@ -33,13 +33,21 @@ def parse_bibtex(text: str) -> list[dict[str, Any]]:
         if ym:
             year = int(ym.group(1))
         doi = (fields.get("doi") or "").replace("https://doi.org/", "")
-        creators = [_person(p, "author") for p in _split_and(fields.get("author") or "")]
-        creators += [_person(p, "editor") for p in _split_and(fields.get("editor") or "")]
+        creators = [
+            _person(p, "author") for p in _split_and(fields.get("author") or "")
+        ]
+        creators += [
+            _person(p, "editor") for p in _split_and(fields.get("editor") or "")
+        ]
         pdfs = []
         file_field = fields.get("file") or fields.get("pdf") or ""
         for part in re.split(r"[;]", file_field):
             path = part.strip()
-            if ":" in path and not path.startswith("/") and not re.match(r"^[A-Za-z]:", path):
+            if (
+                ":" in path
+                and not path.startswith("/")
+                and not re.match(r"^[A-Za-z]:", path)
+            ):
                 # JabRef: description:path:type
                 bits = path.split(":")
                 path = bits[1] if len(bits) >= 2 else bits[0]
@@ -88,7 +96,14 @@ def records_to_bibtex(records: list[dict[str, Any]]) -> str:
         key = _cite_key(rec, i)
         fields = [
             ("title", rec.get("title") or ""),
-            ("author", " and ".join(_creator_bib(c) for c in rec.get("creators") or [] if isinstance(c, dict))),
+            (
+                "author",
+                " and ".join(
+                    _creator_bib(c)
+                    for c in rec.get("creators") or []
+                    if isinstance(c, dict)
+                ),
+            ),
             ("year", str(rec.get("year") or rec.get("date") or "")),
             ("journal", rec.get("publication_title") or ""),
             ("doi", rec.get("doi") or ""),

@@ -92,7 +92,9 @@ class FakeStore:
         cited = normalize_store_id(openalex_id)
         self.cite_calls.append(cited)
         citer_ids = self.cites.get(cited, [])
-        by_id = {normalize_store_id(str(row.get("id") or "")): row for row in self.works}
+        by_id = {
+            normalize_store_id(str(row.get("id") or "")): row for row in self.works
+        }
         rows = [by_id[i] for i in citer_ids if i in by_id]
         if year_from is not None:
             rows = [r for r in rows if int(r.get("publication_year") or 0) >= year_from]
@@ -136,7 +138,9 @@ def test_build_works_sql_doi_and_id():
     assert "'W2'" in sql_ids
 
     with pytest.raises(OpenAlexStoreError):
-        build_works_sql(parquet_glob="/x", columns=["id"], dois=["a"], openalex_ids=["W1"])
+        build_works_sql(
+            parquet_glob="/x", columns=["id"], dois=["a"], openalex_ids=["W1"]
+        )
 
 
 def test_parse_duckdb_json():
@@ -628,7 +632,9 @@ def test_budget_mid_id_batch_without_store_raises_with_pending():
     client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
     with pytest.raises(OpenAlexBudgetExceeded) as caught:
         client.works_by_ids(ids)
-    assert [str(row["id"]).rsplit("/", 1)[-1] for row in caught.value.partial] == ids[:100]
+    assert [str(row["id"]).rsplit("/", 1)[-1] for row in caught.value.partial] == ids[
+        :100
+    ]
     assert caught.value.pending_ids == ids[100:]
 
 
@@ -796,7 +802,10 @@ def test_works_root_and_partition_helpers():
     assert works_root_from_glob("/data/works/**/*.parquet") == "/data/works"
     assert updated_date_from_dirname("updated_date=2024-01-02") == "2024-01-02"
     assert cites_done_marker("/cites", "2024-01-02") == "/cites/.done/2024-01-02"
-    assert cites_partition_outdir("/cites", "2024-01-02") == "/cites/source_date=2024-01-02"
+    assert (
+        cites_partition_outdir("/cites", "2024-01-02")
+        == "/cites/source_date=2024-01-02"
+    )
     sql = build_cites_partition_sql(
         works_root="/data/works", date="2024-01-02", output_dir="/cites"
     )

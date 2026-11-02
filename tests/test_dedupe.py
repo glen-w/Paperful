@@ -43,9 +43,24 @@ def _pair(**overrides):
 
 def test_high_doi_prefers_stored_pdf_over_link_over_bare():
     items = [
-        _pair(key="BARE", has_pdf=False, has_linked_url=False, date_added="2010-01-01T00:00:00Z"),
-        _pair(key="LINK", has_pdf=False, has_linked_url=True, date_added="2011-01-01T00:00:00Z"),
-        _pair(key="PDF", has_pdf=True, has_linked_url=False, date_added="2019-01-01T00:00:00Z"),
+        _pair(
+            key="BARE",
+            has_pdf=False,
+            has_linked_url=False,
+            date_added="2010-01-01T00:00:00Z",
+        ),
+        _pair(
+            key="LINK",
+            has_pdf=False,
+            has_linked_url=True,
+            date_added="2011-01-01T00:00:00Z",
+        ),
+        _pair(
+            key="PDF",
+            has_pdf=True,
+            has_linked_url=False,
+            date_added="2019-01-01T00:00:00Z",
+        ),
     ]
     groups = classify(items, "high_doi")
     assert len(groups) == 1
@@ -67,7 +82,13 @@ def test_older_date_added_breaks_ties():
 
 def test_richer_metadata_before_date_added():
     items = [
-        _pair(key="THIN", creator_count=0, date=None, year=None, date_added="2010-01-01T00:00:00Z"),
+        _pair(
+            key="THIN",
+            creator_count=0,
+            date=None,
+            year=None,
+            date_added="2010-01-01T00:00:00Z",
+        ),
         _pair(key="RICH", creator_count=3, date_added="2024-01-01T00:00:00Z"),
     ]
     groups = classify(items, "high_doi")
@@ -100,7 +121,9 @@ def test_divergent_titles_are_held():
 def test_html_entity_titles_are_not_divergent():
     items = [
         _pair(key="A", title="Fish &amp; ships in the high seas agreement text"),
-        _pair(key="B", title="Fish & ships in the high seas agreement text", has_pdf=True),
+        _pair(
+            key="B", title="Fish & ships in the high seas agreement text", has_pdf=True
+        ),
     ]
     groups = classify(items, "high_doi")
     assert groups[0].held is False
@@ -154,8 +177,12 @@ def test_apply_skips_medium_and_held(tmp_path):
         _pair(key="DROP"),
         _pair(key="HELD1", doi="10.1000/other", title=SAME),
         _pair(key="HELD2", doi="10.1000/other", title=OTHER),
-        make_item(key="M1", doi=None, title="Grey report on area based tools", year=2021),
-        make_item(key="M2", doi=None, title="Grey report on area based tools", year=2021),
+        make_item(
+            key="M1", doi=None, title="Grey report on area based tools", year=2021
+        ),
+        make_item(
+            key="M2", doi=None, title="Grey report on area based tools", year=2021
+        ),
     ]
     groups = classify(items)
     trashed: list[str] = []
@@ -182,8 +209,16 @@ def test_apply_skips_medium_and_held(tmp_path):
 
 def test_apply_medium_trashes_and_audits(tmp_path):
     items = [
-        make_item(key="M1", doi=None, title="Grey report on area based tools", year=2021, has_pdf=True),
-        make_item(key="M2", doi=None, title="Grey report on area based tools", year=2021),
+        make_item(
+            key="M1",
+            doi=None,
+            title="Grey report on area based tools",
+            year=2021,
+            has_pdf=True,
+        ),
+        make_item(
+            key="M2", doi=None, title="Grey report on area based tools", year=2021
+        ),
     ]
     groups = classify(items, "medium_title_year")
     audit = tmp_path / "dedupe-applied.jsonl"
@@ -471,7 +506,9 @@ def test_actionable_runs_high_doi_before_medium():
 
 
 def test_apply_records_item_errors_and_reraises_library_error(tmp_path):
-    groups = classify([_pair(key="KEEP", has_pdf=True), _pair(key="DROP"), _pair(key="BAD")])
+    groups = classify(
+        [_pair(key="KEEP", has_pdf=True), _pair(key="DROP"), _pair(key="BAD")]
+    )
     audit = tmp_path / "dedupe-applied.jsonl"
 
     class Flaky:
@@ -649,9 +686,7 @@ def test_cli_gaps_json(tmp_path, monkeypatch):
             make_item(key="B", has_pdf=False, has_linked_url=True, doi=None),
         ],
     )
-    res = runner.invoke(
-        cli.app, ["gaps", "-c", str(cfg_file), "-C", "BBNJ", "--json"]
-    )
+    res = runner.invoke(cli.app, ["gaps", "-c", str(cfg_file), "-C", "BBNJ", "--json"])
     assert res.exit_code == 0, res.stdout
     payload = json.loads(res.stdout)
     assert payload["items"] == 2
@@ -906,7 +941,12 @@ def test_merge_into_does_not_trash_when_child_move_fails(cfg):
         "DROP": {"key": "DROP", "data": {"key": "DROP", "title": "Drop", "version": 1}},
         "NOTE": {
             "key": "NOTE",
-            "data": {"key": "NOTE", "itemType": "note", "parentItem": "DROP", "note": "x"},
+            "data": {
+                "key": "NOTE",
+                "itemType": "note",
+                "parentItem": "DROP",
+                "note": "x",
+            },
         },
     }
 
@@ -973,7 +1013,10 @@ def test_merge_into_retries_without_date_added(cfg):
 
         def update_item(self, raw):
             calls["n"] += 1
-            if calls["n"] == 1 and raw["data"].get("dateAdded") == "2019-01-01T00:00:00Z":
+            if (
+                calls["n"] == 1
+                and raw["data"].get("dateAdded") == "2019-01-01T00:00:00Z"
+            ):
                 raise RuntimeError("dateAdded rejected")
             items[raw["data"]["key"]] = raw
 
@@ -989,4 +1032,3 @@ def test_merge_into_retries_without_date_added(cfg):
     backend.merge_into("KEEP", "DROP")
     assert items["KEEP"]["data"]["dateAdded"] == "2020-01-01T00:00:00Z"
     assert "DROP" not in items
-

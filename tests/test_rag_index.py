@@ -65,7 +65,9 @@ def index(rag_cfg):
     )
     idx.replace_item(
         "BBBB2222",
-        _rows("BBBB2222", [("Seabed mining licences and royalties.", _unit(0, 0, 1, 0))]),
+        _rows(
+            "BBBB2222", [("Seabed mining licences and royalties.", _unit(0, 0, 1, 0))]
+        ),
     )
     return idx
 
@@ -119,7 +121,9 @@ def test_hybrid_falls_back_to_vector_before_finish_and_uses_text_after(index):
 
 
 def test_replace_item_is_idempotent_and_can_shrink(index):
-    rows = _rows("AAAA1111", [("Only one passage now, about krill.", _unit(0, 1, 0, 0))])
+    rows = _rows(
+        "AAAA1111", [("Only one passage now, about krill.", _unit(0, 1, 0, 0))]
+    )
     index.replace_item("AAAA1111", rows)
     index.replace_item("AAAA1111", rows)
     assert index.count() == 2
@@ -134,7 +138,8 @@ def test_replace_item_is_idempotent_and_can_shrink(index):
 def test_finish_keeps_new_rows_searchable_by_text(index):
     index.finish()
     index.replace_item(
-        "CCCC3333", _rows("CCCC3333", [("Hydrothermal vents host tubeworms.", _unit(0, 0, 0, 1))])
+        "CCCC3333",
+        _rows("CCCC3333", [("Hydrothermal vents host tubeworms.", _unit(0, 0, 0, 1))]),
     )
     index.finish()
     hits = index.search(_unit(1, 0, 0, 0), "tubeworms", k=2, hybrid=True)

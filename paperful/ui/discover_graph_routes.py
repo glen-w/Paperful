@@ -302,5 +302,3 @@ async def handle_discover_graph_expand(ui: UiContext, request: Request) -> JSONR
     except OpenAlexBudgetExceeded as exc:
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=429)
     return JSONResponse(graph)
-
-

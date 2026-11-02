@@ -126,7 +126,9 @@ def docx_structural_issues(path: Path) -> list[str]:
         with zipfile.ZipFile(path) as zf:
             names = set(zf.namelist())
             raw = zf.read("word/document.xml")
-            comments_raw = zf.read("word/comments.xml") if "word/comments.xml" in names else None
+            comments_raw = (
+                zf.read("word/comments.xml") if "word/comments.xml" in names else None
+            )
     except (OSError, zipfile.BadZipFile, KeyError) as exc:
         return [f"docx: {exc}"]
     if b"ns0:" in raw:
@@ -168,7 +170,9 @@ def docx_structural_issues(path: Path) -> list[str]:
         issues.append("commentRangeStart/End ids do not match")
     if set(starts) != set(refs):
         issues.append("commentRangeStart/commentReference ids do not match")
-    overlap = sorted(set(starts) & set(rev_ids), key=lambda x: int(x) if x.isdigit() else x)
+    overlap = sorted(
+        set(starts) & set(rev_ids), key=lambda x: int(x) if x.isdigit() else x
+    )
     if overlap:
         issues.append(f"ins/del ids collide with comment ids {overlap}")
     if comments_raw is not None:
@@ -179,10 +183,7 @@ def docx_structural_issues(path: Path) -> list[str]:
         except ET.ParseError as exc:
             issues.append(f"comments.xml: {exc}")
         else:
-            bodies = [
-                el.get(f"{W}id") or ""
-                for el in croot.iter(_w("comment"))
-            ]
+            bodies = [el.get(f"{W}id") or "" for el in croot.iter(_w("comment"))]
             missing = sorted(set(starts) - set(bodies))
             if missing:
                 issues.append(f"comment ranges missing bodies {missing}")
@@ -221,7 +222,9 @@ def _ensure_comments_rel(rels: bytes) -> bytes:
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
-def _el(tag: str, attrib: dict[str, str] | None = None, text: str | None = None) -> ET.Element:
+def _el(
+    tag: str, attrib: dict[str, str] | None = None, text: str | None = None
+) -> ET.Element:
     node = ET.Element(_w(tag))
     for k, v in (attrib or {}).items():
         node.set(_w(k), v)
@@ -366,7 +369,9 @@ def _apply_edits_to_paras(
 
 
 def _comment_el(cid: int, body: str, when: str) -> ET.Element:
-    node = _el("comment", {"id": str(cid), "author": AUTHOR, "date": when, "initials": "pf"})
+    node = _el(
+        "comment", {"id": str(cid), "author": AUTHOR, "date": when, "initials": "pf"}
+    )
     p = _el("p")
     ref_run = _el("r")
     ref_run.append(_el("annotationRef"))
@@ -446,7 +451,9 @@ def apply_tracked_docx(src: Path, dest: Path, edits: list[RewriteEdit]) -> list[
         ctypes = parts.get("[Content_Types].xml", b"")
         if b"word/comments.xml" not in ctypes:
             try:
-                ct_root = ET.fromstring(ctypes) if ctypes else ET.fromstring(_CONTENT_TYPES)
+                ct_root = (
+                    ET.fromstring(ctypes) if ctypes else ET.fromstring(_CONTENT_TYPES)
+                )
                 ET.SubElement(
                     ct_root,
                     f"{CT}Override",

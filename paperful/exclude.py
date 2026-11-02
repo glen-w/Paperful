@@ -104,9 +104,7 @@ def parse_exclude_rule(row: dict[str, Any], *, index: int = 0) -> ExcludeRule:
     path = str(row.get("path") or "").strip().strip("/")
     key = str(row.get("key") or "").strip()
     if not path and not key:
-        raise ValueError(
-            f"exclude[{index}] needs path or key (got neither)"
-        )
+        raise ValueError(f"exclude[{index}] needs path or key (got neither)")
     mode = str(row.get("mode") or "full").strip().lower() or "full"
     if mode not in MODES:
         raise ValueError(
@@ -140,9 +138,7 @@ def parse_exclude_rules(raw: Any) -> tuple[ExcludeRule, ...]:
     out: list[ExcludeRule] = []
     for i, row in enumerate(raw):
         if not isinstance(row, dict):
-            raise ValueError(
-                f"exclude[{i}] must be a table, got {type(row).__name__}"
-            )
+            raise ValueError(f"exclude[{i}] must be a table, got {type(row).__name__}")
         out.append(parse_exclude_rule(row, index=i))
     return tuple(out)
 

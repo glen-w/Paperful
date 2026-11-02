@@ -60,7 +60,13 @@ def scope_keys(
     """
     prefixes = [p.strip("/") for p in (collections or []) if p and p.strip("/")]
     wanted = set(item_keys or [])
-    if not prefixes and not wanted and year_from is None and year_to is None and not item_types:
+    if (
+        not prefixes
+        and not wanted
+        and year_from is None
+        and year_to is None
+        and not item_types
+    ):
         return None
     keys: set[str] = set()
     for row in ledger.rows():

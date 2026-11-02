@@ -41,7 +41,9 @@ def build_scope_records(
         rec["url"] = it.url
         rec["pmid"] = it.pmid
         rec["abstract"] = it.abstract or rec.get("abstract")
-        rec["collection_paths"] = [p for p in it.collection_paths if p != "_uncollected"]
+        rec["collection_paths"] = [
+            p for p in it.collection_paths if p != "_uncollected"
+        ]
         rec["item_key"] = it.key
         pdf_list: list[str] = []
         if pdf_dir is not None and it.has_pdf:

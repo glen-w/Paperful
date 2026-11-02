@@ -18,7 +18,14 @@ from ..progress import Track
 from ..store import Manifest, MirrorEntry, mirror_entries
 from ..zot import filter_items_by_type, filter_items_by_year
 from .chunk import CHUNKER_VERSION, Chunk, chunk_pages, embed_text
-from .extract import ParseError, Parser, cached_pages, file_sha256, get_parser, needs_ocr
+from .extract import (
+    ParseError,
+    Parser,
+    cached_pages,
+    file_sha256,
+    get_parser,
+    needs_ocr,
+)
 from .index import Index, ledger_path, load_meta
 from .ledger import (
     ACTION_META,
@@ -105,7 +112,9 @@ def select_entries(
     if year_from is None and year_to is None and item_types is None:
         return entries
     items = [entry.item() for entry in entries]
-    items = filter_items_by_type(filter_items_by_year(items, year_from, year_to), item_types)
+    items = filter_items_by_type(
+        filter_items_by_year(items, year_from, year_to), item_types
+    )
     keep = {item.key for item in items}
     return [entry for entry in entries if entry.key in keep]
 
@@ -212,7 +221,9 @@ class _Run:
     ) -> IngestRow:
         """Index the PDF's passages, or fall back to the abstract when it has none."""
         chunks = chunk_pages(
-            pages, chunk_chars=self.cfg.rag_chunk_chars, overlap=self.cfg.rag_chunk_overlap
+            pages,
+            chunk_chars=self.cfg.rag_chunk_chars,
+            overlap=self.cfg.rag_chunk_overlap,
         )
         row = self._row(entry, pdf, sha)
         row.ocr_pending = ocr_pending
@@ -222,10 +233,14 @@ class _Run:
             row.status, row.source, row.chunks = STATUS_OK, source, len(chunks)
             self.ledger.write(row)
             return IngestRow(entry.key, row.title, source, error or reason, len(chunks))
-        why = error or ("waiting for OCR" if ocr_pending else "PDF has no readable text")
+        why = error or (
+            "waiting for OCR" if ocr_pending else "PDF has no readable text"
+        )
         return self._fallback(entry, row, why)
 
-    def index_stub(self, entry: MirrorEntry, pdf: PdfStat | None, reason: str) -> IngestRow:
+    def index_stub(
+        self, entry: MirrorEntry, pdf: PdfStat | None, reason: str
+    ) -> IngestRow:
         """Index the abstract. A PDF that is still unreadable keeps its ledger facts."""
         row = self._row(entry, None, "")
         old = self.ledger.get(entry.key)
@@ -235,7 +250,9 @@ class _Run:
             row.ocr_pending, row.error = old.ocr_pending, old.error
         return self._fallback(entry, row, reason)
 
-    def unreadable(self, entry: MirrorEntry, pdf: PdfStat, sha: str, error: str) -> IngestRow:
+    def unreadable(
+        self, entry: MirrorEntry, pdf: PdfStat, sha: str, error: str
+    ) -> IngestRow:
         row = self._row(entry, pdf, sha)
         row.error = error
         return self._fallback(entry, row, error)
@@ -297,7 +314,9 @@ def _dry_row(entry: MirrorEntry, plan: Plan) -> IngestRow:
     }.get(plan.action)
     if status is None:
         status = DONE_UNCHANGED if plan.reason != "no PDF or abstract" else DONE_NOTHING
-    return IngestRow(entry.key, str(entry.record.get("title") or ""), status, plan.reason)
+    return IngestRow(
+        entry.key, str(entry.record.get("title") or ""), status, plan.reason
+    )
 
 
 def ingest_entries(
@@ -362,7 +381,9 @@ def ingest_entries(
         for key in gone:
             row = ledger.get(key)
             batch.rows.append(
-                IngestRow(key, row.title if row else "", DONE_REMOVED, "not in the mirror")
+                IngestRow(
+                    key, row.title if row else "", DONE_REMOVED, "not in the mirror"
+                )
             )
         return batch
 
@@ -378,7 +399,9 @@ def ingest_entries(
                 batch.rows.append(IngestRow(entry.key, title, DONE_META, plan.reason))
             elif plan.action == ACTION_REMOVE:
                 run.remove(entry.key)
-                batch.rows.append(IngestRow(entry.key, title, DONE_REMOVED, plan.reason))
+                batch.rows.append(
+                    IngestRow(entry.key, title, DONE_REMOVED, plan.reason)
+                )
             elif plan.action == ACTION_STUB or pdf is None:
                 batch.rows.append(run.index_stub(entry, pdf, plan.reason))
             else:
@@ -412,7 +435,9 @@ def ingest_entries(
             row = ledger.get(key)
             run.remove(key)
             batch.rows.append(
-                IngestRow(key, row.title if row else "", DONE_REMOVED, "not in the mirror")
+                IngestRow(
+                    key, row.title if row else "", DONE_REMOVED, "not in the mirror"
+                )
             )
     finally:
         run.finish()

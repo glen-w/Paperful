@@ -92,7 +92,9 @@ def test_authors_and_editors_roles_and_name_forms():
     ],
 )
 def test_year_fallback_regex(year_text, year):
-    xml = _record(f"<titles><title>T</title></titles><dates><year>{year_text}</year></dates>")
+    xml = _record(
+        f"<titles><title>T</title></titles><dates><year>{year_text}</year></dates>"
+    )
     rec = parse_endnote_xml(xml)[0]
     assert rec["year"] == year
     assert rec["date"] == year_text
@@ -102,10 +104,15 @@ def test_ref_type_number_and_name_pick_the_item_type():
     journal = parse_endnote_xml(_record("<titles><title>T</title></titles>"))[0]
     assert journal["item_type"] == "journalArticle"
     book = parse_endnote_xml(
-        _record("<titles><title>T</title></titles>", ref='<ref-type name="Book">6</ref-type>')
+        _record(
+            "<titles><title>T</title></titles>",
+            ref='<ref-type name="Book">6</ref-type>',
+        )
     )[0]
     assert book["item_type"] == "book"
-    nameless = parse_endnote_xml(_record("<titles><title>T</title></titles>", ref=""))[0]
+    nameless = parse_endnote_xml(_record("<titles><title>T</title></titles>", ref=""))[
+        0
+    ]
     assert nameless["item_type"]  # falls back instead of raising
 
 
@@ -115,11 +122,15 @@ def test_accession_number_pmid_vs_free_text_and_urls():
     )[0]
     assert pmid["pmid"] == "12345" and pmid["extra"] == "PMID: 12345"
     other = parse_endnote_xml(
-        _record(_style("accession-num", "WOS:0001") + "<titles><title>T</title></titles>")
+        _record(
+            _style("accession-num", "WOS:0001") + "<titles><title>T</title></titles>"
+        )
     )[0]
     assert other["pmid"] is None and other["extra"] == "WOS:0001"
     web = parse_endnote_xml(
-        _record("<titles><title>T</title></titles><web-urls><url>https://w.test/p</url></web-urls>")
+        _record(
+            "<titles><title>T</title></titles><web-urls><url>https://w.test/p</url></web-urls>"
+        )
     )[0]
     assert web["url"] == "https://w.test/p"
     related = parse_endnote_xml(
@@ -132,9 +143,13 @@ def test_accession_number_pmid_vs_free_text_and_urls():
 
 
 def test_label_becomes_collection_path_only_when_it_is_a_path():
-    path = parse_endnote_xml(_record(_style("label", "BBNJ/EIA") + "<titles><title>T</title></titles>"))[0]
+    path = parse_endnote_xml(
+        _record(_style("label", "BBNJ/EIA") + "<titles><title>T</title></titles>")
+    )[0]
     assert path["collection_paths"] == ["BBNJ/EIA"]
-    plain = parse_endnote_xml(_record(_style("label", "to-read") + "<titles><title>T</title></titles>"))[0]
+    plain = parse_endnote_xml(
+        _record(_style("label", "to-read") + "<titles><title>T</title></titles>")
+    )[0]
     assert plain["collection_paths"] == []
 
 
@@ -168,12 +183,20 @@ def test_internal_pdf_resolves_against_xml_folder_layouts(tmp_path):
     (tmp_path / "PDF" / "deep" / "x").mkdir(parents=True)
     (tmp_path / "PDF" / "deep" / "x" / "c.pdf").write_bytes(b"%PDF")
     xml_path = tmp_path / "lib.xml"
-    assert _resolve_pdf("internal-pdf://a.pdf", tmp_path) == str(tmp_path / "PDF" / "a.pdf")
+    assert _resolve_pdf("internal-pdf://a.pdf", tmp_path) == str(
+        tmp_path / "PDF" / "a.pdf"
+    )
     assert _resolve_pdf("internal-pdf://b.pdf", tmp_path) == str(tmp_path / "b.pdf")
-    assert _resolve_pdf("internal-pdf://other/dir/b.pdf", tmp_path) == str(tmp_path / "b.pdf")
-    assert _resolve_pdf("internal-pdf://c.pdf", tmp_path) == str(tmp_path / "PDF" / "deep" / "x" / "c.pdf")
+    assert _resolve_pdf("internal-pdf://other/dir/b.pdf", tmp_path) == str(
+        tmp_path / "b.pdf"
+    )
+    assert _resolve_pdf("internal-pdf://c.pdf", tmp_path) == str(
+        tmp_path / "PDF" / "deep" / "x" / "c.pdf"
+    )
     # Missing files resolve to the expected location rather than raising.
-    assert _resolve_pdf("internal-pdf://gone.pdf", tmp_path) == str(tmp_path / "PDF" / "gone.pdf")
+    assert _resolve_pdf("internal-pdf://gone.pdf", tmp_path) == str(
+        tmp_path / "PDF" / "gone.pdf"
+    )
     assert xml_path  # silence unused
 
 
@@ -186,7 +209,11 @@ def test_pdf_urls_in_a_full_parse(tmp_path):
         "<url>https://x.test/r.pdf</url></pdf-urls></urls>"
     )
     rec = parse_endnote_xml(xml, xml_path=tmp_path / "lib.xml")[0]
-    assert rec["pdfs"] == [str(tmp_path / "PDF" / "p.pdf"), "/abs/q.pdf", "https://x.test/r.pdf"]
+    assert rec["pdfs"] == [
+        str(tmp_path / "PDF" / "p.pdf"),
+        "/abs/q.pdf",
+        "https://x.test/r.pdf",
+    ]
 
 
 def test_internal_pdf_without_xml_path_keeps_relative_name():
@@ -229,10 +256,18 @@ def test_export_orders_authors_and_editors_and_skips_nameless():
     )
     root = ET.fromstring(xml)
     assert root.find(".//database").get("name") == "mylib"
-    authors = ["".join(a.itertext()) for a in root.findall(".//contributors/authors/author")]
-    editors = ["".join(a.itertext()) for a in root.findall(".//contributors/secondary-authors/author")]
+    authors = [
+        "".join(a.itertext()) for a in root.findall(".//contributors/authors/author")
+    ]
+    editors = [
+        "".join(a.itertext())
+        for a in root.findall(".//contributors/secondary-authors/author")
+    ]
     assert authors == ["Ng, Li", "Single Name"] and editors == ["Ed, It"]
-    assert ["".join(k.itertext()) for k in root.findall(".//keywords/keyword")] == ["t1", "t2"]
+    assert ["".join(k.itertext()) for k in root.findall(".//keywords/keyword")] == [
+        "t1",
+        "t2",
+    ]
     assert "".join(root.find(".//research-notes").itertext()) == "one note"
     assert "".join(root.find(".//accession-num").itertext()) == "99"
     assert root.find(".//related-urls/url").text == "https://u.test/p"
@@ -248,7 +283,9 @@ def test_export_round_trip_preserves_bundle_pdf_names_and_label():
         "collection_paths": ["A/B", "C"],
     }
     back = parse_endnote_xml(records_to_endnote_xml([rec]))[0]
-    assert back["pdfs"][0].endswith("Ng-2021.pdf") and back["pdfs"][1].endswith("other.pdf")
+    assert back["pdfs"][0].endswith("Ng-2021.pdf") and back["pdfs"][1].endswith(
+        "other.pdf"
+    )
     # EndNote has one label per record: only the first path survives.
     assert back["collection_paths"] == ["A/B"]
 
@@ -257,12 +294,21 @@ def test_creator_name_and_person_helpers():
     assert _creator_name({"lastName": "Ng", "firstName": "Li"}) == "Ng, Li"
     assert _creator_name({"name": "Org Inc"}) == "Org Inc"
     assert _creator_name({"firstName": "OnlyFirst"}) == ""
-    assert _person("  Doe,  Jo ", "author") == {"creatorType": "author", "lastName": "Doe", "firstName": "Jo"}
+    assert _person("  Doe,  Jo ", "author") == {
+        "creatorType": "author",
+        "lastName": "Doe",
+        "firstName": "Jo",
+    }
 
 
 def test_load_and_dump_dispatch_for_xml(tmp_path):
     path = tmp_path / "lib.xml"
-    path.write_text(records_to_endnote_xml([{"item_type": "book", "title": "Dispatch", "year": 2000}]), encoding="utf-8")
+    path.write_text(
+        records_to_endnote_xml(
+            [{"item_type": "book", "title": "Dispatch", "year": 2000}]
+        ),
+        encoding="utf-8",
+    )
     assert load_records(path)[0]["title"] == "Dispatch"
     assert load_records(path, "endnote_xml")[0]["title"] == "Dispatch"
     assert "<record>" in dump_records(load_records(path), "EndNote-XML")

@@ -106,7 +106,12 @@ def test_apply_unknown_and_missing_file(tmp_path):
     with pytest.raises(RuntimeError, match="outside"):
         _apply_one(
             backend,
-            Action(op="relink", parent_key="P", attachment_key="A", source_path="/etc/passwd"),
+            Action(
+                op="relink",
+                parent_key="P",
+                attachment_key="A",
+                source_path="/etc/passwd",
+            ),
             tmp_path,
         )
 

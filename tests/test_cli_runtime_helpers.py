@@ -184,9 +184,7 @@ def test_bind_scoped_and_connect_scope(cfg, monkeypatch):
 
     monkeypatch.setattr(cli_runtime, "_require_manager", _require)
     monkeypatch.setattr(cli_runtime, "_connect", lambda cfg, quiet=False: backend)
-    monkeypatch.setattr(
-        cli_runtime, "_load_scope", lambda *a, **k: Loaded()
-    )
+    monkeypatch.setattr(cli_runtime, "_load_scope", lambda *a, **k: Loaded())
     got, loaded, items = cli_runtime._connect_scope(
         scoped, quiet=True, json_out=True, require_manager=True
     )

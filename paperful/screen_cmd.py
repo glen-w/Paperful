@@ -136,7 +136,12 @@ def run_screen(
             }
             for finding in findings
         ],
-        flags={"strict": strict, "apply": apply, "refresh": refresh, "interrupted": interrupted},
+        flags={
+            "strict": strict,
+            "apply": apply,
+            "refresh": refresh,
+            "interrupted": interrupted,
+        },
         started=started,
     )
     from .agent_json import envelope
@@ -157,7 +162,12 @@ def run_screen(
             }
             for finding in findings
         ],
-        flags={"strict": strict, "apply": apply, "refresh": refresh, "interrupted": interrupted},
+        flags={
+            "strict": strict,
+            "apply": apply,
+            "refresh": refresh,
+            "interrupted": interrupted,
+        },
         exit_code=130 if interrupted else (1 if strict and findings else 0),
     )
 

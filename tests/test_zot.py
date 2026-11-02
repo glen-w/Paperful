@@ -132,7 +132,9 @@ def test_filter_items_by_year():
         make_item(key="E", year=None),
     ]
     assert [it.key for it in filter_items_by_year(items)] == ["A", "B", "C", "D", "E"]
-    assert [it.key for it in filter_items_by_year(items, year_from=2023, year_to=2026)] == [
+    assert [
+        it.key for it in filter_items_by_year(items, year_from=2023, year_to=2026)
+    ] == [
         "B",
         "C",
     ]

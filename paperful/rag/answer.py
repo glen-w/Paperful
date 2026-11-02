@@ -178,9 +178,7 @@ def _stream(
     evidence: dict[str, Any],
 ) -> AnswerStream:
     if not hits:
-        return AnswerStream(
-            [NO_HITS], [], [], ask_mode=ask_mode, evidence=evidence
-        )
+        return AnswerStream([NO_HITS], [], [], ask_mode=ask_mode, evidence=evidence)
     context, sources = build_context(
         hits,
         cfg.rag_max_context_chars,
@@ -301,9 +299,12 @@ def _gather(
                     index=index,
                     ledger=ledger,
                 )
-                new = [h for h in more if (h.item_key, h.chunk_index) not in {
-                    (x.item_key, x.chunk_index) for x in scored
-                }]
+                new = [
+                    h
+                    for h in more
+                    if (h.item_key, h.chunk_index)
+                    not in {(x.item_key, x.chunk_index) for x in scored}
+                ]
                 if new:
                     scored.extend(summarize_hits(cfg, new, query, client))
                     kept = filter_evidence(cfg, scored)
@@ -329,9 +330,7 @@ def _answer_advanced(
     del k  # advanced uses evidence_k
     query = (retrieve_as if retrieve_as is not None else question) or ""
     client = client or get_client(cfg)
-    system = _system(
-        cfg, focus=focus, prompt_path=prompt_path, prompt_text=prompt_text
-    )
+    system = _system(cfg, focus=focus, prompt_path=prompt_path, prompt_text=prompt_text)
     prior = list(history)
     kept, candidates, skipped = _gather(
         cfg,

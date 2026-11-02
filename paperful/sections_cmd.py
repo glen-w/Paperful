@@ -18,6 +18,7 @@ from .library import LibraryError
 from .runreport import write_command_report, write_run_report
 from .store import Manifest
 
+
 def run_extract_sections(
     console: Console,
     item: Any,
@@ -150,4 +151,3 @@ def run_extract_sections(
             exit_code=code,
         )
         cli_mod._emit_agent(payload, json_out=True, human=lambda: None)
-

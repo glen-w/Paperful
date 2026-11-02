@@ -25,13 +25,17 @@ runner = CliRunner()
 
 
 def _cfg(tmp_path: Path) -> Config:
-    cfg = Config(email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg = Config(
+        email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state"
+    )
     cfg.state_dir.mkdir(parents=True)
     cfg.out_dir.mkdir(parents=True)
     return cfg
 
 
-def _author(name: str, orcid: str, oa: str, country: str = "US", inst_type: str = "education"):
+def _author(
+    name: str, orcid: str, oa: str, country: str = "US", inst_type: str = "education"
+):
     return {
         "author": {
             "id": f"https://openalex.org/{oa}",
@@ -94,7 +98,9 @@ def test_build_ego_graph_from_works():
     assert graph["schema"] == SCHEMA
     assert graph["ego"]["orcid"] == ORCID
     ids = {n["id"] for n in graph["nodes"]}
-    assert any(ORCID in i or n.get("ego") for n, i in ((n, n["id"]) for n in graph["nodes"]))
+    assert any(
+        ORCID in i or n.get("ego") for n, i in ((n, n["id"]) for n in graph["nodes"])
+    )
     ego = next(n for n in graph["nodes"] if n["ego"])
     assert ego["degree"] == 3
     assert ego["frequency"] == 3
@@ -187,7 +193,9 @@ def test_cli_orcid_and_show(tmp_path: Path, monkeypatch):
         return cfg
 
     monkeypatch.setattr("paperful.cli_runtime._cfg", fake_cfg)
-    monkeypatch.setattr("paperful.network.run.openalex_client", lambda cfg, client=None: FakeOA())
+    monkeypatch.setattr(
+        "paperful.network.run.openalex_client", lambda cfg, client=None: FakeOA()
+    )
     result = runner.invoke(
         cli.app,
         [
@@ -211,7 +219,9 @@ def test_cli_orcid_and_show(tmp_path: Path, monkeypatch):
     payload = json.loads(listed.output)
     assert payload["schema"] == "paperful.agent.json.v1"
     assert payload["summary"]["runs"] >= 1
-    exported = runner.invoke(cli.app, ["network", "export", "cli-gjerde", "--format", "csv"])
+    exported = runner.invoke(
+        cli.app, ["network", "export", "cli-gjerde", "--format", "csv"]
+    )
     assert exported.exit_code == 0, exported.output
 
 
@@ -333,7 +343,9 @@ def test_attributes_reload_after_csv_edit(tmp_path: Path):
 def test_cli_out_dir_and_json(tmp_path: Path, monkeypatch):
     cfg = _cfg(tmp_path)
     monkeypatch.setattr("paperful.cli_runtime._cfg", lambda _path=None: cfg)
-    monkeypatch.setattr("paperful.network.run.openalex_client", lambda cfg, client=None: FakeOA())
+    monkeypatch.setattr(
+        "paperful.network.run.openalex_client", lambda cfg, client=None: FakeOA()
+    )
     dest = tmp_path / "cli-out"
     result = runner.invoke(
         cli.app,
@@ -370,7 +382,9 @@ def test_figures_write_png(tmp_path: Path):
 
     graph = json.loads((FIXTURES / "graph.json").read_text(encoding="utf-8"))
     dest = tmp_path / "figures"
-    written = write_phase_figures(dest, {"early": {"graph": graph, "phase": {"label": "Early"}}})
+    written = write_phase_figures(
+        dest, {"early": {"graph": graph, "phase": {"label": "Early"}}}
+    )
     assert len(written) == 1
     assert written[0].is_file()
     assert written[0].suffix == ".png"
@@ -384,7 +398,9 @@ def test_figures_write_png(tmp_path: Path):
 def test_cli_export_gexf(tmp_path: Path, monkeypatch):
     cfg = _cfg(tmp_path)
     monkeypatch.setattr("paperful.cli_runtime._cfg", lambda _path=None: cfg)
-    monkeypatch.setattr("paperful.network.run.openalex_client", lambda cfg, client=None: FakeOA())
+    monkeypatch.setattr(
+        "paperful.network.run.openalex_client", lambda cfg, client=None: FakeOA()
+    )
     built = runner.invoke(
         cli.app,
         [
@@ -414,7 +430,9 @@ def test_cli_export_gexf(tmp_path: Path, monkeypatch):
 def test_cli_export_unknown_format(tmp_path: Path, monkeypatch):
     cfg = _cfg(tmp_path)
     monkeypatch.setattr("paperful.cli_runtime._cfg", lambda _path=None: cfg)
-    monkeypatch.setattr("paperful.network.run.openalex_client", lambda cfg, client=None: FakeOA())
+    monkeypatch.setattr(
+        "paperful.network.run.openalex_client", lambda cfg, client=None: FakeOA()
+    )
     built = runner.invoke(
         cli.app,
         [

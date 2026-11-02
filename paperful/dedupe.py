@@ -202,13 +202,13 @@ def actionable_groups(
 
 
 def merge_preview_total(groups: list[DedupeGroup]) -> int:
-    return sum(
-        len(g.trash) for g in groups if not g.held and g.keep and g.trash
-    )
+    return sum(len(g.trash) for g in groups if not g.held and g.keep and g.trash)
 
 
 def merge_apply_total(groups: list[DedupeGroup], *, apply_medium: bool) -> int:
-    return sum(len(g.trash) for g in actionable_groups(groups, apply_medium=apply_medium))
+    return sum(
+        len(g.trash) for g in actionable_groups(groups, apply_medium=apply_medium)
+    )
 
 
 def apply_merge(
@@ -416,7 +416,11 @@ def _better_title(keep: Any, drop: Any) -> str | None:
     if _is_blank(keep) and isinstance(drop, str) and not _is_blank(drop):
         return drop
     if isinstance(keep, str) and _FILENAME_TITLE.search(keep.strip()):
-        if isinstance(drop, str) and not _is_blank(drop) and not _FILENAME_TITLE.search(drop.strip()):
+        if (
+            isinstance(drop, str)
+            and not _is_blank(drop)
+            and not _FILENAME_TITLE.search(drop.strip())
+        ):
             return drop
     return None
 
@@ -472,8 +476,12 @@ def _union_list(keep: Any, drop: Any) -> list[Any] | None:
 
 def _merge_tags(keep: Any, drop: Any) -> list[dict[str, Any]] | None:
     """Union tags. A manual tag (type 0) wins over an automatic one."""
-    keep_list = [t for t in keep if isinstance(t, dict)] if isinstance(keep, list) else []
-    drop_list = [t for t in drop if isinstance(t, dict)] if isinstance(drop, list) else []
+    keep_list = (
+        [t for t in keep if isinstance(t, dict)] if isinstance(keep, list) else []
+    )
+    drop_list = (
+        [t for t in drop if isinstance(t, dict)] if isinstance(drop, list) else []
+    )
     by: dict[str, int] = {}
     order: list[str] = []
     for tag in keep_list + drop_list:
@@ -487,7 +495,11 @@ def _merge_tags(keep: Any, drop: Any) -> list[dict[str, Any]] | None:
         elif by[name] != 0 and typ == 0:
             by[name] = 0
     merged = [{"tag": name, "type": by[name]} for name in order]
-    keep_norm = [{"tag": str(t.get("tag") or "").strip(), "type": _tag_type(t)} for t in keep_list if str(t.get("tag") or "").strip()]
+    keep_norm = [
+        {"tag": str(t.get("tag") or "").strip(), "type": _tag_type(t)}
+        for t in keep_list
+        if str(t.get("tag") or "").strip()
+    ]
     if merged == keep_norm:
         return None
     return merged
@@ -577,9 +589,7 @@ def _grey_id(items: list[Item]) -> list[DedupeGroup]:
         fresh = [item for item in members if item.key not in seen]
         if len(fresh) < 2:
             continue
-        groups.append(
-            _make_group(fresh, phase="grey_id", doi=value, reason=kind)
-        )
+        groups.append(_make_group(fresh, phase="grey_id", doi=value, reason=kind))
         seen.update(item.key for item in fresh)
     return groups
 
@@ -611,6 +621,7 @@ def _grey_host(items: list[Item]) -> list[DedupeGroup]:
 
 def _medium_title_year(items: list[Item]) -> list[DedupeGroup]:
     from .greyid import registrable_host
+
     buckets: dict[tuple[str, int], list[Item]] = {}
     for item in items:
         if item.year is None or not _has_title(item):
@@ -777,7 +788,9 @@ def _markdown(
         for group in subset:
             review = " (needs review)" if group.needs_review else ""
             donors = ", ".join(f"`{key}`" for key in group.trash) or "none"
-            lines.append(f"- Keep `{group.keep}` — merge into keeper from {donors}{review}")
+            lines.append(
+                f"- Keep `{group.keep}` — merge into keeper from {donors}{review}"
+            )
             for preview in group.merge_preview:
                 fields = ", ".join(preview.get("fields") or []) or "none"
                 moves = preview.get("move") or []

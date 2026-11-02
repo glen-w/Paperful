@@ -25,7 +25,9 @@ def _ops(monkeypatch) -> None:
         "collections_tree",
         lambda _cfg: {"ok": True, "collections": []},
     )
-    monkeypatch.setattr(ui_app, "collections_tree", lambda _cfg: {"ok": True, "collections": []})
+    monkeypatch.setattr(
+        ui_app, "collections_tree", lambda _cfg: {"ok": True, "collections": []}
+    )
 
 
 def _fresh_index(monkeypatch) -> None:
@@ -65,7 +67,18 @@ def test_index_ingest_preview_enqueues(tmp_path, monkeypatch):
 
     def fake(cfg, cmd_id, **kw):
         seen.append(kw)
-        return {"dry_run": kw["dry_run"], "scope": kw["collection"] or "library", "summary": {"pdf": 2, "ocr": 0, "abstract": 0, "unchanged": 1, "failed": 0, "chunks": 8}}
+        return {
+            "dry_run": kw["dry_run"],
+            "scope": kw["collection"] or "library",
+            "summary": {
+                "pdf": 2,
+                "ocr": 0,
+                "abstract": 0,
+                "unchanged": 1,
+                "failed": 0,
+                "chunks": 8,
+            },
+        }
 
     jobs.rag_ingest_fn = fake
     try:
@@ -109,7 +122,17 @@ def test_index_ingest_shows_running_status(tmp_path, monkeypatch):
 
     def fake(cfg, cmd_id, **kw):
         gate.wait(timeout=2)
-        return {"dry_run": True, "summary": {"pdf": 0, "ocr": 0, "abstract": 0, "unchanged": 0, "failed": 0, "chunks": 0}}
+        return {
+            "dry_run": True,
+            "summary": {
+                "pdf": 0,
+                "ocr": 0,
+                "abstract": 0,
+                "unchanged": 0,
+                "failed": 0,
+                "chunks": 0,
+            },
+        }
 
     jobs.rag_ingest_fn = fake
     try:
@@ -171,7 +194,9 @@ def test_index_search_renders_hits(tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.rag.ledger.Ledger", lambda *a, **k: object())
     monkeypatch.setattr("paperful.rag.retrieve.scope_keys", lambda *a, **k: None)
     monkeypatch.setattr("paperful.rag.retrieve.search", lambda *a, **k: [Hit()])
-    monkeypatch.setattr("paperful.llm.preflight.validate_embedder", lambda cfg: object())
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_embedder", lambda cfg: object()
+    )
 
     client = TestClient(create_app(cfg))
     res = client.post(
@@ -260,7 +285,9 @@ def test_index_batch_empty_and_disabled(tmp_path, monkeypatch):
     cfg.llm_enabled = True
     _ops(monkeypatch)
     client = TestClient(create_app(cfg))
-    empty = client.post("/ask/batch", data={"questions": "  \n# hi"}, follow_redirects=False)
+    empty = client.post(
+        "/ask/batch", data={"questions": "  \n# hi"}, follow_redirects=False
+    )
     assert empty.status_code == 303
     assert "error=questions" in (empty.headers.get("location") or "")
     cfg.llm_enabled = False
@@ -329,7 +356,11 @@ def test_index_rag_questions_scope_and_answered_pack(tmp_path, monkeypatch):
     )
     assert "error=scope" in (scope_bad.headers.get("location") or "")
 
-    jobs.rag_questions_fn = lambda cfg, cmd_id, **kw: {"items": 2, "questions": 5, "dry_run": True}
+    jobs.rag_questions_fn = lambda cfg, cmd_id, **kw: {
+        "items": 2,
+        "questions": 5,
+        "dry_run": True,
+    }
     jobs.rag_answered_fn = lambda cfg, cmd_id, **kw: {
         "stamp": "20260101T000000Z",
         "answered": 1,
@@ -423,7 +454,9 @@ def test_ask_batch_job_forwards_prompt_path(tmp_path, monkeypatch):
         return Pack()
 
     monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_ask", lambda cfg: None)
-    monkeypatch.setattr("paperful.llm.preflight.validate_embedder", lambda cfg: object())
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_embedder", lambda cfg: object()
+    )
     monkeypatch.setattr("paperful.llm.get_client", lambda cfg: object())
     monkeypatch.setattr("paperful.rag.index.Index.open", lambda cfg: object())
     monkeypatch.setattr("paperful.rag.ledger.Ledger", lambda *a, **k: object())
@@ -525,7 +558,14 @@ def test_index_synthesize_enqueues(tmp_path, monkeypatch):
 
     def fake(cfg, cmd_id, **kw):
         seen.append(kw["dry_run"])
-        return {"dry_run": True, "slug": "lib", "sources_disk": 1, "sources_note": 0, "missing": 0, "chunks": 1}
+        return {
+            "dry_run": True,
+            "slug": "lib",
+            "sources_disk": 1,
+            "sources_note": 0,
+            "missing": 0,
+            "chunks": 1,
+        }
 
     jobs.synthesize_fn = fake
     try:

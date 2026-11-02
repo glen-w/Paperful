@@ -27,7 +27,9 @@ def europepmc_work(doi: str, *, cache_dir: Path | None = None) -> dict[str, Any]
     return found.get(_norm_doi(doi))
 
 
-def lookup_dois(dois: list[str], *, cache_dir: Path | None = None) -> dict[str, dict[str, Any] | None]:
+def lookup_dois(
+    dois: list[str], *, cache_dir: Path | None = None
+) -> dict[str, dict[str, Any] | None]:
     """Look up these DOIs. None means the DOI is not in Europe PMC.
 
     One search covers the whole list (chunked). ``/references`` runs only for
@@ -53,7 +55,9 @@ def lookup_dois(dois: list[str], *, cache_dir: Path | None = None) -> dict[str, 
     return out
 
 
-def cached_payload(doi: str, cache_dir: Path | None) -> tuple[bool, dict[str, Any] | None]:
+def cached_payload(
+    doi: str, cache_dir: Path | None
+) -> tuple[bool, dict[str, Any] | None]:
     """`(True, payload-or-None)` when this DOI is already cached."""
     if cache_dir is None:
         return False, None
@@ -94,7 +98,12 @@ def spread_dois(dois: list[str], n: int) -> list[str]:
 def _fetch_chunk(dois: list[str]) -> dict[str, dict[str, Any] | None]:
     data = _request(
         _SEARCH,
-        {"query": " OR ".join(f"DOI:{doi}" for doi in dois), "format": "json", "resultType": "core", "pageSize": str(len(dois))},
+        {
+            "query": " OR ".join(f"DOI:{doi}" for doi in dois),
+            "format": "json",
+            "resultType": "core",
+            "pageSize": str(len(dois)),
+        },
     )
     by_doi = {_norm_doi(str(hit.get("doi") or "")): hit for hit in _results(data)}
     by_doi.pop("", None)
@@ -111,12 +120,21 @@ def _fetch_chunk(dois: list[str]) -> dict[str, dict[str, Any] | None]:
             if source and ident:
                 references = _reference_list(source, ident)
         payloads[doi] = _payload(hit, references)
-    _hydrate_pmids([ref for payload in payloads.values() if payload for ref in payload["references"]])
+    _hydrate_pmids(
+        [
+            ref
+            for payload in payloads.values()
+            if payload
+            for ref in payload["references"]
+        ]
+    )
     return payloads
 
 
 def _reference_list(source: str, ident: str) -> list[dict[str, Any]]:
-    data = _request(_REFS.format(source=source, ident=ident), {"format": "json", "pageSize": "1000"})
+    data = _request(
+        _REFS.format(source=source, ident=ident), {"format": "json", "pageSize": "1000"}
+    )
     listed = ((data.get("referenceList") or {}).get("reference")) or []
     refs: list[dict[str, Any]] = []
     for ref in listed:
@@ -147,7 +165,12 @@ def _hydrate_pmids(references: list[dict[str, Any]]) -> None:
         query = " OR ".join(f"EXT_ID:{ref['pmid']}" for ref in chunk)
         data = _request(
             _SEARCH,
-            {"query": query, "format": "json", "resultType": "lite", "pageSize": str(len(chunk))},
+            {
+                "query": query,
+                "format": "json",
+                "resultType": "lite",
+                "pageSize": str(len(chunk)),
+            },
         )
         by_pmid: dict[str, str] = {}
         for hit in _results(data):
@@ -166,7 +189,11 @@ def _payload(hit: dict[str, Any], references: list[dict[str, Any]]) -> dict[str,
         "title": str(hit.get("title") or ""),
         "year": hit.get("pubYear"),
         "venue": str(hit.get("journalTitle") or ""),
-        "authors": [part.strip() for part in str(hit.get("authorString") or "").split(",") if part.strip()],
+        "authors": [
+            part.strip()
+            for part in str(hit.get("authorString") or "").split(",")
+            if part.strip()
+        ],
         "references": references,
     }
 

@@ -18,7 +18,9 @@ from .snowball.authors import PackAuthor, name_fingerprint
 from .zot import Item
 
 NON_OA_SURFACES = frozenset({"paywalled", "no_oa", "license_blocked"})
-_IMAGE_TLDS = frozenset({"png", "jpg", "jpeg", "gif", "webp", "svg", "pdf", "tif", "tiff"})
+_IMAGE_TLDS = frozenset(
+    {"png", "jpg", "jpeg", "gif", "webp", "svg", "pdf", "tif", "tiff"}
+)
 _EMAIL_RE = re.compile(
     r"(?<![A-Za-z0-9._%+\-])([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,24})",
     re.I,

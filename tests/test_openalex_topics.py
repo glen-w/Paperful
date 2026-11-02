@@ -26,7 +26,12 @@ from paperful.snowball.watch import (
     watch_dir,
 )
 
-FIXTURE = Path(__file__).parent / "fixtures" / "openalex_topics" / "keyword_scoring_before_after.json"
+FIXTURE = (
+    Path(__file__).parent
+    / "fixtures"
+    / "openalex_topics"
+    / "keyword_scoring_before_after.json"
+)
 
 
 # ---- run stamp ---------------------------------------------------------------------
@@ -94,7 +99,9 @@ def test_rebaseline_dry_run_then_apply_once(cfg, monkeypatch):
     assert after["rebaselined_for"] == EPOCH_AFTER
     assert after["last_run_at"] == "2026-09-01T00:00:00Z"
     # seen and inbox are left alone: the next run absorbs, it does not forget.
-    assert json.loads((watch_dir(cfg, "bbnj") / "seen.json").read_text())["identities"] == ["doi:10.1/a"]
+    assert json.loads((watch_dir(cfg, "bbnj") / "seen.json").read_text())[
+        "identities"
+    ] == ["doi:10.1/a"]
     assert (watch_dir(cfg, "bbnj") / "inbox.jsonl").read_text() == '{"x": 1}\n'
 
     # Once only.
@@ -114,13 +121,20 @@ def test_rebaseline_skips_new_baselines_and_non_keyword_watches(cfg, monkeypatch
     )
     save_watch(cfg, "fresh", "kw")
     save_watch(cfg, "refsonly", "refs")
-    for name, when in (("fresh", "2026-11-02T00:00:00Z"), ("refsonly", "2026-01-01T00:00:00Z")):
+    for name, when in (
+        ("fresh", "2026-11-02T00:00:00Z"),
+        ("refsonly", "2026-01-01T00:00:00Z"),
+    ):
         path = watch_dir(cfg, name) / "watch.json"
         body = load_watch(cfg, name)
         body["baseline_at"] = when
         path.write_text(json.dumps(body), encoding="utf-8")
-    assert "after the topic change" in rebaseline_watch(cfg, "fresh", apply=True)["reason"]
-    assert rebaseline_watch(cfg, "refsonly", apply=True)["reason"] == "not keyword-based"
+    assert (
+        "after the topic change" in rebaseline_watch(cfg, "fresh", apply=True)["reason"]
+    )
+    assert (
+        rebaseline_watch(cfg, "refsonly", apply=True)["reason"] == "not keyword-based"
+    )
     assert load_watch(cfg, "fresh")["baseline_at"] == "2026-11-02T00:00:00Z"
     assert list_watch_names(cfg) == ["fresh", "refsonly"]
 
@@ -142,12 +156,15 @@ def test_rebaseline_cli_dry_run_and_apply(cfg, monkeypatch, tmp_path):
         "[snowball]\nenabled = true\n"
     )
     runner = CliRunner()
-    res = runner.invoke(cli.app, ["snowball", "watch", "rebaseline", "--all", "-c", str(conf)])
+    res = runner.invoke(
+        cli.app, ["snowball", "watch", "rebaseline", "--all", "-c", str(conf)]
+    )
     assert res.exit_code == 0, res.stdout
     assert "would reset" in res.stdout and "Dry run" in res.stdout
     assert load_watch(cfg, "bbnj")["baseline_at"] == "2026-05-01T00:00:00Z"
     res = runner.invoke(
-        cli.app, ["snowball", "watch", "rebaseline", "--all", "--apply", "-c", str(conf)]
+        cli.app,
+        ["snowball", "watch", "rebaseline", "--all", "--apply", "-c", str(conf)],
     )
     assert res.exit_code == 0, res.stdout
     assert load_watch(cfg, "bbnj")["baseline_at"] is None
@@ -206,7 +223,11 @@ def _candidate(work: dict, shared: list[str]) -> Candidate:
         hop=1,
         direction="keywords",
         ids={"openalex": short},
-        biblio={"title": work["title"], "cited_by_count": work["cited_by_count"], "keyword_overlap": len(shared)},
+        biblio={
+            "title": work["title"],
+            "cited_by_count": work["cited_by_count"],
+            "keyword_overlap": len(shared),
+        },
         why="",
         status="new",
         provenance={},
@@ -223,13 +244,17 @@ def test_keyword_scoring_matches_the_frozen_before_after_fixture(epoch):
     assert seed == want["seed_keywords"]
     rows = []
     for work in data["neighbours"]:
-        shared = [k for k in chosen_keywords(work, limit=0, min_score=min_score) if k in seed]
+        shared = [
+            k for k in chosen_keywords(work, limit=0, min_score=min_score) if k in seed
+        ]
         rows.append(_candidate(work, shared))
     apply_overlap(rows)
     by_id = {r.ids["openalex"]: r for r in rows}
     assert {k: v.biblio["overlap"] for k, v in by_id.items()} == want["overlap"]
     assert {k: v.score for k, v in by_id.items()} == want["scores"]
-    assert [r.ids["openalex"] for r in sorted(rows, key=lambda r: -r.score)] == want["ranked"]
+    assert [r.ids["openalex"] for r in sorted(rows, key=lambda r: -r.score)] == want[
+        "ranked"
+    ]
 
 
 def test_the_two_epochs_rank_the_same_neighbours_differently():

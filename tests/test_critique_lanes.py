@@ -107,7 +107,9 @@ def test_lane_state_absorb_skips_empty_claims_without_ledger():
 
     state = _LaneState()
     extra = [make_finding(code="x", severity="info", lane="suggested")]
-    state.absorb(extra, {"reviewers": [{"id": "a"}], "prompt_sha": "abc", "narrative": "n"})
+    state.absorb(
+        extra, {"reviewers": [{"id": "a"}], "prompt_sha": "abc", "narrative": "n"}
+    )
     assert len(state.out) == 1
     assert state.first_sha == "abc"
     assert state.first_narrative == "n"

@@ -108,7 +108,9 @@ def run_network_export(
     out = dest if dest is not None else run_dir(cfg, run_id) / f"export.{fmt}"
     kind = (fmt or "csv").strip().lower()
     if kind == "csv":
-        path = _write_edge_csv(out.with_suffix(".csv") if out.suffix != ".csv" else out, graph)
+        path = _write_edge_csv(
+            out.with_suffix(".csv") if out.suffix != ".csv" else out, graph
+        )
     elif kind in {"gexf", "graphml"}:
         path = _call(lambda: _write_nx(out, graph, kind))
     else:
@@ -134,7 +136,9 @@ def run_network_attributes(
     if write_template or not dest.is_file():
         rows = bundle.get("attributes") or seed_attributes(bundle.get("graph") or {})
         write_attributes_csv(dest, rows)
-        console.print(f"Wrote [bold]{dest}[/] — edit region / discipline / sector / career_stage, then re-run without --write-template to recompute brokerage.")
+        console.print(
+            f"Wrote [bold]{dest}[/] — edit region / discipline / sector / career_stage, then re-run without --write-template to recompute brokerage."
+        )
         return
     updated = _call(lambda: refresh_metrics(cfg, run_id))
     console.print(
@@ -163,7 +167,9 @@ def run_network_list(console: Console, *, config: Path | None, fmt: str) -> None
         )
         return
     if not rows:
-        console.print("No network runs yet. Try [bold]paperful network orcid <orcid>[/].")
+        console.print(
+            "No network runs yet. Try [bold]paperful network orcid <orcid>[/]."
+        )
         return
     table = Table(title="Network runs")
     table.add_column("run_id")
@@ -182,7 +188,9 @@ def run_network_list(console: Console, *, config: Path | None, fmt: str) -> None
     console.print(table)
 
 
-def _emit_run(console: Console, bundle: dict[str, Any], *, fmt: str, command: str) -> None:
+def _emit_run(
+    console: Console, bundle: dict[str, Any], *, fmt: str, command: str
+) -> None:
     meta = bundle.get("meta") or {}
     metrics = bundle.get("metrics") or {}
     if fmt == "json":
@@ -202,7 +210,10 @@ def _emit_run(console: Console, bundle: dict[str, Any], *, fmt: str, command: st
                     items=metrics.get("by_phase") or [],
                     paths={"run": bundle.get("path") or ""},
                     flags={"partition": meta.get("partition") or "none"},
-                    report={"ego": metrics.get("ego"), "brokerage": metrics.get("brokerage")},
+                    report={
+                        "ego": metrics.get("ego"),
+                        "brokerage": metrics.get("brokerage"),
+                    },
                 ),
                 indent=2,
             )

@@ -15,7 +15,9 @@ from .authors import host_of, is_blocked_host, is_simple_host
 
 
 def searxng_base_url(cfg: Config) -> str:
-    return (cfg.searxng_base_url or os.environ.get("SEARXNG_BASE_URL") or "").rstrip("/")
+    return (cfg.searxng_base_url or os.environ.get("SEARXNG_BASE_URL") or "").rstrip(
+        "/"
+    )
 
 
 def rank_hit(url: str, *, surname: str, title: str = "") -> int:
@@ -56,7 +58,9 @@ def search_query(
     q = (query or "").strip()
     if not base or not q:
         return []
-    folder = cache_dir if cache_dir is not None else cfg.state_dir / "critique" / "searxng"
+    folder = (
+        cache_dir if cache_dir is not None else cfg.state_dir / "critique" / "searxng"
+    )
     want = max(1, int(limit))
     max_pages = max(1, int(pages or max(1, (want + 19) // 20)))
     if getter is not None:
@@ -117,7 +121,9 @@ def search_author_site(
         score = rank_hit(url, surname=surname or name.split()[-1] if name else "")
         if score < 0:
             continue
-        ranked.append((score, {"url": url, "title": str(row.get("title") or ""), "score": score}))
+        ranked.append(
+            (score, {"url": url, "title": str(row.get("title") or ""), "score": score})
+        )
     ranked.sort(key=lambda pair: -pair[0])
     return [row for _score, row in ranked[:8]]
 

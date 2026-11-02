@@ -232,8 +232,10 @@ class _LaneState:
     ) -> None:
         self.out.extend(extra)
         self.reviewer_meta.extend(meta.get("reviewers") or [])
-        keep = extra or (keep_if_narrative and meta.get("narrative")) or (
-            keep_if_ledger and meta.get("ledger")
+        keep = (
+            extra
+            or (keep_if_narrative and meta.get("narrative"))
+            or (keep_if_ledger and meta.get("ledger"))
         )
         if keep:
             self.first_sha = self.first_sha or str(meta.get("prompt_sha") or "")
@@ -260,9 +262,7 @@ def _run_optional_lane(
         say(start_msg)
     t0 = time.perf_counter()
     extra, meta = runner()
-    say(
-        f"{done_label} ({time.perf_counter() - t0:.0f}s, {len(extra)} comment(s))"
-    )
+    say(f"{done_label} ({time.perf_counter() - t0:.0f}s, {len(extra)} comment(s))")
     return extra, meta
 
 
@@ -294,10 +294,7 @@ def _run_reviewers(
             continue
         timeout_s = float(cfg.llm_timeout_s or 120)
         label = f"Reviewer {i}/{n_reviewers} {reviewer.id}"
-        say(
-            f"{label} · {model} "
-            f"(wall {timeout_s:.0f}s, idle {timeout_s:.0f}s)…"
-        )
+        say(f"{label} · {model} (wall {timeout_s:.0f}s, idle {timeout_s:.0f}s)…")
         prompt_sha = sha256((prompt + user[:2000]).encode("utf-8")).hexdigest()[:12]
         max_tokens = int(getattr(reviewer, "max_tokens", CRITIQUE_REVIEWER_MAX_TOKENS))
         request = ChatRequest(
@@ -710,17 +707,13 @@ def suggested_from_llm(
             row["outline_ledger"] = list(outline_meta.get("ledger") or [])
         if claims_meta:
             row["claims"] = {
-                k: v
-                for k, v in claims_meta.items()
-                if k not in {"reviewers", "ledger"}
+                k: v for k, v in claims_meta.items() if k not in {"reviewers", "ledger"}
             }
             row["claims_ledger"] = list(claims_meta.get("ledger") or [])
         if verify_meta:
             row["verify"] = {k: v for k, v in verify_meta.items() if k != "reviewers"}
         if context_meta:
-            row["context"] = {
-                k: v for k, v in context_meta.items() if k != "reviewers"
-            }
+            row["context"] = {k: v for k, v in context_meta.items() if k != "reviewers"}
         return row
 
     if (

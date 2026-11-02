@@ -842,9 +842,7 @@ def plan_page(
         return plan_dict(empty, match, doi=doi, url=url, title=title)
     if index is None:
         index = prepare(cfg, opener=opener, run_sync_fn=run_sync_fn)
-    match = lookup(
-        index, doi=doi, url=url, title=title, year=year, pdf_url=pdf_url
-    )
+    match = lookup(index, doi=doi, url=url, title=title, year=year, pdf_url=pdf_url)
     return plan_dict(index, match, doi=doi, url=url, title=title)
 
 
@@ -867,7 +865,9 @@ def _record_files(out_dir: Path, key: str) -> list[Path]:
 def _folder_has_pdf(folder: Path) -> bool:
     if not folder.is_dir():
         return False
-    return any(path.is_file() and path.stat().st_size > 0 for path in folder.glob("*.pdf"))
+    return any(
+        path.is_file() and path.stat().st_size > 0 for path in folder.glob("*.pdf")
+    )
 
 
 def _fill_blanks(rec: dict[str, Any], page: dict[str, Any]) -> None:
@@ -1048,7 +1048,11 @@ def _strip_active_html(text: str) -> str:
 
 def _looks_like_html(text: str) -> bool:
     sample = text.lstrip()[:400].lower()
-    return sample.startswith("<!doctype html") or sample.startswith("<html") or "<html" in sample
+    return (
+        sample.startswith("<!doctype html")
+        or sample.startswith("<html")
+        or "<html" in sample
+    )
 
 
 def _note_snapshot(cfg: Config, key: str, page_url: str) -> None:
@@ -1058,7 +1062,8 @@ def _note_snapshot(cfg: Config, key: str, page_url: str) -> None:
         if not isinstance(rows, list):
             rows = []
         if not any(
-            isinstance(row, dict) and row.get("filename") == SNAPSHOT_NAME for row in rows
+            isinstance(row, dict) and row.get("filename") == SNAPSHOT_NAME
+            for row in rows
         ):
             rows.append(
                 {
@@ -1261,9 +1266,7 @@ def apply_page(
         return _fail("refused_host")
     if index is None:
         index = prepare(cfg, opener=opener, run_sync_fn=run_sync_fn)
-    match = lookup(
-        index, doi=doi, url=url, title=title, year=year, pdf_url=pdf_url
-    )
+    match = lookup(index, doi=doi, url=url, title=title, year=year, pdf_url=pdf_url)
     if match.action == "blocked" and match.reason == "refused_host":
         return _fail("refused_host")
     if match.action == "ambiguous":
@@ -1367,9 +1370,9 @@ def apply_page(
         "note": note,
         "lanes": lanes,
         "folder": str(folder),
-        "collection": collection if match.action == "create" else (
-            (item.collection_paths or [""])[0]
-        ),
+        "collection": collection
+        if match.action == "create"
+        else ((item.collection_paths or [""])[0]),
         "tags": tags,
         "reason": ""
         if placed in {"saved", "kept"} or snapshot in {"saved", "kept"}

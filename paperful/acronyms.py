@@ -19,9 +19,7 @@ from .zot import Item
 SCHEMA = "paperful.acronyms.v1"
 _TOKEN = re.compile(r"\b[A-Z][A-Z0-9]{2,9}\b")
 # A real Roman numeral, not merely letters from that alphabet (so LCD stays).
-_ROMAN = re.compile(
-    r"^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$"
-)
+_ROMAN = re.compile(r"^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$")
 _SMALL = frozenset(
     {
         "AND",

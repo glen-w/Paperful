@@ -124,7 +124,9 @@ def test_collect_pack_both_evidence_stamps(tmp_path):
     assert stamps == {"held", "public-metadata-only"}
     assert counts["held"] >= 1
     assert counts["public_metadata_only"] == 1
-    folder = write_pack(cfg.state_dir, "library", "area-based management", rows, [], counts)
+    folder = write_pack(
+        cfg.state_dir, "library", "area-based management", rows, [], counts
+    )
     dois = (folder / "dois.txt").read_text(encoding="utf-8")
     assert "10.1000/public" in dois
     assert "10.1000/held" not in dois

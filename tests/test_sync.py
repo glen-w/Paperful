@@ -123,9 +123,7 @@ class FakeZotero:
             raise LibraryReadError("Zotero read failed (library changes)")
         live = self._live()
         rows = [
-            self._out(r)
-            for r in live.values()
-            if since is None or r["version"] > since
+            self._out(r) for r in live.values() if since is None or r["version"] > since
         ]
         return ChangeSet(
             version=self.version,
@@ -171,7 +169,9 @@ class FakeZotero:
         return self.calls["raw_item"] + self.calls["children"]
 
 
-def _folder(cfg, key: str, collection: str = "Alpha", title: str = "First title") -> Path:
+def _folder(
+    cfg, key: str, collection: str = "Alpha", title: str = "First title"
+) -> Path:
     return cfg.out_dir / collection / f"Smith - 2020 - {title} -- {key}"
 
 
@@ -662,7 +662,9 @@ def test_a_commands_first_refresh_does_not_start_the_whole_pdf_copy(cfg):
     assert stats.full and stats.pdf_exports == 0 and zot.calls["export_pdf"] == 0
     assert not sync_state(cfg.out_dir)["pdfs_complete"]
     zot.attach("ITEM0002", "ATT00002")
-    stats = run_sync(cfg, zot, pdfs="all", backfill=False)  # later: the changed item only
+    stats = run_sync(
+        cfg, zot, pdfs="all", backfill=False
+    )  # later: the changed item only
     assert stats.pdf_exports == 1
     assert not sync_state(cfg.out_dir)["pdfs_complete"]
     stats = run_sync(cfg, zot, pdfs="all")  # paperful sync finishes the job

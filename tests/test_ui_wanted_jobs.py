@@ -29,7 +29,13 @@ def test_attach_preview_apply_hook(tmp_path, monkeypatch):
     monkeypatch.setattr(
         wanted_jobs,
         "_load_items",
-        lambda _c, _col: (None, [], __import__("paperful.store", fromlist=["Manifest"]).Manifest(cfg.manifest_path)),
+        lambda _c, _col: (
+            None,
+            [],
+            __import__("paperful.store", fromlist=["Manifest"]).Manifest(
+                cfg.manifest_path
+            ),
+        ),
     )
     from paperful.store import Manifest
 
@@ -79,9 +85,7 @@ def test_attach_preview_fingerprint_matches_pending_subset(tmp_path, monkeypatch
     cfg.state_dir.mkdir(parents=True)
     items = [_Item("K1", "10.1/a"), _Item("K2", "10.2/b")]
     manifest = Manifest(cfg.manifest_path)
-    manifest.write(
-        Record(itemKey="K1", status=STATUS_OK, doi="10.1/a", path="a.pdf")
-    )
+    manifest.write(Record(itemKey="K1", status=STATUS_OK, doi="10.1/a", path="a.pdf"))
     monkeypatch.setattr(
         wanted_jobs,
         "_load_items",
@@ -114,7 +118,8 @@ def test_attach_preview_fingerprint_matches_pending_subset(tmp_path, monkeypatch
 
 
 @pytest.mark.skipif(
-    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available()
+    is False,
     reason="paperful[serve] extra missing",
 )
 def test_wanted_attach_http_409(tmp_path, monkeypatch):
@@ -128,7 +133,9 @@ def test_wanted_attach_http_409(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ops,
         "doctor_payload",
-        lambda _cfg, probe=False: [{"name": "x", "status": "green", "code": "", "detail": ""}],
+        lambda _cfg, probe=False: [
+            {"name": "x", "status": "green", "code": "", "detail": ""}
+        ],
     )
     client = TestClient(create_app(cfg))
     res = client.post("/wanted/attach", data={"review_token": "missing"})
@@ -136,7 +143,8 @@ def test_wanted_attach_http_409(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(
-    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available()
+    is False,
     reason="paperful[serve] extra missing",
 )
 def test_wanted_attach_keys_ignore_stale_preview(tmp_path, monkeypatch):
@@ -160,7 +168,9 @@ def test_wanted_attach_keys_ignore_stale_preview(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ops,
         "doctor_payload",
-        lambda _cfg, probe=False: [{"name": "x", "status": "green", "code": "", "detail": ""}],
+        lambda _cfg, probe=False: [
+            {"name": "x", "status": "green", "code": "", "detail": ""}
+        ],
     )
     attached: list[str] = []
 

@@ -8,6 +8,7 @@ from typing import Any
 import typer
 from rich.console import Console
 
+
 def run_recover(
     console: Console,
     *,
@@ -172,4 +173,3 @@ def run_recover(
         human=lambda: print_run_summary(console, report, path),
     )
     cli_mod._flush(backend)
-

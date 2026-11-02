@@ -80,7 +80,11 @@ def _mock_http(monkeypatch, handler):
     )
 
 
-ARTICLE = "<html><body>" + "A real article body about marine governance. " * 6 + "</body></html>"
+ARTICLE = (
+    "<html><body>"
+    + "A real article body about marine governance. " * 6
+    + "</body></html>"
+)
 
 
 def _http(request: httpx.Request) -> httpx.Response:
@@ -92,9 +96,13 @@ def _http(request: httpx.Request) -> httpx.Response:
     if path == "/old":
         return httpx.Response(301, headers={"location": "https://example.org/ok"})
     if path == "/stub":
-        return httpx.Response(200, text="<html>x</html>", headers={"content-type": "text/html"})
+        return httpx.Response(
+            200, text="<html>x</html>", headers={"content-type": "text/html"}
+        )
     if path == "/file.pdf":
-        return httpx.Response(200, content=b"%PDF-1.4", headers={"content-type": "application/pdf"})
+        return httpx.Response(
+            200, content=b"%PDF-1.4", headers={"content-type": "application/pdf"}
+        )
     return httpx.Response(500, text="boom")
 
 
@@ -131,7 +139,10 @@ def test_urls_report_json_classifies_every_target(cfg_file, monkeypatch):
                         "url": "https://example.org/file.pdf",
                     },
                 },
-                {"key": "CH2", "data": {"contentType": "text/html", "url": "https://x.test"}},
+                {
+                    "key": "CH2",
+                    "data": {"contentType": "text/html", "url": "https://x.test"},
+                },
             ]
         },
     )
@@ -177,7 +188,9 @@ def test_urls_apply_rewrites_only_known_playbook_targets(cfg_file, monkeypatch):
     _mock_http(monkeypatch, _http)
     monkeypatch.setattr(
         "paperful.urls.planned_rewrite",
-        lambda url, playbooks=None: "https://example.org/ok.pdf" if url.endswith("/ok") else None,
+        lambda url, playbooks=None: (
+            "https://example.org/ok.pdf" if url.endswith("/ok") else None
+        ),
     )
     res = runner.invoke(
         cli.app,
@@ -192,13 +205,18 @@ def test_urls_apply_rewrites_only_known_playbook_targets(cfg_file, monkeypatch):
 
 
 def test_urls_apply_refused_when_library_is_read_only(cfg_file, monkeypatch):
-    backend = FakeBackend([make_item(key="OKAY", url="https://example.org/ok")], write=False)
+    backend = FakeBackend(
+        [make_item(key="OKAY", url="https://example.org/ok")], write=False
+    )
     _wire(monkeypatch, backend)
     _mock_http(monkeypatch, _http)
     monkeypatch.setattr(
-        "paperful.urls.planned_rewrite", lambda url, playbooks=None: "https://example.org/x.pdf"
+        "paperful.urls.planned_rewrite",
+        lambda url, playbooks=None: "https://example.org/x.pdf",
     )
-    res = runner.invoke(cli.app, ["urls", "--library", "--apply", "--config", str(cfg_file)])
+    res = runner.invoke(
+        cli.app, ["urls", "--library", "--apply", "--config", str(cfg_file)]
+    )
     assert res.exit_code == 0, res.output
     assert backend.patches == []
     assert "Refused 1" in res.output
@@ -214,7 +232,9 @@ def _cfg_obj(cfg_file):
 def _proposal(cfg, key="P1", body=None, status=None):
     item = make_item(key=key, title="Marine governance of the high seas")
     text = body if body is not None else ("Marine governance of the high seas. " * 80)
-    path = write_proposal(cfg, item, b"%PDF-1.4 fake", "https://example.org/article", body=text)
+    path = write_proposal(
+        cfg, item, b"%PDF-1.4 fake", "https://example.org/article", body=text
+    )
     if status:
         data = json.loads(path.read_text(encoding="utf-8"))
         data["status"] = status
@@ -224,7 +244,9 @@ def _proposal(cfg, key="P1", body=None, status=None):
 
 def test_htmlpdf_list_empty_and_filtered(cfg_file):
     cfg = _cfg_obj(cfg_file)
-    res = runner.invoke(cli.app, ["htmlpdf", "proposals", "list", "--config", str(cfg_file)])
+    res = runner.invoke(
+        cli.app, ["htmlpdf", "proposals", "list", "--config", str(cfg_file)]
+    )
     assert res.exit_code == 0
     assert "No HTML snapshot proposals" in res.output
 
@@ -248,7 +270,9 @@ def test_htmlpdf_reject_removes_pdf_and_marks_rejected(cfg_file):
     path = _proposal(cfg, "P1")
     pdf = proposals_dir(cfg) / "P1.pdf"
     assert pdf.is_file()
-    res = runner.invoke(cli.app, ["htmlpdf", "proposals", "reject", "P1", "--config", str(cfg_file)])
+    res = runner.invoke(
+        cli.app, ["htmlpdf", "proposals", "reject", "P1", "--config", str(cfg_file)]
+    )
     assert res.exit_code == 0, res.output
     assert "Rejected proposal P1" in res.output
     assert json.loads(path.read_text(encoding="utf-8"))["status"] == "rejected"
@@ -270,7 +294,16 @@ def test_htmlpdf_apply_attaches_and_marks_applied(cfg_file, monkeypatch):
     _wire(monkeypatch, backend)
     res = runner.invoke(
         cli.app,
-        ["htmlpdf", "proposals", "apply", "P1", "--format", "json", "--config", str(cfg_file)],
+        [
+            "htmlpdf",
+            "proposals",
+            "apply",
+            "P1",
+            "--format",
+            "json",
+            "--config",
+            str(cfg_file),
+        ],
     )
     assert res.exit_code == 0, res.output
     assert backend.attached and backend.attached[0][0] == "P1"
@@ -284,7 +317,9 @@ def test_htmlpdf_apply_human_message(cfg_file, monkeypatch):
     cfg = _cfg_obj(cfg_file)
     _proposal(cfg, "P1")
     _wire(monkeypatch, FakeBackend([]))
-    res = runner.invoke(cli.app, ["htmlpdf", "proposals", "apply", "P1", "--config", str(cfg_file)])
+    res = runner.invoke(
+        cli.app, ["htmlpdf", "proposals", "apply", "P1", "--config", str(cfg_file)]
+    )
     assert res.exit_code == 0, res.output
     assert "Attached snapshot P1" in res.output
 
@@ -294,7 +329,9 @@ def test_htmlpdf_apply_needs_write_support(cfg_file, monkeypatch):
     _proposal(cfg, "P1")
     backend = FakeBackend([], write=False)
     _wire(monkeypatch, backend)
-    res = runner.invoke(cli.app, ["htmlpdf", "proposals", "apply", "P1", "--config", str(cfg_file)])
+    res = runner.invoke(
+        cli.app, ["htmlpdf", "proposals", "apply", "P1", "--config", str(cfg_file)]
+    )
     assert res.exit_code == 2
     assert "needs library write support" in res.output
     assert backend.attached == []
@@ -306,9 +343,13 @@ def test_htmlpdf_apply_refuses_non_pending_and_failed_gate(cfg_file, monkeypatch
     _proposal(cfg, "EMPTY", body=" ")
     backend = FakeBackend([])
     _wire(monkeypatch, backend)
-    done = runner.invoke(cli.app, ["htmlpdf", "proposals", "apply", "DONE", "--config", str(cfg_file)])
+    done = runner.invoke(
+        cli.app, ["htmlpdf", "proposals", "apply", "DONE", "--config", str(cfg_file)]
+    )
     assert done.exit_code == 1 and "is applied" in done.output
-    empty = runner.invoke(cli.app, ["htmlpdf", "proposals", "apply", "EMPTY", "--config", str(cfg_file)])
+    empty = runner.invoke(
+        cli.app, ["htmlpdf", "proposals", "apply", "EMPTY", "--config", str(cfg_file)]
+    )
     assert empty.exit_code == 1 and "failed the page gate" in empty.output
     assert backend.attached == []
 
@@ -319,9 +360,13 @@ def test_htmlpdf_apply_missing_pdf_and_attach_failure(cfg_file, monkeypatch):
     (proposals_dir(cfg) / "NOPDF.pdf").unlink()
     _proposal(cfg, "BAD")
     _wire(monkeypatch, FakeBackend([], attach_ok=False))
-    missing = runner.invoke(cli.app, ["htmlpdf", "proposals", "apply", "NOPDF", "--config", str(cfg_file)])
+    missing = runner.invoke(
+        cli.app, ["htmlpdf", "proposals", "apply", "NOPDF", "--config", str(cfg_file)]
+    )
     assert missing.exit_code == 1 and "missing a PDF" in missing.output
-    bad = runner.invoke(cli.app, ["htmlpdf", "proposals", "apply", "BAD", "--config", str(cfg_file)])
+    bad = runner.invoke(
+        cli.app, ["htmlpdf", "proposals", "apply", "BAD", "--config", str(cfg_file)]
+    )
     assert bad.exit_code == 1 and "zotero said no" in bad.output
     data = json.loads((proposals_dir(cfg) / "BAD.json").read_text(encoding="utf-8"))
     assert data["status"] == "pending"  # a failed attach does not consume the proposal

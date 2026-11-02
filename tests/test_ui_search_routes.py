@@ -32,7 +32,9 @@ class FakeSearXNG:
 def env(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
-    cfg = Config(email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg = Config(
+        email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state"
+    )
     cfg.state_dir.mkdir(parents=True)
     cfg.searxng_base_url = "http://searx.test"
     monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _c, probe=False: [])
@@ -90,7 +92,12 @@ def test_search_get_and_web_tab(env):
 def test_search_run_enqueues_when_searxng_set(env):
     res = env.client.post(
         "/discover/search/run",
-        data={"query": "Gjerde IUCN", "hosts": "iucn.org", "filetype": "pdf", "max": "10"},
+        data={
+            "query": "Gjerde IUCN",
+            "hosts": "iucn.org",
+            "filetype": "pdf",
+            "max": "10",
+        },
         follow_redirects=False,
     )
     assert res.status_code == 303
@@ -121,7 +128,9 @@ def test_search_run_blank_query_does_not_enqueue(env):
 def test_search_run_unset_searxng_does_not_enqueue(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
-    cfg = Config(email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg = Config(
+        email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state"
+    )
     cfg.state_dir.mkdir(parents=True)
     cfg.searxng_base_url = ""
     monkeypatch.delenv("SEARXNG_BASE_URL", raising=False)
@@ -150,7 +159,9 @@ def test_search_run_unset_searxng_does_not_enqueue(tmp_path, monkeypatch):
 def test_web_tab_hidden_when_pref_off(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
-    cfg = Config(email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg = Config(
+        email="t@example.org", out_dir=tmp_path / "out", state_dir=tmp_path / "state"
+    )
     cfg.state_dir.mkdir(parents=True)
     cfg.ui_web_search = "off"
     cfg.searxng_base_url = "http://searx.test"
@@ -159,7 +170,9 @@ def test_web_tab_hidden_when_pref_off(tmp_path, monkeypatch):
         "paperful.ui.app.collections_tree", lambda _c: {"ok": True, "collections": []}
     )
     queued: list = []
-    monkeypatch.setattr(commands, "enqueue", lambda *_a, **_k: queued.append("x") or "cmd1")
+    monkeypatch.setattr(
+        commands, "enqueue", lambda *_a, **_k: queued.append("x") or "cmd1"
+    )
     client = TestClient(create_app(cfg), raise_server_exceptions=False)
     res = client.get("/discover", params={"tab": "web"})
     assert res.status_code == 200

@@ -48,7 +48,20 @@ def keyword_depth(explicit: int | None) -> int:
 
 MAX_STEM_VARIANTS = 8
 MAX_SEARCH_BYTES = 3500
-_STEM_SUFFIXES = ("", "s", "es", "ing", "ed", "ion", "ions", "al", "ally", "ic", "ical", "y")
+_STEM_SUFFIXES = (
+    "",
+    "s",
+    "es",
+    "ing",
+    "ed",
+    "ion",
+    "ions",
+    "al",
+    "ally",
+    "ic",
+    "ical",
+    "y",
+)
 
 
 def expand_search_term(term: str) -> tuple[str, list[str]]:
@@ -96,7 +109,9 @@ def expand_search_term(term: str) -> tuple[str, list[str]]:
             kept.append(word)
             size += extra
         group = " OR ".join(kept or variants[:1])
-        notices.append("stem expansion truncated to keep search= under OpenAlex's URL cap")
+        notices.append(
+            "stem expansion truncated to keep search= under OpenAlex's URL cap"
+        )
     return f"({group})" if " OR " in group else group, notices
 
 
@@ -139,8 +154,12 @@ def compose_keyword_query(
                 bits.append(f'"{_escape_phrase(part)}"')
         query = joiner.join(bits)
     if len(query.encode("utf-8")) > MAX_SEARCH_BYTES:
-        query = query.encode("utf-8")[:MAX_SEARCH_BYTES].decode("utf-8", errors="ignore")
-        bucket.append("keyword query truncated to keep search= under OpenAlex's URL cap")
+        query = query.encode("utf-8")[:MAX_SEARCH_BYTES].decode(
+            "utf-8", errors="ignore"
+        )
+        bucket.append(
+            "keyword query truncated to keep search= under OpenAlex's URL cap"
+        )
     return query
 
 
@@ -428,7 +447,9 @@ def unique_ids(ids: list[str]) -> list[str]:
     return seen
 
 
-def sample_ids(ids: list[str], limit: int, *, rng: random.Random | None = None) -> list[str]:
+def sample_ids(
+    ids: list[str], limit: int, *, rng: random.Random | None = None
+) -> list[str]:
     """Keep ``limit`` ids at random. ``limit <= 0`` keeps every id."""
     cleaned = unique_ids(ids)
     if limit <= 0 or len(cleaned) <= limit:
@@ -540,7 +561,9 @@ def format_direction(sides: frozenset[str]) -> str:
     """Canonical direction string. refs+cites stays ``both``."""
     if sides == frozenset({"refs", "cites"}):
         return "both"
-    ordered = [side for side in ("refs", "cites", "keywords", "similar") if side in sides]
+    ordered = [
+        side for side in ("refs", "cites", "keywords", "similar") if side in sides
+    ]
     return "+".join(ordered)
 
 

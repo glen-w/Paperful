@@ -59,7 +59,9 @@ def run_sr_status(cfg, *, slug: str) -> int:
         d = str(row.get("decision") or "")
         if d in counts:
             counts[d] += 1
-    console.print(f"Review {slug}: {protocol.get('title') or protocol.get('question') or '(no title)'}")
+    console.print(
+        f"Review {slug}: {protocol.get('title') or protocol.get('question') or '(no title)'}"
+    )
     console.print(f"Screening: {counts}")
     return 0
 

@@ -180,7 +180,9 @@ def _from_pdf(path: Path) -> ExtractedDoc:
     text = text_from_pdf(path, max_pages=None)
     # Split on form feed when pdftotext kept pages; else one blob.
     raw_pages = [p for p in text.split("\f")] if "\f" in text else [text]
-    pages = [p.strip() for p in raw_pages if p.strip()] or ([text] if text.strip() else [])
+    pages = [p.strip() for p in raw_pages if p.strip()] or (
+        [text] if text.strip() else []
+    )
     alnum = sum(1 for ch in text if ch.isalnum())
     finding = "ok"
     if alnum < MIN_ALNUM:
@@ -201,7 +203,9 @@ def _from_plain(path: Path, fmt: str) -> ExtractedDoc:
     raw = path.read_bytes()
     text = raw.decode("utf-8", errors="replace")
     paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
-    return _finish(paras or ([text] if text.strip() else []), fmt=fmt, loc_kind="paragraph")
+    return _finish(
+        paras or ([text] if text.strip() else []), fmt=fmt, loc_kind="paragraph"
+    )
 
 
 def _from_html(path: Path) -> ExtractedDoc:
@@ -252,13 +256,16 @@ def _from_odt(path: Path) -> ExtractedDoc:
             paras.append(line)
     if not paras:
         body = root.find(f"{_OFFICE_NS}body")
-        blob = "".join(body.itertext()) if body is not None else "".join(root.itertext())
+        blob = (
+            "".join(body.itertext()) if body is not None else "".join(root.itertext())
+        )
         paras = [p.strip() for p in blob.splitlines() if p.strip()]
     return _finish(paras, fmt="odt", loc_kind="paragraph")
 
 
 def _from_rtf(path: Path) -> ExtractedDoc:
     raw = path.read_text(encoding="latin-1", errors="replace")
+
     # Hex escapes first, then drop control words.
     def _hex(match: re.Match[str]) -> str:
         token = match.group(0)
@@ -277,7 +284,11 @@ def _from_rtf(path: Path) -> ExtractedDoc:
 
     text = _RTF_GROUP.sub(_hex, raw)
     text = re.sub(r"[ \t]+\n", "\n", text)
-    paras = [p.strip() for p in re.split(r"\n+", text) if p.strip() and not p.startswith("rtf")]
+    paras = [
+        p.strip()
+        for p in re.split(r"\n+", text)
+        if p.strip() and not p.startswith("rtf")
+    ]
     return _finish(paras, fmt="rtf", loc_kind="paragraph")
 
 

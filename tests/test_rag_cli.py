@@ -53,7 +53,9 @@ def fakes(monkeypatch):
     """Swap the embedder, parser and chat client for offline stand-ins."""
     embedder, chat = FakeEmbedder(), StubChat()
     monkeypatch.setattr("paperful.llm.validate_embedder", lambda cfg: embedder)
-    monkeypatch.setattr("paperful.llm.preflight.validate_llm_for_ask", lambda cfg: "stub")
+    monkeypatch.setattr(
+        "paperful.llm.preflight.validate_llm_for_ask", lambda cfg: "stub"
+    )
     monkeypatch.setattr("paperful.llm.get_client", lambda cfg: chat)
     monkeypatch.setattr("paperful.rag.ingest.get_parser", lambda cfg: TextFileParser())
     monkeypatch.setattr("paperful.rag.ingest.ocrmypdf_available", lambda: False)
@@ -230,15 +232,23 @@ def test_status_works_with_rag_off_and_counts_manager_only_pdfs(tmp_path, fakes)
     folder = add_item(cfg, "CCCC3333")
     record = json.loads((folder / "record.json").read_text())
     record["attachments"] = [
-        {"key": "X", "filename": "a.pdf", "linkMode": "imported_file",
-         "contentType": "application/pdf"},
+        {
+            "key": "X",
+            "filename": "a.pdf",
+            "linkMode": "imported_file",
+            "contentType": "application/pdf",
+        },
     ]
     write_json(folder / "record.json", record)
     linked = add_item(cfg, "DDDD4444", title="Linked only")
     record = json.loads((linked / "record.json").read_text())
     record["attachments"] = [
-        {"key": "Y", "filename": "b", "linkMode": "linked_url",
-         "contentType": "application/pdf"},
+        {
+            "key": "Y",
+            "filename": "b",
+            "linkMode": "linked_url",
+            "contentType": "application/pdf",
+        },
     ]
     write_json(linked / "record.json", record)
     res = _run(["rag", "status"], config)
@@ -294,7 +304,10 @@ def test_ask_streams_an_answer_and_lists_cited_sources(mirror):
 
 def test_ask_mode_advanced_records_on_the_run(mirror):
     _ingest(mirror)
-    res = _run(["ask", "What do krill eat?", "--ask-mode", "advanced", "--no-stream"], mirror["config"])
+    res = _run(
+        ["ask", "What do krill eat?", "--ask-mode", "advanced", "--no-stream"],
+        mirror["config"],
+    )
     assert res.exit_code == 0, plain_text(res.stdout)
     assert mirror["chat"].json_requests
     report = sorted((mirror["cfg"].state_dir / "runs").glob("*-ask.json"))[-1]
@@ -304,10 +317,16 @@ def test_ask_mode_advanced_records_on_the_run(mirror):
 
 def test_ask_no_stream_and_show_context(mirror):
     _ingest(mirror)
-    res = _run(["ask", "krill?", "--no-stream", "--show-context", "-k", "2"], mirror["config"])
+    res = _run(
+        ["ask", "krill?", "--no-stream", "--show-context", "-k", "2"], mirror["config"]
+    )
     out = plain_text(res.stdout)
     assert res.exit_code == 0, out
-    assert out.index("Passages") < out.index("Krill eat algae [S1].") < out.index("Sources")
+    assert (
+        out.index("Passages")
+        < out.index("Krill eat algae [S1].")
+        < out.index("Sources")
+    )
 
 
 def test_ask_lists_retrieved_sources_when_none_were_cited(mirror):
@@ -333,10 +352,17 @@ def test_ask_model_error_exits_1(mirror):
 
 def test_ask_without_a_question_reads_one_per_line(mirror):
     _ingest(mirror)
-    res = _run(["ask"], mirror["config"], input="What do krill eat?\n\nAnd whales?\n:q\nignored\n")
+    res = _run(
+        ["ask"],
+        mirror["config"],
+        input="What do krill eat?\n\nAnd whales?\n:q\nignored\n",
+    )
     out = plain_text(res.stdout)
     assert res.exit_code == 0, out
-    assert [r.messages[-1]["content"].rsplit("Question: ", 1)[1] for r in mirror["chat"].requests] == [
+    assert [
+        r.messages[-1]["content"].rsplit("Question: ", 1)[1]
+        for r in mirror["chat"].requests
+    ] == [
         "What do krill eat?",
         "And whales?",
     ]
@@ -367,7 +393,9 @@ def test_ask_loop_keeps_going_after_a_failed_question(mirror):
     chat.chat_stream = flaky
     res = _run(["ask"], mirror["config"], input="first?\nsecond?\n")
     out = plain_text(res.stdout)
-    assert res.exit_code == 0 and "model crashed" in out and "Krill eat algae [S1]." in out
+    assert (
+        res.exit_code == 0 and "model crashed" in out and "Krill eat algae [S1]." in out
+    )
 
 
 # ---- auto-ingest -------------------------------------------------------------
@@ -386,7 +414,9 @@ def test_rag_auto_is_silent_when_the_switch_is_off(mirror, monkeypatch):
 def test_rag_auto_indexes_named_and_manifest_logged_items(mirror, monkeypatch):
     cfg = mirror["cfg"]
     cfg.rag_auto_ingest = True
-    monkeypatch.setattr("paperful.rag.ingest.get_embedder", lambda cfg: mirror["embedder"])
+    monkeypatch.setattr(
+        "paperful.rag.ingest.get_embedder", lambda cfg: mirror["embedder"]
+    )
     manifest = Manifest(cfg.manifest_path)
     manifest.write(Record(itemKey="AAAA1111", status=STATUS_OK, path="ocean/x.pdf"))
     since = manifest.get("AAAA1111").ts - 1

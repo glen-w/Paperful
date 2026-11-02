@@ -485,8 +485,10 @@ def test_ollama_chat_stream_yields_content_and_skips_thinking(mock_ollama):
 
 
 def test_ollama_chat_stream_raises_on_error_line(mock_ollama):
-    body = json.dumps({"message": {"content": "par"}}) + "\n" + json.dumps(
-        {"error": "model crashed"}
+    body = (
+        json.dumps({"message": {"content": "par"}})
+        + "\n"
+        + json.dumps({"error": "model crashed"})
     )
     mock_ollama(lambda req: httpx.Response(200, text=body))
     client = OllamaClient(base_url="http://127.0.0.1:11434", allow_remote=False)
@@ -511,7 +513,9 @@ def test_litellm_chat_stream_reads_deltas(monkeypatch):
             delta = types.SimpleNamespace(content=text)
             return types.SimpleNamespace(choices=[types.SimpleNamespace(delta=delta)])
 
-        return iter([chunk("a"), types.SimpleNamespace(choices=[]), chunk(None), chunk("b")])
+        return iter(
+            [chunk("a"), types.SimpleNamespace(choices=[]), chunk(None), chunk("b")]
+        )
 
     monkeypatch.setitem(
         sys.modules, "litellm", types.SimpleNamespace(completion=completion)

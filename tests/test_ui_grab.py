@@ -162,9 +162,7 @@ def test_force_attach_overrides_config_and_stops_without_write(tmp_path, monkeyp
     from paperful.pipeline import RunStats
     from paperful.run_cmd import run_fetch
 
-    item = SimpleNamespace(
-        key="K1", has_pdf=False, has_linked_url=False, pdf_tier=""
-    )
+    item = SimpleNamespace(key="K1", has_pdf=False, has_linked_url=False, pdf_tier="")
     seen: dict = {}
 
     class Backend:
@@ -190,10 +188,14 @@ def test_force_attach_overrides_config_and_stops_without_write(tmp_path, monkeyp
             return self.stats
 
     monkeypatch.setattr("paperful.run_cmd.Pipeline", FakePipe)
-    monkeypatch.setattr("paperful.run_cmd.preflight_ezproxy_session", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "paperful.run_cmd.preflight_ezproxy_session", lambda *a, **k: None
+    )
     monkeypatch.setattr("paperful.run_cmd.rag_auto_after_command", lambda *a, **k: None)
     monkeypatch.setattr("paperful.cli_runtime._require_manager", lambda _cfg: None)
-    monkeypatch.setattr("paperful.cli_runtime._scope_keys", lambda *_a, **_k: (["K1"], "C"))
+    monkeypatch.setattr(
+        "paperful.cli_runtime._scope_keys", lambda *_a, **_k: (["K1"], "C")
+    )
     monkeypatch.setattr("paperful.cli_runtime._library_write_api", lambda _b: "local")
     monkeypatch.setattr("paperful.cli_runtime._flush", lambda _b: None)
     monkeypatch.setattr("paperful.cli_runtime._finish_run", lambda *a, **k: None)
@@ -290,7 +292,9 @@ def test_preview_all_uses_missing_list_only(tmp_path, monkeypatch):
             path="have.pdf",
         )
     )
-    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: ([have, miss], manifest))
+    monkeypatch.setattr(
+        jobs, "_load_scope_items", lambda _c, _col: ([have, miss], manifest)
+    )
     commands.write_command(
         cfg,
         {"id": "prev", "verb": "preview_run", "status": "running", "created": 1},
@@ -337,7 +341,9 @@ def test_matching_preview_ignores_newer_attach_token(tmp_path, monkeypatch):
         {"id": "prev", "verb": "preview_run", "status": "done", "created": 1},
     )
     jobs.preview_run(cfg, "prev", collection="BBNJ", preset="oa", keys=None, flags={})
-    preview = commands.load_review(cfg, (commands.read_command(cfg, "prev") or {})["review_token"])
+    preview = commands.load_review(
+        cfg, (commands.read_command(cfg, "prev") or {})["review_token"]
+    )
     assert preview is not None
     attach = commands.create_review_token(
         cfg,
@@ -476,12 +482,16 @@ def test_preview_fingerprint_matches_ticked_subset_only(tmp_path, monkeypatch):
     m1 = _Item("M1", "10.1/m1")
     m2 = _Item("M2", "10.1/m2")
     manifest = Manifest(cfg.manifest_path)
-    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: ([m1, m2], manifest))
+    monkeypatch.setattr(
+        jobs, "_load_scope_items", lambda _c, _col: ([m1, m2], manifest)
+    )
     commands.write_command(
         cfg,
         {"id": "prev2", "verb": "preview_run", "status": "running", "created": 1},
     )
-    jobs.preview_run(cfg, "prev2", collection="BBNJ", preset="oa", keys=["M1"], flags={})
+    jobs.preview_run(
+        cfg, "prev2", collection="BBNJ", preset="oa", keys=["M1"], flags={}
+    )
     rec = commands.read_command(cfg, "prev2") or {}
     review = commands.load_review(cfg, rec["review_token"])
     assert review is not None
@@ -539,7 +549,8 @@ def test_attach_selected_held_mismatch_skipped_on_main_button(tmp_path, monkeypa
 
 
 @pytest.mark.skipif(
-    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available()
+    is False,
     reason="paperful[serve] extra missing",
 )
 def test_wanted_grab_uses_grab_review_token(tmp_path, monkeypatch):
@@ -556,7 +567,9 @@ def test_wanted_grab_uses_grab_review_token(tmp_path, monkeypatch):
     monkeypatch.setattr(
         ops,
         "doctor_payload",
-        lambda _cfg, probe=False: [{"name": "x", "status": "green", "code": "", "detail": ""}],
+        lambda _cfg, probe=False: [
+            {"name": "x", "status": "green", "code": "", "detail": ""}
+        ],
     )
     grabbed: list[str] = []
 
@@ -594,7 +607,8 @@ def test_wanted_grab_uses_grab_review_token(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(
-    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available()
+    is False,
     reason="paperful[serve] extra missing",
 )
 def test_wanted_attach_route_and_button(tmp_path, monkeypatch):
@@ -649,7 +663,8 @@ def test_wanted_attach_route_and_button(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(
-    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available() is False,
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available()
+    is False,
     reason="paperful[serve] extra missing",
 )
 def test_grab_without_preview_stays_on_wanted(tmp_path, monkeypatch):
@@ -659,7 +674,9 @@ def test_grab_without_preview_stays_on_wanted(tmp_path, monkeypatch):
 
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)
-    monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: ([], Manifest(cfg.manifest_path)))
+    monkeypatch.setattr(
+        jobs, "_load_scope_items", lambda _c, _col: ([], Manifest(cfg.manifest_path))
+    )
     client = TestClient(create_app(cfg))
     res = client.post("/wanted/grab", data={}, follow_redirects=False)
     assert res.status_code == 303

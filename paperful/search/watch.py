@@ -173,7 +173,9 @@ def load_watch(cfg: Config, name: str) -> dict[str, Any]:
     _check_name(name)
     path = watch_dir(cfg, name) / "watch.json"
     if not path.is_file():
-        raise SearchError(f"Unknown search watch {name!r}. Save one with search watch save.")
+        raise SearchError(
+            f"Unknown search watch {name!r}. Save one with search watch save."
+        )
     body = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(body, dict):
         raise SearchError(f"Corrupt watch ledger at {path}.")
@@ -270,7 +272,11 @@ def run_watch(
     backend: Any = None,
 ) -> WatchResult:
     body = load_watch(cfg, name)
-    interval = int(body.get("interval_days") if body.get("interval_days") is not None else DEFAULT_INTERVAL)
+    interval = int(
+        body.get("interval_days")
+        if body.get("interval_days") is not None
+        else DEFAULT_INTERVAL
+    )
     if not force and body.get("last_run_at"):
         left = days_until_due(str(body.get("last_run_at") or ""), interval)
         if left > 0:
@@ -461,7 +467,11 @@ def apply_watch(
 
 def show_watch(cfg: Config, name: str, *, console: Console) -> None:
     body = load_watch(cfg, name)
-    interval = int(body.get("interval_days") if body.get("interval_days") is not None else DEFAULT_INTERVAL)
+    interval = int(
+        body.get("interval_days")
+        if body.get("interval_days") is not None
+        else DEFAULT_INTERVAL
+    )
     last = str(body.get("last_run_at") or "") or None
     console.print(f"search watch {name}")
     console.print(f"  query · {' '.join(str(t) for t in (body.get('query') or []))}")

@@ -89,4 +89,6 @@ def run_ocr_ignore_import_failures(
     ignores = OcrIgnoreList(cfg.ocr_ignore_path)
     for key, why in pairs:
         ignores.add(key, why, source="auto")
-    console.print(f"Added {len(pairs)} item(s) from {path.name} → {cfg.ocr_ignore_path}")
+    console.print(
+        f"Added {len(pairs)} item(s) from {path.name} → {cfg.ocr_ignore_path}"
+    )

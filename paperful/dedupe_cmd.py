@@ -16,6 +16,7 @@ from .library import LibraryError
 from .runreport import write_command_report
 from .store import Manifest
 
+
 def run_dedupe(
     console: Console,
     *,
@@ -133,9 +134,7 @@ def run_dedupe(
                 raise typer.Exit(1)
             progress.advance(class_id)
             preview_n = merge_preview_total(groups)
-            preview_id = progress.add_task(
-                "Previewing merges…", total=preview_n or 1
-            )
+            preview_id = progress.add_task("Previewing merges…", total=preview_n or 1)
 
             def _preview_status(keep: str, drop: str) -> None:
                 progress.update(
@@ -183,7 +182,9 @@ def run_dedupe(
                 )
             else:
                 with cli_mod._item_progress() as progress:
-                    merge_id = progress.add_task("Merging duplicates…", total=merge_n or 1)
+                    merge_id = progress.add_task(
+                        "Merging duplicates…", total=merge_n or 1
+                    )
 
                     def _merge_status(keep: str, drop: str, phase: str) -> None:
                         progress.update(

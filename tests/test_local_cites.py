@@ -58,14 +58,10 @@ def test_index_inverts_references_and_drops_self_cites(tmp_path):
         make_item(key="B", doi="10.1000/b"),
     ]
     client = _Client(_works())
-    index = load_local_cites(
-        _Lib(items), "BBNJ", state_dir=tmp_path, client=client
-    )
+    index = load_local_cites(_Lib(items), "BBNJ", state_dir=tmp_path, client=client)
     assert index.count(openalex="W9") == 2
     assert index.count(openalex="W1") == 0
-    again = load_local_cites(
-        _Lib(items), "BBNJ", state_dir=tmp_path, client=client
-    )
+    again = load_local_cites(_Lib(items), "BBNJ", state_dir=tmp_path, client=client)
     assert again.count(openalex="W9") == 2
     assert client.calls == 1
 
@@ -73,9 +69,7 @@ def test_index_inverts_references_and_drops_self_cites(tmp_path):
 def test_budget_miss_keeps_partial_index(tmp_path):
     items = [make_item(key="A", doi="10.1000/a"), make_item(key="B", doi="10.1000/b")]
     client = _Client(_works(), boom=True)
-    index = load_local_cites(
-        _Lib(items), "BBNJ", state_dir=tmp_path, client=client
-    )
+    index = load_local_cites(_Lib(items), "BBNJ", state_dir=tmp_path, client=client)
     assert index.count(openalex="W9") == 2
     assert not (tmp_path / "cites").exists()
 
@@ -101,7 +95,9 @@ def test_prepare_skips_filtered_rows(tmp_path):
     index = load_local_cites(_Lib([]), "Inbox", state_dir=tmp_path, client=client)
     index.prepare(
         [
-            row("10.11138/mltj/2017.7.1.119.pmid:28717619;pmcid:pmc5505579", "filtered"),
+            row(
+                "10.11138/mltj/2017.7.1.119.pmid:28717619;pmcid:pmc5505579", "filtered"
+            ),
             row("10.1000/new", "new"),
         ],
         client,

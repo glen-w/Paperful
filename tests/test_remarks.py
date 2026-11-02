@@ -14,12 +14,16 @@ class _Notes:
         self.tags: list[tuple[str, str, str]] = []
 
     def create_or_update_note(self, key, html, tag):
-        self.notes = [row for row in self.notes if not (row[0] == key and row[2] == tag)]
+        self.notes = [
+            row for row in self.notes if not (row[0] == key and row[2] == tag)
+        ]
         self.notes.append((key, html, tag))
         return "NOTE"
 
     def replace_prefixed_tag(self, key, prefix, tag):
-        self.tags = [row for row in self.tags if not (row[0] == key and row[1] == prefix)]
+        self.tags = [
+            row for row in self.tags if not (row[0] == key and row[1] == prefix)
+        ]
         self.tags.append((key, prefix, tag))
 
 
@@ -35,10 +39,18 @@ def test_say_replaces_note_and_prefixed_tag():
     say(lib, "K", "found", "Free copy from Unpaywall.", surface="tag")
     say(lib, "K", "duplicate", "Same paper as Smith 2019.", surface="tag")
     say(lib, "K", "found", "Downloaded through your library login.", surface="tag")
-    assert ("K", "paperful duplicate:", "paperful duplicate: Same paper as Smith 2019.") in lib.tags
+    assert (
+        "K",
+        "paperful duplicate:",
+        "paperful duplicate: Same paper as Smith 2019.",
+    ) in lib.tags
     found = [row for row in lib.tags if row[1] == "paperful found:"]
     assert found == [
-        ("K", "paperful found:", "paperful found: Downloaded through your library login.")
+        (
+            "K",
+            "paperful found:",
+            "paperful found: Downloaded through your library login.",
+        )
     ]
     say(lib, "K", "found", "Free copy from Unpaywall.", surface="off")
     assert len(lib.notes) == 1
@@ -70,21 +82,26 @@ def test_remark_duplicates_skips_held_groups():
 
 
 def test_linked_sentence_cites_and_seeds():
-    assert linked_sentence(hop=0, direction="refs", overlap=1, cite_count=4, library=False) == (
-        "Cited by 4 papers in this collection."
-    )
-    assert linked_sentence(hop=0, direction="refs", overlap=1, cite_count=1, library=True) == (
-        "Cited by 1 paper in your library."
-    )
+    assert linked_sentence(
+        hop=0, direction="refs", overlap=1, cite_count=4, library=False
+    ) == ("Cited by 4 papers in this collection.")
+    assert linked_sentence(
+        hop=0, direction="refs", overlap=1, cite_count=1, library=True
+    ) == ("Cited by 1 paper in your library.")
     assert (
-        linked_sentence(hop=1, direction="cites", overlap=3, cite_count=0, library=False)
+        linked_sentence(
+            hop=1, direction="cites", overlap=3, cite_count=0, library=False
+        )
         == "Cites 3 of the papers you started from."
     )
     assert (
         linked_sentence(hop=1, direction="refs", overlap=2, cite_count=4, library=False)
         == "Cited by 4 papers in this collection. In the bibliography of 2 of the papers you started from."
     )
-    assert linked_sentence(hop=1, direction="both", overlap=1, cite_count=0, library=False) == ""
+    assert (
+        linked_sentence(hop=1, direction="both", overlap=1, cite_count=0, library=False)
+        == ""
+    )
     assert (
         linked_sentence(hop=1, direction="both", overlap=2, cite_count=0, library=False)
         == "Linked to 2 of the papers you started from."
@@ -113,7 +130,12 @@ def _row(**kwargs):
         hop=1,
         direction="refs",
         ids={"doi": "10.1/new", "openalex": "W9"},
-        biblio={"title": "New", "year": 2021, "authors": ["Ada Lovelace"], "overlap": 1},
+        biblio={
+            "title": "New",
+            "year": 2021,
+            "authors": ["Ada Lovelace"],
+            "overlap": 1,
+        },
         why="ref",
         status="new",
         provenance={},
@@ -134,7 +156,16 @@ def test_create_new_writes_collection_cites_not_a_single_seed():
     lib.notes.clear()
     create_new(
         lib,
-        [_row(biblio={"title": "New", "year": 2021, "authors": ["Ada Lovelace"], "overlap": 2})],
+        [
+            _row(
+                biblio={
+                    "title": "New",
+                    "year": 2021,
+                    "authors": ["Ada Lovelace"],
+                    "overlap": 2,
+                }
+            )
+        ],
         "Inbox",
         note_provenance=False,
         local_cites=LocalCites(),

@@ -106,7 +106,7 @@ def test_load_fingerprints_fingerprint_dir_csv(tmp_path):
     folder = tmp_path / "pps-fingerprints"
     folder.mkdir()
     (folder / "tortured.csv").write_text(
-        "Fingerprint,Expected\n\"sign to clamor\",signal-to-noise\n",
+        'Fingerprint,Expected\n"sign to clamor",signal-to-noise\n',
         encoding="utf-8",
     )
     cfg.screen_fingerprint_dir = folder
@@ -192,7 +192,10 @@ def test_fingerprint_cache_and_csv_edges(cfg, tmp_path):
     )
 
     assert tokens_in_window("hello", [], 5) is False
-    assert parse_fingerprint_csv("fingerprint,expected\nonlyone\nexpr,val\n")[0].expression == "expr"
+    assert (
+        parse_fingerprint_csv("fingerprint,expected\nonlyone\nexpr,val\n")[0].expression
+        == "expr"
+    )
     assert load_fingerprints(None, cfg, "nope") == []
 
     folder = cfg.state_dir / "pps" / "fingerprints"
@@ -244,9 +247,7 @@ def test_status_lookups_handle_http_errors(cfg):
     assert "retracted" in crossref_update_codes(
         {"relation": [{"relation-type": "is-retracted-by"}]}
     )
-    assert "withdrawn" in crossref_update_codes(
-        {"update-to": [{"type": "withdrawal"}]}
-    )
+    assert "withdrawn" in crossref_update_codes({"update-to": [{"type": "withdrawal"}]})
     assert "expression_of_concern" in crossref_update_codes(
         {"update-to": [{"type": "expression of concern"}]}
     )
@@ -276,9 +277,7 @@ def test_screen_items_status_and_callbacks(cfg, monkeypatch):
 
     cfg.screen_detectors = ["retracted"]
     item = make_item(doi="10.1000/test.doi")
-    monkeypatch.setattr(
-        "paperful.screen.prepare_identifiers", lambda *_a, **_k: None
-    )
+    monkeypatch.setattr("paperful.screen.prepare_identifiers", lambda *_a, **_k: None)
     monkeypatch.setattr(
         "paperful.screen.lookup_doi_status", lambda *_a, **_k: ["retracted"]
     )
@@ -315,7 +314,14 @@ def test_apply_screen_swallows_tag_errors(cfg):
 
     item = make_item(key="K2", doi="10.1000/x")
     findings = [
-        ScreenFinding(itemKey="K2", code="retracted", title=item.title, detail="x", doi=item.doi, url="https://ex.org"),
+        ScreenFinding(
+            itemKey="K2",
+            code="retracted",
+            title=item.title,
+            detail="x",
+            doi=item.doi,
+            url="https://ex.org",
+        ),
         ScreenFinding(itemKey="K2", code="pubpeer", title=item.title, detail="y"),
     ]
     assert apply_screen(Backend(), cfg, [item, make_item(key="NONE")], findings) == 0

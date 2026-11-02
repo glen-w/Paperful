@@ -87,7 +87,9 @@ def test_light_parser_splits_on_form_feeds(tmp_path, monkeypatch):
     assert calls[0][-2:] == [str(pdf), "-"]
 
 
-def test_light_parser_falls_back_to_pypdf_and_keeps_the_page_count(tmp_path, monkeypatch):
+def test_light_parser_falls_back_to_pypdf_and_keeps_the_page_count(
+    tmp_path, monkeypatch
+):
     pdf = _blank_pdf(tmp_path / "scan.pdf", pages=4)
     _fake_pdftotext(monkeypatch, b"", returncode=1)
     pages = LightParser().pages(pdf)

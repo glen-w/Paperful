@@ -18,7 +18,12 @@ import pytest
 
 from paperful import mendeley
 from paperful.library import LibraryError
-from paperful.mendeley import MendeleyAuthError, MendeleyClient, _next_link, _retry_after
+from paperful.mendeley import (
+    MendeleyAuthError,
+    MendeleyClient,
+    _next_link,
+    _retry_after,
+)
 from tests.conftest import mock_client
 
 TOKEN_FILE = "mendeley-oauth.json"
@@ -92,7 +97,14 @@ class Api:
 def _client(cfg, api, **tokens) -> MendeleyClient:
     _write_tokens(
         cfg,
-        **(tokens or {"access_token": "old", "refresh_token": "old-refresh", "expires_at": time.time() + 3600}),
+        **(
+            tokens
+            or {
+                "access_token": "old",
+                "refresh_token": "old-refresh",
+                "expires_at": time.time() + 3600,
+            }
+        ),
     )
     return MendeleyClient(cfg, http=mock_client(api))
 
@@ -109,18 +121,25 @@ def test_fresh_token_is_used_without_any_http(cfg):
 
 def test_token_near_expiry_is_refreshed_and_rotated(cfg):
     api = Api()
-    client = _client(cfg, api, access_token="old", refresh_token="r1", expires_at=time.time() + 30)
+    client = _client(
+        cfg, api, access_token="old", refresh_token="r1", expires_at=time.time() + 30
+    )
     assert client.ensure_token() == "new-access"
     assert api.token_posts[0]["grant_type"] == "refresh_token"
     assert api.token_posts[0]["refresh_token"] == "r1"
     assert api.token_posts[0]["redirect_uri"] == cfg.mendeley_redirect_uri
     stored = _stored(cfg)
-    assert stored["refresh_token"] == "new-refresh" and stored["expires_at"] > time.time() + 3000
+    assert (
+        stored["refresh_token"] == "new-refresh"
+        and stored["expires_at"] > time.time() + 3000
+    )
 
 
 def test_refresh_keeps_old_refresh_token_when_server_omits_it(cfg):
     api = Api(refresh_reply=_token_reply(refresh=None))
-    client = _client(cfg, api, access_token="old", refresh_token="keep-me", expires_at=0)
+    client = _client(
+        cfg, api, access_token="old", refresh_token="keep-me", expires_at=0
+    )
     client.ensure_token()
     assert _stored(cfg)["refresh_token"] == "keep-me"
 
@@ -140,10 +159,14 @@ def test_missing_or_corrupt_token_file_gives_setup_instructions(cfg, content):
 
 def test_refresh_rejected_by_server_is_an_auth_error(cfg):
     api = Api(refresh_reply=httpx.Response(400, text="invalid_grant"))
-    client = _client(cfg, api, access_token="old", refresh_token="revoked", expires_at=0)
+    client = _client(
+        cfg, api, access_token="old", refresh_token="revoked", expires_at=0
+    )
     with pytest.raises(MendeleyAuthError, match="token exchange 400"):
         client.ensure_token()
-    assert _stored(cfg)["refresh_token"] == "revoked"  # a failed refresh never clobbers the stored token
+    assert (
+        _stored(cfg)["refresh_token"] == "revoked"
+    )  # a failed refresh never clobbers the stored token
 
 
 def test_exchange_sends_basic_auth_from_config_and_env(cfg, monkeypatch):
@@ -156,11 +179,17 @@ def test_exchange_sends_basic_auth_from_config_and_env(cfg, monkeypatch):
     cfg.mendeley_client_id, cfg.mendeley_client_secret = "cfg-id", "cfg-secret"
     client = MendeleyClient(cfg, http=mock_client(handler))
     client._exchange({"grant_type": "refresh_token", "refresh_token": "r"})
-    assert seen["auth"] == "Basic " + __import__("base64").b64encode(b"cfg-id:cfg-secret").decode()
+    assert (
+        seen["auth"]
+        == "Basic " + __import__("base64").b64encode(b"cfg-id:cfg-secret").decode()
+    )
     monkeypatch.setenv("PAPERFUL_MENDELEY_CLIENT_ID", "env-id")
     monkeypatch.setenv("PAPERFUL_MENDELEY_CLIENT_SECRET", "env-secret")
     client._exchange({"grant_type": "refresh_token", "refresh_token": "r"})
-    assert seen["auth"] == "Basic " + __import__("base64").b64encode(b"env-id:env-secret").decode()
+    assert (
+        seen["auth"]
+        == "Basic " + __import__("base64").b64encode(b"env-id:env-secret").decode()
+    )
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX file modes")
@@ -196,16 +225,23 @@ def test_download_refreshes_on_401_and_follows_redirect_without_bearer(cfg, tmp_
     seen: dict[str, str | None] = {}
 
     def handler(request):
-        if request.url.host == "api.mendeley.com" and request.url.path == "/oauth/token":
+        if (
+            request.url.host == "api.mendeley.com"
+            and request.url.path == "/oauth/token"
+        ):
             return _token_reply()
         if request.url.host == "api.mendeley.com":
             if request.headers.get("authorization") != "Bearer new-access":
                 return httpx.Response(401, text="expired")
-            return httpx.Response(303, headers={"Location": "https://bucket.s3.test/f.pdf"})
+            return httpx.Response(
+                303, headers={"Location": "https://bucket.s3.test/f.pdf"}
+            )
         seen["bucket_auth"] = request.headers.get("authorization")
         return httpx.Response(200, content=b"%PDF-bucket")
 
-    _write_tokens(cfg, access_token="old", refresh_token="r", expires_at=time.time() + 3600)
+    _write_tokens(
+        cfg, access_token="old", refresh_token="r", expires_at=time.time() + 3600
+    )
     client = MendeleyClient(cfg, http=mock_client(handler))
     dest = client.download_file("FID", tmp_path / "deep" / "dir" / "f.pdf")
     assert dest.read_bytes() == b"%PDF-bucket"
@@ -234,7 +270,10 @@ def test_download_redirect_without_location_and_http_errors(cfg, tmp_path, sleep
         client.download_file("BAD", tmp_path / "b.pdf")
     with pytest.raises(LibraryError, match="download 403"):
         client.download_file("S3FAIL", tmp_path / "c.pdf")
-    assert client.download_file("DIRECT", tmp_path / "d.pdf").read_bytes() == b"%PDF-direct"
+    assert (
+        client.download_file("DIRECT", tmp_path / "d.pdf").read_bytes()
+        == b"%PDF-direct"
+    )
     assert not (tmp_path / "a.pdf").exists() and not (tmp_path / "c.pdf").exists()
 
 
@@ -251,23 +290,34 @@ def test_upload_refreshes_on_401_and_sends_document_link(cfg, tmp_path):
             return httpx.Response(401, text="expired")
         return httpx.Response(201, json={"id": "F9"})
 
-    _write_tokens(cfg, access_token="old", refresh_token="r", expires_at=time.time() + 3600)
+    _write_tokens(
+        cfg, access_token="old", refresh_token="r", expires_at=time.time() + 3600
+    )
     client = MendeleyClient(cfg, http=mock_client(handler))
     assert client.upload_file("DOC1", pdf) == {"id": "F9"}
     assert len(seen) == 2
-    assert 'rel="document"' in seen[-1].headers["link"] and "/documents/DOC1" in seen[-1].headers["link"]
+    assert (
+        'rel="document"' in seen[-1].headers["link"]
+        and "/documents/DOC1" in seen[-1].headers["link"]
+    )
     assert seen[-1].headers["content-disposition"] == 'attachment; filename="paper.pdf"'
 
 
 @pytest.mark.parametrize(
     ("status", "text", "expect"),
-    [(400, "File ALREADY exists", {"id": None, "duplicate": True}), (500, "boom", None), (400, "bad pdf", None)],
+    [
+        (400, "File ALREADY exists", {"id": None, "duplicate": True}),
+        (500, "boom", None),
+        (400, "bad pdf", None),
+    ],
 )
 def test_upload_duplicate_vs_failure(cfg, tmp_path, status, text, expect):
     pdf = tmp_path / "p.pdf"
     pdf.write_bytes(b"x")
     _write_tokens(cfg, access_token="t", expires_at=time.time() + 3600)
-    client = MendeleyClient(cfg, http=mock_client(lambda r: httpx.Response(status, text=text)))
+    client = MendeleyClient(
+        cfg, http=mock_client(lambda r: httpx.Response(status, text=text))
+    )
     if expect is None:
         with pytest.raises(LibraryError, match=f"upload {status}"):
             client.upload_file("D", pdf)
@@ -286,7 +336,9 @@ def test_upload_empty_success_body_returns_null_id(cfg, tmp_path):
 # --- 429 / Retry-After ---------------------------------------------------------------
 
 
-def test_rate_limit_waits_then_retries_in_get_download_and_upload(cfg, tmp_path, sleeps):
+def test_rate_limit_waits_then_retries_in_get_download_and_upload(
+    cfg, tmp_path, sleeps
+):
     api = Api(valid="t")
     client = _client(cfg, api, access_token="t", expires_at=time.time() + 3600)
     api.statuses = [429]
@@ -305,7 +357,9 @@ def test_rate_limit_waits_then_retries_in_get_download_and_upload(cfg, tmp_path,
     [("0", 1.0), ("2", 2.0), ("999", 60.0), ("abc", 5.0), (None, 5.0), ("-4", 1.0)],
 )
 def test_retry_after_is_clamped(header, expected):
-    resp = httpx.Response(429, headers={"Retry-After": header} if header is not None else {})
+    resp = httpx.Response(
+        429, headers={"Retry-After": header} if header is not None else {}
+    )
     assert _retry_after(resp) == expected
 
 
@@ -316,8 +370,14 @@ def test_retry_after_is_clamped(header, expected):
     ("header", "expected"),
     [
         ("", None),
-        ('<https://api.mendeley.com/x?page=2>; rel="next"', "https://api.mendeley.com/x?page=2"),
-        ('<https://a/prev>; rel="prev", <https://a/next>; rel="next"', "https://a/next"),
+        (
+            '<https://api.mendeley.com/x?page=2>; rel="next"',
+            "https://api.mendeley.com/x?page=2",
+        ),
+        (
+            '<https://a/prev>; rel="prev", <https://a/next>; rel="next"',
+            "https://a/next",
+        ),
         ('<https://a/last>; rel="last"', None),
         ('<https://a/next> ; REL="next"', "https://a/next"),
         ("garbage", None),
@@ -336,13 +396,18 @@ def test_paginate_sends_params_only_on_first_page_and_accepts_dicts(cfg):
             return httpx.Response(
                 200,
                 json=[{"n": 1}],
-                headers={"Link": '<https://api.mendeley.com/things?page=2>; rel="next"'},
+                headers={
+                    "Link": '<https://api.mendeley.com/things?page=2>; rel="next"'
+                },
             )
         return httpx.Response(200, json={"n": 2})
 
     _write_tokens(cfg, access_token="t", expires_at=time.time() + 3600)
     client = MendeleyClient(cfg, http=mock_client(handler))
-    assert client.paginate("/things", accept="x", params={"view": "all"}) == [{"n": 1}, {"n": 2}]
+    assert client.paginate("/things", accept="x", params={"view": "all"}) == [
+        {"n": 1},
+        {"n": 2},
+    ]
     assert seen[0][1] == {"view": "all", "limit": "500"}
     assert seen[1][1] == {"page": "2"}
 
@@ -357,11 +422,16 @@ def test_request_handles_204_and_plain_text(cfg):
 
 def test_ping_requires_a_profile_object(cfg):
     _write_tokens(cfg, access_token="t", expires_at=time.time() + 3600)
-    client = MendeleyClient(cfg, http=mock_client(lambda r: httpx.Response(200, json=["nope"])))
+    client = MendeleyClient(
+        cfg, http=mock_client(lambda r: httpx.Response(200, json=["nope"]))
+    )
     with pytest.raises(MendeleyAuthError, match="did not return a profile"):
         client.ping()
     ok = MendeleyClient(
-        cfg, http=mock_client(lambda r: httpx.Response(200, json={"id": "p", "email": "a@b.test"}))
+        cfg,
+        http=mock_client(
+            lambda r: httpx.Response(200, json={"id": "p", "email": "a@b.test"})
+        ),
     ).ping()
     assert ok == {"display_name": "a@b.test", "profile_id": "p", "supports_write": True}
 
@@ -399,7 +469,9 @@ def _login_env(cfg, monkeypatch, *, callback_query):
 
         def hit():
             try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{port}{query}", timeout=5) as r:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}{query}", timeout=5
+                ) as r:
                     statuses.append(r.status)
             except urllib.error.HTTPError as exc:
                 statuses.append(exc.code)
@@ -415,7 +487,9 @@ def _login_env(cfg, monkeypatch, *, callback_query):
 
 def test_login_exchanges_code_and_stores_tokens(cfg, monkeypatch):
     client, opened, api, statuses = _login_env(
-        cfg, monkeypatch, callback_query=lambda state: f"/callback?code=THECODE&state={state}"
+        cfg,
+        monkeypatch,
+        callback_query=lambda state: f"/callback?code=THECODE&state={state}",
     )
     tokens = client.login()
     assert tokens["access_token"] == "new-access"
@@ -431,7 +505,9 @@ def test_login_exchanges_code_and_stores_tokens(cfg, monkeypatch):
 
 def test_login_rejects_state_mismatch(cfg, monkeypatch):
     client, _opened, api, _statuses = _login_env(
-        cfg, monkeypatch, callback_query=lambda state: "/callback?code=EVIL&state=forged"
+        cfg,
+        monkeypatch,
+        callback_query=lambda state: "/callback?code=EVIL&state=forged",
     )
     with pytest.raises(MendeleyAuthError, match="did not return an authorization code"):
         client.login()
@@ -443,7 +519,9 @@ def test_login_surfaces_provider_error(cfg, monkeypatch):
     client, _o, api, _s = _login_env(
         cfg,
         monkeypatch,
-        callback_query=lambda state: f"/callback?error=access_denied&error_description=User+said+no&state={state}",
+        callback_query=lambda state: (
+            f"/callback?error=access_denied&error_description=User+said+no&state={state}"
+        ),
     )
     with pytest.raises(MendeleyAuthError, match="User said no"):
         client.login()
@@ -452,7 +530,9 @@ def test_login_surfaces_provider_error(cfg, monkeypatch):
 
 def test_login_ignores_callback_on_other_paths(cfg, monkeypatch):
     client, _o, api, statuses = _login_env(
-        cfg, monkeypatch, callback_query=lambda state: f"/elsewhere?code=X&state={state}"
+        cfg,
+        monkeypatch,
+        callback_query=lambda state: f"/elsewhere?code=X&state={state}",
     )
     with pytest.raises(MendeleyAuthError, match="did not return an authorization code"):
         client.login()

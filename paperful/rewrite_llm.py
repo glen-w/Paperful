@@ -134,15 +134,23 @@ def proposed_from_area(
     model = (area.model or cfg.llm_model or "").strip()
     prompt = load_area_prompt(area)
     if prompt is None:
-        return [], [
-            {"finding_id": str(f.get("id") or ""), "reason": "needs_author"}
-            for f in findings
-        ], model
+        return (
+            [],
+            [
+                {"finding_id": str(f.get("id") or ""), "reason": "needs_author"}
+                for f in findings
+            ],
+            model,
+        )
     if client is None or not model:
-        return [], [
-            {"finding_id": str(f.get("id") or ""), "reason": "needs_author"}
-            for f in findings
-        ], model
+        return (
+            [],
+            [
+                {"finding_id": str(f.get("id") or ""), "reason": "needs_author"}
+                for f in findings
+            ],
+            model,
+        )
 
     payload = []
     for row in findings:
@@ -183,10 +191,14 @@ def proposed_from_area(
     try:
         raw = chat(client, req)
     except Exception:
-        return [], [
-            {"finding_id": str(f.get("id") or ""), "reason": "needs_author"}
-            for f in findings
-        ], model
+        return (
+            [],
+            [
+                {"finding_id": str(f.get("id") or ""), "reason": "needs_author"}
+                for f in findings
+            ],
+            model,
+        )
     data = parse_llm_json(raw) or {}
     edits: list[RewriteEdit] = []
     skips: list[dict[str, str]] = []

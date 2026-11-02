@@ -35,7 +35,9 @@ def test_crossref_work_paths(cfg):
         if "empty" in path:
             return httpx.Response(
                 200,
-                json={"message": {"author": ["x"], "issued": {"date-parts": [["nope"]]}}},
+                json={
+                    "message": {"author": ["x"], "issued": {"date-parts": [["nope"]]}}
+                },
             )
         return httpx.Response(
             200,

@@ -217,7 +217,7 @@ def remediation_text(
     if check.name == "rewrite":
         return (
             "Set [llm].enabled = true for rewrite areas other than style, "
-            "or set [rewrite].areas = [\"style\"] for glossary/Vale swaps only. "
+            'or set [rewrite].areas = ["style"] for glossary/Vale swaps only. '
             "See docs/rewrite.md."
         )
     if check.name == "LLM":
@@ -226,7 +226,7 @@ def remediation_text(
                 "Ollama must be running on the host (not inside this container).\n"
                 "1. On the host: ollama serve  (Docker Desktop: default loopback "
                 "is fine; Linux Engine: OLLAMA_HOST=0.0.0.0 ollama serve).\n"
-                "2. Keep [llm].base_url = \"http://127.0.0.1:11434\" — Paperful "
+                '2. Keep [llm].base_url = "http://127.0.0.1:11434" — Paperful '
                 "rewrites loopback to host.docker.internal inside Compose "
                 "(or set PAPERFUL_OLLAMA_HOST). See docs/llm.md#docker.\n"
                 "3. ollama pull <model>, then continue."
@@ -716,7 +716,11 @@ def _fetch_lane_checks(cfg: Config) -> list[Check]:
 
         if twenty_api_key() and twenty_base_url(cfg):
             checks.append(
-                Check("Twenty", "green", "enabled (no live probe; sync --apply writes People)")
+                Check(
+                    "Twenty",
+                    "green",
+                    "enabled (no live probe; sync --apply writes People)",
+                )
             )
         else:
             checks.append(
@@ -840,9 +844,15 @@ def _osf_check(cfg: Config) -> Check | None:
     sig = osf_signal(Manifest(cfg.manifest_path))
     if not sig.misses:
         return None
-    line = f"{sig.osf} of {sig.misses} recent misses point at OSF hosts ({sig.share:.0%})"
+    line = (
+        f"{sig.osf} of {sig.misses} recent misses point at OSF hosts ({sig.share:.0%})"
+    )
     if sig.meaningful:
-        return Check("osf preprints", "amber", f"{line} · enough signal to build a thin OSF source")
+        return Check(
+            "osf preprints",
+            "amber",
+            f"{line} · enough signal to build a thin OSF source",
+        )
     return Check(
         "osf preprints",
         "green",
@@ -1207,12 +1217,18 @@ def _rag_checks(cfg) -> list[Check]:
     if not cfg.rag_enabled:
         return [Check("RAG index", "green", "disabled (rag.enabled false)")]
     if importlib.util.find_spec("lancedb") is None:
-        return [Check("RAG index", "amber", "lancedb not installed — uv sync --extra rag")]
+        return [
+            Check("RAG index", "amber", "lancedb not installed — uv sync --extra rag")
+        ]
     out: list[Check] = []
     try:
         embedder = validate_embedder(cfg)
         out.append(
-            Check("RAG embeddings", "green", f"{embedder.provider} · {embedder.model} — ok")
+            Check(
+                "RAG embeddings",
+                "green",
+                f"{embedder.provider} · {embedder.model} — ok",
+            )
         )
     except LlmConfigError as exc:
         out.append(Check("RAG embeddings", "amber", str(exc)))
@@ -1295,9 +1311,7 @@ _NAMED_GREY_PACKS = (
 )
 
 
-def _exclude_check(
-    cfg: Config, *, collections: dict | None = None
-) -> Check:
+def _exclude_check(cfg: Config, *, collections: dict | None = None) -> Check:
     """Summarise [[exclude]] protect rules; amber when a path/key is unmatched."""
     from .exclude import ExcludeGuard
 

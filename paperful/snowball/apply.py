@@ -326,6 +326,7 @@ def run_continue(
     )
     return PathResult(dest, 0, summary=state)
 
+
 def run_resume(
     cfg: Config,
     run_id: str,
@@ -486,6 +487,7 @@ def run_resume(
             raise SnowballError(str(exc)) from exc
     return PathResult(dest, 0)
 
+
 def _resume_saved_queue(
     cfg: Config,
     run_id: str,
@@ -545,6 +547,7 @@ def _resume_saved_queue(
             fill_pdfs(cfg, lib, pending, console, mode=mode)
     _maybe_dedupe_after(cfg, request, lib, request.collection, console)
     return PathResult(dest, 1 if failed else 0)
+
 
 def run_apply(
     cfg: Config,

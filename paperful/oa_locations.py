@@ -12,7 +12,9 @@ def _norm_license(loc: dict[str, Any]) -> str:
     return str(lic).strip()
 
 
-def _location_rank(loc: dict[str, Any], *, work_oa_status: str = "") -> tuple[int, int, int]:
+def _location_rank(
+    loc: dict[str, Any], *, work_oa_status: str = ""
+) -> tuple[int, int, int]:
     host = str(loc.get("host_type") or "").lower()
     version = str(loc.get("version") or "").lower()
     license = _norm_license(loc).lower()
@@ -30,7 +32,9 @@ def rank_unpaywall_locations(data: dict[str, Any]) -> list[dict[str, Any]]:
     def add(loc: dict[str, Any] | None) -> None:
         if not loc:
             return
-        key = str(loc.get("url_for_pdf") or loc.get("url") or loc.get("url_for_landing_page"))
+        key = str(
+            loc.get("url_for_pdf") or loc.get("url") or loc.get("url_for_landing_page")
+        )
         if key in keys:
             return
         keys.add(key)

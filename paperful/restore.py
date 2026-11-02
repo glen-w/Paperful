@@ -15,7 +15,13 @@ from typing import Any
 
 from .mirror import GONE_STATES, library_state, record_pdf
 from .progress import Track
-from .store import ITEM_SCHEMA, _record_weight, is_item_dirname, item_key_from_dirname, load_json
+from .store import (
+    ITEM_SCHEMA,
+    _record_weight,
+    is_item_dirname,
+    item_key_from_dirname,
+    load_json,
+)
 from .zot import Item, normalize_doi
 
 
@@ -124,7 +130,9 @@ def record_in_scope(
     return True
 
 
-def parent_payload(record: dict[str, Any], collection_keys: list[str]) -> dict[str, Any]:
+def parent_payload(
+    record: dict[str, Any], collection_keys: list[str]
+) -> dict[str, Any]:
     from .interop.load import parent_payload as _parent_payload
 
     data = _parent_payload(record, collection_keys)

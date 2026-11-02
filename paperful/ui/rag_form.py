@@ -153,7 +153,11 @@ def _persist_upload(cfg: Config, data: bytes, name: str | None) -> Path | None:
 
 
 def safe_prompt_child(root: Path, name: str) -> Path | None:
-    if not name or _SAFE_NAME.sub("", name) != name or not name.endswith((".md", ".txt")):
+    if (
+        not name
+        or _SAFE_NAME.sub("", name) != name
+        or not name.endswith((".md", ".txt"))
+    ):
         return None
     try:
         base = root.resolve()

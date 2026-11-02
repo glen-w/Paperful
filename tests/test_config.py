@@ -674,7 +674,7 @@ def test_critique_glossary_knobs_are_parsed(tmp_path):
                 "glossary": False,
                 "glossary_dir": "house-terms",
                 "glossary_similarity_min": 0.91,
-            }
+            },
         },
         tmp_path / "config.toml",
     )
@@ -711,7 +711,12 @@ def test_extract_sections_table_is_parsed(tmp_path):
 
 @pytest.mark.parametrize(
     "table",
-    [{"ocr": "always"}, {"parser": "pymupdf"}, {"embed_provider": "openai"}, {"embed_model": " "}],
+    [
+        {"ocr": "always"},
+        {"parser": "pymupdf"},
+        {"embed_provider": "openai"},
+        {"embed_model": " "},
+    ],
 )
 def test_rag_table_rejects_unknown_values(tmp_path, table):
     from paperful.config import _from_dict

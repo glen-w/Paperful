@@ -54,7 +54,9 @@ def find(item: Item, ctx: Context) -> Candidate:
             picked.append(url)
             continue
         host = (urlparse(url).hostname or "").lower()
-        last = (author.fingerprint.split("|", 1)[0] if author.fingerprint else "").lower()
+        last = (
+            author.fingerprint.split("|", 1)[0] if author.fingerprint else ""
+        ).lower()
         if last and last in blob and looks_like_pdf_url(url):
             picked.append(url)
     if not picked and pdfs:

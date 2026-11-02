@@ -70,9 +70,7 @@ def test_lookup_apply_writes_pack_and_contact(cfg, monkeypatch):
         )
 
     authors = [PackAuthor(name="Ada Lovelace", fingerprint="lovelace|a")]
-    rows = lookup_authors(
-        cfg, authors, getter=getter, collection="BBNJ", apply=True
-    )
+    rows = lookup_authors(cfg, authors, getter=getter, collection="BBNJ", apply=True)
     assert rows[0].status == "match"
     assert "github.io" in rows[0].listing_url
     pack = load_pack_file(pack_path(cfg, "bbnj", promoted=False))
@@ -105,9 +103,7 @@ def test_lookup_ambiguous_and_empty_do_not_write(cfg, monkeypatch):
         )
 
     authors = [PackAuthor(name="Lovelace", fingerprint="lovelace|")]
-    rows = lookup_authors(
-        cfg, authors, getter=getter, collection="BBNJ", apply=True
-    )
+    rows = lookup_authors(cfg, authors, getter=getter, collection="BBNJ", apply=True)
     assert rows[0].status == "ambiguous"
     assert not pack_path(cfg, "bbnj", promoted=False).is_file()
     assert not list((cfg.state_dir / "author-contacts").glob("*.json"))
@@ -131,9 +127,7 @@ def test_lookup_rejects_researchgate_website(cfg, monkeypatch):
         )
 
     authors = [PackAuthor(name="Ada Lovelace", fingerprint="lovelace|a")]
-    rows = lookup_authors(
-        cfg, authors, getter=getter, collection="BBNJ", apply=True
-    )
+    rows = lookup_authors(cfg, authors, getter=getter, collection="BBNJ", apply=True)
     assert rows[0].status == "match"
     assert rows[0].listing_url == ""
     contact = json.loads(
@@ -320,12 +314,19 @@ def test_sync_appends_homepage_and_stamps_keywords(cfg, monkeypatch):
     patches = [body for method, url, body in calls if method == "PATCH" and body]
     homepage = next(body["homepage"] for body in patches if "homepage" in body)
     assert homepage["primaryLinkUrl"] == "https://ada.example.edu/"
-    assert homepage["secondaryLinks"][0]["url"].startswith("https://lovelace.github.io/")
+    assert homepage["secondaryLinks"][0]["url"].startswith(
+        "https://lovelace.github.io/"
+    )
     keywords = next(body["keywords"] for body in patches if "keywords" in body)
     assert "paperful" in keywords and "ocean-bbnj" in keywords and "ocean" in keywords
-    assert any(method == "POST" and url.endswith("/notes") for method, url, _body in calls)
+    assert any(
+        method == "POST" and url.endswith("/notes") for method, url, _body in calls
+    )
     assert any(url.endswith("/noteTargets") for _method, url, _body in calls)
-    assert next(row for row in applied if row.fingerprint == person.fingerprint).twenty_id == "abc"
+    assert (
+        next(row for row in applied if row.fingerprint == person.fingerprint).twenty_id
+        == "abc"
+    )
 
 
 def test_sync_fills_empty_homepage(cfg, monkeypatch):
@@ -362,8 +363,14 @@ def test_sync_creates_miss_and_skips_ambiguous(cfg, monkeypatch):
         if method == "GET" and "Babbage" in filt:
             return _people_payload(
                 [
-                    {"id": "1", "name": {"firstName": "Charles", "lastName": "Babbage"}},
-                    {"id": "2", "name": {"firstName": "Charles", "lastName": "Babbage"}},
+                    {
+                        "id": "1",
+                        "name": {"firstName": "Charles", "lastName": "Babbage"},
+                    },
+                    {
+                        "id": "2",
+                        "name": {"firstName": "Charles", "lastName": "Babbage"},
+                    },
                 ]
             )
         if method == "GET":
@@ -392,7 +399,9 @@ def test_sync_creates_miss_and_skips_ambiguous(cfg, monkeypatch):
         make_item(
             key="B",
             creator_people=[
-                CreatorPerson(first="Charles", last="Babbage", display="Charles Babbage")
+                CreatorPerson(
+                    first="Charles", last="Babbage", display="Charles Babbage"
+                )
             ],
         ),
     ]
@@ -406,9 +415,13 @@ def test_sync_creates_miss_and_skips_ambiguous(cfg, monkeypatch):
     apply_sync_actions(
         cfg, planned, collection="BBNJ", sender=sender, sleeper=lambda _s: None
     )
-    posts = [url for method, url in calls if method == "POST" and url.endswith("/people")]
+    posts = [
+        url for method, url in calls if method == "POST" and url.endswith("/people")
+    ]
     assert len(posts) == 1
-    contact = json.loads(next((cfg.state_dir / "author-contacts").glob("*.json")).read_text())
+    contact = json.loads(
+        next((cfg.state_dir / "author-contacts").glob("*.json")).read_text()
+    )
     assert contact["twenty_id"] == "new-ada"
 
 
@@ -444,8 +457,12 @@ def test_author_site_cache_and_policy_order(cfg):
     lanes = apply_fetch_order(
         cfg, ["unpaywall", "author_site", "scholar", "scihub"], item
     )
-    assert lanes.index("unpaywall") < lanes.index("author_site") < lanes.index("scholar")
-    steps = [step.name for step in order_run(cfg, ["ezproxy", "author_site", "scholar"])]
+    assert (
+        lanes.index("unpaywall") < lanes.index("author_site") < lanes.index("scholar")
+    )
+    steps = [
+        step.name for step in order_run(cfg, ["ezproxy", "author_site", "scholar"])
+    ]
     assert steps.index("author_site") < steps.index("scholar")
 
 

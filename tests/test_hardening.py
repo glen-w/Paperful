@@ -131,7 +131,10 @@ def _token(cfg, keys=("K1", "K2"), fingerprint="fp"):
 
 def test_review_token_is_single_use(cfg):
     token = _token(cfg)
-    assert commands.consume_review(cfg, token, fingerprint="fp", keys=["K1"]) == (True, "")
+    assert commands.consume_review(cfg, token, fingerprint="fp", keys=["K1"]) == (
+        True,
+        "",
+    )
     ok, msg = commands.consume_review(cfg, token, fingerprint="fp", keys=["K1"])
     assert not ok
     assert msg == "token already used"
@@ -155,7 +158,14 @@ def test_review_token_rejects_keys_outside_preview(cfg):
 
 
 def test_review_token_unknown_and_malformed(cfg):
-    for bad in ("nope-nope-nope", "short", "../../etc/passwd", "a" * 129, "tok en!!", ""):
+    for bad in (
+        "nope-nope-nope",
+        "short",
+        "../../etc/passwd",
+        "a" * 129,
+        "tok en!!",
+        "",
+    ):
         ok, msg = commands.consume_review(cfg, bad, fingerprint="fp", keys=None)
         assert (ok, msg) == (False, "unknown token"), bad
 
@@ -165,13 +175,17 @@ def test_review_token_symlink_escape_is_refused(cfg, tmp_path):
     reviews = cfg.state_dir / "gui" / "reviews"
     reviews.mkdir(parents=True, exist_ok=True)
     outside = tmp_path / "outside.json"
-    outside.write_text('{"token": "linklinklink", "fingerprint": "fp"}', encoding="utf-8")
+    outside.write_text(
+        '{"token": "linklinklink", "fingerprint": "fp"}', encoding="utf-8"
+    )
     try:
         (reviews / "linklinklink.json").symlink_to(outside)
     except OSError:  # pragma: no cover - platform without symlink rights
         pytest.skip("cannot create symlink")
     assert commands.load_review(cfg, "linklinklink") is None
-    assert commands.consume_review(cfg, "linklinklink", fingerprint="fp", keys=None) == (
+    assert commands.consume_review(
+        cfg, "linklinklink", fingerprint="fp", keys=None
+    ) == (
         False,
         "unknown token",
     )
@@ -231,7 +245,9 @@ HOSTILE_NAMES = [
 
 @pytest.mark.skipif(fastapi_missing, reason="paperful[serve] extra missing")
 @pytest.mark.parametrize("filename", HOSTILE_NAMES)
-def test_ingest_preview_upload_stays_under_uploads(ui_client, cfg, tmp_path, monkeypatch, filename):
+def test_ingest_preview_upload_stays_under_uploads(
+    ui_client, cfg, tmp_path, monkeypatch, filename
+):
     monkeypatch.setattr("paperful.ui.commands.enqueue", lambda *a, **k: "cmd")
     before = _snapshot(tmp_path)
     ui_client.post(
@@ -261,7 +277,9 @@ def test_ingest_preview_upload_stays_under_uploads(ui_client, cfg, tmp_path, mon
         "x" * 300 + ".md",
     ],
 )
-def test_critique_upload_stays_under_uploads(ui_client, cfg, tmp_path, monkeypatch, filename):
+def test_critique_upload_stays_under_uploads(
+    ui_client, cfg, tmp_path, monkeypatch, filename
+):
     monkeypatch.setattr("paperful.ui.commands.enqueue", lambda *a, **k: "cmd")
     before = _snapshot(tmp_path)
     body = b"Hello paragraph with enough letters to pass the extract minimum.\n" * 4
@@ -280,7 +298,9 @@ def test_critique_upload_stays_under_uploads(ui_client, cfg, tmp_path, monkeypat
 
 @pytest.mark.skipif(fastapi_missing, reason="paperful[serve] extra missing")
 @pytest.mark.parametrize("filename", HOSTILE_NAMES)
-def test_aw_import_upload_stays_under_uploads(ui_client, cfg, tmp_path, monkeypatch, filename):
+def test_aw_import_upload_stays_under_uploads(
+    ui_client, cfg, tmp_path, monkeypatch, filename
+):
     monkeypatch.setattr("paperful.ui.jobs.authorwatch_import", lambda *a, **k: None)
     before = _snapshot(tmp_path)
     ui_client.post(
@@ -337,7 +357,9 @@ def test_rag_form_upload_and_prompt_names_are_sanitized(cfg):
 
 
 @pytest.mark.skipif(fastapi_missing, reason="paperful[serve] extra missing")
-def test_run_ids_with_odd_characters_do_not_read_outside_commands(ui_client, cfg, tmp_path):
+def test_run_ids_with_odd_characters_do_not_read_outside_commands(
+    ui_client, cfg, tmp_path
+):
     (tmp_path / "secret.json").write_text('{"leak": true}', encoding="utf-8")
     for bad in ("..%2f..%2fsecret", "%2e%2e", "....//secret", "x" * 400):
         res = ui_client.get(f"/v1/runs/{bad}")
@@ -354,7 +376,11 @@ def test_settings_whitelist_for_attach_mode(ui_client, cfg):
         follow_redirects=False,
     )
     assert cfg.ui_attach_mode == "manual"
-    ui_client.post("/settings", data={"attach_mode": "AUTO", "preset": "oa"}, follow_redirects=False)
+    ui_client.post(
+        "/settings",
+        data={"attach_mode": "AUTO", "preset": "oa"},
+        follow_redirects=False,
+    )
     assert cfg.ui_attach_mode == "auto"
 
 
@@ -411,7 +437,9 @@ def _attach_button(html: str) -> str:
 
 
 @pytest.mark.skipif(fastapi_missing, reason="paperful[serve] extra missing")
-def test_attach_button_disabled_at_zero_and_enabled_with_pending(ui_client, cfg, monkeypatch):
+def test_attach_button_disabled_at_zero_and_enabled_with_pending(
+    ui_client, cfg, monkeypatch
+):
     _wanted_env(cfg, monkeypatch, with_pending=False)
     ui_client.cookies.set("pf_collection", "ocean")
     zero = _attach_button(ui_client.get("/wanted").text)
@@ -438,7 +466,9 @@ def test_attach_post_at_zero_is_409_and_writes_nothing(ui_client, cfg, monkeypat
     assert res.status_code == 409
     assert "no attachable" in res.json()["error"]
     assert wrote == []
-    res = ui_client.post("/wanted/attach", data={"keys": ["K1"]}, follow_redirects=False)
+    res = ui_client.post(
+        "/wanted/attach", data={"keys": ["K1"]}, follow_redirects=False
+    )
     assert res.status_code == 409
     assert wrote == []
 
@@ -464,7 +494,9 @@ def test_grab_default_is_manual_and_does_not_attach(cfg, monkeypatch):
     attached: list[object] = []
     monkeypatch.setattr(jobs, "_attach_keys", lambda *_a, **_k: attached.append(1) or 0)
     captured: dict = {}
-    monkeypatch.setattr("paperful.run_cmd.run_fetch", lambda console, c, **kw: captured.update(kw))
+    monkeypatch.setattr(
+        "paperful.run_cmd.run_fetch", lambda console, c, **kw: captured.update(kw)
+    )
     jobs.run_fetch_fn = None
     token = commands.create_review_token(
         cfg,
@@ -534,7 +566,9 @@ def test_grab_passes_no_scihub_override(cfg, monkeypatch):
     manifest = Manifest(cfg.manifest_path)
     monkeypatch.setattr(jobs, "_load_scope_items", lambda _c, _col: (items, manifest))
     captured: dict = {}
-    monkeypatch.setattr("paperful.run_cmd.run_fetch", lambda console, c, **kw: captured.update(kw))
+    monkeypatch.setattr(
+        "paperful.run_cmd.run_fetch", lambda console, c, **kw: captured.update(kw)
+    )
     jobs.run_fetch_fn = None
     token = commands.create_review_token(
         cfg,
@@ -572,8 +606,12 @@ def test_cdp_launch_is_loopback_only(cfg, monkeypatch, tmp_path):
         raise _Stop
 
     monkeypatch.setattr(session, "ensure_playwright", lambda auto_install=True: "")
-    monkeypatch.setattr(session, "_prepare_profile_dir", lambda _c: tmp_path / "profile")
-    monkeypatch.setattr(session, "login_url_for", lambda _c, _s: "https://example.test/login")
+    monkeypatch.setattr(
+        session, "_prepare_profile_dir", lambda _c: tmp_path / "profile"
+    )
+    monkeypatch.setattr(
+        session, "login_url_for", lambda _c, _s: "https://example.test/login"
+    )
     monkeypatch.setattr(session.subprocess, "Popen", fake_popen)
     with pytest.raises(_Stop):
         session._login_via_system_chrome(
@@ -583,8 +621,13 @@ def test_cdp_launch_is_loopback_only(cfg, monkeypatch, tmp_path):
     port_flag = next(a for a in cmd if a.startswith("--remote-debugging-port="))
     port = port_flag.split("=", 1)[1]
     assert port.isdigit()
-    origins = next(a for a in cmd if a.startswith("--remote-allow-origins=")).split("=", 1)[1]
-    assert set(origins.split(",")) == {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
+    origins = next(a for a in cmd if a.startswith("--remote-allow-origins=")).split(
+        "=", 1
+    )[1]
+    assert set(origins.split(",")) == {
+        f"http://127.0.0.1:{port}",
+        f"http://localhost:{port}",
+    }
     assert "*" not in origins
     assert not any(a.startswith("--remote-debugging-address") for a in cmd)
 

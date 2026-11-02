@@ -76,9 +76,7 @@ def propose_patch(
     When ``prepared`` is True (caller already ran ``lint_item`` / ``prepare_identifiers``),
     skip a second network prepare pass.
     """
-    allowed = (
-        load_acronym_allowlist(cfg.state_dir) if allowlist is None else allowlist
-    )
+    allowed = load_acronym_allowlist(cfg.state_dir) if allowlist is None else allowlist
     if not prepared:
         prepare_identifiers(
             client,

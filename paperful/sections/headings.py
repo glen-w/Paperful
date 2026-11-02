@@ -155,9 +155,7 @@ def _load_overlay(cfg: Config | None) -> dict[str, tuple[str, ...]]:
             if isinstance(value, str):
                 syns = (value.strip().lower(),)
             elif isinstance(value, list):
-                syns = tuple(
-                    str(v).strip().lower() for v in value if str(v).strip()
-                )
+                syns = tuple(str(v).strip().lower() for v in value if str(v).strip())
             else:
                 continue
             prev = out.get(canon, ())

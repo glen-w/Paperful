@@ -35,7 +35,9 @@ def find(item: Item, ctx: Context) -> Candidate:
             timeout=30,
         )
     except httpx.HTTPError as exc:
-        return Candidate.miss(NAME, Outcome.ERROR, f"request failed ({type(exc).__name__})")
+        return Candidate.miss(
+            NAME, Outcome.ERROR, f"request failed ({type(exc).__name__})"
+        )
     if resp.status_code == 429:
         return Candidate.miss(NAME, Outcome.ERROR, "HTTP 429")
     if resp.status_code in {401, 403}:

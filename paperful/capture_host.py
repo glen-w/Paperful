@@ -61,15 +61,12 @@ def host_launcher_path(cfg: Config) -> Path:
     """
     if sys.platform == "darwin":
         return (
-            Path.home()
-            / "Library/Application Support/Paperful/capture/paperful-host"
+            Path.home() / "Library/Application Support/Paperful/capture/paperful-host"
         )
     if sys.platform.startswith("linux"):
         return Path.home() / ".local/share/paperful/capture/paperful-host"
     if sys.platform == "win32":
-        local = os.environ.get("LOCALAPPDATA") or str(
-            Path.home() / "AppData" / "Local"
-        )
+        local = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
         return Path(local) / "Paperful" / "capture" / "paperful-host.bat"
     return cfg.state_dir / "capture" / "paperful-host"
 

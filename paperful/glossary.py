@@ -268,9 +268,7 @@ def _best_left_expansion(
         if normalize_phrase(expansion_text) == normalize_phrase(entry.expansion):
             canonical_start = start
             continue
-        if not _is_known_mismatch(
-            expansion_text, entry, similarity_min=similarity_min
-        ):
+        if not _is_known_mismatch(expansion_text, entry, similarity_min=similarity_min):
             continue
         score = max(
             [phrase_similarity(expansion_text, entry.expansion)]

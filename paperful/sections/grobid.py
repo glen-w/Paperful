@@ -102,7 +102,9 @@ def process_pdf(
     sha = file_sha256(pdf)
     owns = False
     header = (
-        client.consolidate_header if client is not None else cfg.grobid_consolidate_header
+        client.consolidate_header
+        if client is not None
+        else cfg.grobid_consolidate_header
     )
     citations = (
         client.consolidate_citations

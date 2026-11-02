@@ -68,7 +68,9 @@ def test_build_context_gives_one_marker_per_paper():
     hits = [
         _hit("AAAA1111", "First passage."),
         _hit("BBBB2222", "Other paper.", title="Whales", authors=["Silva", "Okafor"]),
-        _hit("AAAA1111", "Second passage.", page_start=9, page_end=9, section="Results"),
+        _hit(
+            "AAAA1111", "Second passage.", page_start=9, page_end=9, section="Results"
+        ),
     ]
     context, sources = build_context(hits, max_chars=10_000)
     assert [s.marker for s in sources] == ["S1", "S2"]
@@ -76,7 +78,10 @@ def test_build_context_gives_one_marker_per_paper():
     blocks = context.split("\n\n")
     assert blocks[0] == "[S1] Chen (2019), Krill in winter, pp. 3-4\nFirst passage."
     assert blocks[1].startswith("[S2] Silva & Okafor (2019), Whales, pp. 3-4\n")
-    assert blocks[2] == "[S1] Chen (2019), Krill in winter, p. 9 (Results)\nSecond passage."
+    assert (
+        blocks[2]
+        == "[S1] Chen (2019), Krill in winter, p. 9 (Results)\nSecond passage."
+    )
 
 
 def test_build_context_stops_at_the_budget_but_keeps_the_first():
@@ -123,7 +128,9 @@ def test_cited_markers(text, markers):
 def ledger(tmp_path):
     ledger = Ledger(tmp_path / "ingest.jsonl")
     ledger.write(
-        LedgerRow(key="A", year=2015, item_type="journalArticle", dirs=["ocean/BBNJ/x -- A"])
+        LedgerRow(
+            key="A", year=2015, item_type="journalArticle", dirs=["ocean/BBNJ/x -- A"]
+        )
     )
     ledger.write(
         LedgerRow(
@@ -199,7 +206,11 @@ def test_search_joins_metadata_and_caps_passages_per_item(built):
     assert set(by_key) == {"AAAA1111", "BBBB2222"}
     assert len(by_key["AAAA1111"]) == MAX_CHUNKS_PER_ITEM
     silva = by_key["BBBB2222"][0]
-    assert (silva.title, silva.authors, silva.year) == ("Seabed mining", ["Silva"], 2021)
+    assert (silva.title, silva.authors, silva.year) == (
+        "Seabed mining",
+        ["Silva"],
+        2021,
+    )
     assert silva.page_start == 1 and silva.source == "pdf"
     assert hits == sorted(hits, key=lambda h: -h.score)
     assert built["embedder"].queries[-1] == "krill under ice"
@@ -217,7 +228,9 @@ def test_search_respects_k_scope_and_empty_queries(built):
 
 
 def test_answer_streams_and_reports_cited_sources(built):
-    chat = StubChat(pieces=["Krill eat ", "algae [S1]", ". Mining pays royalties [S2]."])
+    chat = StubChat(
+        pieces=["Krill eat ", "algae [S1]", ". Mining pays royalties [S2]."]
+    )
     reply = answer(built["cfg"], "What do krill eat?", client=chat, **_tools(built))
     assert {s.marker for s in reply.sources} == {"S1", "S2"}
     assert reply.text == ""
@@ -239,12 +252,21 @@ def test_answer_uses_rag_model_and_passes_history(built):
     first = answer(cfg, "What do krill eat?", client=chat, **_tools(built))
     first.read()
     follow = answer(
-        cfg, "And in summer?", history=first.turns("What do krill eat?"), client=chat, **_tools(built)
+        cfg,
+        "And in summer?",
+        history=first.turns("What do krill eat?"),
+        client=chat,
+        **_tools(built),
     )
     follow.read()
     request = chat.requests[1]
     assert request.model == "qwen3:8b"
-    assert [m["role"] for m in request.messages] == ["system", "user", "assistant", "user"]
+    assert [m["role"] for m in request.messages] == [
+        "system",
+        "user",
+        "assistant",
+        "user",
+    ]
     assert request.messages[1]["content"] == "What do krill eat?"
     assert request.messages[2]["content"] == first.text
     # Retrieval uses the new question alone.
@@ -262,7 +284,9 @@ def test_answer_retrieves_on_retrieve_as_keeps_the_question(built):
     )
     reply.read()
     assert built["embedder"].queries[-1] == "BBNJ EIA procedure"
-    assert chat.requests[0].messages[-1]["content"].endswith("Question: and the EIA part?")
+    assert (
+        chat.requests[0].messages[-1]["content"].endswith("Question: and the EIA part?")
+    )
 
 
 def test_answer_ignores_markers_that_were_not_offered(built):
@@ -279,7 +303,9 @@ def test_answer_without_hits_does_not_call_the_model(built):
 
 
 def test_answer_surfaces_model_errors_on_iteration(built):
-    reply = answer(built["cfg"], "krill", client=StubChat(error="model crashed"), **_tools(built))
+    reply = answer(
+        built["cfg"], "krill", client=StubChat(error="model crashed"), **_tools(built)
+    )
     with pytest.raises(LLMClientError, match="model crashed"):
         reply.read()
 

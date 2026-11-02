@@ -32,7 +32,9 @@ def read_seeds_text(path: str, *, stdin=None) -> str:
     handle = stdin if stdin is not None else sys.stdin
     if path.strip() == "-":
         if getattr(handle, "isatty", lambda: False)():
-            raise SnowballError("stdin is a TTY. Pass --seeds-file PATH or pipe a list.")
+            raise SnowballError(
+                "stdin is a TTY. Pass --seeds-file PATH or pipe a list."
+            )
         return handle.read()
     dest = Path(path).expanduser()
     if not dest.is_file():

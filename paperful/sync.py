@@ -54,7 +54,9 @@ class SyncStats:
     written: int = 0  # items whose folders were rewritten
     gone: int = 0  # items marked as having left the library
     unread: int = 0  # items the manager could not give; version not advanced
-    unwritten: list[str] = field(default_factory=list)  # the disk refused; version not advanced
+    unwritten: list[str] = field(
+        default_factory=list
+    )  # the disk refused; version not advanced
     pdf_exports: int = 0
     pdf_keys: list[str] = field(default_factory=list)  # items whose PDF was copied in
     pdf_missing: int = 0  # the manager lists a PDF it could not hand over
@@ -180,7 +182,9 @@ def _plan_delta(
     return plan
 
 
-def _read_annotations(backend: Any, children: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _read_annotations(
+    backend: Any, children: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for ch in children:
         data = ch.get("data") or {}
@@ -283,7 +287,9 @@ def stored_pdf_missing(record: dict[str, Any], folder: Path) -> bool:
     if library_state(record) in GONE_STATES:
         return False
     rows = [r for r in (record.get("attachments") or []) if isinstance(r, dict)]
-    return any(is_pdf_attachment(r) for r in rows) and record_pdf(folder, record) is None
+    return (
+        any(is_pdf_attachment(r) for r in rows) and record_pdf(folder, record) is None
+    )
 
 
 def _cache_is_current(cached: Path, record: dict[str, Any]) -> bool:
@@ -366,7 +372,10 @@ def copy_pdfs(
                     continue
                 if row.get("linkMode") == "linked_url":
                     continue
-                if is_pdf_attachment(row) or row.get("contentType") == "application/pdf":
+                if (
+                    is_pdf_attachment(row)
+                    or row.get("contentType") == "application/pdf"
+                ):
                     continue
                 name = row.get("filename") or row.get("title") or f"{row['key']}.bin"
                 safe = Path(str(name)).name or f"{row['key']}.bin"
@@ -459,7 +468,9 @@ def run_sync(
         return stats
 
     # Checked before anything is written: a wrong library must not half-apply.
-    _retire_gone(cfg, changes, index, SyncStats(), dry_run=True, accept_gone=accept_gone)
+    _retire_gone(
+        cfg, changes, index, SyncStats(), dry_run=True, accept_gone=accept_gone
+    )
     cfg.out_dir.mkdir(parents=True, exist_ok=True)
     write_collections(cfg.out_dir, changes.collections)
     if plan.parents:
@@ -474,7 +485,9 @@ def run_sync(
     # The version moves only when everything it covers is on disk.
     pdfs_complete = bool(state.get("pdfs_complete"))
     if stats.unread == 0 and not stats.unwritten:
-        _write_state(cfg, changes, state, stats, pdfs_complete=pdfs_complete and mode == "all")
+        _write_state(
+            cfg, changes, state, stats, pdfs_complete=pdfs_complete and mode == "all"
+        )
 
     if mode == "all" and (backfill or not changes.full):
         # A command's own refresh never starts the whole-library copy, even
@@ -519,9 +532,7 @@ def _write_standalones(
                 for t in (data.get("tags") or [])
                 if isinstance(t, dict) and t.get("tag")
             ]
-            collections = [
-                str(c) for c in (data.get("collections") or []) if c
-            ]
+            collections = [str(c) for c in (data.get("collections") or []) if c]
             write_json(
                 folder / "record.json",
                 {
@@ -550,9 +561,7 @@ def _write_standalones(
                     export_att(key, dest)
                 except LibraryError:
                     stats.unread += 1
-            collections = [
-                str(c) for c in (data.get("collections") or []) if c
-            ]
+            collections = [str(c) for c in (data.get("collections") or []) if c]
             write_json(
                 folder / "record.json",
                 {
@@ -595,9 +604,7 @@ def _write_state(
     )
 
 
-def clean_pdf_cache(
-    cfg: Config, *, apply: bool = False
-) -> dict[str, Any]:
+def clean_pdf_cache(cfg: Config, *, apply: bool = False) -> dict[str, Any]:
     """Remove ``state/pdf-cache/`` files already absorbed into ``out/`` or stale vs MD5.
 
     Dry-run by default (``apply=False``). Returns counts of kept / removable / removed.
@@ -641,7 +648,9 @@ def clean_pdf_cache(
     }
 
 
-def sync_report(cfg: Config, stats: SyncStats, *, dry_run: bool, pdfs: str) -> dict[str, Any]:
+def sync_report(
+    cfg: Config, stats: SyncStats, *, dry_run: bool, pdfs: str
+) -> dict[str, Any]:
     now = _now()
     return {
         "schema": "paperful.run_report.v1",

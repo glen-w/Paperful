@@ -68,7 +68,9 @@ def test_write_command_report_attaches_witness(cfg):
     assert "witness" in report
     assert report["witness"]["schema"] == SCHEMA
     assert report["witness"]["config_sha256"]
-    assert "sources_configured" in RUN_REPORT_KEYS  # freeze still lists full build_report keys
+    assert (
+        "sources_configured" in RUN_REPORT_KEYS
+    )  # freeze still lists full build_report keys
 
 
 def test_attach_witness_idempotent(cfg):

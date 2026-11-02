@@ -11,7 +11,12 @@ from paperful.fetch_wins import (
     record_win,
     write_learned,
 )
-from paperful.playbooks import GreyPlaybook, apply_rewrite, load_pack_file, merge_playbooks
+from paperful.playbooks import (
+    GreyPlaybook,
+    apply_rewrite,
+    load_pack_file,
+    merge_playbooks,
+)
 
 
 def test_rewrite_recipe_from_two_wins(cfg, tmp_path):
@@ -57,9 +62,7 @@ def test_rewrite_recipe_from_two_wins(cfg, tmp_path):
     assert learned.stat().st_mtime_ns == before
     books = load_pack_file(learned)
     assert books[0].kind == "rewrite"
-    hit = apply_rewrite(
-        "https://onlinelibrary.wiley.com/doi/abs/10.1002/zzz", books
-    )
+    hit = apply_rewrite("https://onlinelibrary.wiley.com/doi/abs/10.1002/zzz", books)
     assert hit is not None and "pdfdirect" in hit
 
 
@@ -126,8 +129,14 @@ def test_propose_then_promote(cfg, tmp_path):
         win="meta",
     )
     text = propose_toml(
-        [{"host": "nature.com", "start_url": "https://www.nature.com/articles/s1",
-          "final_url": "https://www.nature.com/articles/s1.pdf", "win": "meta"}],
+        [
+            {
+                "host": "nature.com",
+                "start_url": "https://www.nature.com/articles/s1",
+                "final_url": "https://www.nature.com/articles/s1.pdf",
+                "win": "meta",
+            }
+        ],
         min_hits=1,
     )
     proposed = cfg.state_dir / "playbooks-proposed.toml"
@@ -168,7 +177,9 @@ def test_playbooks_promote_config(tmp_path):
     bare.write_text('email = "a@b.c"\n', encoding="utf-8")
     assert load_config(bare).playbooks_promote == "gated"
     bad = tmp_path / "bad.toml"
-    bad.write_text('email = "a@b.c"\n[playbooks]\npromote = "always"\n', encoding="utf-8")
+    bad.write_text(
+        'email = "a@b.c"\n[playbooks]\npromote = "always"\n', encoding="utf-8"
+    )
     with pytest.raises(ValueError):
         load_config(bad)
 

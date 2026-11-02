@@ -16,6 +16,7 @@ from .library import LibraryError
 from .runreport import write_command_report
 from .store import Manifest
 
+
 def run_attachments(
     console: Console,
     *,

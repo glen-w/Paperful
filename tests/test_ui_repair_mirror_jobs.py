@@ -56,7 +56,9 @@ def _cmd_record(cmd_id: str, verb: str = "repair_lint") -> dict:
 def scoped_backend(monkeypatch):
     title = "The BBNJ agreement and marine biodiversity beyond national jurisdiction"
     items = [
-        make_item(key="KEEP", doi="10.1000/bbnj.1", title=title, collection_paths=["BBNJ"]),
+        make_item(
+            key="KEEP", doi="10.1000/bbnj.1", title=title, collection_paths=["BBNJ"]
+        ),
         make_item(
             key="DROP",
             title=title,
@@ -293,7 +295,9 @@ def test_repair_preview_attachments(cfg, scoped_backend, monkeypatch):
     assert rec["summary"]["findings"] == {}
 
 
-def test_repair_apply_attachments_requires_surgery_flags(cfg, scoped_backend, monkeypatch):
+def test_repair_apply_attachments_requires_surgery_flags(
+    cfg, scoped_backend, monkeypatch
+):
     from paperful.attachments import Scan
 
     monkeypatch.setattr(

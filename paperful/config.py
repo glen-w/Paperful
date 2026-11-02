@@ -382,7 +382,9 @@ class Config:
     snowball_author_site_max_authors: int = 15
     snowball_author_site_max_queries: int = 20
     # Saturation stop. off keeps the one-shot hop caps.
-    snowball_stop_rule: str = "off"  # off | marginal_yield | asymptotic_coverage | budget | any
+    snowball_stop_rule: str = (
+        "off"  # off | marginal_yield | asymptotic_coverage | budget | any
+    )
     snowball_stop_eps: float = 0.01
     snowball_stop_k: int = 2
     snowball_stop_tau: float = 0.95
@@ -431,7 +433,9 @@ class Config:
     rag_hybrid: bool = True  # vector + full-text; falls back to vector only
     rag_abstracts: bool = True  # index the abstract when an item has no readable PDF
     rag_model: str = ""  # chat model for `ask`; empty → llm.model
-    rag_focus: str = "default"  # default | questions | gaps | methods | answered | conflict
+    rag_focus: str = (
+        "default"  # default | questions | gaps | methods | answered | conflict
+    )
     rag_prompt: str = ""  # custom system prompt file for ask; empty → focus preset
     rag_dest: str = "disk"  # disk | zotero | both — batch note writes (needs --apply)
     rag_extract_questions_llm: bool = False  # LLM lane for `rag questions`
@@ -453,7 +457,9 @@ class Config:
     rag_context_neighbors: int = 0
     # Structured IMRaD section extract (`extract-sections`).
     extract_sections_llm: bool = False
-    extract_sections_headings: str = ""  # extra synonym TOML; also state/section-headings.toml
+    extract_sections_headings: str = (
+        ""  # extra synonym TOML; also state/section-headings.toml
+    )
     extract_sections_fields: tuple[str, ...] = (
         "abstract",
         "conclusion",
@@ -869,7 +875,9 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
     if "map_category_defs" in raw:
         from .snowball.map_categories import parse_map_category_defs
 
-        cfg.snowball_map_category_defs = parse_map_category_defs(raw["map_category_defs"])
+        cfg.snowball_map_category_defs = parse_map_category_defs(
+            raw["map_category_defs"]
+        )
         if "map_categories" not in raw:
             # New custom defs join the default map set unless map_categories is set.
             extra = tuple(
@@ -1115,9 +1123,7 @@ def parse_synthesize_layout(value: str, *, key: str = "layout") -> str:
     if not layout:
         return "default"
     if layout not in _SYNTHESIZE_LAYOUTS:
-        raise ValueError(
-            f"config {key} {value!r} must be default, conflict, or review"
-        )
+        raise ValueError(f"config {key} {value!r} must be default, conflict, or review")
     return layout
 
 
@@ -1217,9 +1223,7 @@ def parse_critique_reviewers(raw: Any) -> tuple[CritiqueReviewer, ...]:
         if "max_tokens" in row and row.get("max_tokens") is not None:
             max_tokens = max(0, int(row.get("max_tokens")))
         out.append(
-            CritiqueReviewer(
-                id=rid, model=model, prompt=prompt, max_tokens=max_tokens
-            )
+            CritiqueReviewer(id=rid, model=model, prompt=prompt, max_tokens=max_tokens)
         )
     return tuple(out)
 

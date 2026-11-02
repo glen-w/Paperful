@@ -13,12 +13,8 @@ from .sections.headings import canonical_for_heading
 
 _HEADING_LINE = re.compile(r"^(?:#{1,6}\s+)?([A-Z][A-Za-z][A-Za-z0-9 ,:/-]{2,80})$")
 
-SOURCE_FAMILIES = frozenset(
-    {"abstract", "results", "conclusion", "introduction"}
-)
-SUPPORT_FAMILIES = frozenset(
-    {"methodology", "results", "limitations", "discussion"}
-)
+SOURCE_FAMILIES = frozenset({"abstract", "results", "conclusion", "introduction"})
+SUPPORT_FAMILIES = frozenset({"methodology", "results", "limitations", "discussion"})
 LIGHT_FAMILIES = frozenset(
     {"related_work", "acknowledgements", "references", "appendix"}
 )

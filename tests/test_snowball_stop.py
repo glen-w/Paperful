@@ -8,7 +8,12 @@ from pathlib import Path
 import pytest
 from rich.console import Console
 
-from paperful.snowball.command import SnowballError, SnowballRequest, run_continue, run_doi
+from paperful.snowball.command import (
+    SnowballError,
+    SnowballRequest,
+    run_continue,
+    run_doi,
+)
 from paperful.config import load_config
 from paperful.snowball.stop import (
     IterationStat,
@@ -106,7 +111,9 @@ def test_iterative_crawl_stops_after_one_hop_until_continue(tmp_path: Path):
     assert state["depth_ceiling"] == 3
     run_id = first.run_dir.name
     with pytest.raises(SnowballError, match="Keep or Skip"):
-        run_continue(cfg, run_id, console=console, client=client, lookup=lambda doi, title: None)
+        run_continue(
+            cfg, run_id, console=console, client=client, lookup=lambda doi, title: None
+        )
 
     rewritten = []
     for line in (first.run_dir / "candidates.jsonl").read_text().splitlines():
@@ -200,7 +207,9 @@ def test_asymptotic_coverage_fires_when_keeps_flatten():
         IterationStat(3, 8, 1),
         IterationStat(4, 6, 0),
     ]
-    fired = asymptotic_coverage(history, StopParams(rule="asymptotic_coverage", tau=0.95, min_points=4))
+    fired = asymptotic_coverage(
+        history, StopParams(rule="asymptotic_coverage", tau=0.95, min_points=4)
+    )
     assert fired.triggered is True
     assert fired.value is not None and fired.value >= 0.95
 

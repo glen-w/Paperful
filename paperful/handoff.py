@@ -281,6 +281,7 @@ def missing_from_run_outcomes(
     rows.sort(key=lambda r: r.title.lower())
     return rows
 
+
 def soft_attempts(attempts: list[str]) -> bool:
     return any(
         "download-failed(too small" in a or "download-failed(not a PDF" in a
@@ -417,9 +418,7 @@ def open_tabs(
     cfg: Config | None = None,
 ) -> int:
     """Open URLs in the user's default browser. Returns how many tabs were opened."""
-    targets = handoff_targets(
-        rows, include_doi_tabs=include_doi_tabs, scholar=scholar
-    )
+    targets = handoff_targets(rows, include_doi_tabs=include_doi_tabs, scholar=scholar)
     if not targets:
         return 0
     if len(targets) > TABS_CONFIRM_AFTER:
@@ -494,9 +493,7 @@ def attach_pdf_file(
             probe.pages, probe.words, min_words=cfg.short_pdf_min_words
         )
         if verdict == "sparse_short":
-            raise ValueError(
-                f"sparse one-page PDF ({probe.words} words): {path}"
-            )
+            raise ValueError(f"sparse one-page PDF ({probe.words} words): {path}")
     if not backend.supports_write():
         raise LibraryError("This library has no write support.")
     import hashlib
@@ -562,7 +559,9 @@ def walk_missing(
         url = opening_url(row, scholar=scholar)
         say(f"[{idx}/{len(targets)}] {row.key} — {row.title}")
         if row.hint == HINT_AUTHOR_REQUEST:
-            say("  ResearchGate: click Request full-text yourself (ToS; Paperful does not click).")
+            say(
+                "  ResearchGate: click Request full-text yourself (ToS; Paperful does not click)."
+            )
         say(f"  opening {url}")
         opened_at = datetime.now(tz=timezone.utc).timestamp()
         open_fn(url)

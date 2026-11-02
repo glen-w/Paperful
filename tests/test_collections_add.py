@@ -88,9 +88,7 @@ def test_classify_path_fallback_when_raw_collections_empty():
             "M1": {"collections": [], "title": "Mendeley-like", "paths": ["BBNJ"]},
         }
     )
-    batch = classify_rows(
-        ["M1"], backend, collection_key="C1", collection_path="BBNJ"
-    )
+    batch = classify_rows(["M1"], backend, collection_key="C1", collection_path="BBNJ")
     assert batch.rows[0].status == "already-in"
 
 

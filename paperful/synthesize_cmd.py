@@ -16,6 +16,7 @@ from .config import wants_disk, wants_zotero
 from .library import LibraryError
 from .runreport import ItemOutcome, build_report, write_run_report
 
+
 def run_synthesize(
     console: Console,
     *,

@@ -123,11 +123,21 @@ def test_probe_cites_overlap(tmp_path: Path):
     class _Client:
         def works_by_dois(self, dois, select=""):
             return [
-                {"id": "https://openalex.org/W1", "doi": "https://doi.org/10.1000/a", "display_name": "Seed A"},
-                {"id": "https://openalex.org/W2", "doi": "https://doi.org/10.1000/b", "display_name": "Seed B"},
+                {
+                    "id": "https://openalex.org/W1",
+                    "doi": "https://doi.org/10.1000/a",
+                    "display_name": "Seed A",
+                },
+                {
+                    "id": "https://openalex.org/W2",
+                    "doi": "https://doi.org/10.1000/b",
+                    "display_name": "Seed B",
+                },
             ]
 
-        def works_citing(self, openalex_id, *, limit, from_created_date=None, sort=None):
+        def works_citing(
+            self, openalex_id, *, limit, from_created_date=None, sort=None
+        ):
             return [
                 {
                     "id": "https://openalex.org/W9",
@@ -273,9 +283,7 @@ def test_keepup_cites_baseline_proposes_zero(
     def fake_baseline(*_a, **_k):
         return {"doi:10.1000/old"}
 
-    monkeypatch.setattr(
-        "paperful.keepup_cites.baseline_identities", fake_baseline
-    )
+    monkeypatch.setattr("paperful.keepup_cites.baseline_identities", fake_baseline)
     result = run_job(cfg, "field", console=_console(), force=True)
     assert result.baseline is True
     assert result.proposed == 0

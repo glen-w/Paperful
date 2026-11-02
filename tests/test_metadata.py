@@ -113,9 +113,7 @@ def test_propose_overwrite_replaces_title_date_venue(cfg, monkeypatch):
             source="crossref",
         ),
     )
-    patch = propose_patch(
-        client, cfg, item, findings, overwrite=True, prepared=True
-    )
+    patch = propose_patch(client, cfg, item, findings, overwrite=True, prepared=True)
     assert patch is not None
     assert patch.after["publicationTitle"] == "New Venue"
     assert patch.after["date"] == "2019-06"
@@ -124,9 +122,13 @@ def test_propose_overwrite_replaces_title_date_venue(cfg, monkeypatch):
 
 def test_propose_replaces_blank_and_citation_titles_without_overwrite(cfg):
     work_title = "Hand function and tool behavior in early hominids"
-    blank = make_item(doi="10.9/ok", title="", url=None, publication_title=None, date=None)
+    blank = make_item(
+        doi="10.9/ok", title="", url=None, publication_title=None, date=None
+    )
     client = mock_client(
-        _work_handler("10.9/ok", work_title, venue="Journal of Human Evolution", year=1998)
+        _work_handler(
+            "10.9/ok", work_title, venue="Journal of Human Evolution", year=1998
+        )
     )
     findings = lint_item(client, cfg, blank)
     assert any(finding.code == "title_unusable" for finding in findings)
@@ -135,7 +137,9 @@ def test_propose_replaces_blank_and_citation_titles_without_overwrite(cfg):
     assert patch.after["title"] == work_title
 
     cite = '[1] R.L. Susman: "Hand function and tool behavior in early hominids," J. Hum. Evol.'
-    cited = make_item(doi="10.9/ok", title=cite, url=None, publication_title="V", date="1998")
+    cited = make_item(
+        doi="10.9/ok", title=cite, url=None, publication_title="V", date="1998"
+    )
     findings = lint_item(client, cfg, cited)
     assert any(finding.code == "title_unusable" for finding in findings)
     patch = propose_patch(client, cfg, cited, findings, prepared=True)
@@ -418,7 +422,9 @@ def test_html_title_cleanup_patch(cfg):
         prepared=True,
     )
     assert patch is not None
-    assert patch.after["title"] == "A sufficiently long test title about marine governance"
+    assert (
+        patch.after["title"] == "A sufficiently long test title about marine governance"
+    )
     assert patch.source == "title_html"
 
 
@@ -434,7 +440,9 @@ def test_html_all_caps_title_strips_then_recases(cfg):
         prepared=True,
     )
     assert patch is not None
-    assert patch.after["title"] == "A Sufficiently Long Test Title About Marine Governance"
+    assert (
+        patch.after["title"] == "A Sufficiently Long Test Title About Marine Governance"
+    )
     assert patch.source == "title_case"
 
 
@@ -451,7 +459,9 @@ def test_title_all_caps_recases_filename_stays_findings(cfg):
         mock_client(lambda r: httpx.Response(500)), cfg, caps, findings, prepared=True
     )
     assert patch is not None
-    assert patch.after["title"] == "A Sufficiently Long Test Title About Marine Governance"
+    assert (
+        patch.after["title"] == "A Sufficiently Long Test Title About Marine Governance"
+    )
     assert patch.source == "title_case"
 
     fn = make_item(
@@ -630,9 +640,7 @@ def test_pdf_doi_not_adopted_when_library_ok(cfg, tmp_path, monkeypatch):
     patch = propose_patch(client, cfg, item, findings, prepared=True)
     assert patch is None or patch.after.get("doi") != "10.5555/other"
 
-    patch_ow = propose_patch(
-        client, cfg, item, findings, overwrite=True, prepared=True
-    )
+    patch_ow = propose_patch(client, cfg, item, findings, overwrite=True, prepared=True)
     assert patch_ow is not None
     assert patch_ow.after.get("doi") == "10.5555/other"
     assert patch_ow.source == "pdf"

@@ -11,7 +11,9 @@ from .expand import publication_year
 from .openalex import SELECT, OpenAlexBudgetExceeded, short_id, work_to_candidate
 
 
-def repair_reference_titles(rows: list[Candidate], client: Any, *, tally: Any = None) -> None:
+def repair_reference_titles(
+    rows: list[Candidate], client: Any, *, tally: Any = None
+) -> None:
     """Fill hop neighbours whose title or year is missing from the OpenAlex work.
 
     A Crossref or Semantic Scholar reference is often only a DOI, or the whole
@@ -27,11 +29,15 @@ def repair_reference_titles(rows: list[Candidate], client: Any, *, tally: Any = 
         if _needs_work(row):
             need.append(row)
             continue
-        if not (row.ids.get("doi") or "").strip() and not usable_work_title(row.biblio.get("title")):
+        if not (row.ids.get("doi") or "").strip() and not usable_work_title(
+            row.biblio.get("title")
+        ):
             _reject_title(row)
     if not need:
         return
-    by_doi = _works_by_doi(client, [str(row.ids.get("doi") or "") for row in need], tally=tally)
+    by_doi = _works_by_doi(
+        client, [str(row.ids.get("doi") or "") for row in need], tally=tally
+    )
     for row in need:
         doi = normalize_doi(str(row.ids.get("doi") or "")) or ""
         work = by_doi.get(doi)
@@ -54,7 +60,9 @@ def _needs_work(row: Candidate) -> bool:
     return publication_year(row.biblio.get("year")) is None
 
 
-def _works_by_doi(client: Any, dois: list[str], *, tally: Any) -> dict[str, dict[str, Any]]:
+def _works_by_doi(
+    client: Any, dois: list[str], *, tally: Any
+) -> dict[str, dict[str, Any]]:
     if client is None or not hasattr(client, "works_by_dois"):
         return {}
     previous = getattr(client, "stage", None)
@@ -111,7 +119,10 @@ def _merge_work(row: Candidate, work: dict[str, Any]) -> None:
         if "is_oa" in incoming:
             biblio["is_oa"] = incoming["is_oa"]
     else:
-        if publication_year(biblio.get("year")) is None and publication_year(incoming.get("year")) is not None:
+        if (
+            publication_year(biblio.get("year")) is None
+            and publication_year(incoming.get("year")) is not None
+        ):
             biblio["year"] = incoming.get("year")
         if not biblio.get("authors") and incoming.get("authors"):
             biblio["authors"] = list(incoming["authors"])

@@ -103,7 +103,9 @@ class Index:
         return int(self.meta["dim"])
 
     @classmethod
-    def open(cls, cfg: Config, *, dim: int | None = None, create: bool = False) -> Index:
+    def open(
+        cls, cfg: Config, *, dim: int | None = None, create: bool = False
+    ) -> Index:
         """Open the index for the configured embedding model.
 
         ``create`` makes it when absent and needs ``dim``. ``meta.json`` is
@@ -181,12 +183,16 @@ class Index:
         where = _key_filter(keys) if keys is not None else None
         if hybrid and text.strip():
             try:
-                query = self._table.search(query_type="hybrid").vector(vector).text(text)
+                query = (
+                    self._table.search(query_type="hybrid").vector(vector).text(text)
+                )
                 if where:
                     query = query.where(where)
                 rows = query.limit(k).to_list()
                 return [
-                    _hit(row, row.get("_relevance_score"), include_vector=include_vector)
+                    _hit(
+                        row, row.get("_relevance_score"), include_vector=include_vector
+                    )
                     for row in rows
                 ]
             except Exception:

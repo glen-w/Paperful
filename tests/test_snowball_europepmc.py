@@ -7,7 +7,9 @@ from paperful.snowball.fill import run_fill_pass
 from paperful.snowball.tally import Tally, colour_for, metrics_for
 
 
-def _row(doi: str, *, hop: int = 0, direction: str = "refs", why: str = "seed") -> Candidate:
+def _row(
+    doi: str, *, hop: int = 0, direction: str = "refs", why: str = "seed"
+) -> Candidate:
     return Candidate(
         "r",
         {"type": "doi", "value": doi},
@@ -114,7 +116,13 @@ def test_reference_list_is_skipped_unless_the_record_has_one(tmp_path, monkeypat
     def fake_get(url, params=None, headers=None, timeout=None):
         urls.append(url)
         if url.endswith("/references"):
-            return Resp({"referenceList": {"reference": [{"doi": "10.1000/should-not", "title": "No"}]}})
+            return Resp(
+                {
+                    "referenceList": {
+                        "reference": [{"doi": "10.1000/should-not", "title": "No"}]
+                    }
+                }
+            )
         return Resp(
             {
                 "resultList": {
@@ -180,7 +188,17 @@ def test_pmid_only_reference_is_resolved_to_a_doi(tmp_path, monkeypatch):
             )
         if "EXT_ID:" in query:
             return Resp(
-                {"resultList": {"result": [{"pmid": "19623248", "doi": "10.1371/journal.pone.0000001", "id": "19623248"}]}}
+                {
+                    "resultList": {
+                        "result": [
+                            {
+                                "pmid": "19623248",
+                                "doi": "10.1371/journal.pone.0000001",
+                                "id": "19623248",
+                            }
+                        ]
+                    }
+                }
             )
         return Resp(
             {
@@ -203,7 +221,12 @@ def test_pmid_only_reference_is_resolved_to_a_doi(tmp_path, monkeypatch):
     payload = europepmc_work("10.1073/pnas.1", cache_dir=tmp_path / "europepmc")
     assert payload is not None
     assert payload["references"] == [
-        {"doi": "10.1371/journal.pone.0000001", "pmid": "19623248", "title": "A real paper", "year": 2009}
+        {
+            "doi": "10.1371/journal.pone.0000001",
+            "pmid": "19623248",
+            "title": "A real paper",
+            "year": 2009,
+        }
     ]
 
 
@@ -213,12 +236,18 @@ def test_every_citation_backend_skips_a_closed_gap():
     def crossref(doi: str) -> dict:
         asked.append(f"crossref:{doi}")
         if doi == "10.1000/gap":
-            return {"references": [{"doi": "10.1000/via-crossref", "title": "Via", "year": 2018}]}
+            return {
+                "references": [
+                    {"doi": "10.1000/via-crossref", "title": "Via", "year": 2018}
+                ]
+            }
         return {}
 
     def later(doi: str) -> dict:
         asked.append(doi)
-        return {"references": [{"doi": "10.1000/should-not", "title": "No", "year": 2017}]}
+        return {
+            "references": [{"doi": "10.1000/should-not", "title": "No", "year": 2017}]
+        }
 
     parent = _row("10.1000/gap")
     neighbour = _row("10.1000/neighbour", hop=1, why="ref of 10.1000/other")
@@ -247,4 +276,6 @@ def test_openalex_allowance_notice_is_yellow():
         colour_for("OpenAlex free allowance exhausted; switching to API key.")
         == "yellow"
     )
-    assert colour_for("OpenAlex daily allowance for your API key is used up.") == "yellow"
+    assert (
+        colour_for("OpenAlex daily allowance for your API key is used up.") == "yellow"
+    )

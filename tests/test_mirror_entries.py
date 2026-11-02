@@ -76,7 +76,9 @@ def test_mirror_entries_counts_a_hardlinked_pdf_once(tmp_path):
 
 
 def test_mirror_entries_keeps_a_pdf_folder_without_record(tmp_path):
-    _mirror_dir(tmp_path, "inbox", "Unknown - n.d. - Scan -- ZZZZ9999", pdf=b"%PDF-1.4 a")
+    _mirror_dir(
+        tmp_path, "inbox", "Unknown - n.d. - Scan -- ZZZZ9999", pdf=b"%PDF-1.4 a"
+    )
     (entry,) = mirror_entries(tmp_path)
     assert entry.key == "ZZZZ9999" and entry.record == {} and len(entry.pdfs) == 1
     item = entry.item()

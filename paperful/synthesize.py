@@ -304,9 +304,7 @@ def _probe_reduce_fit(
     in_len = max(len(probe_in), 1)
     ratio = len(probe_out) / in_len
     later_len = min(budget, max(1, int(ratio * budget)))
-    refined = forecast_reduce_variable(
-        first_level_count, max_len, later_len, budget
-    )
+    refined = forecast_reduce_variable(first_level_count, max_len, later_len, budget)
     if refined <= 1:
         return
     raise ReduceCapError(
@@ -427,17 +425,11 @@ def assemble_report(
         )
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     chunk_word = "chunk" if n_chunks == 1 else "chunks"
-    detail = (
-        f"{len(sources)} summaries · {n_chunks} {chunk_word} · scope {_esc(scope_label)}"
-    )
+    detail = f"{len(sources)} summaries · {n_chunks} {chunk_word} · scope {_esc(scope_label)}"
     if llm_egress_is_remote(cfg):
-        footer = (
-            f"<p><em>paperful · remote LLM · {_esc(cfg.llm_model)} · {stamp} · {detail}</em></p>"
-        )
+        footer = f"<p><em>paperful · remote LLM · {_esc(cfg.llm_model)} · {stamp} · {detail}</em></p>"
     else:
-        footer = (
-            f"<p><em>paperful · {_esc(cfg.llm_model)} · {stamp} · prompt {prompt_sha} · {detail}</em></p>"
-        )
+        footer = f"<p><em>paperful · {_esc(cfg.llm_model)} · {stamp} · prompt {prompt_sha} · {detail}</em></p>"
     parts.append(footer)
     from .notehtml import wrap
 

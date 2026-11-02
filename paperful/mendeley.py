@@ -85,7 +85,9 @@ class MendeleyClient:
             self.http.close()
 
     def ping(self) -> dict[str, Any]:
-        profile = self.get("/profiles/me", accept="application/vnd.mendeley-profile.1+json")
+        profile = self.get(
+            "/profiles/me", accept="application/vnd.mendeley-profile.1+json"
+        )
         if not isinstance(profile, dict):
             raise MendeleyAuthError("Mendeley /profiles/me did not return a profile")
         return {
@@ -185,19 +187,21 @@ class MendeleyClient:
         self._store(tokens)
         return tokens
 
-    def get(self, path: str, *, accept: str, params: dict[str, Any] | None = None) -> Any:
+    def get(
+        self, path: str, *, accept: str, params: dict[str, Any] | None = None
+    ) -> Any:
         return self._request("GET", path, accept=accept, params=params)
 
-    def paginate(self, path: str, *, accept: str, params: dict[str, Any] | None = None) -> list[Any]:
+    def paginate(
+        self, path: str, *, accept: str, params: dict[str, Any] | None = None
+    ) -> list[Any]:
         query = dict(params or {})
         query.setdefault("limit", 500)
         url: str | None = path if path.startswith("http") else API + path
         out: list[Any] = []
         first = True
         while url:
-            resp = self._raw(
-                "GET", url, accept=accept, params=query if first else None
-            )
+            resp = self._raw("GET", url, accept=accept, params=query if first else None)
             data = resp.json()
             if isinstance(data, list):
                 out.extend(data)
@@ -285,7 +289,9 @@ class MendeleyClient:
             time.sleep(_retry_after(resp))
             resp = self.http.post(f"{API}/files", headers=headers, content=data)
         if resp.status_code not in (200, 201):
-            raise LibraryError(f"Mendeley file upload {resp.status_code}: {resp.text[:300]}")
+            raise LibraryError(
+                f"Mendeley file upload {resp.status_code}: {resp.text[:300]}"
+            )
         return resp.json() if resp.content else {"id": None}
 
     def _request(
@@ -346,7 +352,9 @@ class MendeleyClient:
             time.sleep(_retry_after(resp))
             resp = self.http.request(method, url, **kwargs)
         if resp.status_code >= 400:
-            raise LibraryError(f"Mendeley {method} {url} → {resp.status_code}: {resp.text[:400]}")
+            raise LibraryError(
+                f"Mendeley {method} {url} → {resp.status_code}: {resp.text[:400]}"
+            )
         return resp
 
     def _exchange(self, body: dict[str, str]) -> dict[str, Any]:
@@ -358,7 +366,9 @@ class MendeleyClient:
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         if resp.status_code >= 400:
-            raise MendeleyAuthError(f"token exchange {resp.status_code}: {resp.text[:300]}")
+            raise MendeleyAuthError(
+                f"token exchange {resp.status_code}: {resp.text[:300]}"
+            )
         data = resp.json()
         data["expires_at"] = time.time() + int(data.get("expires_in") or 3600)
         return data
@@ -543,7 +553,9 @@ class MendeleyBackend(ExcludeMixin):
             keys: set[str] = set()
             for sub in self.subtree_keys(col):
                 keys |= membership.get(sub, set())
-            missing = sum(1 for k in keys if not (docs.get(k) or {}).get("file_attached"))
+            missing = sum(
+                1 for k in keys if not (docs.get(k) or {}).get("file_attached")
+            )
             counts[key] = (len(keys), missing)
         return counts
 
@@ -585,7 +597,9 @@ class MendeleyBackend(ExcludeMixin):
 
     def get_item(self, key: str) -> Item | None:
         try:
-            doc = self.client.get(f"/documents/{key}", accept=ACCEPT_DOC, params={"view": "all"})
+            doc = self.client.get(
+                f"/documents/{key}", accept=ACCEPT_DOC, params={"view": "all"}
+            )
         except LibraryError:
             return None
         if not isinstance(doc, dict):
@@ -595,7 +609,9 @@ class MendeleyBackend(ExcludeMixin):
 
     def raw_item(self, key: str) -> dict[str, Any] | None:
         try:
-            doc = self.client.get(f"/documents/{key}", accept=ACCEPT_DOC, params={"view": "all"})
+            doc = self.client.get(
+                f"/documents/{key}", accept=ACCEPT_DOC, params={"view": "all"}
+            )
         except LibraryError:
             return None
         return _raw_from_doc(doc) if isinstance(doc, dict) else None
@@ -603,7 +619,9 @@ class MendeleyBackend(ExcludeMixin):
     def children(self, key: str) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         try:
-            files = self.client.get("/files", accept=ACCEPT_FILE, params={"document_id": key})
+            files = self.client.get(
+                "/files", accept=ACCEPT_FILE, params={"document_id": key}
+            )
         except LibraryError:
             files = []
         for f in files or []:
@@ -723,7 +741,9 @@ class MendeleyBackend(ExcludeMixin):
             msg = str(exc)
             return AttachResult(False, reason=msg, code=attach_failure_code(msg))
         if result.get("duplicate"):
-            return AttachResult(True, attachment_key=None, reason="unchanged", code="unchanged")
+            return AttachResult(
+                True, attachment_key=None, reason="unchanged", code="unchanged"
+            )
         return AttachResult(
             True,
             attachment_key=str(result.get("id") or ""),
@@ -955,7 +975,9 @@ class MendeleyBackend(ExcludeMixin):
             built.append(part)
             sofar = "/".join(built)
             self._collections = None
-            found = next((c for c in self.collections().values() if c.path == sofar), None)
+            found = next(
+                (c for c in self.collections().values() if c.path == sofar), None
+            )
             if found is not None:
                 self._check_collection_op("ensure_path", found.key)
                 parent = found.key
@@ -1061,9 +1083,7 @@ class MendeleyBackend(ExcludeMixin):
             return ids
         return set(self._documents())
 
-    def _membership_for_docs(
-        self, docs: list[dict[str, Any]]
-    ) -> dict[str, set[str]]:
+    def _membership_for_docs(self, docs: list[dict[str, Any]]) -> dict[str, set[str]]:
         """Folder membership for ``docs`` without forcing a whole-library document fetch."""
         mapping: dict[str, set[str]] = {k: set() for k in self.collections()}
         used_uuids = False
@@ -1189,9 +1209,7 @@ def _item_from_doc(
     arxiv = ident.get("arxiv") or extract_arxiv_id(url or "")
     authors = doc.get("authors") or []
     surnames = [
-        str(a.get("last_name") or "").strip()
-        for a in authors
-        if isinstance(a, dict)
+        str(a.get("last_name") or "").strip() for a in authors if isinstance(a, dict)
     ]
     surnames = [s for s in surnames if s]
     first = surnames[0] if surnames else None

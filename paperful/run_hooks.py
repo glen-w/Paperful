@@ -20,6 +20,7 @@ from .routing import sources_for_item
 from .runreport import write_command_report
 from .store import Manifest
 
+
 def stdin_is_tty() -> bool:
     from . import cli_runtime as cli_mod
 
@@ -64,7 +65,9 @@ def flush_backend(console: Console, backend: LibraryBackend) -> None:
     )
 
 
-def rag_auto_after_command(console: Console, cfg: Config, since: float, keys: Any = ()) -> None:
+def rag_auto_after_command(
+    console: Console, cfg: Config, since: float, keys: Any = ()
+) -> None:
     if not (cfg.rag_enabled and cfg.rag_auto_ingest):
         return
     from .rag.auto import auto_ingest

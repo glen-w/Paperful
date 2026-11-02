@@ -7,6 +7,7 @@ from typing import Any
 from ..config import Config
 from . import commands, jobs
 
+
 def ask_turn(
     cfg: Config,
     cmd_id: str,
@@ -108,7 +109,9 @@ def rag_ingest(
         from ..llm.preflight import validate_embedder
 
         embedder = validate_embedder(cfg)
-    whole_mirror = not (collection or "").strip() and year_from is None and year_to is None
+    whole_mirror = (
+        not (collection or "").strip() and year_from is None and year_to is None
+    )
     batch = ingest_entries(
         cfg,
         entries,
@@ -736,5 +739,3 @@ def synthesize(
             "missing": len(prepared.missing),
         },
     )
-
-

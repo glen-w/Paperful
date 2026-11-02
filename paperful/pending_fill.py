@@ -96,9 +96,7 @@ def _rows(cfg: Config) -> Iterator[dict[str, Any]]:
             yield _row("authorwatch", people.name, data)
 
 
-def pending_fill(
-    cfg: Config, library_dois: set[str] | None = None
-) -> dict[str, Any]:
+def pending_fill(cfg: Config, library_dois: set[str] | None = None) -> dict[str, Any]:
     """Distinct pending papers (by DOI), minus anything already in the library.
 
     Rows without a DOI are kept (keyed by title) so nothing is silently hidden.

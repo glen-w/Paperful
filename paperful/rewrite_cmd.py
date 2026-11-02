@@ -51,7 +51,9 @@ def run_rewrite(
         console.print("[red]Pass --pack PATH, --item KEY, or --file PATH.[/]")
         raise typer.Exit(1)
     if has_item and has_file and not has_pack:
-        console.print("[red]Pass --item or --file (or --pack with --file), not both.[/]")
+        console.print(
+            "[red]Pass --item or --file (or --pack with --file), not both.[/]"
+        )
         raise typer.Exit(1)
     if len(item_keys) > 1:
         console.print("[red]Pass a single --item KEY.[/]")
@@ -91,9 +93,7 @@ def run_rewrite(
         raise typer.Exit(1)
 
     try:
-        area_ids = parse_rewrite_areas_list(
-            area if area else list(cfg.rewrite_areas)
-        )
+        area_ids = parse_rewrite_areas_list(area if area else list(cfg.rewrite_areas))
         output_ids = parse_rewrite_outputs(
             output if output else list(cfg.rewrite_outputs)
         )
@@ -173,7 +173,11 @@ def run_rewrite(
             }
             for e in ((result.get("plan") or {}).get("edits") or [])
         ],
-        flags={"dry_run": dry_run, "areas": list(area_ids), "outputs": list(output_ids)},
+        flags={
+            "dry_run": dry_run,
+            "areas": list(area_ids),
+            "outputs": list(output_ids),
+        },
         exit_code=0,
     )
 

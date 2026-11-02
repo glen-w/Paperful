@@ -166,7 +166,9 @@ def compute_style_metrics(text: str) -> dict[str, Any]:
     }
 
 
-def long_sentences(text: str, *, min_words: int = LONG_SENTENCE_WORDS) -> list[tuple[int, int, str]]:
+def long_sentences(
+    text: str, *, min_words: int = LONG_SENTENCE_WORDS
+) -> list[tuple[int, int, str]]:
     """Return (1-based index, word count, quote) for extreme sentences."""
     out: list[tuple[int, int, str]] = []
     for idx, sent in enumerate(split_sentences(text), start=1):

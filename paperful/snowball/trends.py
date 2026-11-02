@@ -25,7 +25,9 @@ class TrendsReport:
     profile: str | None = None
 
 
-def resolve_trends_query(cfg: Config, *, query: str | None, profile: str | None) -> tuple[str, str | None]:
+def resolve_trends_query(
+    cfg: Config, *, query: str | None, profile: str | None
+) -> tuple[str, str | None]:
     """Return (openalex_search, profile_name)."""
     prof = (profile or "").strip()
     q = (query or "").strip()
@@ -35,7 +37,9 @@ def resolve_trends_query(cfg: Config, *, query: str | None, profile: str | None)
         raw = load_profile(cfg, prof)
         mode = str(raw.get("mode") or "").strip().lower()
         if mode not in {"search", "hybrid"}:
-            raise SnowballError("Trends need a search or hybrid profile with query terms.")
+            raise SnowballError(
+                "Trends need a search or hybrid profile with query terms."
+            )
         return composed_query_from_profile(raw), prof
     if not q:
         raise SnowballError("Pass a search query or --profile.")

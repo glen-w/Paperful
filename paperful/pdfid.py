@@ -65,9 +65,7 @@ def probe_pdf_bytes(content: bytes) -> PdfProbe:
         dest.unlink(missing_ok=True)
 
 
-def short_pdf_verdict(
-    pages: int, words: int, *, min_words: int
-) -> ShortPdfVerdict:
+def short_pdf_verdict(pages: int, words: int, *, min_words: int) -> ShortPdfVerdict:
     """Classify a PDF for the one-page density gate.
 
     Unreadable PDFs (``pages < 1``) stay ``ok`` so opaque but otherwise-valid

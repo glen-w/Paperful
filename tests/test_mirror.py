@@ -159,9 +159,9 @@ def test_item_v1_golden_record_from_raw():
     assert rec["doi"] == "10.1000/abc.1"
     assert "DOI" not in rec["fields"]
     golden = json.loads(
-        (Path(__file__).resolve().parent / "fixtures" / "item_v1" / "record.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            Path(__file__).resolve().parent / "fixtures" / "item_v1" / "record.json"
+        ).read_text(encoding="utf-8")
     )
     assert rec["schema"] == golden["schema"]
     assert rec["item_key"] == golden["item_key"]
@@ -180,7 +180,10 @@ def test_selected_collections_limit_paths_like_a_scoped_listing(tmp_path):
     mirrored = item_from_record(rec, folder, out, selected={"COL2"})
     assert mirrored.collection_paths == scoped.collection_paths == ["BBNJ/EIA"]
     outside = item_from_record(rec, folder, out, selected={"OTHER"})
-    assert outside.collection_paths == item_from_json(raw, COLS, {"OTHER"}).collection_paths
+    assert (
+        outside.collection_paths
+        == item_from_json(raw, COLS, {"OTHER"}).collection_paths
+    )
 
 
 def test_folder_pdf_counts_when_the_record_has_no_attachment_rows(tmp_path):
@@ -213,7 +216,9 @@ def test_index_finds_every_folder_for_a_key_and_updates_them_all(tmp_path):
     assert update_record(out, "KEY00001", lambda rec: rec.update(title="New")) == 2
     for collection in ("A", "B"):
         rec = json.loads(
-            record_path(out / collection / "Smith - 2020 - Paper -- KEY00001").read_text()
+            record_path(
+                out / collection / "Smith - 2020 - Paper -- KEY00001"
+            ).read_text()
         )
         assert rec["title"] == "New"
     assert load_record(out, "MISSING1") is None
@@ -225,7 +230,9 @@ def test_record_pdf_prefers_the_fetched_file(tmp_path):
     folder.mkdir()
     (folder / "a-export.pdf").write_bytes(b"%PDF-1.4 a")
     (folder / "z-fetched.pdf").write_bytes(b"%PDF-1.4 z")
-    assert record_pdf(folder, {"fetch": {"pdf": "z-fetched.pdf"}}).name == "z-fetched.pdf"
+    assert (
+        record_pdf(folder, {"fetch": {"pdf": "z-fetched.pdf"}}).name == "z-fetched.pdf"
+    )
     assert record_pdf(folder, {"fetch": {"pdf": "gone.pdf"}}).name == "a-export.pdf"
     assert record_pdf(folder, None).name == "a-export.pdf"
 
@@ -257,7 +264,10 @@ def test_pdf_for_finds_a_mirror_pdf_the_manifest_never_recorded(tmp_path):
     pdf.write_bytes(b"%PDF-1.4")
     assert pdf_for(out, item, None) == pdf
     cfg = Config(out_dir=out, state_dir=tmp_path / "state")
-    assert resolve_pdf_path(cfg, item, Manifest(tmp_path / "state" / "manifest.jsonl")) == pdf
+    assert (
+        resolve_pdf_path(cfg, item, Manifest(tmp_path / "state" / "manifest.jsonl"))
+        == pdf
+    )
 
 
 def test_pdf_for_survives_a_retitled_item(tmp_path):

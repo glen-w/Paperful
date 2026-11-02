@@ -304,7 +304,9 @@ def test_paywall_prices_sum_unsaved_articles(cfg):
             itemKey="A",
             title="t",
             status="not_found",
-            attempts=["browser_agent:not_found(paywall @springer.com; price 39.95 EUR)"],
+            attempts=[
+                "browser_agent:not_found(paywall @springer.com; price 39.95 EUR)"
+            ],
         ),
         ItemOutcome(
             itemKey="B",
@@ -316,13 +318,17 @@ def test_paywall_prices_sum_unsaved_articles(cfg):
             itemKey="C",
             title="t",
             status="not_found",
-            attempts=["browser_agent:not_found(paywall @elsevier.com; price 29.95 USD)"],
+            attempts=[
+                "browser_agent:not_found(paywall @elsevier.com; price 29.95 USD)"
+            ],
         ),
         ItemOutcome(
             itemKey="D",
             title="t",
             status="attached",
-            attempts=["browser_agent:not_found(paywall @springer.com; price 39.95 EUR)"],
+            attempts=[
+                "browser_agent:not_found(paywall @springer.com; price 39.95 EUR)"
+            ],
         ),
     ]
     report = build_report(stats, cfg)
@@ -351,7 +357,10 @@ def test_print_run_summary_renders(cfg):
         Console(file=buf, force_terminal=False), report, cfg.state_dir / "last-run.json"
     )
     out = buf.getvalue()
-    assert "downloaded 2 · attached 1 · deferred 0 · not_found 3 · write-api unknown" in out
+    assert (
+        "downloaded 2 · attached 1 · deferred 0 · not_found 3 · write-api unknown"
+        in out
+    )
     assert "PDFs downloaded" in out and "2" in out
     assert "Fields corrected" in out
     assert "Sources checked" in out
@@ -365,7 +374,9 @@ def test_print_run_summary_renders(cfg):
 def test_low_download_advice_names_the_retry(cfg):
     assert low_download_advice(downloaded=7, sought=8) is None
     assert low_download_advice(downloaded=2, sought=7) is None
-    note = low_download_advice(downloaded=108, sought=981, collection="Inbox/Basketball")
+    note = low_download_advice(
+        downloaded=108, sought=981, collection="Inbox/Basketball"
+    )
     assert note is not None
     assert "session login ezproxy" in note
     assert "session login scholar" in note
@@ -506,7 +517,10 @@ def test_show_payload_omits_missing_child_items(cfg):
     shown = show_payload(cfg, pack)
     assert shown["steps"][0]["summary"] == {}
     assert shown["steps"][0]["duration_s"] is None
-    assert "items" not in shown["steps"][0]["summary"] or shown["steps"][0]["summary"] == {}
+    assert (
+        "items" not in shown["steps"][0]["summary"]
+        or shown["steps"][0]["summary"] == {}
+    )
 
     assert "findings 3" == headline("lint", {"findings": 3, "findings_by_code": {}})
     assert "summarized 2, failed 1" == headline(
@@ -519,7 +533,9 @@ def test_show_payload_omits_missing_child_items(cfg):
     assert "downloaded 2" in headline(
         "run", {"pdfs_downloaded": 2, "attached": 1, "not_found": 9}
     )
-    assert headline("synthesize", {"included": 5, "missing": 1}) == "included 5, missing 1"
+    assert (
+        headline("synthesize", {"included": 5, "missing": 1}) == "included 5, missing 1"
+    )
     assert headline("other", {"ok": True, "n": 2}) == "n 2"
 
 

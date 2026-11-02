@@ -172,14 +172,18 @@ class FakeListing:
             data = {
                 "itemType": item.item_type,
                 "title": item.title,
-                "creators": [{"creatorType": "author", "lastName": s} for s in surnames],
+                "creators": [
+                    {"creatorType": "author", "lastName": s} for s in surnames
+                ],
                 "date": item.date or (str(item.year) if item.year else ""),
                 "url": item.url or "",
                 "extra": extra,
                 "abstractNote": item.abstract or "",
                 "publicationTitle": item.publication_title or "",
                 "dateAdded": item.date_added or "",
-                "collections": [by_path[p] for p in self._stub_paths(item) if p in by_path],
+                "collections": [
+                    by_path[p] for p in self._stub_paths(item) if p in by_path
+                ],
             }
             for name, value in (
                 ("bookTitle", item.book_title),
@@ -224,7 +228,13 @@ class FakeListing:
         version = type(self)._listing_version
         if path == "/collections":
             rows = [
-                {"data": {"key": c.key, "name": c.name, "parentCollection": c.parent or False}}
+                {
+                    "data": {
+                        "key": c.key,
+                        "name": c.name,
+                        "parentCollection": c.parent or False,
+                    }
+                }
                 for c in self._stub_collections().values()
             ]
             return rows, version

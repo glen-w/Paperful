@@ -162,7 +162,9 @@ def test_reachout_module_does_not_import_fetch_sources():
 
 
 def test_emails_from_abstract():
-    item = make_item(abstract="Please write to foo@marine.org for the PDF.", extra="", has_pdf=False)
+    item = make_item(
+        abstract="Please write to foo@marine.org for the PDF.", extra="", has_pdf=False
+    )
     assert emails_from_item(item) == ["foo@marine.org"]
 
 

@@ -55,7 +55,10 @@ class _ScreenshotNoise:
 
     def filter(self, record: Any) -> bool:
         text = record.getMessage().lower()
-        return not ("screenshot" in text and ("timed out" in text or "capture_screenshot" in text))
+        return not (
+            "screenshot" in text
+            and ("timed out" in text or "capture_screenshot" in text)
+        )
 
 
 def _quiet_screenshot_noise() -> None:
@@ -216,7 +219,9 @@ def _build_agent_llm(cfg: Config, model: str) -> Any:
     return ChatOllama(model=model, host=host)
 
 
-async def _async_recover(cfg: Config, item: Item, url: str, *, model: str) -> RecoverResult:
+async def _async_recover(
+    cfg: Config, item: Item, url: str, *, model: str
+) -> RecoverResult:
     from browser_use import Agent, Browser
 
     llm = _build_agent_llm(cfg, model)
@@ -658,9 +663,7 @@ def _finish_recover(
     start_url: str = "",
 ) -> RecoverResult:
     """Attach page, step, and download context to a generic miss or a hit."""
-    result = _result_from_downloads(
-        downloads, min_bytes, miss=miss, captcha=captcha
-    )
+    result = _result_from_downloads(downloads, min_bytes, miss=miss, captcha=captcha)
     if result.pdf_bytes:
         how = _success_how(agent)
         if how:

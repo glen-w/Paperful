@@ -84,7 +84,11 @@ def _instance_urls(inst: dict) -> list[str]:
 
 def _direct_pdf(url: str) -> bool:
     low = url.lower()
-    return looks_like_pdf_url(url) or "pdf=render" in low or low.split("?")[0].endswith(".pdf")
+    return (
+        looks_like_pdf_url(url)
+        or "pdf=render" in low
+        or low.split("?")[0].endswith(".pdf")
+    )
 
 
 def _wanted(url: str) -> bool:
