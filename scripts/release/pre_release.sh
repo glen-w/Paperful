@@ -19,9 +19,13 @@ read_version() {
     py=python
   fi
   "$py" - <<'PY'
-import tomllib
+import re
 from pathlib import Path
-print(tomllib.load(Path("pyproject.toml").open("rb"))["project"]["version"])
+text = Path("pyproject.toml").read_text(encoding="utf-8")
+match = re.search(r'(?m)^version = "([^"]+)"', text)
+if match is None:
+    raise SystemExit("pyproject.toml has no version")
+print(match.group(1))
 PY
 }
 

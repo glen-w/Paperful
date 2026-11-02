@@ -538,7 +538,10 @@ def test_optional_lanes_absent_from_default_source_lists():
 
 
 def test_shipped_example_configs_do_not_enable_optional_lanes():
-    import tomllib
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # Python 3.10
+        import tomli as tomllib
 
     root = Path(__file__).resolve().parent.parent
     for name in ("config.example.toml", "config.minimal.toml"):

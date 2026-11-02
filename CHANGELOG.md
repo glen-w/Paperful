@@ -6,6 +6,10 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.8.4 — 2026-11-02
+
+- **Windows CI, again.** The path helper no longer recurses through `as_posix`, and Python 3.10 tests do not import `tomllib`.
+
 ## 1.8.3 — 2026-11-02
 
 - **Windows CI.** Test configs write paths with forward slashes so TOML does not treat `\U` as an escape. Atomic replace retries when Windows still has the destination open. Obfuscated loopback hosts are blocked without DNS. A case-only folder rename keeps the PDF.

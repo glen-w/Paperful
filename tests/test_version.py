@@ -4,15 +4,22 @@ from __future__ import annotations
 
 import inspect
 import re
-import tomllib
 from pathlib import Path
 
 from paperful import __version__
 
 
+def _toml():
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # Python 3.10
+        import tomli as tomllib
+    return tomllib
+
+
 def test_version_matches_pyproject():
     root = Path(__file__).resolve().parents[1]
-    expected = tomllib.load((root / "pyproject.toml").open("rb"))["project"]["version"]
+    expected = _toml().load((root / "pyproject.toml").open("rb"))["project"]["version"]
     assert __version__ == expected
 
 

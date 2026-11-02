@@ -28,8 +28,11 @@ def pytest_configure() -> None:
         return
     import pathlib
 
+    # as_posix() calls str(), so the override has to use the original method.
+    original = pathlib.PurePath.__str__
+
     def _posix(self: pathlib.PurePath) -> str:
-        return self.as_posix()
+        return original(self).replace("\\", "/")
 
     pathlib.PurePath.__str__ = _posix  # type: ignore[method-assign]
     pathlib.PureWindowsPath.__str__ = _posix  # type: ignore[method-assign]

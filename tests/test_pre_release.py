@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,10 +53,16 @@ def test_dist_only_rejects_stale_artifacts(tmp_path: Path) -> None:
     assert "0.9.0" in proc.stderr + proc.stdout
 
 
+def _project_version() -> str:
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    for line in text.splitlines():
+        if line.startswith('version = "'):
+            return line.split('"', 2)[1]
+    raise AssertionError("pyproject.toml has no version")
+
+
 def test_dist_only_accepts_matching_version(tmp_path: Path) -> None:
-    version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
-        "project"
-    ]["version"]
+    version = _project_version()
     dist = tmp_path / "dist"
     dist.mkdir()
     (dist / f"paperful-{version}-py3-none-any.whl").write_bytes(b"x")
