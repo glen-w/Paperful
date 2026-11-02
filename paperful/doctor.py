@@ -451,60 +451,78 @@ def run_checks(
     *,
     probe: bool = False,
 ) -> list[Check]:
+    checks, info = _manager_checks(cfg, zl, ping)
+    checks.extend(_disk_checks(cfg))
+    checks.extend(_session_checks(cfg, probe=probe))
+    checks.extend(_fetch_lane_checks(cfg))
+    checks.extend(_tool_path_checks())
+    checks.extend(_corpus_checks(cfg, zl, info))
+    return checks
+
+
+def _manager_checks(
+    cfg: Config,
+    zl: ZoteroLocal | None,
+    ping: Callable[[], dict] | None,
+) -> tuple[list[Check], dict | None]:
     checks: list[Check] = []
     info: dict | None = None
     manager = (cfg.manager or "zotero").strip().lower()
     if manager == "mendeley":
         checks.append(_mendeley_library_check(cfg))
-    elif manager == "endnote":
+        return checks, info
+    if manager == "endnote":
         checks.append(_endnote_library_check(cfg))
-    else:
-        zot_where = zotero_local_label()
-        if zl is None:
-            checks.append(Check(_ZOTERO_CHECK, "red", f"not checked ({zot_where})"))
+        return checks, info
+    zot_where = zotero_local_label()
+    if zl is None:
+        checks.append(Check(_ZOTERO_CHECK, "red", f"not checked ({zot_where})"))
+        return checks, info
+    try:
+        info = ping() if ping else zl.ping()
+        ver = info.get("zotero_version") or "?"
+        checks.append(
+            Check(
+                _ZOTERO_CHECK,
+                "green",
+                f"reachable at {zot_where} (Zotero {ver})",
+            )
+        )
+    except ConnectionError as exc:
+        checks.append(
+            Check(
+                _ZOTERO_CHECK,
+                "red",
+                f"{zot_where}: {exc}",
+                code=zotero_failure_code(exc),
+            )
+        )
+    except Exception as exc:
+        checks.append(
+            Check(
+                _ZOTERO_CHECK,
+                "red",
+                f"{zot_where} unreachable: {exc}",
+                code=zotero_failure_code(exc),
+            )
+        )
+    if info is not None:
+        if info.get("supports_write"):
+            checks.append(Check("Write API", "green", "yes (Zotero 10+)"))
         else:
-            try:
-                info = ping() if ping else zl.ping()
-                ver = info.get("zotero_version") or "?"
-                checks.append(
-                    Check(
-                        _ZOTERO_CHECK,
-                        "green",
-                        f"reachable at {zot_where} (Zotero {ver})",
-                    )
+            checks.append(
+                Check(
+                    "Write API",
+                    "amber",
+                    "no — attach, fix-metadata --apply, and dedupe --apply need Zotero 10+",
+                    code="zotero_no_write",
                 )
-            except ConnectionError as exc:
-                checks.append(
-                    Check(
-                        _ZOTERO_CHECK,
-                        "red",
-                        f"{zot_where}: {exc}",
-                        code=zotero_failure_code(exc),
-                    )
-                )
-            except Exception as exc:
-                checks.append(
-                    Check(
-                        _ZOTERO_CHECK,
-                        "red",
-                        f"{zot_where} unreachable: {exc}",
-                        code=zotero_failure_code(exc),
-                    )
-                )
+            )
+    return checks, info
 
-        if info is not None:
-            if info.get("supports_write"):
-                checks.append(Check("Write API", "green", "yes (Zotero 10+)"))
-            else:
-                checks.append(
-                    Check(
-                        "Write API",
-                        "amber",
-                        "no — attach, fix-metadata --apply, and dedupe --apply need Zotero 10+",
-                        code="zotero_no_write",
-                    )
-                )
 
+def _disk_checks(cfg: Config) -> list[Check]:
+    checks: list[Check] = []
     if cfg.email.strip():
         checks.append(Check("email", "green", cfg.email))
     elif "unpaywall" in cfg.sources:
@@ -524,20 +542,21 @@ def run_checks(
                 "empty — polite-pool APIs need an email",
             )
         )
-
     for label, path in (("out_dir", cfg.out_dir), ("state_dir", cfg.state_dir)):
         if _writable(path):
             checks.append(Check(label, "green", str(path)))
         else:
             checks.append(Check(label, "red", f"not writable: {path}"))
-
     docker_paths = _docker_paths_check(cfg)
     if docker_paths is not None:
         checks.append(docker_paths)
-
     checks.append(_mirror_check(cfg))
     checks.append(_playwright_check())
+    return checks
 
+
+def _session_checks(cfg: Config, *, probe: bool) -> list[Check]:
+    checks: list[Check] = []
     cookie_path = cfg.ezproxy_cookie_path
     vault = cfg.state_dir / "sessions" / "cookies.txt"
     state = cfg.state_dir / "sessions" / "storage_state.json"
@@ -573,7 +592,6 @@ def run_checks(
             )
     else:
         checks.append(Check("EZProxy", "green", "disabled (ezproxy_base empty)"))
-
     scholar_path = cfg.scholar_cookie_path
     if "scholar" in cfg.sources:
         if scholar_path.is_file() or vault.is_file() or meta.is_file():
@@ -595,7 +613,11 @@ def run_checks(
             )
     else:
         checks.append(Check("Scholar", "green", "not in sources"))
+    return checks
 
+
+def _fetch_lane_checks(cfg: Config) -> list[Check]:
+    checks: list[Check] = []
     if cfg.core_api_key:
         checks.append(
             Check("CORE", "green", "core_api_key set (OA PDF lane on by default)")
@@ -608,7 +630,6 @@ def run_checks(
                 "optional — set core_api_key in config.toml to enable the CORE OA lane",
             )
         )
-
     if cfg.camofox_enabled:
         from .camofox_recover import camofox_server_ready
 
@@ -630,9 +651,7 @@ def run_checks(
                     "start camofox-browser (npx @askjo/camofox-browser) or see docs/camofox.md",
                 )
             )
-
     checks.extend(_grobid_checks(cfg))
-
     if cfg.serpapi_enabled:
         from .routing import serpapi_api_key
 
@@ -654,7 +673,6 @@ def run_checks(
                     code="serpapi_key",
                 )
             )
-
     from .screen import fingerprint_cache_age_days, pubpeer_devkey
 
     if cfg.screen_pubpeer:
@@ -680,7 +698,6 @@ def run_checks(
                 code="pps_fingerprints_stale",
             )
         )
-
     from .author_request import rg_handoff_enabled
 
     if rg_handoff_enabled(cfg):
@@ -694,7 +711,6 @@ def run_checks(
                 code="rg_handoff",
             )
         )
-
     if cfg.twenty_enabled:
         from .twenty import twenty_api_key, twenty_base_url
 
@@ -711,7 +727,6 @@ def run_checks(
                     code="twenty_key",
                 )
             )
-
     from .snowball.searxng import searxng_base_url
 
     sx = searxng_base_url(cfg)
@@ -730,7 +745,11 @@ def run_checks(
                 code="searxng",
             )
         )
+    return checks
 
+
+def _tool_path_checks() -> list[Check]:
+    checks: list[Check] = []
     if shutil.which("pdftotext"):
         checks.append(Check("pdftotext", "green", "on PATH"))
     else:
@@ -741,7 +760,6 @@ def run_checks(
                 "missing — install poppler for PDF DOI extraction; pypdf is fallback",
             )
         )
-
     if shutil.which("ocrmypdf"):
         checks.append(Check("ocrmypdf", "green", "on PATH"))
     else:
@@ -753,7 +771,6 @@ def run_checks(
                 "apt install ocrmypdf tesseract-ocr-eng",
             )
         )
-
     if shutil.which("vale"):
         checks.append(Check("vale", "green", "on PATH"))
     else:
@@ -765,7 +782,6 @@ def run_checks(
                 "(https://vale.sh; brew install vale)",
             )
         )
-
     if shutil.which("paperguard"):
         checks.append(Check("paperguard", "green", "on PATH"))
     else:
@@ -777,8 +793,15 @@ def run_checks(
                 "(https://github.com/exergyleizhou-ux/PaperGuard)",
             )
         )
+    return checks
 
-    checks.append(_grey_playbooks_check(cfg))
+
+def _corpus_checks(
+    cfg: Config,
+    zl: ZoteroLocal | None,
+    info: dict | None,
+) -> list[Check]:
+    checks: list[Check] = [_grey_playbooks_check(cfg)]
     exclude_cols = None
     if zl is not None and info is not None:
         try:
@@ -804,7 +827,6 @@ def run_checks(
         checks.append(osf)
     checks.append(_author_packs_check(cfg))
     checks.append(_authorwatch_check(cfg))
-
     return checks
 
 

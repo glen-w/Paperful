@@ -216,6 +216,32 @@ def test_osf_check_quiet_without_a_manifest_and_green_below_the_bar(tmp_path):
     assert check.status == "green" and "no OSF source needed" in check.detail
 
 
+def test_run_checks_offline_builder_names(cfg, tmp_path, monkeypatch):
+    from paperful.doctor import run_checks
+
+    monkeypatch.setattr("paperful.doctor.in_docker", lambda: False)
+    cfg.out_dir = tmp_path / "out"
+    cfg.state_dir = tmp_path / "state"
+    cfg.out_dir.mkdir()
+    cfg.state_dir.mkdir()
+    cfg.sources = ["unpaywall"]
+    cfg.email = ""
+    names = [c.name for c in run_checks(cfg, None)]
+    assert names[0] == "Zotero :23119"
+    assert "email" in names
+    assert "out_dir" in names
+    assert "state_dir" in names
+    assert "Mirror" in names
+    assert "Playwright" in names
+    assert "EZProxy" in names
+    assert "Scholar" in names
+    assert "CORE" in names
+    assert "SearXNG" in names
+    assert "pdftotext" in names
+    email = next(c for c in run_checks(cfg, None) if c.name == "email")
+    assert email.status == "red" and email.code == "unpaywall_email"
+
+
 def test_osf_check_amber_when_the_demand_bar_is_met(tmp_path):
     from paperful.config import Config
     from paperful.doctor import _osf_check

@@ -137,6 +137,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `inbox_cmd.py` | `inbox` watch/drain/proposals after flags | `inbox`, `inbox_match`, `inbox_route` |
 | `capture.py` | Firefox page → mirror identity, blank-field merge, staged PDF/HTML, snapshot, capture note | `store`, `mirror`, `snapshot`, `run_cmd`, `notehtml` |
 | `capture_host.py` | Native-messaging stdio host and `install-host` | `capture` |
+| `doctor.py` | `run_checks` orchestrates domain helpers (`_manager_checks`, `_disk_checks`, `_session_checks`, `_fetch_lane_checks`, `_tool_path_checks`, `_corpus_checks`) | config, optional live ping |
 | `doctor_cmd.py` / `collections_cmd.py` / `session_cmd.py` / `mirrors_cmd.py` / `pack_cmd.py` / `cache_cmd.py` | Operator verbs (doctor, collections, session/ezproxy/scholar, mirrors, pack, cache clean) | `cli_runtime`, domain modules |
 | `cli.py` | Flags, Typer apps, exits. Re-exports `cli_runtime` names | everything |
 | `routing.py` | Per-item lanes; owns `SERIAL_SOURCES` (Sci-Hub and other serial phases) | `config`, `zot` |
