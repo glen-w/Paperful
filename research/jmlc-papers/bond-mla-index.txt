@@ -1,0 +1,591 @@
+Bond University
+Research Repository
+
+Global money laundering appeal index: application of principal component analysis
+Tiwari, Milind; Gepp, Adrian; Kumar, Kuldeep
+Published in:
+Journal of Money Laundering Control
+DOI:
+10.1108/JMLC-10-2021-0108
+Licence:
+Other
+Link to output in Bond University research repository.
+
+Recommended citation(APA):
+Tiwari, M., Gepp, A., & Kumar, K. (2023). Global money laundering appeal index: application of principal
+component analysis. Journal of Money Laundering Control, 26(1), 205-211. https://doi.org/10.1108/JMLC-102021-0108
+
+General rights
+Copyright and moral rights for the publications made accessible in the public portal are retained by the authors and/or other copyright owners
+and it is a condition of accessing publications that users recognise and abide by the legal requirements associated with these rights.
+For more information, or if you believe that this document breaches copyright, please contact the Bond University research repository
+coordinator.
+
+Download date: 02 Nov 2026
+
+Global Money Laundering Appeal Index: An Application of Principal Component
+Analysis
+Milind Tiwaria1, Adrian Geppa, Kuldeep Kumara
+a
+
+Bond University, Australia
+
+Abstract
+The paper aims at developing a global ranking system determining a country's appeal as a
+destination for money laundering. Using Principal Component Analysis (PCA), four
+components relating to economic feasibility, financial liberty, government spending, and tax
+regime were critical in influencing a country's money laundering appeal. It is the first attempt
+to use a statistical technique to understand the underlying components of a country's money
+laundering appeal. It could be used to develop more effective preventative strategies.
+Key Words: Economic growth; Forensic accounting; Money laundering; Principal Component
+Analysis; Walker Gravity Model
+JEL Classification: C38; G32; E39; K42
+
+Corresponding author: Milind Tiwari, Bond University, 14, University Drive, Robina, Queensland – 4226,
+Australia, e-mail address: mtiwari@bond.edu.au
+1
+
+© Emerald Publishing Limited.
+This AAM is provided for your own personal use only.
+It may not be used for resale, reprinting, systematic distribution, emailing, or for any other commercial purpose without the permission of the publisher.
+
+1. Introduction
+Money laundering presents social, economic, and political harm to a country and the global
+economy by providing an opportunity to launder and reinvest criminal proceeds. Such
+opportunities lead to economic distortions, erosion of financial sectors, reduced government
+revenues, and other socioeconomic effects (Barone et al., 2018; Degryse et al., 2019; Walker
+and Unger, 2009). The extent of economic and financial disruptions can be assessed based on
+Barone and Masciandaro (2011) estimates. They found money laundering operations to
+produce legal assets worth USD 108.72 billion in Eastern Europe in 2009. As a result, efforts
+have been made to measure money laundering flows, construct money laundering risk
+indicators and uncover other such instances (Basel Institute on Governance, 2014; Collin,
+2019; Ferwerda and Kleemans, 2019). Walker (1999) can be regarded as a pioneer in the
+domain. He postulated a range of factors contributing to the attractiveness of a destination for
+money laundering. The factors contributing to attractiveness have often been used to estimate
+the magnitude of money laundering, and there is often a debate around the accuracy of the
+generated estimates (Collin, 2019).
+Efforts have been made to improve the proposed Walker Gravity model, and one such effort in
+this regard was by Unger et al. (2006). The attractiveness component has been improved only
+through the addition or removal of variables. No attempts in the literature have been made to
+use quantitative techniques to develop an index of money laundering appeal. This paper
+attempts to use a standardized and replicable methodology to condense into a single measure
+the complex and multifaceted phenomenon of a country's appeal as a destination for money
+laundering, thus avoiding the difficulty of precisely calculating illicit financial flows.
+This paper uses principal component analysis (PCA hereafter), with a mix of standardized and
+unstandardized components relating to attractiveness, economic freedom, and money
+
+© Emerald Publishing Limited.
+This AAM is provided for your own personal use only.
+It may not be used for resale, reprinting, systematic distribution, emailing, or for any other commercial purpose without the permission of the publisher.
+
+laundering risk to come up with an index of money laundering appeal (Basel Institute on
+Governance, 2014; Khan et al., 2018; Kim and Holmes, 2016). Such an index would act as an
+additional tool to support policymakers and investigators in allocating relevant resources
+effectively and developing suitable preventative strategies; for banks and professionals, the
+indicator would improve their due-diligence operations. Such efforts would combat the
+phenomenon of money laundering responsible for the stagnation of economic growth through
+tax evasion, corruption, and the creation of non-competitive markets.
+2. Data and Methodology
+The data on 30 variables incorporated for analysis in the paper have been collected for 150
+countries. The year chosen for analysis is 2014 to facilitate comparison with the results of an
+earlier study that used the traditional gravity model to develop the attractiveness of money
+laundering for countries. In the case of missing variables, the variable information available
+for the most recent year, past or present, is considered for analysis. Finally, not to exclude
+countries from analysis, the variables for which no information is available, the variable value
+is recorded as 0 for that country. Table I below provides the list of variables used for analysis:
+Variables
+
+Source
+
+Description
+
+Per Capital Gross Domestic Product
+
+The World Bank
+
+Assessment of country's macroeconomy
+
+(GDP), Government Expenditure, Tariff
+
+(2020)
+
+Rate, Income Tax Rate, Corporate Tax
+Rate, Tax Burden (% GDP), Public Debt (%
+GDP),
+
+FDI
+
+Inflows
+
+(in
+
+millions),
+
+Unemployment, Inflation (%), Financial
+Deposits
+Basel AML Score
+
+Basel Institute on
+
+Ranking countries based on their
+
+Governance
+
+assessed risk of money laundering or
+
+(2014)
+
+terrorist activity to come up with Basel
+
+© Emerald Publishing Limited.
+This AAM is provided for your own personal use only.
+It may not be used for resale, reprinting, systematic distribution, emailing, or for any other commercial purpose without the permission of the publisher.
+
+Anti-money laundering (AML) Risk
+Index
+Economic
+
+Freedom
+
+Score,
+
+Business
+
+Freedom,
+
+Financial
+
+Freedom,
+
+Fiscal
+
+Kim and Holmes
+
+Assessment
+
+of
+
+economic
+
+freedom
+
+(2016)
+
+available to a country's population to
+
+Freedom, Government Spending, Labor
+
+come up with the Index of Economic
+
+Freedom,
+
+Freedom
+
+Monetary
+
+Freedom,
+
+Trade
+
+Freedom
+Attractiveness Score, Banking Secrecy
+
+Khan et al. (2018);
+
+Estimate the magnitude of money
+
+(BS), Conflict (C), Corruption (COR),
+
+Walker and Unger
+
+laundering for countries subject to their
+
+Member
+
+(2009)
+
+attractiveness for it
+
+of
+
+Egmont
+
+Group
+
+(EG),
+
+Government Attitude (AG), Swift Member
+
+Table I. List of variables
+The use of variables for accessing countries' attractiveness has been limited to estimating the
+magnitude of money laundering. It presents an opportunity to develop an index of a country's
+appeal as a destination for it. The rationale to incorporate additional variables stems from works
+directing attention towards the link between money laundering and economic cycles, economic
+growth, and taxes (Barone et al., 2018; Johannesen et al., 2016). Such an index would differ
+from the Basel AML Risk Index and other similar indices that do not measure the country's
+actual money laundering activity. These indices' focus has been to assess the risk level based
+on adherence to AML/CTF (Countering Terrorism Financing) standards and other such risk
+categories. The rankings of such global indices are more suitable in a probabilistic rather than
+economic sense.
+This paper uses PCA to reduce a large number of variables into fewer components representing
+a specific phenomenon; in this case, money laundering appeal. The data are assessed to
+determine how the variables covariate. The number of components is selected based on
+
+© Emerald Publishing Limited.
+This AAM is provided for your own personal use only.
+It may not be used for resale, reprinting, systematic distribution, emailing, or for any other commercial purpose without the permission of the publisher.
+
+accepted standards – the Kaiser-Harris criterion and parallel analysis. The unrotated
+components are subject to rotation to ensure the pattern of loadings is easier to interpret. The
+components are then extracted to be normalized and combined in a composite indicator using
+the proportion of variance explained by each component as weights (Ferwerda and Kleemans,
+2019; Watkins, 2006).
+3. Results
+The suitability of the data for PCA is assessed by using a correlation matrix, Kaiser-MeyerOlkin Measure of Sampling Adequacy (KMO), and Barlett's Test of Sphericity (Kaiser, 1960).
+The high correlation between variables (as seen in Figure 1), a KMO value of 0.768, and a
+significant sphericity test, as presented in Table II suggest the data are suitable for PCA.
+
+Figure I. Correlogram of variables
+
+© Emerald Publishing Limited.
+This AAM is provided for your own personal use only.
+It may not be used for resale, reprinting, systematic distribution, emailing, or for any other commercial purpose without the permission of the publisher.
+
+Kaiser-Meyer-Olkin Measure of Sampling Adequacy.
+Bartlett's Test of Sphericity
+
+Approx. Chi-Square
+
+0.768
+4931.351
+
+df
+
+435
+
+Sig.
+
+0.000
+
+Table II. KMO and Bartlett's Test of Sphericity
+
+The decision of the number of components to be extracted is based on a mix of Kaiser-criterion
+(components with eigenvalues > 1) and parallel analysis (Watkins, 2006). The comparison of
+eigenvalues obtained from Kaiser-criterion and parallel analysis (Table III) are presented below
+and suggests that four components should be extracted:
+
+Initial Eigenvalues
+Component
+
+Total
+
+Random Data Eigenvalues (Parallel Analysis)
+
+% of variance
+
+Total
+
+Decision
+
+1
+
+10.922
+
+36.406
+
+2.067
+
+Accept
+
+2
+
+3.063
+
+10.210
+
+1.916
+
+Accept
+
+3
+
+1.996
+
+6.654
+
+1.779
+
+Accept
+
+4
+
+1.878
+
+6.260
+
+1.679
+
+Accept
+
+5
+
+1.390
+
+4.633
+
+1.595
+
+Reject
+
+Table III. Comparison of eigenvalues from Kaiser-criterion and Parallel Analysis
+The extracted components were subject to varimax rotation to ensure suitable factorization.
+The output is presented in Table IV and Table V below:
+
+© Emerald Publishing Limited.
+This AAM is provided for your own personal use only.
+It may not be used for resale, reprinting, systematic distribution, emailing, or for any other commercial purpose without the permission of the publisher.
+
+1
+Attractiveness
+
+0.817
+
+FD
+
+0.791
+
+Freedom from Corruption
+
+0.789
+
+Property Rights
+
+0.780
+
+COR
+
+-0.755
+
+Economic Freedom Score
+
+0.723
+
+Business Freedom
+
+0.678
+
+GDP
+
+0.670
+
+FDI Inflows in millions
+
+0.561
+
+Component
+2
+3
+
+4
+
+0.608
+
+Labor Freedom
+Public Debt as percent of
+GDP
+C
+AG
+Unemployment
+Monetary Freedom
+
+0.808
+
+Inflation in percentage
+
+-0.725
+
+Investment Freedom
+
+0.699
+
+Financial Freedom
+
+0.553
+
+0.657
+
+Trade Freedom
+
+0.606
+
+Tariff Rate
+
+-0.504
+
+BS
+Basel AML Score
+EG
+Government Expenditure
+
+0.916
+
+Government Spending
+
+-0.913
+
+Tax Burden as percent of
+
+0.665
+
+GDP
+Swift
+Income Tax Rate
+
+0.903
+
+Fiscal Freedom
+
+-0.888
+
+Corporate Tax Rate
+
+0.774
+
+Table IV. Rotated component matrix
+
+© Emerald Publishing Limited.
+This AAM is provided for your own personal use only.
+It may not be used for resale, reprinting, systematic distribution, emailing, or for any other commercial purpose without the permission of the publisher.
+
+Variance
+Component
+
+% of variance
+
+Cumulative %
+
+1
+
+22.949
+
+22.949
+
+2
+
+14.859
+
+37.809
+
+3
+
+12.228
+
+50.037
+
+4
+
+9.494
+
+59.530
+
+Table V. Variance explained by components
+The first component (1) comprised the set of variables related to a country's economic
+feasibility and explained 22.9 % of the overall variance. The second component (2) explained
+14.85% of the overall variance and included proxies for financial liberty. The expenditure
+incurred and income source to support it by a country's government are grouped in the third
+component (3) and explain 12.22% of the overall variance. Finally, the fourth component (4)
+relates to a country's tax regime and explains 9.49% of the overall variance. Consequently, a
+country's appeal for money laundering can be explained as a follows:
+𝑀𝑜𝑛𝑒𝑦 𝐿𝑎𝑢𝑛𝑑𝑒𝑟𝑖𝑛𝑔 𝐴𝑝𝑝𝑒𝑎𝑙 = 𝑓(𝐸, 𝐹, 𝐺, 𝑇)
+Where,
+E = Economic feasibility of a country to invest in
+F = Financial liberty available to people to transact and do business
+G = Government spending
+T = Tax regime
+Each principal component's variance is used as a fraction of the model's overall variance as a
+weight to obtain the index. The index is normalized using the Min-Max criterion and is
+expressed as follows:
+
+© Emerald Publishing Limited.
+This AAM is provided for your own personal use only.
+It may not be used for resale, reprinting, systematic distribution, emailing, or for any other commercial purpose without the permission of the publisher.
+
+𝐺𝑙𝑜𝑏𝑎𝑙 𝑀𝑜𝑛𝑒𝑦 𝐿𝑎𝑢𝑛𝑑𝑒𝑟𝑖𝑛𝑔 𝐴𝑝𝑝𝑒𝑎𝑙 𝐼𝑛𝑑𝑒𝑥
+4
+
+= ∑
+
+(Sij ∗ wj ) = (𝑆1𝑖 ∗ 𝑤1 ) + (𝑆2𝑖 ∗ 𝑤2 ) + (𝑆3𝑖 ∗ 𝑤3 ) + (𝑆4𝑖 ∗ 𝑤4 )
+
+𝑗=1
+
+Where the subscript i indicates the country (150 in total), j is the component and wj is the
+proportion of variance explained by each component, that is, 𝑤1 = 22.9%, 𝑤2 = 14.85%,
+𝑤3 = 12.22%, and w4 = 9.49%, respectively. Sij is the relevant value from the PCA for
+each component. According to the index, for 2014, the most appealing countries for money
+laundering were Denmark, Sweden, and the United States, and the least appealing countries
+were Sudan, Iran, and Iraq (Ranking results are in Table A of the appendix).
+4. Conclusion
+The use of PCA instead of a more theoretical approach is validated by comparing rankings with
+Khan et al. (2018), and the results were found to be similar. Additionally, Denmark's being
+found an appealing destination for money laundering in 2014 aligns with a Danish bank's
+involvement in one of the largest such scandals around the same time (Bjerregaard and
+Kirchmaier, 2019). The robustness of results can be considered suitable for future work along
+with the incorporation of more variables. At present, the paper proposes an approach where a
+complex phenomenon of money laundering appeal can be placed into a single composite
+indicator, allowing for ranking of geographical locations. Such an index might not only inform
+national strategies to prevent money laundering but provides an opportunity to use a similar
+approach to develop more localized hot spot maps that could move analysis at the sub-national
+level. Finally, concerns about whether a low Basel AML Risk score (Manning et al., 2020)
+results in lower chances of money laundering are addressed through this paper.
+
+© Emerald Publishing Limited.
+This AAM is provided for your own personal use only.
+It may not be used for resale, reprinting, systematic distribution, emailing, or for any other commercial purpose without the permission of the publisher.
+
+Acknowledgment
+The authors are grateful to Basel Institute on Governance, The Heritage Foundation, and Wahaj
+Ahmed Khan for their assistance in providing the data.
+Funding
+This work was supported by the Australian Government Research Training Program.
+References
+Barone, R., D. Delle Side, D. Masciandaro, 2018. Drug trafficking, money laundering and the
+business cycle: Does secular stagnation include crime? Metroeconomica 69, 409-426.
+Basel Institute on Governance, 2014. Basel AML Index 2014 Report. (Basel Institute on
+Governance).
+Bjerregaard, E., T. Kirchmaier, 2019. The Danske Bank Money Laundering Scandal: A Case
+Study. Available at SSRN 3446636.
+Collin, M., 2019. Illicit Financial Flows: Concepts, Measurement, and Evidence. World Bank
+Research Observer 35, 44-86.
+Degryse, H., A. Karas, K. Schoors, 2019. Relationship lending during a trust crisis on the
+interbank market: A friend in need is a friend indeed. Economics Letters 182, 1-4.
+Ferwerda, J., E.R. Kleemans, 2019. Estimating Money Laundering Risks: An Application to
+Business Sectors in the Netherlands. European Journal on Criminal Policy and Research 25,
+45-62.
+Johannesen, N., T. Tørsløv, L. Wier, 2016. Are less developed countries more exposed to
+multinational tax avoidance? Method and evidence from micro-data. The World Bank
+Economic Review.
+Kaiser, H.F., 1960. The application of electronic computers to factor analysis. Educational and
+psychological measurement 20, 141-151.
+Khan, W.A., S.T. Jawaid, I. Arif, 2018. Where does a nation's wealth go? Evidence from a
+third world country. Journal of Money Laundering Control 21, 426-476.
+Kim, A.B., K.R. Holmes, 2016. 2014 Index of economic freedom. The Heritage Foundation in
+Partnership with Wall Street Journal.
+Manning, M., G.T. Wong, N. Jevtovic, 2020. Investigating the relationships between FATF
+recommendation compliance, regulatory affiliations and the Basel Anti‑Money Laundering
+Index. Security Journal.
+The World Bank, 2020. World Bank Open Data.
+Unger, B., M. Siegel, J. Ferwerda, W. de Kruijf, M. Busuioic, K. Wokke, G. Rawlings, 2006.
+The amounts and the effects of money laundering. Report for the Ministry of Finance 16.
+Walker, J., 1999. How Big is Global Money Laundering? Journal of Money Laundering
+Control 3, 25-37.
+Walker, J., B. Unger, 2009. Measuring global money laundering. Review of law and economics
+5, 821-853.
+Watkins, M.W., 2006. Determining parallel analysis criteria. Journal of modern applied
+statistical methods 5, 344-346.
+
+© Emerald Publishing Limited.
+This AAM is provided for your own personal use only.
+It may not be used for resale, reprinting, systematic distribution, emailing, or for any other commercial purpose without the permission of the publisher.
+
+

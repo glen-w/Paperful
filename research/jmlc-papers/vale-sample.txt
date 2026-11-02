@@ -1,0 +1,10 @@
+Abstract
+Purpose: This paper aims to examine anti money laundering controls.
+Design/methodology/approach: We use a cross-country dataset.
+Findings: Results show improved compliance.
+Originality/value: This study is novel.
+Keywords: money laundering, compliance, FATF
+1. Introduction
+Previous work (Smith & Jones, 2020) found antimoney laundering gaps.
+References
+Smith, A. (2020), "Title here", Journal of Money Laundering Control, Vol. 1 No. 1, pp.1-9.

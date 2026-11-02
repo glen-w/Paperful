@@ -1,0 +1,22 @@
+; Journal of Money Laundering Control — Vale config for Paperful critique
+; Copy to your project root as .vale.ini (or set [critique].vale_config in config.toml).
+;
+;   cp styles/JMLC/vale.ini.example .vale.ini
+;   vale --config=.vale.ini path/to/manuscript.txt
+;   uv run paperful critique --file manuscript.docx --vale
+
+StylesPath = ../../styles
+MinAlertLevel = suggestion
+
+; Optional: add community packages (run `vale sync` after uncommenting).
+; Packages = Microsoft, write-good
+
+[*]
+JMLC.Abstract = YES
+JMLC.Terms = YES
+JMLC.EmeraldHarvard = YES
+JMLC.References = YES
+JMLC.Spelling = YES
+JMLC.Headings = YES
+JMLC.Manuscript = YES
+JMLC.Jargon = YES

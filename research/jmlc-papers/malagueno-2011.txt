@@ -1,0 +1,1697 @@
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+Accounting and Corruption:
+A Cross-Country Analysis*
+Ricardo Malagueño, Ph.D.
+Lecturer in Accounting
+University of Essex
+Chad O. Albrecht, Ph.D.
+The Research Group
+Huntsman School of Business
+Utah State University
+Christopher Ainge
+Research Fellow, The Research Group
+Huntsman School of Business
+Utah State University
+Nathaniel M. Stephens, Ph.D.
+The Research Group
+Huntsman School of Business
+Utah State University
+
+*
+
+The Authors would like to thank the generous support of the Research Group, a nationally recognized
+consortium of university scholars, corporate leaders, and qualified undergraduate students dedicated to high
+quality, collaborative research that contributes to the business profession.
+
+2
+Abstract
+Purpose – The purpose of this paper is to better understand the relationship
+between accounting and auditing quality and the perceived level of corruption.
+Design/methodology/approach – This relationship is studied by performing a
+cross-country analysis using public data to measure accounting quality, audit
+quality, and corruption.
+Findings – Consistent with our predictions, we find evidence that accounting and
+auditing quality are significantly related to the level of perceived corruption in a
+country.
+Research Limitations/implications –These findings suggest that countries with
+more transparent reporting have lower levels of perceived corruption and that the
+level of perceived corruption may be reduced in a country by improving accounting
+and auditing quality.
+Practical implications – The findings suggest that countries can reduce the level of
+perceived corruption by improving the transparency of financial reporting by
+improving accounting and auditing standards.
+Originality/value – While significant amounts of research has examined perceived
+corruption, this study is the first to address the impact of high quality accounting
+information on the level of perceived corruption.
+Keywords Corporate Governance, Comparative Accounting Systems and Practice,
+Auditing, International Regulations, Corruption, Business/Government interaction
+and relations;
+Paper Type Research Paper
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+3
+1. Introduction
+Organizations are portrayed financially through audited accounting information. The
+purpose of this information is to stakeholders about the financial status of the organization, allowing
+them to make informed decisions regarding the organization. Poor auditing and accounting1
+standards create a situation where there is a lack of accountability to stakeholders, where managers
+can act in a way that is contrary to the expectations of stakeholders without consequence, and where
+assets can be misused and misallocated (Jensen and Meckling, 1976).
+Auditing and accounting standards seek to make financial information transparent,
+mitigating the risk that those with economic power act in ways that are unethical, illegal, or
+inappropriate. In short, one goal of accounting and auditing standards are to make it more difficult
+for managers of organizations to act contrary to the expectations of shareholders. When good
+accounting standards exist, organizations are required to disclose information in ways that create
+transparent, accurate, and comparable financial information. As organizations are held to higher
+accounting and auditing standards, management and others within the organization are forced to be
+more transparent about the use of the organization’s assets, making corrupt practices by
+management and others more difficult to commit and conceal. Indeed, as Hall and Yago (2000: 2)
+indicate, “A key reason for keeping transactions secret is to conceal corrupt practices. With
+transparency comes prying eyes.”
+Corruption has been defined as “an exchange between two parties… which (i) has an
+influence on the allocation of resources either immediately or in the future; and (ii) involves the use
+or abuse of public or collective responsibility for private ends (Macrae, 1982:678).” This definition
+is broad enough to include both political corruption, where one of the parties is a public official and
+uses his or her office for private gain, as well as economic corruption, where one of the parties uses
+economic power derived from his or her firm for private gain. By definition, corruption requires
+illegal practices and often has to do with illegal cash payments, misallocation of assets, and other
+inappropriate economically driven transactions (Husted, 1999; Treisman, 2000). Accounting seeks
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+4
+to make the economic transactions of an organization transparent. The role of auditing is to provide
+third party assurance of that transparency. In other words, accounting information is a vehicle
+through which private companies demonstrate that they operate legally (i.e. that they do not
+participate in rent-seeking behavior), and public institutions and their managers are held
+accountable to the public.
+In this paper, we perform a cross-country analysis using data from different countries to
+empirically investigate the relationship between accounting and corruption. We do not attempt to
+build a model that explains corruption—such models are plentiful in the literature and, given the
+complexity of corruption, vary widely (for a review - Andvig and Fjeldstad, 2001, Aidt, 2003).
+Rather, we investigate and provide evidence on the relationship between corruption and the quality
+of accounting and auditing present in a country. Specifically, we investigate the relationship
+between two measures of accounting quality and corruption and find that for these measures a
+relationship exists. We then construct a model for corruption using measures of accounting and
+auditing and a proxy for economic development, and find that two measures of accounting are
+significant in explaining corruption when controlling for economic development. To further test the
+relationship between corruption and accounting, we replicate two corruption models existent in the
+literature (DiRienzo et al., 2007; Treisman 2000), and find that adding proxies for accounting
+quality provide additional power in explaining corruption. This is an important discovery because
+if, as our research suggests, better accounting and auditing systems are associated with less
+perceived corruption, then governments may be able to decrease corruption by improving
+accounting and auditing standards- thus improving their business climate, encouraging investments
+by both nationals and foreigners, and increasing their overall productivity and GDP.
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+5
+2. Literature Review
+Corruption has been described as a serious global problem that affects countries throughout
+the world (Transparency International, 2007).
+
+Furthermore, corruption reduces foreign direct
+
+investment and economic growth (Mauro, 1995; Wei, 2000; Gupta et al., 2002), lowers investment
+in education and health (Mauro, 1997), and puts less corrupt countries at a disadvantage when
+seeking international contracts (Kantor, 1996).Corruption also increases and distorts public
+investment and decreases public expenditures for operation and maintenance of investments (Tanzi
+and Davoodi, 1997). Further, corruption reduces revenue generated through taxation, contributing
+to the inability of some governments to function properly (Tanzi and Davoodi, 1997). Corruption
+has been credited with eroding trust in the political system and reducing interpersonal trust in
+society (Seligson, 2002). A specific example of the costs of corruption is provided by Hu (2001),
+who estimates the economic cost of corruption to the Chinese economy between 1995 and 1998 to
+be between 13.2 and 16.8 percent of China’s GDP. It is clear that corruption is a serious problem to
+international business, and that an understanding of the contributors (and the possible solutions) of
+corruption are essential.
+While corruption has long been a problem, corruption has only recently been the topic of
+much academic research. Initially, most of the corruption literature was theoretical in nature. Two
+of these dominant theories include “public choice” (Rose-Ackerman, 1978) and “game theory”
+(Macrae, 1982). Theoretical scholars have suggested that there are three central elements to
+corruption (Jain, 2001). Jain explains these three elements as the follows:
+“First, someone must have discretionary power…Second, there must be economic
+rents associated with this power…And third, the legal/judicial system must offer
+sufficiently low probability of detection and/or penalty for the wrongdoing (Jain, 2001:
+77)”.
+Since these three factors provide a basis for how corruption occurs, analyzing these three
+elements can prove helpful when developing strategies to combat corruption. Furthermore, as Jain
+(2001) indicates, these three elements of corruption can be broken into two parts – the first two
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+6
+requirements serve as incentives for corruption and the third requirement acts as a deterrent of
+corruption. The focus of this paper is on the third element of corruption – the detection of
+wrongdoing. If an effective accounting system is in place, the likelihood that someone can engage
+in corrupt acts without being discovered decreases. As a result, Jain’s “probability of detection” is
+increased, the misallocation of assets is more readily brought to light, and less corruption should be
+the result.
+
+As accounting and auditing standards rise, and especially as audits become more
+
+mandatory, more frequent, and more independent, countries should experience less corruption.
+Over the last 30 years, our overall knowledge of corruption has increased substantially.
+Along with theoretical work, various case studies and empirical work has suggested possible
+explanations of corruption within specific countries (Bunker and Cohen, 1983; Levin and Satarov,
+2000). Unfortunately, however, past research on corruption provided mixed results regarding the
+degree of damage that corruption has upon society. It was uncertain whether corruption actually
+“greased the wheels” of economic transactions, providing economic growth in countries or if
+corruption was detrimental to society and limited economic growth. Theoretically, supporters of the
+“greasing the wheel” argument had a compelling story—corruption facilitated economic
+transactions and was a seemingly efficient way to allocate political goods (Leff, 1964; Beck and
+Maher, 1986). However, research provided by Mauro (1995) countered this argument by providing
+strong empirical evidence suggesting detrimental effects of corruption on society. Today, there is
+general consensus that corruption negatively effects organizations, economies, and society (Wei,
+2000; Pierre-Guillaume and Sekkat, 2005).
+While initial research on corruption attempted to determine the impact of corruption on
+society, more recent research is examining the causes of corruption. By understanding the
+determinants of corruption, society can better understand how to combat and deter corruption.
+Recent research has provided evidence that many factors influence levels of corruption, including
+the level of Protestantism, a history of British rule, level of economic development, level of
+imports, use of a federal system of government (Treisman, 2000), accessibility of information
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+7
+(DiRienzo et al., 2007), inequality of income distribution and government size (Husted, 1999),
+Hofstede’s cultural values (Husted, 1999; Davis and Ruhe, 2003; DiRienzo,et al,. 2007;), economic
+freedom (Goel and Nelson, 2005), and competition (Ades and Di Tella, 1999; Svensson, 2005).
+Indeed, many variables have been shown to influence the level of corruption.
+In addition to recent research on corruption, there has also been a great deal of literature on
+the value of effective accounting and auditing. Research has suggested that the quality of
+accounting information is so important to organizations that they are actually willing to pay a
+premium for what the market perceives as high quality accounting and auditing services. For
+example, Beatty (1989) suggests that investors are willing to pay much higher prices, yielding much
+lower returns, for stock in IPO companies that are audited by audit firms with good reputations.
+Other research, such as the Big Four audit premium literature, demonstrates that markets around the
+world value the quality of information provided by Big Four auditing companies so much that they
+are actually willing to pay premium pricing for their services. Choi et al. (2008), McMeeking et al.
+(2003), Francis (1984), Firth (1985), and DeFond et al. (2000) show a Big Four audit premium in
+the UK, Australia, New Zealand, and Hong Kong, respectively.
+While there exists much literature on both corruption and the value of quality accounting
+and auditing, there is less empirical research to suggest a relationship between the two. While Hall
+and Yago (2000) use a contrived measure of earnings opacity that is driven by both accounting and
+corruption, they provide no significant conclusive evidence to empirically link accounting and
+corruption. Furthermore, Di Tella and Schargrodsky (2003) suggested a link between auditing and
+wages with corruption and prices, however their study was limited only to one country – Argentina.
+Kimbro (2002) performs a cross-country analysis of corruption and finds a relationship between the
+number of accountants per capita and the level of corruption. As a result there is little cross-country
+research that establishes a direct empirical link between accounting and corruption.
+While empirical evidence that examines the relationship between accounting and corruption
+is scarce, there are various references to such a relationship within the literature. For example, Alam
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+8
+(1995: 430) lists “managerial and accounting skills” as possible correlates to corruption. Shleifer
+and Vishny (1993: 604) indicate that, “the first step to reduce corruption should be to create an
+accounting system that prevents theft from the government.” Speaking of corruption in China, Sun
+(1999: 6) suggests that accounting practices have already served to lower corruption within China
+and that “accounting reviews and inspection campaigns have served to uncover more obvious
+violations and deter future ones.”
+
+Kaufmann (1997: 130) states that “training programs in
+
+investigative journalism, accounting, and auditing” could all be used to fight corruption in the
+international community. Everett et al. (2007: 515) claim “corruption is a problem and accounting
+can aid in its fight”.
+Other research also suggests a link between corruption and accounting. For example, RoseAckerman (1997: 49-50) suggests that “creating structures within the public sector that make
+government actions more transparent” may deter corruption. She specifically suggests “financial
+management systems that audit government accounts and make financial information about the
+government public.” Further, Tanzi and Davoodi (1997: 8) explain that corruption in governmental
+budgeting is highly likely when “some of the essential controlling or auditing institutions are not
+well developed.” Likewise, Leiken (1997: 72) indicates that the United States can help control
+corruption in multilateral development banks by demanding that these banks “enforce their own
+rules on effective accounting systems, adequate internal controls, and timely audits.”
+As can be seen, the presence and quality of accounting systems, controls, and audits are
+often mentioned, though not empirically tested, in current corruption literature. Given the
+theoretically appealing link between accounting and corruption, we consider the lack of empirical
+evidence to support an accounting-corruption connection to be a major gap within the existing
+literature, and we seek to establish that link.
+
+3. Variable Descriptions and Hypothesis Development
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+9
+In the following section, we discuss two different proxies that we use to measure
+accounting and auditing quality and our hypothesis related to each. The first of these two proxies
+we label BIG4, while the second proxy we label as PAQ. We now discuss these two proxies, which
+are defined in Table 1, panel A.
+(Insert table1 here)
+Our measure of BIG4 is a reflection of the presence of large, international accounting firms
+within a county (i.e. Ernst & Young, PricewaterhouseCoopers, KPMG, and Deloitte and Touche).
+The auditor quality literature suggests that the market is willing to pay a premium for Big 4
+auditing. This is presumably because with highly reputable auditing, one gets better-audited
+financial statements, resulting in more accurate and predictable information and decreased
+information risk. These factors all result in increases in the prices that investors are willing to pay
+for the stock of a company. Thus, BIG4 measures the quality of auditing as practiced within a
+country. It does not necessarily measure the accounting or auditing standards of a country, as large
+firms often hold themselves to higher standards than national standards require. As auditing
+becomes more efficient, any inappropriate financial transactions by companies would more likely
+be exposed, increasing the probability that corruption would be detected. This in turn decreases the
+demand for rent-seeking behavior of those entrusted with power. Based upon this logic, we present
+our first hypothesis:
+
+H1: There is a negative relationship between the increased presence of Big 4 firms and
+perceived level of corruption in countries.
+
+Our measure for PAQ is a reflection of the perceived quality of accounting and auditing
+standards based upon the survey responses of businesspeople within various countries2. This survey
+is administered annually by the World Economic Forum in their Global Competitiveness Survey,
+where the question is asked: “Financial auditing and reporting standards regarding company
+financial performance in your country are (1 = extremely weak, 7 = extremely strong —the best in
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+10
+the world).”These business people who participate in the survey undoubtedly gain their perception
+of accounting and auditing as they see it practiced in their respective organizations. Thus, while
+BIG4 is a proxy for quality of auditing in that it measures the percentage of firms audited by large
+accounting firms, PAQ is a more subjective proxy for accounting and auditing quality. However, as
+with BIG4, we posit that those countries that have a higher perceived level of auditing and
+accounting standards will experience less corrupt behavior by those entrusted with power than
+countries with poorer accounting and auditing standards. Hence, our second hypothesis is:
+H2: There is a negative relationship between the perceived quality of accounting in a
+country and perceived level of corruption.
+
+In order to test our hypotheses it is also necessary to have some viable measure of
+corruption. There have been many different proxies for corruption used in the literature, from the
+number of political figures convicted for abuse of power (Goel and Nelson, 1998), to management
+time with bureaucracy (Kaufmann and Wei, 2000), to a number of survey methods measuring
+corruption within a country. In recent research, the latter form has been the preferred measure, with
+Transparency International’s Corruption Perception Index (CPI) being one of the more popular.
+While discussed extensively by various researchers (e.g. Treisman, 2000; Goel and Nelson, 2005),
+we offer only a brief explanation of the corruption perception index.
+The CPI is a survey of surveys, taking results from many other surveys and combining them
+to make an index of perceived corruption. It is validated in Wilhelm (2002) and its shortcomings are
+discussed in Kaufmann (1998). Jain (2001) offers a review of corruption in general, and includes
+many of the different ways that corruption has been measured. Perhaps the major difference
+between the CPI and other proxies for corruption is that the CPI is a measure of perceived
+corruption, not a measure of some objective phenomena related to corruption. However, even
+“objective” measures are not always accurately observable, and any objective proxy measures
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+11
+something only related to corruption and not corruption itself. Therefore, we believe the CPI to be
+the best available proxy for corruption.
+As a first step in testing H1and H2, we examine the correlation between each measure of
+accounting and corruption. We expect a significant correlation between both BIG4 and PAQ with
+perceived corruption. Table 1, panel B shows the correlation coefficients.
+These correlations show support for both H1 and H2. The correlations suggest that higher
+levels of corporate financial disclosure and practiced auditing are negatively correlated with
+corruption.
+
+5. Regression Analysis
+While correlations are useful in establishing a relationship between accounting and
+corruption, they suggest only an association subject to several reservations. The first of these
+reservations is that there are many other factors (omitted variables) that could be driving the
+relationship seen in the correlations. For example, wealthier countries (those with higher GDPs)
+may have more resources to combat corruption. Further, because there are so many more economic
+transactions happening in wealthier countries, corruption would prove costlier if allowed to flourish,
+and there thus may be more incentive to prevent it. Further, wealthier countries are often more
+politically stable, more democratic and have a more sophisticated political system that prevents
+corruption.
+
+Given this, it might be that many variables, such as country wealth, affect both
+
+accounting and corruption, and the observed correlation is only showing the relationship between
+the omitted variable.
+To mitigate this problem, we replicate two corruption models existent in the literature, and
+add accounting and auditing variables to test for significance. To find the two models, we searched
+the literature for corruption models that were: (1) published in top journals, (2) replicable (3)
+performed with publically accessible data and (4) substantially different from each other. Based
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+12
+upon these criteria, we identified two models, provided by DiRienzo et al., (2007) (hereafter,
+DiRienzo), and Treisman (2000), (hereafter Treisman).
+
+Using DiRienzo et al. (2007) Control Variables
+The DiRienzo model for explaining corruption focuses around economic freedom, certain
+cultural factors and access to information. The research by DiRienzo seeks to demonstrate that
+increased access to digital information (variable DAI) will decrease corruption. The model
+essentially uses all other variables as control variables. While explained fully in DiRienzo (2000),
+we offer a brief explanation of the control variables included in the DiRienzo model.
+First, DiRienzo posits, along with Alam (1995), Rose-Ackerman (1978), and Tanzi (1998),
+that countries with unstable and unwieldy governments are more prone to be corrupt. This is a result
+of less regulation, which brings about the possibility of more corruption. Further, Ades and Di Tella
+(1999) and Treisman (2000) claim that more open economies are less likely to experience
+corruption. These references suggest the need to have a variable to measure the level of economic
+freedom within a country in the model. Given this, DiRienzo controls for Economic Freedom, a
+variable created and published in Gwartney, et al., (2002). Along with supporting economic
+freedom, DiRienzo also uses a proxy for economic development (GDP per capita), which the
+literature also supports as being related to corruption (Husted, 1999). Along with economic freedom
+and development, DiRienzo suggests that corruption is very much a cultural phenomena. Supported
+by Husted (1999), DiRienzo also explains corruption using different cultural phenomena within a
+country by using four of Hofstede’s cultural value indicators: Power Distance, Individualism,
+Masculinity, and Uncertainty avoidance.
+First, corruption has been suggested to be influenced by the level of power distance within a
+country. As power is more unequally distributed, with the persons at the top wielding a more
+disproportionate share of the power, people in the society are less likely to criticize and question
+authority. This makes it easier for persons in authority to abuse their public office for the sake of
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+13
+private gain. Second, the individualism of a society has been negatively linked to corruption
+(Husted, 1999). It is thought that this is the result of society placing a higher value on individual
+achievement and responsibility. In individualist societies, people are accountable for what they do,
+while in more collective societies, individuals are less responsible for their individual actions.
+Third, more masculine societies place a higher value on money and power (Adler, 2002),
+motivating corrupt acts that engender the growth of power and wealth. Lastly, Hofstede’s cultural
+value of uncertainty avoidance is linked to corruption in that people in societies that avoid
+uncertainty are less comfortable in unpredictable situations. This leads to an unwillingness to put
+ones’ self in uncertain situations, such as those caused by challenging and questioning authority.
+The variables used in DiRienzo are further described in Table2.
+(Insert table 2 here)
+Like DiRienzo, we posit that cultural, economic, and information access factors may
+contribute to corruption. However, we also believe that the quality of a country’s accounting and
+auditing influence the level of corruption within a country. To test this, we insert BIG4 and PAQ
+into the DiRienzo regression model and test whether the accounting variables are significant in
+explaining corruption in different countries3while controlling for all the other DiRienzo variables.
+The results of ordinary least squares estimations of these models are displayed in Table3. We start
+with Model 1, which is the original DiRienzo model (in the DiRienzo paper, it is Model 2). It
+includes the cultural and economic factors, as well as the variable of most interest in the DiRienzo
+study, a proxy for the access to digital information (DAI).
+Model 1: CPI = β0 - β1PDI + β2IDV + β3MAS + β4UAI + β5EFW + β6GDP + β7DAI + ε
+
+We obtain substantially similar results to DiRienzo, with any differences being attributable
+to data availability for all countries. We then estimate the model adding the accounting variables
+together in Model 2, and then adding each of the two accounting variables separately in Models 3
+and 4.
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+14
+Model 2: CPI = β0 -β1PDI +β2IDV + β3MAS + β4UAI + β5EFW + β6GDP + β7DAI + β8PAQ +
+β9BIG4 + ε
+Model 3: CPI = β0 -β1PDI +β2IDV + β3MAS - β4UAI + β5EFW + β6GDP + β7DAI + β8PAQ + ε
+Model 4: CPI = β0 -β1PDI +β2IDV + β3MAS - β4UAI + β5EFW + β6GDP + β7DAI + β9BIG4 + ε
+
+(Insert table 3 here)
+
+Examining the significance of the accounting variables in Models 2-4, we find that both
+BIG4 and PAQ are significant at the .05 level, supporting H1 and H2. These results suggest that after
+controlling for several country-specific factors, the quality of accounting information has a
+significant impact on the level of corruption in a country.
+
+Using Treisman (2000) Control Variables
+While DiRienzo offers a model of corruption that allows for significant explanation by
+cultural factors, DiRienzo’s model places little focus on the historical economic and political factors
+that influence corruption. Economic freedom and economic development are very general measures
+and are meant to encompass all economic factors that influence corruption. However, there are no
+control variables for specific economic and political factors. To ensure that accounting is still
+significant when controlling for a number of specific economic and other variables, we replicate a
+portion of Treisman. Specifically, we replicate the series of nested regressions found in Treisman’s
+Table 3 (Treisman, 2000: 417).
+This nested regression tests for the influence on corruption of the legal system, colonial
+tradition, religious affiliation, ethno linguistic division, natural resource endowment, economic
+development, federalism, democracy, central government wages, degree of state intervention and
+the frequency of turnover of the government leadership. Treisman accomplishes this by starting out
+with a baseline model for explaining corruption that contains the most exogenous and difficult to
+change variables: the legal system, colonial tradition, religious affiliation, ethno linguistic division
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+15
+and the natural resource endowments. He then includes variables to see if the extra variables add
+additional explanatory power to the model, and whether they are significant. Table 4 describes
+Treisman’s variables.
+(Insert table 4 here)
+To test our hypotheses, while controlling for the variables used in Treisman (2000), we add
+both PAQ and BIG4 into the series of nested regressions, right after the base model, in step 2 of the
+series of regressions. We add the variables at this point to analyze their ability to explain corruption
+at every stage of the nested regression sequence.4 We display our results in a manner similar to
+Treisman’s paper, where we start with a single model, results displayed vertically, and then estimate
+additional models, displaying each model with another column in the table. The results are shown in
+Table 5.
+(Insert table 5 here)
+From this series of nested regression, we see that for one stage of the series BIG4 remains
+significant, thus providing some evidence to support H1. We also find that at every stage of the
+nested regressions, PAQ remains highly significant, providing strong evidence in favor of H2.
+Further, examining the R-squared statistic, we also find significant reason to believe that adding
+PAQ and BIG4 adds explanatory power to our model.
+
+6. Sensitivity Analysis
+Endogeneity
+While we have demonstrated that accounting and corruption are related when controlling
+for many other factors, the direction of causality is not altogether clear. In other words, we must
+clarify if good accounting and auditing help to prevent and deter corruption, or if high levels of
+corruption create an environment of poor auditing and accounting systems. For example, the main
+asset that good audit firms have is their reputation. As a result, it is possible that as the risk of
+corruption increases good audit firms will be less willing to audit entities in that country, and the
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+16
+perception of accounting will suffer as a result. Further, it is often politicians who create laws and
+organizations that govern accounting standards and enforcement. Since rent-seeking public officials
+have the incentive to allow corruption, they may create a situation in which poor accounting and
+auditing occurs. This problem with endogeneity is a serious concern, and has been listed as an
+inherent limitation in many corruption studies (e.g., Treisman, 2000; Other reference is needed).
+The econometric solution for endogeneity includes finding a suitable instrumental variable—
+something that has proved difficult in the area of corruption. As a result of these limitations, many
+corruption studies do not attempt to correct for endogeneity (examples).
+To attempt to correct for endogeneity (econometrics reference), we find several
+instrumental variables and run a two-stage least squares regression, instrumenting for PAQ. This
+means that we use an instrumental variable and all other exogenous variables in the model to
+estimate PAQ, and then use the estimate of PAQ to estimate corruption.5
+No instrument fits each of these requirements perfectly. Indeed, as Treisman (2000)
+suggests, the lack of a suitable instrument is a difficulty faced in the corruption literature.6
+However, to ameliorate the difficulty of a lack of a perfect instrument, we select several different
+reasonable instruments for PAQ, and estimate the model using a two stage approach with each
+instrument. Table 6describes the different instruments we use in our study. Any of these variables
+risks being a poor instrument. However, given that many of them are uncorrelated with each other,
+and they give similar results, even if they were not suitable instruments, their lack of correlation
+would indicate they are not suitable in different ways. The fact that they give somewhat similar
+coefficients for PAQ, lends credibility to their use as suitable instruments.
+(Insert table 6 here)
+Our instruments for PAQ – Governance Transparency, Disclosure, Auditors per capita, and
+Aggressive – are all highly and significantly correlated with PAQ, as can be seen in Table 7.
+Further, as can be seen in Table 7, many of them are uncorrelated with each other. In untabulated
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+17
+results, many of these instruments are also uncorrelated with the control variables of each of the two
+models we estimate.
+(Insert table 7 here)
+Using these instruments, we estimate both the DiRienzo model and the Treisman model
+using the two-stage least squares approach, and report the results in Table8. Panel A presents results
+using the DiRienzo control variables, and Panel B presents results from using the Treisman control
+variables.
+(Insert table 8 here)
+We find that when using aggressive, governance transparency and disclosure as
+instruments, PAQ is significant at the .01, .05 and .10 levels, respectively. We also find that the
+coefficients are all quite similar. Additionally, we find significance at the .10 level using
+governance transparency and auditors per capita using the DiRienzo model. While the results from
+each of the instruments are not the same, there are significant similarities between the estimations
+using different instruments. While our lack of a perfect instrument is a limitation in our study, we
+have provided some evidence for the significance of accounting and auditing standards in
+explaining the level of corruption in a country even when considering endogeneity.
+
+7. Discussion and Conclusions
+The purpose of this research is to empirically examine the relationship between accounting
+and corruption. With this aim we perform a cross-country analysis using data from 57 countries to
+investigate the relationship between levels of accounting and auditing quality and perceived
+corruption. Through correlation analysis and regression, while controlling for variables found in
+DiRienzo et al (2007) and Treisman (2000), we find evidence to support the hypothesis that: (H1):
+there is a negative relationship between the increased presence of Big Four firms and perceived
+level of corruption in countries, and (H2): there is a negative relationship between the perceived
+quality of accounting in a country and perceived level of corruption in countries. Considering the
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+18
+limitations of suitable instruments, we address endogeneity concerns by running a two-stage least
+squares analysis using four different instrumental variables. Results are robust to controlling for
+endogeneity for H2. Through using different models with uncorrelated variables, and through using
+two-stage least squares and a set of instruments, we address the problems of omitted variable bias
+and endogeneity, respectively. These findings strongly supporting our overall hypothesis that better
+accounting and auditing is related to reduced corruption.
+The magnitude of the coefficients related to the PAQ in our models demonstrates that
+perceived accounting quality is not only statistically correlated with perceived corruption, but
+economically significant. Given this, along with our demonstration through two-stage least squares
+regression that better accounting decreases corruption, these finding have significance for countries
+desiring to fight corruption: by improving accounting and auditing quality, countries may be able to
+lower corruption.
+These findings, which show that better auditing and accounting standards are associated
+with corruption, are significant and important. Corruption keeps both countries and organizations
+from progressing. This inability to progress is caused by two factors. First, corruption siphons funds
+away which could be reinvested in the economy to help the economy grow. Resources that are
+misallocated as a result of corruption mean that resources are not effectively invested in productive
+assets, exploration or other ways to improve a standard of living. While other countries are
+increasing their GDP and improving their competitive positions, countries with high corruption are
+continually trailing, just trying to get to where they could have been without the corruption. The
+second damaging effect of corruption is probably even more important. Foreign organizations and
+individuals are reticent to invest in countries when they don’t believe their investments will be safe
+or where they perceive corruption to be high. The negative impact of perceived corruption in
+inhibiting investment in economies is likely more significant than the economic catch-up game
+being played by the economies themselves. The double negatives of decreased investments by
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+19
+foreigners and spinning economic wheels to make up for misallocated resources can be devastating
+to an economy.
+In today’s global environment, economies compete not only against each other but against
+their own previous performance. A growing economy is a healthy economy, and a stale or declining
+economy is not only stagnant but failing. Countries that desire to develop economically should do
+everything possible to decrease corruption. This paper suggests a relationship between accounting
+and corruption, and thus suggests that countries may be able to decrease corruption by improving
+the quality of their accounting and auditing.
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+20
+Table 1
+Panel A: Variable Definitions
+Variable
+b
+
+BIG4
+
+PAQ
+
+CPI
+
+Descriptiona
+
+Source
+
+Big Four. The percentage of firms audited by Big Four
+accounting firms, BIG4 equals 1 if percentages range between
+0 and 25%, 2 if between 25-50%, 3 if between 50-75%, and 4
+if between 75-100%.
+Perceived Accounting Quality. The survey results of asking World Economic
+business people worldwide to evaluate the strength of
+Forum, Executive
+accounting standards using the following scale: “Financial
+Opinion Survey 2003.
+auditing and reporting standards regarding company financial
+performance in your country are (1 = extremely weak, 7 =
+extremely strong —the best in the world)”.
+Corruption perception index for 2003.
+International
+Transparency (2003)
+
+Panel B: Descriptive Statistics and Correlations for Corruption and Test Variables
+N. Obs.
+
+CPI
+PAQ
+BIG4
+
+128
+100
+42
+
+Mean
+
+4.28
+4.82
+3.26
+
+Std.
+Deviation
+
+CPI
+
+PAQ
+
+BIG4
+
+2.30
+0.96
+0.96
+
+1
+0.842***
+0.625***
+
+1
+0.522***
+
+1
+
+a - Where possible we use the description of the variable offered in the original source of the measure.
+b - While we use the term Big4, for some of the years included in this study, there were actually five major
+public accounting firms (Big 5) rather than four.
+***p<0.01
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+21
+Table 2 – Description of Variables used in DiRienzo et al. (2007)
+Variable
+Description
+PDI
+Power Distance: One of Hofstede’s Cultural Values outlined in Hofstede (1980,
+2001). Refers to the extent that less powerful members of society accept that
+power is not evenly distributed. In other words, power distance shows how
+followers within a society endorse inequality and power.
+IDV
+
+Individualism: One of Hofstede’s Cultural Values outlined in Hofstede (1980,
+2001). Refers to the extent that individuals are integrated into groups. On the
+individualist side, ties between individuals are loose. The opposite of
+individualism is collectivism, where people are integrated into strong cohesive
+groups. The word individualism refers to the group – not to the state.
+
+MAS
+
+Masculinity: One of Hofstede’s Cultural Values outlined in Hofstede (1980,
+2001). Refers to the distribution of gender roles. The opposite of masculinity is
+femininity. In highly masculine countries women are more assertive and
+competitive, but not as much as men, so that highly masculine countries show a
+gap between men and women’s values.
+
+UAI
+
+Uncertainty Avoidance: One of Hofstede’s Cultural Values outlined in
+Hofstede (1980, 2001). Refers to a society’s ability for tolerance of uncertainty
+and ambiguity. In other words, uncertainty avoidance refers to the extent that a
+culture helps its members to feel either uncomfortable or comfortable in
+situations that are uncertain and unstructured.
+
+EFW
+
+Economic Freedom: An index published in Gwartney et al., (2002) which takes
+into account factors such as the size of government, legal structure, security of
+property rights, access to sound money, freedom to exchange with foreigners,
+and regulation of credit.
+
+DAI
+
+Digital Access Index: This index is represented on a scale of 0 (low access) to 1
+(highest access). The overall country score is based on digital communication
+infrastructure, affordability of digital communication access, digital
+communication knowledge, quality of information communication technology,
+and digital information and communication technology.
+
+GDP
+
+Gross Domestic Product: Gross domestic product is a measure of national
+income and output for a given country’s economy. It is the sum of gross value
+added by all resident producers in the economy plus any product taxes and minus
+any subsidies not included in the value of the products. It is calculated without
+making deductions for depreciation of fabricated assets or for depletion and
+degradation of natural resources.
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+22
+Table 3 – Regression Results using DiRienzo Model Control Variables
+This table presents findings from regressing CPI (the perceived corruption measure) on two test variables (PAQ and Big4) and
+control variables to examine the relationship between accounting quality and corruption. All variables are defined in either table 1
+or table 2.
+Model 1
+
+Model 2
+
+Model 3
+
+Model 4
+
+Std.
+Coefficient Error
+
+Std.
+Coefficient Error
+
+Std.
+Coefficient Error
+
+Std.
+Coefficient Error
+
+Constant
+-2.159
+1.696
+Test Variables
+PAQ
+Big4
+Control Variables-From DiRienzo et al. (2007)
+PDI
+-0.012
+0.008
+IDV
+-0.005
+0.008
+MAS
+-0.016
+0.007 **
+UAI
+-0.007
+0.005
+EFW
+0.88
+0.22 ***
+GDP
+0.000
+0.000 ***
+DAI
+4.804
+1.575 ***
+N. Obs
+F
+Adj R-Sq.
+
+37
+36.36***
+0.90
+
+57
+58.36***
+0.88
+
+-6.351
+
+2.261
+
+***
+
+-4.695
+
+1.74
+
+**
+
+0.72
+0.389
+
+0.352
+0.168
+
+*
+**
+
+0.778
+
+0.25
+
+***
+
+-0.012
+-0.011
+-0.014
+0.000
+0.841
+0.000
+4.569
+
+0.01
+0.009
+0.007
+0.006
+0.282
+0.000
+1.869
+
+*
+***
+**
+
+-0.003
+-0.007
+-0.013
+-0.004
+0.566
+0.000
+4.977
+
+0.008
+0.008
+0.006
+0.005
+0.227
+0.000
+1.462
+
+55
+60.46***
+0.90
+
+Dependent variable CPI 2003
+*p<0.10; **p<0.05; ***p<0.01
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+**
+**
+***
+***
+
+-3.558
+
+1.901
+
+*
+
+0.42
+
+0.176
+
+**
+
+-0.018
+-0.007
+-0.018
+-0.002
+1.134
+0.000
+3.557
+
+0.01
+0.01
+0.007
+0.006
+0.256
+0.000
+1.902
+
+*
+
+37
+36.26***
+0.89
+
+**
+***
+*
+
+23
+Table 4 – Description of Variables used in Treisman (2000)
+Variable
+CPI
+
+Description
+Corruption perception index for 2003.
+
+Source
+Transparency International
+
+COMMONLAW
+
+Common Law System. Company law or commercial code is
+English Common Law.
+Probability that two randomly selected inhabitants will not
+belong to the same ethno linguistic group.
+Have a federal system of government.
+Former British Colony or UK.
+Fuels, minerals and metals as a share of 1993 merchandise
+exports.
+Government Turnover. Average number of government leaders
+per year. (number of government leaders in recent period
+divided by length of period in years); recent period: most
+countries 5 Jan. 1980–Dec. 1993; former USSR 5 Jan. 1991–
+1994; post-comm. Europe5Jan. 1990–Dec. 1994. Must be 14
+days to count. Leader is PM in parliamentary system, President
+or head of state in presidential or non-democracy.
+Average government wage relative to per capita GDP.
+Imports of goods and services as a percentage of GDP, 1994.
+
+La Porta et al. (1997)
+
+ETHNOLING
+FEDERAL
+BRITISH
+RESOURCES
+TURNOVER
+
+GOVWAGE
+IMPORTS
+LOGGDP
+NEVERCOLONY
+PROTESTANT
+INTERVENTION
+DEMOCRACY
+
+Word count 8,954
+Author’s pre-publication proof
+
+Log GDP per Capita GDP, 1990.
+Dummy Variable indicating whether the country was ever a
+British Colony.
+Percentage of Population professing protestant faith.
+Index of degree to which "state interference hinders
+development of business."
+Democratic in all 46 years between 1950-1995, using
+definition of democracy established by Alvarez et al (1996).
+
+Mauro (1995)
+Elzar (1995)
+Greir (1995)
+World Bank World Development Reports
+(1995)
+From Rulers Database.
+Http://www.geocities.com/Athens/1058/
+rulers.html
+
+Shiavo Campo et al. (1997)
+World Bank and the World Development
+Report.
+Penn World Tables 5.6 a.
+Fieldhouse (1982) and Grier (1995).
+La Porta et al (1999)
+Institute from Management Development.
+Alvarez et al (1996)
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+24
+Table 5 – Series of Regressions Using Treisman (2000) Control Variables
+This table presents results of regressing CPI (a perceived corruption measure) on two test variables (PAQ and Big4) as
+well as control variables to examine the relationship between accounting quality and corruption. Variables are defined in
+either table 1 or table 4.
+Model
+Variable
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+Common Law System
+Former British Colony or UK
+Never a Colony
+Percent Protestant
+Ethno linguistic Division
+Fuel Metal and Mineral Exports
+Big4
+PAQ
+Log GDP per Capita
+Federal
+Uninterrupted Democracy
+Imports/GDP (%)
+State Intervention
+Government Wage
+Government Turnover
+
+0.658
+0.643
+-1.258
+0.042***
+-0.028***
+-0.02**
+
+-1.446
+0.197
+0.498
+0.008
+-0.016
+-0.004
+0.497*
+2.619***
+
+-0.729
+0.195
+0.803**
+0.011*
+-0.004
+-0.002
+0.189
+1.47***
+3.837***
+
+-1.034
+0.431
+0.852**
+0.009
+0.002
+0.002
+0.169
+1.449***
+4.141***
+-0.561
+0.016
+
+-0.916
+0.435
+0.884**
+0.011
+-0.003
+-0.001
+0.184
+1.265**
+3.963***
+-0.429
+0.116
+0.009
+
+Constant
+
+6.00***
+
+-9.041***
+
+-17.707***
+
+-18.725***
+
+-17.425***
+
+-1.365
+0.577
+0.612
+0.002
+-0.008
+0.014
+0.239
+2.057***
+1.902
+-0.016
+-0.527
+0.002
+0.896**
+-0.098
+1.012
+-16.515**
+
+0.50
+72
+
+0.88
+42
+
+0.88
+42
+
+0.88
+42
+
+0.879
+39
+
+0.893
+32
+
+Adj. R-squared
+N
+*p<0.10; **p<0.05; ***p<0.01
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+25
+Table6 – Description of Instrumental Variables
+Instrument
+Disclosure
+(DISC)
+
+Description
+
+Source
+
+Average ranking of the way firms in different
+countries disclose a variety of financial issues,
+including R&D, Capital expenditures,
+subsidiaries, segment-product, segmentgeographic and accounting policy.
+
+Bushman (2004),
+constructed using the
+International
+Accounting and
+Auditing Trends,
+IAAT data.
+Bhattacharya (2003)
+
+Aggressiveness Scaled accruals by lagged total assets for each
+firm, determine its median in the cross-section of
+firms per country per year, and then average
+across time to obtain the “earnings
+aggressiveness” variable per country.
+Auditors Per
+The number of auditors per 100,000 population. Saudagaran and Diga
+Capita
+(1997), Table 6, page
+51, constructed using
+data from the
+International
+Federation of
+Accountants (IFAC)
+secretariat.
+Governance
+Developed in Bushman (2004) using factor
+Developed using
+(Governance
+analysis on many different variables that are
+factor analysis in
+Transparency) being used to describe corporate financial
+Bushman, et al.
+transparency. “A relative measure of the
+(2004), also referred to
+availability of information for outside investors
+as Factor 2.
+to hold officers and directors accountable.”
+(Bushman, et al., 2004: 220)
+*p<0.10; **p<0.05; ***p<0.01
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+Correlation
+with PAQ
+0.717***
+
+-0.492***
+
+0.729***
+
+0.492***
+
+26
+Table 7 – Correlations
+This table presents correlations between accounting quality variables, corruption, and proposed instruments. Instrumental
+variables are defined in table 6, and test variables are defined in table 1.
+
+CPI
+PAQ
+DISC
+BIG4
+Agressiveness
+Auditorspercap
+Governance
+
+CPI
+
+PAQ
+
+1
+0.841***
+0.619***
+0.625***
+-0.494***
+0.675***
+0.423***
+
+1
+0.717***
+0.522***
+-0.492***
+0.729***
+0.492***
+
+DISC
+
+1
+0.445***
+0.308*
+0.597***
+0.521***
+
+BIG4
+
+1
+-0.256
+0.62***
+0.463***
+
+Agressiveness
+
+Auditorspercap
+
+Governance
+
+1
+-0.318*
+0.055
+
+1
+0.371*
+
+1
+
+*p<0.10; **p<0.05; ***p<0.01
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+27
+Table 8 – Two Stage Least Squares Using Instrumental Variables
+This table presents results of two-stage least squares regressions with CPI (a measure of perceived
+corruption) as the dependent variable and instrumental variables control variables as independent
+variables. The instrumental variables are Aggressiveness, Governance Transparency, DISC, and
+Auditor Per Capita. The coefficient for these instruments is indicated next to the PAQ label.
+Control variables come from two separate models (the DiRienzo model and the Triesman model).
+Regression results from the two stage least squares estimation using DiRienzo control variables are
+presented in Panel A, and results using the Triesmann control variables are presented in Panel B.
+Instrument Used in Place of Accounting Perception
+Governance
+Aggressiveness Transparency DISC
+
+Auditors
+Per Capita
+
+Panel A: Using DiRienzo Control Variables
+
+DiRienzo Model
+
+-0.152
+PAQ
+-0.018
+PDI
+-0.001
+IDV
+-0.031**
+MAS
+0.006
+UAI
+2.107**
+EFW
+0.000
+GDP
+1.755
+DAI
+-7.785***
+Constant
+Panel B: Using Triesman Control Variables
+PAQ
+2.246**
+
+Triesman Model
+
+Common Law System
+Former British Colony or UK
+Never a Colony
+Percent Protestant
+Ethno linguistic Division
+Fuel Metal and Mineral Exports
+Log GDP per Capita
+Federal
+Uninterrupted Democracy
+Constant
+Dependent variable CPI 2003
+*p<0.10; **p<0.05; ***p<0.01
+
+Word count 8,954
+Author’s pre-publication proof
+
+-1.498
+0.375
+0.782*
+0.007
+0.003
+0.009
+3.311***
+-0.668*
+-0.352
+-18.914***
+
+1.291*
+-0.007
+-0.018*
+-0.012*
+0.001
+0.685*
+0.000
+6.359***
+-8.324***
+
+1.109
+-0.009
+-0.017*
+-0.013*
+0.000
+0.761**
+0.000
+6.157***
+-7.66**
+
+2.493*
+0.007
+-0.033
+-0.004
+-0.002
+0.189
+0.000*
+6.187*
+-12.177***
+
+2.65***
+-0.916
+-0.340
+1.079***
+0.006
+-0.004
+0.011
+3.304***
+-0.400
+-0.442
+-21.081***
+
+2.692*
+-0.998
+-0.306
+1.06***
+0.005
+-0.003
+0.011
+3.312**
+-0.417
+-0.490
+-21.3***
+
+-3.673
+1.398
+2.028
+0.097
+0.042
+-0.008
+0.027
+8.398
+-0.451
+1.714
+-9.351
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+28
+Appendix A. Countries Used in DiRienzo Model 2
+Countries
+AUSTRALIA
+AUSTRIA
+BELGIUM
+BRAZIL
+CANADA
+CHILE
+COLOMBIA
+DENMARK
+FINLAND
+FRANCE
+GERMANY
+GREECE
+
+Word count 8,954
+Author’s pre-publication proof
+
+INDIA
+IRELAND
+ISRAEL
+ITALY
+JAPAN
+KOREA, SOUTH
+LUXEMBOURG
+MEXICO
+NETHERLANDS
+NEW ZEALAND
+NORWAY
+PAKISTAN
+
+PHILIPPINES
+PORTUGAL
+SINGAPORE
+SOUTH AFRICA
+SPAIN
+SWEDEN
+SWITZERLAND
+THAILAND
+TURKEY
+UNITED KINGDOM
+UNITED STATES
+URUGUAY
+VENEZUELA
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+29
+References
+Ades, A. and Di Tella, R. (1999),“Rents, Competition and Corruption”, American Economic
+Review,Vol.89 No.4, pp.982-993.
+Adler, N. (2002), International Dimensions of Organizational Behavior, South Western: New York.
+Aidt, T. S. (2003),“Economic analysis of corruption: a survey”, The Economic Journal, Vol. 113, pp. 632–
+652.
+Alam, M. (1995),A Theory of Limits on Corruption and Some Applications,Kyklos,Vol.48,pp.419-435.
+Alvarez, M., Cheibub, J.A., Limongi, F. and Przeworski, A.(1996),“Classifying political regimes”, Studies
+in Comparative International Development,Vol.31 No.2,pp.3–36.
+Andvig, J. C., & Fjeldstad, O. (2001),“Corruption: a review of contemporary research” (R2001:7): Chr.
+Michelsen Institutefor Development Studies and Human Rights.
+Beatty, Randolph P. (1989), “Auditor reputation and the pricing of initial public offerings”, The
+Accounting Review, Vol. 64 No. 4, pp.693-709.
+Beck, P.J. and Maher, M.W. (1986),“A comparison of bribery and bidding in thin markets”, Economics
+Letters, Vol. 20, pp. 1-5.
+Bhattacharya, U., Daouk, H. and Welker, M. (2003),“The world price of earnings opacity”,The Accounting
+Review,Vol.78 No.3, pp.641-678.
+Bunker, S. and Cohen, L. (1983),“Collaboration and competition in two colonization projects: Toward a
+general theory of official corruption”, Human Organization,Vol.42, pp.106-114.
+Bushman, R. Piotroski, J. and Smith, A. (2004),“What determines corporate transparency”, Journal of
+Accounting Research,Vol.42 No.2., pp. 207–252.
+Choi, J. H.,Kim, J-B., Liu, X. and Simunic, D. A. (2008),“Audit pricing, legal liability regimes, and Big4
+premiums: Theory and cross-country evidence”, Contemporary Accounting Research, Vol. 25 No.
+2, pp. 55–99.
+Cornelius, P. (2005a),“Good corporate practices in poor corporate governance systems: Some evidence
+from the Global Competitiveness Report”, Corporate Governance,Vol.5 No.3,pp.12-23.
+Cornelius, P. (2005b),“Corporate practices and national governance systems: What do country rankings tell
+us?”,German Law Journal, March 1st2005, No. 3.
+Davis, J. and Ruhe, J. (2003),“Perceptions of country corruption: Antecedents and outcomes”, Journal of
+Business Ethics,Vol.43 No.4,pp. 275–288.
+DeFond, M.L., F.R. Francis and T.J. Wong (2000),“Auditor industry specialization and market
+segmentation: Evidence from Hong Kong”, Auditing: A Journal of Practice and Theory, Vol. 19
+No. 1 pp.49-66.
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+30
+DiRienzo, C., Das, J., Cord, K. and Burbridge, J. (2007),“Corruption and the role of information”, Journal
+of International Business,Vol.38 No.2,pp. 320–332.
+Di Tella, D. and Schargrodsky, E. (2003),“The role of wages and auditing during a crackdown on
+corruption in the city of Buenos Aires”, The Journal of Law and Economics, Vol.46, pp.269–292.
+Everett, J., Neu, D., Rahaman, A. S. (2007), “Accounting and the global fight against corruption”,
+Accounting, Organizations and Society, Vol. 32 No.6, pp. 513-542.
+Firth, M. (1985),“An analysis of audit fees and their determinants in New Zealand”, Auditing: A Journal of
+Practice and Theory, Vol.4 No.2, pp.23-37.
+Fieldhouse, D.K.(1982),The Colonial Empires: A Comparative Survey from the Eighteenth Century,
+Second edition, Macmillan, London.
+Francis, J. (1984),“The effect of audit firm size on audit prices: a study of the Australian market”, Journal
+of Accounting and Economics, Vol.6, pp.133-151.
+Goel, R.K. and Nelson, M.A.(1998), “Corruption and government size: a disaggregated analysis”, Public
+Choice, XCVII,pp.107-120.
+Goel, R.K. and Nelson, M.A.(2005), “Economic Freedom versus Political Freedom: Cross-Country
+Influences on Corruption”, Australian Economic Papers, Vol. 44 No. 2, pp. 121-133.
+Grier, R.(1995),“The effect of religion on economic development: a cross national study of 63 former
+colonies”,Kyklos,Vol.50 No.1, pp.47–62.
+Gupta, S., Davoodi H. and Alonso-Terme, R. (2002), “Does corruption affect income inequality and
+poverty?”, Economics of Governance, Vol. 3, pp. 23-45.
+Gwartney, W., Lawson, R., Park, W., Edard, C. de Rugy, V and Wagh, S. (2002), Economic Freedom of
+the World Annual Report, http://www.freetheworld.com/download.html.
+Hall, T. and Yago, G. (2000),“Estimating the cost of opacity using sovereign bond spreads”, Policy Brief,
+No.13, Milken Institute, California, April 3, 2000.
+Husted, B. (1999),“Wealth, culture, and corruption”, Journal of International Business Studies”,Vol.30
+No.2, 2nd Qtr, pp.339-359.
+Hu, A., 2001. Corruption: the largest social pollution in China. International Economy Review, Vol. 2.pp.
+12–21 (China). 2001.
+Hu, Angang, “China: corruption and anti-corruption strategies”, Working Paper, Tsinhua University,
+Beijing.
+Jain, A. (2001),“Corruption: areview”, Journal of Economic Surveys, Vol.15 No 1, pp. 71-121.
+Jensen, M.C. and Meckling, W.H. (1976),”Theory of the firm: managerial behavior, agency costs, and
+ownership structure”, Journal of Financial Economics,Vol.3,pp.305–360.
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+31
+Kantor, M. (1996),Remarks At Detroit Economic Club, Available athttp://www.usembassyisrael.org.il/publish/press/commerce/archive/july/dc1_7-30.htm, Accessed 11/23/1007.
+Kaufmann, D. (1997),“Corruption: the facts”, Foreign Policy, No.107, pp.114-131.
+Kaufmann, D. (1998),Research on corruption: critical empirical issues, In Jain (ed) Economics of
+Corruption, (Kluwer Academic Publishers), pp.129-176
+Kaufmann, D. and Wei, S. (2000),“Does ‘grease money’ speed up the wheels of commerce?”, Working
+Paper, WP/00/64, Washington DC: International Monetary Fund.
+La Porta, R., Lopez-de-Silanes, F., Shleifer, A. and Vishny, R.W. (1997b), “Legal determinants of external
+finance”,Journal of Finance.Vol. 52 No. 3, pp. 1131–1150.
+La Porta, R., Lopez-de-Silanes, F., Shleifer, A. and Vishny, R.W. (1999),“The quality of government”,
+Journal of Law, Economics and Organization, Vol. 15 No. 1, pp. 222–279.
+Leff, N. (1964),“Economic development through bureaucratic corruption”, The American Behavioral
+Scientist,Vol.8 No.2,pp.8-21.
+Leiken, R. (1997),“Controlling the global corruption epidemic”, Foreign Policy,No.105, pp.55-73.
+Levin, M. and Satarov, G. (2000),“Corruption and institutions in Russia”, European Journal of Political
+Economy, Vol. 16, pp. 113–132.
+Macrae, J. (1982),“Underdevelopment and the economics of corruption: a game theory approach”, World
+Development,Vol.8 No.10, pp.677-687.
+Mauro, P. (1995),“Corruption and Growth”, Quarterly Journal of Economics,Vol.110,pp.681–712.
+Mauro, P. (1997),“The effects of corruption on growth, investment, and government expenditure: acrosscountry analysis”, Corruption in the Global Economy, ed.by Kimberly Ann Elliott, Washington:
+Institute for International Economics, pp. 83-107
+McMeeking, K.P., Pope, P.F. and Peasnell, K.V. (2003), “The determinants of the UK Big Six Premium”,
+Working Paper, The University of Exeter, 2003.
+Pierre-Guillaume Méon, P-G. and Sekkat, K. (2005),“Does corruption grease or sand the wheels of
+growth?”,Public Choice,Vol.122, pp.1-2.
+Rose-Ackerman, S. (1978), Corruption: A study in political economy, New York, NY: Academic Press.
+Rose-Ackerman, S. (1997),“The political economy of corruption”,In Elliott (1997) pp.31-60.
+Saudagaran, S.M. and Diga, J.G.(1997),”Financial reporting in emerging capital markets: characteristics
+and policy issues”, Accounting Horizons,Vol.11 No.2, pp.41-64.
+Seligson, M. (2002),“The impact of corruption on regime legitimacy: acomparative study of four Latin
+American countries”, The Journal of Politics,Vol.64 No.2, pp.408–433.
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+32
+Schiavo-Campo, S., de Tommaso, G. and Mukherjee, A.(1997),In: An International Statistical Survey of
+Government Employment and Wages, World Bank PRWP 1806, Washington, DC.
+Shleifer, A. and Vishny, R. (1993),“Corruption”,The Quarterly Journal of Economics,Vol.108 No.3,
+pp.599-617.
+Sun, Y. (1999),“Reform, state, and corruption: is corruption less destructive in China than in
+Russia?”,Comparative Politics,Vol.32 No.1, pp.1-20.
+Svensson, J. (2005), “Eight Questions about Corruption”, Journal of Economic Perspectives, Vol. 19
+No.3, pp. 19–42.
+Tanzi, V. and Davoodi, H. (1997),“Corruption, public investment and growth”,IMF Working Paper,pp. 97139, Retrieved at http://www1.worldbank.org/
+publicsector/anticorrupt/FlagshipCourse2003/TanziDavoodi.pdf on 8/1/2007.
+Tanzi, V. (1998),“Corruption around the world: causes, consequences, scope, and cures”,IMF Staff
+Papers,Vol.45 No.5, pp.559-594.
+Transparency International (2007),Transparency International’s Corruption PerceptionIndex: 1997-2006,
+Available at http://www.transparency.org, Accessed 2/12/2007.
+Treisman, D. (2000),“The causes of corruption: a cross-national study”,Journal of Public
+Economics,Vol.76,pp.399-457.
+Wei, S.-J. (2000),“How taxing is corruption on international investors”,The Review of Economics and
+Statistics, Vol.82 No.1, pp.1-11.
+Wilhelm, P. (2002),“International validation of the corruption perceptions index: implications for
+business ethics and entrepreneurship education”,Journal of Business Ethics,Vol.35 No.3, pp.177–
+189.
+World Bank (1997),World Development Report: The State in a Changing World, Oxford University Press,
+New York.
+
+1
+
+Throughout the paper, we refer to both accounting and auditing quality and accounting and auditing standards.
+Accounting is the process wherein financial information is summarized and transmitted to the public. Auditing is the
+process wherein accounting information is verified. They are both part of the same process, working together to
+create transparent and accurate financial information.
+2
+Unlike BIG4, PAQ has not been used much in the empirical literature. For two cases in which PAQ has been used
+in the literature, see Cornelius (2005a and 2005b).
+3
+An example of the countries examined is found in Appendix A. As a result of data availability, our sample size,
+and the resultant number of countries, varied from model to model. DiRienzo model 2 was one of our more
+restricted samples, and so the countries listed in this Appendix represent the 37 countries used in DiRienzo Model 2.
+4
+One difficulty arises in replicating Treisman with the accounting variables. While BIG4 was actually created back
+in the mid-90s (obviously, at that time it was Big5), and thus fits in the same time frame as the Treisman data, the
+PAQ variable has only been measured since 2002, which places it several years ahead of any of the Treisman
+variables. However, in the original Treisman data, there are variables spanning two decades, so, we feel comfortable
+using the accounting perception variable.
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+33
+
+5
+
+A suitable instrument must meet several different requirements. First, it must be highly correlated to the
+independent variable we are instrumenting for, in this case, PAQ. Second, it must be correlated only with the
+instrumental variable, and only affect the dependant variable through the instrumental variable (something which
+can only really be determined theoretically). Third, it must be uncorrelated to the error term. Unfortunately,
+correlations with the error term are not directly observable, as the error term is a function of which controls are
+included in the model. However, non-correlation with the existing control variables will give us some assurance that
+the instrument is uncorrelated to the unobservable error term. As a final condition, it must be theoretically
+appealing. That is, it should make sense that PAQ and the instrument are related
+6
+Treisman (2000: 408) states, in discussing the problem of solving endogeneity, “This, however, requires the
+identification of suitable instruments…. Only in one case — the link between economic development and corruption
+— was I able to find a reasonably convincing instrument to test for the direction of causation. A large question mark,
+therefore, remains over the impact of some of the other key variables.”
+
+Word count 8,954
+Author’s pre-publication proof
+
+To appear in Journal of Money Laundering Control
+(DOI no: 10.1108/13685201011083885)
+
+
