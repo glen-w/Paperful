@@ -594,25 +594,17 @@ def run_apply(
     creatable = [row for row in kept if row.status == "new"]
     if not creatable:
         console.print("nothing to create (all keep rows already in library)")
-        write_report(
-            dest,
-            {
-                "created": 0,
-                "skipped_exists": len(kept),
-                "attach_ok": 0,
-                "attach_deferred": 0,
-            },
-        )
-        return PathResult(
-            dest,
-            0,
-            summary={
-                "created": 0,
-                "skipped_exists": len(kept),
-                "attach_ok": 0,
-                "attach_deferred": 0,
-            },
-        )
+        from .prisma import prisma_counts
+
+        report = {
+            "created": 0,
+            "skipped_exists": len(kept),
+            "attach_ok": 0,
+            "attach_deferred": 0,
+            "prisma": prisma_counts(rows, added=0),
+        }
+        write_report(dest, report)
+        return PathResult(dest, 0, summary=report)
 
     note = (
         cfg.snowball_note_provenance
@@ -641,6 +633,9 @@ def run_apply(
         "attach_ok": 0,
         "attach_deferred": 0,
     }
+    from .prisma import prisma_counts
+
+    report["prisma"] = prisma_counts(rows, added=int(counts["created"]))
     mode = _pdf_mode(request)
     if mode != "off" and items:
         stats = fill_pdfs(cfg, lib, items, console, mode=mode)

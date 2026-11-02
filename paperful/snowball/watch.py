@@ -29,7 +29,9 @@ from .command import (
 )
 from .openalex_epoch import EPOCH_AFTER, TOPIC_MIGRATION, predates_migration
 from .profile import load_profile, request_from_profile
+from .prisma import prisma_counts
 from .queue import load_queue
+from .response_cache import classify_rows
 
 SCHEMA = "paperful.snowball.watch.v1"
 TAG = "paperful-snowball"
@@ -45,6 +47,9 @@ class WatchResult:
     proposed: int
     already_seen: int
     baseline_count: int = 0
+    prisma: dict[str, int] | None = None
+    watch_drift: dict[str, int] | None = None
+    summary: dict[str, Any] | None = None
 
 
 @dataclass
@@ -586,6 +591,7 @@ def run_watch(
     backend: Any = None,
     lookup: Any = None,
     dedupe_scope: str | None = None,
+    refresh: bool = False,
 ) -> WatchResult:
     if not cfg.snowball_enabled:
         raise SnowballError("Snowball is off. Set [snowball] enabled = true in config.toml.")
@@ -599,7 +605,7 @@ def run_watch(
     if dedupe_scope and str(dedupe_scope).strip():
         request.dedupe_scope = str(dedupe_scope).strip()
     is_baseline = not body.get("baseline_at")
-    if not is_baseline:
+    if not is_baseline and not refresh:
         request.from_created_date = _cursor_date(body.get("last_run_at") or body.get("baseline_at"))
     else:
         request.from_created_date = None
@@ -620,17 +626,23 @@ def run_watch(
         rows = []
 
     seen = load_seen(cfg, name)
+    drift = classify_rows(watch_dir(cfg, name), rows)
     if is_baseline:
         for row in rows:
             key = row.identity
             if key:
                 seen.add(key)
         save_seen(cfg, name, seen)
-        _rewrite_candidates(
-            result.run_dir,
-            [],
-            meta={"watch": name, "baseline": True, "baseline_count": len(seen)},
-        )
+        prisma = prisma_counts(rows, added=0)
+        extra = {
+            "watch": name,
+            "baseline": True,
+            "baseline_count": len(seen),
+            "prisma": prisma,
+            "watch_drift": drift,
+            "refresh": bool(refresh),
+        }
+        _rewrite_candidates(result.run_dir, [], meta=extra)
         now = _now()
         body.update(
             {
@@ -651,6 +663,9 @@ def run_watch(
             proposed=0,
             already_seen=len(seen),
             baseline_count=len(seen),
+            prisma=prisma,
+            watch_drift=drift,
+            summary=extra,
         )
 
     proposed: list[Candidate] = []
@@ -669,16 +684,17 @@ def run_watch(
     save_seen(cfg, name, seen)
     if proposed:
         append_inbox(cfg, name, proposed)
-    _rewrite_candidates(
-        result.run_dir,
-        proposed,
-        meta={
-            "watch": name,
-            "baseline": False,
-            "proposed": len(proposed),
-            "already_seen": already,
-        },
-    )
+    prisma = prisma_counts(rows, added=0)
+    extra = {
+        "watch": name,
+        "baseline": False,
+        "proposed": len(proposed),
+        "already_seen": already,
+        "prisma": prisma,
+        "watch_drift": drift,
+        "refresh": bool(refresh),
+    }
+    _rewrite_candidates(result.run_dir, proposed, meta=extra)
     now = _now()
     body.update(
         {
@@ -697,4 +713,7 @@ def run_watch(
         baseline=False,
         proposed=len(proposed),
         already_seen=already,
+        prisma=prisma,
+        watch_drift=drift,
+        summary=extra,
     )

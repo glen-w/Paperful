@@ -183,8 +183,8 @@ def _run_snowball(
             cli_mod.console.print(f"[red]{exc}[/]")
         raise typer.Exit(exc.code) from exc
     cli_mod._rag_auto(cfg, snowball_started)
-    # Writing gates join the run-report / witness trail (dry-run crawls stay queue-only).
-    if command in {"snowball apply"}:
+    # Writing gates and watch polls join the run-report / witness trail.
+    if command in {"snowball apply", "snowball watch run"}:
         summary = dict(getattr(result, "summary", None) or {})
         summary.setdefault("write_api", None)
         run_dir = getattr(result, "run_dir", None)
@@ -1175,6 +1175,7 @@ def run_snowball_watch_run(
     dedupe_scope: Any,
     digest: Any,
     config: Any,
+    refresh: Any = False,
 ) -> None:
     """Baseline on first run; later runs write only unseen new works to the inbox."""
     from . import cli_runtime as cli_mod
@@ -1184,13 +1185,19 @@ def run_snowball_watch_run(
     from .snowball.watch import run_watch
 
     def _run(c: Config):
-        result = run_watch(c, name, console=console, dedupe_scope=dedupe_scope)
+        result = run_watch(
+            c,
+            name,
+            console=console,
+            dedupe_scope=dedupe_scope,
+            refresh=bool(refresh),
+        )
         if digest and not result.exit_code:
             written = write_watch_digest(c, name)
             _print_briefing(written, apply=False, collection="", cfg=c)
         return result
 
-    _run_snowball(cfg, _run)
+    _run_snowball(cfg, _run, command="snowball watch run")
 
 def run_snowball_watch_rebaseline(
     console: Console,

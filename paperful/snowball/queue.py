@@ -9,6 +9,7 @@ from typing import Any
 
 from .candidate import Candidate
 from .openalex import OpenAlexClient
+from .prisma import prisma_counts, prisma_from_stop
 
 
 def write_queue(
@@ -49,6 +50,8 @@ def write_queue(
         )
     if meta:
         summary.update(meta)
+    screened = prisma_from_stop(summary, dest)
+    summary["prisma"] = prisma_counts(rows, screened=screened)
     (dest / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     from .citation_graph import write_graph
 

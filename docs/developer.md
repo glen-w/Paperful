@@ -233,6 +233,7 @@ Tier policy (1.0 contract):
 | `paperful.authorwatch.suggestion.v1` | `state/authorwatch/<name>/suggestions.jsonl` | `authorwatch_suggest` | T2 | — |
 | `paperful.snowball.candidate.v1` | `state/snowball/<run-id>/` | `snowball.candidate` | T2 | Additive through 1.x |
 | `paperful.snowball.watch.v1` | snowball watch cursor | `snowball.watch` | T2 | — |
+| `paperful.snowball.watch.responses.v1` | `state/snowball/watches/<name>/responses.json` | `snowball.response_cache` | T2 | Drift classes `new` / `unchanged` / `metadata_changed` / `reassigned_id`. Additive `prisma` / `watch_drift` on queue `summary.json` and `snowball watch run` reports; not frozen `RUN_REPORT_SUMMARY_KEYS` |
 | `paperful.keepup.v1` | `state/keepup/<name>/job.json` | `keepup` | T2 | Alert loop / what-cites; see [keepup.md](keepup.md) |
 | `paperful.snowball.coauthors.v1` | co-author graph | `snowball.authors` | T2 | — |
 | `paperful.network.v1` | `state/network/<run-id>/` | `network` | T2 | ORCID ego graph, phase slices, metrics, `attributes.csv`. Distinct from snowball `coauthors.v1`. |

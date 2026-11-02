@@ -41,6 +41,7 @@ paperful snowball search "high seas EIA" --gate dry-run --format json
 paperful snowball apply <run-id> -C "Inbox/Snowball" --format json
 paperful snowball watch save bbnj --profile keyword-scout
 paperful snowball watch run bbnj --digest
+paperful snowball watch run bbnj --refresh
 paperful snowball watch digest bbnj
 paperful snowball digest --run-id <run-id>
 paperful snowball watch briefing bbnj
@@ -78,6 +79,7 @@ this profile watch.
 paperful snowball watch save bbnj --profile keyword-scout
 paperful snowball watch run bbnj          # first time: baseline, inbox empty
 paperful snowball watch run bbnj --digest # later: N new, then digest.md
+paperful snowball watch run bbnj --refresh  # skip last-run date cursor; rewrite responses.json
 paperful snowball watch show bbnj
 paperful snowball watch rebaseline --all  # dry run; --apply once after the Oct 2026 OpenAlex topic change
 paperful snowball watch digest bbnj       # ranked rollup; --apply -C files a note
@@ -105,8 +107,17 @@ Ledger under `state/snowball/watches/<name>/`:
 | `watch.json` | `paperful.snowball.watch.v1` — profile name, `baseline_at`, `last_run_at`, `last_run_id` |
 | `seen.json` | Identities already recorded (`doi:` or `openalex:`) |
 | `inbox.jsonl` | Append-only proposed `status = new` rows |
+| `responses.json` | `paperful.snowball.watch.responses.v1` — content hash per identity (`new` / `unchanged` / `metadata_changed` / `reassigned_id`) |
 | `briefing.md` | Thin markdown export (`watch briefing`) |
 | `digest.md` | Frontier digest (`watch digest` or `watch run --digest`) |
+
+Every crawl `summary.json` (and `snowball apply` / `snowball watch run`
+command reports) also carries additive **PRISMA-style counts**:
+`identified`, `screened`, `kept`, `added`. Counts only — no recall
+percentage. Watch runs add `watch_drift` (`new` / `unchanged` /
+`metadata_changed` / `reassigned_id`) from `responses.json`. `--refresh`
+skips the last-run `from_created_date` cursor and rewrites that cache;
+Paperful still does not schedule watches.
 
 `export-proposals` reads `inbox.jsonl` here (or `candidates.jsonl` on a crawl
 run dir). See [BibTeX / RIS from the queue](#bibtex--ris-from-the-queue).

@@ -6,6 +6,22 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+### Added
+
+- **Stuff workbench.** Advanced `/stuff` (item or upload, background job,
+  `pack.md` download). Same XOR as the CLI; never writes the library.
+- **Synthesize layouts.** `--layout default|conflict|review` (and `--prompt`
+  as `custom`) shape the brief. Distinct from Ask `--focus`. Sidecar
+  `paperful.synthesis.v1` records `layout` / `prompt_label`.
+- **PRISMA counts** on snowball `summary.json` and `snowball apply` /
+  `snowball watch run` reports: `identified` / `screened` / `kept` /
+  `added`. Additive; not a frozen run-report key. No recall percentage.
+- **Watch drift cache.** `state/snowball/watches/<name>/responses.json`
+  (`paperful.snowball.watch.responses.v1`) classifies `new` /
+  `unchanged` / `metadata_changed` / `reassigned_id`. `watch run --refresh`
+  skips the last-run date cursor and rewrites the cache. Paperful still
+  does not schedule watches.
+
 ## 1.6.4 — 2026-11-02
 
 ### Added

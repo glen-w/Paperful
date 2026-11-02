@@ -409,11 +409,16 @@ chasing and complement each other everywhere else.
   flags / profile / Discover). One hop, then Keep/Skip, then
   `snowball continue`. `asymptotic_coverage`, `budget`, and `any` are
   included. Hop caps stay as ceilings. No recall percentage.
-- A **response-hash cache with drift classification** for watches — tells a
-  genuinely new paper apart from a reassigned or merged ID (matters for
-  [OpenAlex topics](#after-110-openalex-topics)).
+- A **response-hash cache with drift classification** for watches — **shipped**
+  (`responses.json`, `watch_drift` on `snowball watch run`; `--refresh`
+  rewrites the cache and skips the last-run date cursor). Tells a genuinely
+  new paper apart from a reassigned or merged ID (matters for
+  [OpenAlex topics](#after-110-openalex-topics)). Paperful still does not
+  schedule watches.
 - **PRISMA-style counts** (identified, screened, kept, added) in the run
-  report.
+  report — **shipped** as additive `summary.prisma` on snowball queues,
+  apply, and watch run reports. Not a frozen `RUN_REPORT_SUMMARY_KEYS`
+  member. Counts only; no recall percentage.
 
 **Interoperate:** export a Discover queue as SnowBallSLR seeds or labels;
 import `included.csv` / RIS into Wanted. Reviewers do the rigorous chase
@@ -571,7 +576,7 @@ until Wanted is honest. Do not grow 1.x into a second product.
 | Conflicting-evidence `synthesize` (question → methods → findings → limits) over **your** PDFs. **Shipped** as `--layout conflict` / `review` | Synthesize | Held full text only | [Briefs](#after-110-briefs-ask) |
 | Figure/table **pullouts** (caption + page + stem), not generated artwork | Extract | Publisher bans on genAI primary images | [Briefs](#after-110-briefs-ask) |
 | `stuff`: sentence or outline section → `rag search`; extra cites enter **Zotero before** `\cite`; no invented BibTeX. **CLI shipped**; `--apply` later | Write | Fail closed if index empty | [`stuff`](#stuff-later-extra-citations-from-the-library) |
-| PRISMA **counts** in the run report; watch **drift** hash; export Discover / import `included.csv` | Screen / keep current | Counts only; no fake recall % | [Snowballing](#after-110-snowball-review) |
+| PRISMA **counts** in the run report; watch **drift** hash. **Shipped** (`summary.prisma`, `responses.json`). Export Discover / import `included.csv` later | Screen / keep current | Counts only; no fake recall % | [Snowballing](#after-110-snowball-review) |
 | Official PRISMA flow from **exact counts**, not AI-illustrated diagrams | Screen / export | Methods figure | [SR mode](#after-110-bigger-bets) |
 | Point at Better BibTeX + Quarto (do not vendor CSL) | Write / export | Parked until testers ask | [Parked](#after-110-parked) |
 | ASReview-class ranking only as optional local embeddings | Screen | Not dual review | [Embeddings](#after-110-embeddings) |

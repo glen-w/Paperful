@@ -4954,6 +4954,14 @@ def snowball_watch_run(
         "--digest",
         help="Also write watches/<name>/digest.md after a successful run.",
     ),
+    refresh: bool = typer.Option(
+        False,
+        "--refresh",
+        help=(
+            "Skip the last-run date cursor and rewrite the watch response cache "
+            "from this fetch. Paperful still does not schedule watches."
+        ),
+    ),
     config: Path | None = ConfigOpt,
 ) -> None:
     """Baseline on first run; later runs write only unseen new works to the inbox."""
@@ -4964,6 +4972,7 @@ def snowball_watch_run(
         name=name,
         dedupe_scope=dedupe_scope,
         digest=digest,
+        refresh=refresh,
         config=config,
     )
 
