@@ -99,3 +99,26 @@ def test_suggested_from_llm_dispatches_lane_helpers():
         assert callable(getattr(critique_llm, name))
         assert f"{name}(" in src
         assert f"def {name}(" not in src
+
+
+def test_lane_state_absorb_skips_empty_claims_without_ledger():
+    from paperful.critique import make_finding
+    from paperful.critique_llm import _LaneState
+
+    state = _LaneState()
+    extra = [make_finding(code="x", severity="info", lane="suggested")]
+    state.absorb(extra, {"reviewers": [{"id": "a"}], "prompt_sha": "abc", "narrative": "n"})
+    assert len(state.out) == 1
+    assert state.first_sha == "abc"
+    assert state.first_narrative == "n"
+    assert state.reviewer_meta == [{"id": "a"}]
+
+    empty = _LaneState()
+    empty.absorb(
+        [],
+        {"skipped": "empty_reply", "narrative": "ignored"},
+        keep_if_ledger=True,
+        keep_if_narrative=False,
+    )
+    assert empty.skip_reason == "empty_reply"
+    assert empty.first_narrative == ""

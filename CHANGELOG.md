@@ -6,6 +6,8 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.6.4 — 2026-11-02
+
 ### Added
 
 - **OpenAlex trusted journal lists:** snowball `--listed-in` /
@@ -36,6 +38,17 @@ may still be added). See [releases](docs/releases.md).
   landings). Writes `state/search/<run-id>/` (`paperful.search.v1`). Discover →
   Web. Apply creates metadata parents only; PDFs stay Wanted / `run`. Not a
   Google HTML scrape. [Web grey search](docs/search.md).
+
+### Changed
+
+- **Module split (no fetch-model change).** Skip-host lists and
+  `delay_serial_s` (alias of `delay_scihub_s`) are shared; `run` uses
+  catalogue PDF helpers; doctor checks split by domain; Discover HTTP
+  handlers live in graph/search/people modules; snowball `_execute` /
+  continue / resume / apply live in `execute.py` and `apply.py` (public
+  `run_*` stay on `command.py`); critique `suggested_from_llm` dispatches
+  named lanes; `try_download` sits next to `commit_download`. Sci-Hub stays
+  serial after OA. See [developer](docs/developer.md).
 
 ### Fixed
 

@@ -166,3 +166,31 @@ def test_post_smokes_per_family(tmp_path, monkeypatch):
 
     res = client.post("/rewrite", data={}, follow_redirects=False)
     assert res.status_code < 500
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_last_review_token_reads_matching_command(cfg, monkeypatch):
+    from paperful.ui.discover_common import last_review_token
+
+    monkeypatch.setattr(
+        "paperful.ui.commands.list_commands",
+        lambda *_a, **_k: [
+            {"verb": "other", "review_token": "skip"},
+            {"verb": "search_apply", "review_token": "tok-1"},
+        ],
+    )
+    ui = type("U", (), {"cfg": cfg})()
+    assert last_review_token(ui, "search_apply") == "tok-1"
+    monkeypatch.setattr("paperful.ui.commands.list_commands", lambda *_a, **_k: [])
+    assert last_review_token(ui, "search_apply") == ""
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_graph_overlay_stays_none_without_names(cfg):
+    from paperful.ui.discover_graph_routes import _graph_overlay_context
+
+    ui = type("U", (), {"cfg": cfg})()
+    assert _graph_overlay_context(ui, "", "") == (None, None)
+    watch, compare = _graph_overlay_context(ui, "  ", "not-a-run")
+    assert watch is None
+    assert compare == set()
