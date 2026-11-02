@@ -489,6 +489,11 @@ class Config:
             self.grey_playbooks = merge_playbooks(True, ())
 
     @property
+    def delay_serial_s(self) -> tuple[float, float]:
+        """Pause window for serial vault / Sci-Hub fetches. Same bytes as delay_scihub_s."""
+        return self.delay_scihub_s
+
+    @property
     def manifest_path(self) -> Path:
         return self.state_dir / "manifest.jsonl"
 
@@ -644,8 +649,9 @@ def _from_dict(raw: dict[str, Any], source: Path) -> Config:
         cfg.sources = [str(s) for s in raw["sources"]]
     if "scihub_mirrors" in raw:
         cfg.scihub_mirrors = [str(m) for m in raw["scihub_mirrors"]]
-    if "delay_scihub_s" in raw:
-        lo, hi = raw["delay_scihub_s"]
+    delay_raw = raw.get("delay_serial_s", raw.get("delay_scihub_s"))
+    if delay_raw is not None:
+        lo, hi = delay_raw
         cfg.delay_scihub_s = (float(lo), float(hi))
     if "concurrency_oa" in raw:
         cfg.concurrency_oa = max(1, int(raw["concurrency_oa"]))

@@ -92,7 +92,7 @@ ezproxy_base = ""
 scihub_mirrors = ["sci-hub.ru", "sci-hub.ren", "sci-hub.box", "sci-hub.se", "sci-hub.st"]
 
 # Random delay between Sci-Hub / EZProxy / htmlpdf requests, seconds [min, max].
-delay_scihub_s = [3.0, 8.0]
+delay_serial_s = [3.0, 8.0]  # alias: delay_scihub_s
 
 # Parallelism for open-access sources; Scholar, EZProxy, htmlpdf, and Sci-Hub are always serial.
 concurrency_oa = 4

@@ -100,7 +100,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `pipeline_phases.py` | OA parallel and serial fetch phases | `pipeline` helpers |
 | `run_hooks.py` | EZProxy recovery, handoff, dry-run rows for `run` | `pipeline`, `handoff` |
 | `gaps_cmd.py` | `gaps` body after the CLI parses flags | `handoff`, `run_hooks` |
-| `run_cmd.py` | `run` body after the CLI parses flags | `pipeline`, `run_hooks` |
+| `run_cmd.py` | `run` body after the CLI parses flags | `pipeline`, `run_hooks`, `catalogue` (PDF-todo helpers; not `zot`) |
 | `ask_cmd.py` | `ask` body after the CLI parses flags | `agent_ops`, rag |
 | `dedupe_cmd.py` / `attachments_cmd.py` / `summarize_cmd.py` / `synthesize_cmd.py` | Completeness verbs after flags | domain modules via `cli_runtime` |
 | `completeness_cmd.py` | Re-export shim for the four verbs (keep `cli` imports and monkeypatches stable) | the four `*_cmd` modules |

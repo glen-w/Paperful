@@ -13,6 +13,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from ..config import Config
+from ..playbooks import is_author_site_skip_host
 from .candidate import Candidate
 from .openalex import normalize_orcid, short_id
 
@@ -24,19 +25,6 @@ else:  # pragma: no cover
 PACK_SCHEMA = "paperful.author_pack.v1"
 GRAPH_SCHEMA = "paperful.snowball.coauthors.v1"
 _UNSAFE = re.compile(r"[^a-z0-9]+")
-_SKIP_HOSTS = (
-    "researchgate.net",
-    "academia.edu",
-    "linkedin.com",
-    "twitter.com",
-    "x.com",
-    "facebook.com",
-    "scholar.google",
-    "doi.org",
-    "youtube.com",
-    "wikipedia.org",
-    "orcid.org",
-)
 _SIMPLE_HOSTS = (
     "github.io",
     "weebly.com",
@@ -264,8 +252,7 @@ def host_of(url: str) -> str:
 
 
 def is_blocked_host(host: str) -> bool:
-    host = (host or "").lower()
-    return any(host == skip or host.endswith("." + skip) for skip in _SKIP_HOSTS)
+    return is_author_site_skip_host(host)
 
 
 def is_simple_host(url: str) -> bool:

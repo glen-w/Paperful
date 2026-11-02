@@ -12,23 +12,28 @@ from urllib.parse import quote_plus, urljoin
 import httpx
 from bs4 import BeautifulSoup
 
+from ..playbooks import url_is_direct_skip
 from ..zot import Item
 from .base import Candidate, Context, Outcome
 
 NAME = "scholar"
 _PROBE_URL = "https://scholar.google.com/scholar?q=information&hl=en&as_sdt=0%2C5"
 
-_SKIP_HOSTS = (
-    "scholar.google.",
+# Path fragments that are publisher landings, not files. Host-level skips
+# come from playbooks.DIRECT_SKIP_HOSTS via url_is_direct_skip.
+_SKIP_PATHS = (
     "accounts.google.",
-    "doi.org",
-    "dx.doi.org",
-    "sciencedirect.com/science/article/abs/",  # abs pages are not PDFs
-    "link.springer.com/article/",  # landing, not file
+    "sciencedirect.com/science/article/abs/",
+    "link.springer.com/article/",
     "onlinelibrary.wiley.com/doi/abs/",
     "tandfonline.com/doi/abs/",
     "jstor.org/stable/",
 )
+
+
+def _skip_pdf_url(url: str) -> bool:
+    low = (url or "").lower()
+    return url_is_direct_skip(low) or any(p in low for p in _SKIP_PATHS)
 
 
 def is_blocked(resp: httpx.Response) -> bool:
@@ -143,7 +148,7 @@ def extract_pdf_links(html: str, base_url: str) -> list[str]:
         # Keep Google redirectors so we can unwrap them below; skip other GS chrome.
         if "scholar.google." in low and "url=" not in low:
             return
-        if any(h in low for h in _SKIP_HOSTS if "scholar.google" not in h):
+        if _skip_pdf_url(abs_url) and "scholar.google." not in low:
             return
         if abs_url not in found:
             found.append(abs_url)
@@ -176,6 +181,6 @@ def extract_pdf_links(html: str, base_url: str) -> list[str]:
         low = u.lower()
         if not low.startswith(("http://", "https://")):
             continue
-        if u not in out and not any(h in low for h in _SKIP_HOSTS):
+        if u not in out and not _skip_pdf_url(u):
             out.append(u)
     return out

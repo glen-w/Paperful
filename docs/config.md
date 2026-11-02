@@ -467,7 +467,7 @@ run misbehaves or you host infrastructure yourself.
 | `circuit_breaker_threshold` | `3` | Captcha or block-page failures before a source pauses. A 429 does not count. After the pause, one item is tried again |
 | `user_agent` | Chrome-like string | HTTP `User-Agent` for source and download requests |
 | `scihub_mirrors` | built-in list | Hostnames tried in order when Sci-Hub is opted in |
-| `delay_scihub_s` | `[3, 8]` | Random pause (seconds) before each Sci-Hub / EZProxy / htmlpdf page fetch |
+| `delay_serial_s` (alias `delay_scihub_s`) | `[3, 8]` | Random pause (seconds) before each serial vault / Sci-Hub / EZProxy / htmlpdf / Scholar page fetch. `delay_serial_s` wins when both keys are set |
 | `mirror_failures_before_skip` | `3` | Network failures before a Sci-Hub mirror is skipped for the run |
 
 ### LLM and attachment fine print

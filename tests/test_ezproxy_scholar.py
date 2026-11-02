@@ -328,6 +328,16 @@ def test_scholar_skips_javascript_void_links():
     assert urls == ["https://repo.test/ok.pdf"]
 
 
+def test_scholar_skips_direct_hosts_and_abs_landings():
+    html = """
+    <a href="https://doi.org/10.1/x">[PDF]</a>
+    <a href="https://www.sciencedirect.com/science/article/abs/pii/S000">[PDF]</a>
+    <a href="https://repo.test/ok.pdf">[PDF]</a>
+    """
+    urls = scholar.extract_pdf_links(html, "https://scholar.google.com/scholar")
+    assert urls == ["https://repo.test/ok.pdf"]
+
+
 def test_scholar_extracts_pdf_sidebar():
     html = """
     <div class="gs_r"><div class="gs_or_ggsm"><a href="https://repository.example.edu/paper.pdf">[PDF]</a></div></div>

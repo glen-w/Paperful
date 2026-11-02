@@ -13,6 +13,7 @@ from paperful.playbooks import (
     apply_rewrite,
     apply_synthesize,
     host_matches,
+    is_author_site_skip_host,
     load_builtin_pack,
     load_pack_dir,
     looks_like_pdf_url,
@@ -20,6 +21,7 @@ from paperful.playbooks import (
     playbook_from_dict,
     rewrite_playbook_name,
     scrape_playbooks_for_host,
+    url_is_direct_skip,
 )
 from paperful.sources.landing import (
     extract_pdf_urls,
@@ -598,3 +600,14 @@ kind = "nope"
         cfg = load_config(cfg_path)
     assert cfg.grey_playbooks == []
     assert any("ignored" in str(w.message) for w in caught)
+
+
+def test_shared_skip_hosts_cover_direct_and_author_site():
+    assert url_is_direct_skip("https://doi.org/10.1/x")
+    assert url_is_direct_skip("https://scholar.google.com/scholar?q=x")
+    assert not url_is_direct_skip("https://iucn.org/resources/paper.pdf")
+    assert is_author_site_skip_host("orcid.org")
+    assert is_author_site_skip_host("www.linkedin.com")
+    assert is_author_site_skip_host("scholar.google.com")
+    assert not is_author_site_skip_host("x.computer")
+    assert not is_author_site_skip_host("iucn.org")

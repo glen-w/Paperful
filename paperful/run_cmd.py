@@ -25,8 +25,8 @@ from .run_hooks import (
     rag_auto_after_command,
     run_dry_run_table_and_payload,
 )
+from .catalogue import items_without_stored_pdf, linked_url_only_count
 from .store import Manifest, items_from_mirror
-from .zot import items_without_stored_pdf, linked_url_only_count
 
 
 def run_fetch(

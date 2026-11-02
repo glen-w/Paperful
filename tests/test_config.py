@@ -44,6 +44,7 @@ mirror_failures_before_skip = 7
     assert cfg.state_dir == Path("~/.scihub-state").expanduser()
     assert cfg.sources == ["unpaywall", "scihub"] and cfg.scihub_mirrors == ["a.test"]
     assert cfg.delay_scihub_s == (1.0, 2.0)
+    assert cfg.delay_serial_s == (1.0, 2.0)
     assert cfg.concurrency_oa == 1  # clamped to >= 1
     assert (
         cfg.attach is False
@@ -70,6 +71,20 @@ short_pdf_min_words = 50
 def test_missing_explicit_path_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_config(tmp_path / "missing.toml")
+
+
+def test_delay_serial_s_alias_wins_over_delay_scihub_s(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text(
+        """
+email = "me@example.org"
+delay_scihub_s = [1, 2]
+delay_serial_s = [4, 5]
+"""
+    )
+    cfg = load_config(p)
+    assert cfg.delay_scihub_s == (4.0, 5.0)
+    assert cfg.delay_serial_s == (4.0, 5.0)
 
 
 def test_ezproxy_relogin_can_be_turned_off(tmp_path):

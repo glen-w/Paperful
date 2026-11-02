@@ -144,7 +144,7 @@ def phase_serial(
         if name == "serpapi" and self._serpapi_over_budget():
             return self._skip_serpapi(queue, reason="max_calls")
         still: list[tuple[Item, list[str]]] = []
-        lo, hi = self.cfg.delay_scihub_s
+        lo, hi = self.cfg.delay_serial_s
         first = True
         for idx, (item, attempts) in enumerate(queue):
             if self._stop.is_set():
@@ -196,7 +196,7 @@ def phase_interleave(
         """
         self._emit(f"[bold]-- {first}+{second}[/] ({len(queue)} remaining)")
         still: list[tuple[Item, list[str]]] = []
-        lo, hi = self.cfg.delay_scihub_s
+        lo, hi = self.cfg.delay_serial_s
         need_gap = False
         for idx, (item, attempts) in enumerate(queue):
             if self._stop.is_set():

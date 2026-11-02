@@ -30,6 +30,13 @@ DIRECT_SKIP_HOSTS = (
     "semanticscholar.org",
     "researchgate.net",
 )
+# Author-homepage preflight: social / profile hosts on top of DIRECT_SKIP_HOSTS.
+AUTHOR_SITE_EXTRA_HOSTS = (
+    "academia.edu",
+    "linkedin.com",
+    "wikipedia.org",
+    "orcid.org",
+)
 
 _UN_LANG = frozenset({"en", "fr", "es", "ar", "ru", "zh", "de"})
 _BUILTIN_PACK = Path(__file__).resolve().parent / "data" / "grey_playbooks_ocean.toml"
@@ -60,6 +67,20 @@ class GreyPlaybook:
 def url_is_direct_skip(url: str) -> bool:
     low = (url or "").lower()
     return any(h in low for h in DIRECT_SKIP_HOSTS)
+
+
+def is_author_site_skip_host(host: str) -> bool:
+    """True when a homepage host is a profile/social/DOI landing, not a PDF site."""
+    host = (host or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    skips = DIRECT_SKIP_HOSTS + AUTHOR_SITE_EXTRA_HOSTS
+    return any(
+        host == skip
+        or host.endswith("." + skip)
+        or host.startswith(skip + ".")
+        for skip in skips
+    )
 
 
 def host_matches(host: str, patterns: tuple[str, ...] | list[str]) -> bool:
