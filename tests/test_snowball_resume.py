@@ -231,3 +231,9 @@ def test_execute_uses_phase_helpers():
         assert callable(getattr(command, name))
         assert f"{name}(" in src
         assert f"def {name}(" not in src
+    from paperful.snowball import apply, execute
+
+    assert command._execute is execute._execute
+    assert command.run_apply is apply.run_apply
+    assert command.run_resume is apply.run_resume
+    assert command.run_continue is apply.run_continue

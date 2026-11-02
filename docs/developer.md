@@ -163,7 +163,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `authorwatch_suggest.py` | Corpus / cited / coauthor / mix suggestions → `suggestions.jsonl`; shared co-author accumulation for briefing | `authors_report`, OpenAlex, promoted packs |
 | `authorwatch_social.py` | Parse operator-saved RG / LinkedIn / Academia HTML or CSV (no network) | stdlib HTML/CSV |
 | `keepup.py` / `keepup_cites.py` | Alert loop job ledger (`paperful.keepup.v1`); poll watch / authorwatch / collection citers; interval gate; apply + dismiss | `snowball.watch`, `authorwatch`, OpenAlex `works_citing` |
-| `snowball/` | Crawl, hops, watch (`watch apply` from inbox), thin briefing, frontier digest, `trends` (OpenAlex `group_by` year counts). `watch run` does not create library items. Citation-map categories live in `map_categories.py`; library annotate/add/remove in `graph_library.py` | OpenAlex; library protocol only on apply |
+| `snowball/` | Crawl, hops, watch (`watch apply` from inbox), thin briefing, frontier digest, `trends` (OpenAlex `group_by` year counts). `command.py` is the public `run_*` surface; `_execute` / gate / create-and-fill live in `execute.py`, continue/resume/apply in `apply.py`. `watch run` does not create library items. Citation-map categories live in `map_categories.py`; library annotate/add/remove in `graph_library.py` | OpenAlex; library protocol only on apply |
 | `sections/` | IMRaD field extract (`extract-sections`): deterministic split + optional GROBID TEI + optional LLM fill | `rag.extract` text cache, `rag.chunk` / `sections.headings`, `grobid_client`, gated `llm` |
 | `grobid_client.py` | Thin httpx client for an operator-owned GROBID REST server | `sections.grobid`, `rag.extract.GrobidParser`, `doctor` |
 
