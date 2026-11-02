@@ -249,7 +249,7 @@ def test_endnote_copy_on_lock_includes_journal(cfg, tmp_path, monkeypatch):
     real_copy = shutil.copy2
 
     def spy(src, dst, *args, **kwargs):
-        copied.append(str(src).rsplit("/", 1)[-1])
+        copied.append(Path(src).name)
         return real_copy(src, dst, *args, **kwargs)
 
     monkeypatch.setattr("paperful.endnote.shutil.copy2", spy)

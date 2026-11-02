@@ -28,15 +28,16 @@ def pytest_configure() -> None:
         return
     import pathlib
 
-    # as_posix() calls str(), so the override has to use the original method.
-    original = pathlib.PurePath.__str__
+    # f-strings call __format__, not __str__. pathlib.relative_to compares
+    # the native spelling, so overriding __str__ breaks pytest itself
+    # (as_posix also calls str and would recurse).
+    def _posix_format(self: pathlib.PurePath, spec: str) -> str:
+        del spec
+        return str(self).replace("\\", "/")
 
-    def _posix(self: pathlib.PurePath) -> str:
-        return original(self).replace("\\", "/")
-
-    pathlib.PurePath.__str__ = _posix  # type: ignore[method-assign]
-    pathlib.PureWindowsPath.__str__ = _posix  # type: ignore[method-assign]
-    pathlib.WindowsPath.__str__ = _posix  # type: ignore[method-assign]
+    pathlib.PurePath.__format__ = _posix_format  # type: ignore[method-assign]
+    pathlib.PureWindowsPath.__format__ = _posix_format  # type: ignore[method-assign]
+    pathlib.WindowsPath.__format__ = _posix_format  # type: ignore[method-assign]
 
     read = pathlib.Path.read_text
     write = pathlib.Path.write_text

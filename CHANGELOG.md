@@ -6,6 +6,10 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.8.5 — 2026-11-02
+
+- **Windows CI.** Test paths are formatted with forward slashes without replacing `Path.__str__`, which broke `relative_to`. Python 3.10 tests do not import `tomllib`.
+
 ## 1.8.4 — 2026-11-02
 
 - **Windows CI, again.** The path helper no longer recurses through `as_posix`, and Python 3.10 tests do not import `tomllib`.

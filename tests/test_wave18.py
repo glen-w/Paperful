@@ -149,7 +149,7 @@ def test_httpx_client_construction_stays_central():
     root = Path(__file__).resolve().parents[1] / "paperful"
     allowed = {"paperful/http.py", "paperful/llm/client.py"}
     found = [
-        str(path.relative_to(root.parent))
+        path.relative_to(root.parent).as_posix()
         for path in root.rglob("*.py")
         if "httpx.Client(" in path.read_text(encoding="utf-8")
     ]

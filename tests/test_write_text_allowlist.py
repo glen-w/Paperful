@@ -86,7 +86,7 @@ ALLOW = frozenset(
 def test_write_text_does_not_spread():
     root = Path(__file__).resolve().parents[1] / "paperful"
     found = {
-        str(path.relative_to(root.parent))
+        path.relative_to(root.parent).as_posix()
         for path in root.rglob("*.py")
         if ".write_text(" in path.read_text(encoding="utf-8")
     }
