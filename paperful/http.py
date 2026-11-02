@@ -9,7 +9,7 @@ Twenty, Ollama) pass ``guard=False``.
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, Literal, overload
 
 import httpx
 
@@ -79,6 +79,30 @@ def _backoff(attempt: int) -> float:
     base = 0.05 * (2**attempt)
     jitter = (time.time_ns() % 1000) / 1000 * base
     return base + jitter
+
+
+@overload
+def client(
+    *,
+    timeout: float | httpx.Timeout | None = ...,
+    follow_redirects: bool = ...,
+    headers: dict[str, str] | None = ...,
+    retries: Literal[0],
+    guard: bool = ...,
+    **kwargs: Any,
+) -> httpx.Client: ...
+
+
+@overload
+def client(
+    *,
+    timeout: float | httpx.Timeout | None = ...,
+    follow_redirects: bool = ...,
+    headers: dict[str, str] | None = ...,
+    retries: int = ...,
+    guard: bool = ...,
+    **kwargs: Any,
+) -> httpx.Client | _RetryClient: ...
 
 
 def client(

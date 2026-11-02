@@ -6,6 +6,10 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.8.2 — 2026-11-02
+
+- **Types.** A client built with `retries=0` stays an `httpx.Client` for the type checker. Grey probe status no longer reuses the candidate status name.
+
 ## 1.8.1 — 2026-11-02
 
 - **CLI config lookup.** `sr` and the other commands that call `_cfg` now resolve it when the command runs, so a patched config in tests is the one that is used. No operator-facing change.

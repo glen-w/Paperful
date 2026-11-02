@@ -199,8 +199,8 @@ def run_search(
         if do_probe:
             info = probe_url(str(probed.get("url") or ""), getter=probe_getter)
             kind = str(info.get("kind") or "")
-            status = int(info.get("status") or 0)
-            if status in {401, 403}:
+            http_status = int(info.get("status") or 0)
+            if http_status in {401, 403}:
                 probed["reason"] = "host_blocked"
                 if not probed.get("playbook") and probed.get("host"):
                     gap_hosts.add(str(probed["host"]))
