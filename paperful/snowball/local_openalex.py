@@ -260,7 +260,7 @@ def build_citing_sql(
 
 def works_root_from_glob(parquet_glob: str) -> str:
     """Derive the works directory from a parquet glob ending in ``**/*.parquet``."""
-    text = (parquet_glob or "").strip().rstrip("/")
+    text = (parquet_glob or "").strip().replace("\\", "/").rstrip("/")
     for suffix in ("/**/*.parquet", "/*.parquet", "/**/*", "/*"):
         if text.endswith(suffix):
             return text[: -len(suffix)]

@@ -206,8 +206,14 @@ def test_unlocked_database_is_opened_in_place_without_a_temp_copy(
 
 
 def test_library_in_a_folder_with_uri_special_characters_still_reads(tmp_path):
-    odd = tmp_path / "My Library #2 (100%?)"
-    odd.mkdir()
+    name = "My Library #2 (100%?)"
+    odd = tmp_path / name
+    try:
+        odd.mkdir()
+    except OSError:
+        # Windows paths cannot contain "?". "#" and "%" still exercise the URI.
+        odd = tmp_path / "My Library #2 (100%)"
+        odd.mkdir()
     enl = _library(odd, refs=[(1, "Odd path title", 0)])
     _e, _d, eni = library_paths(enl)
     conn = connect_readonly(eni)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from paperful import pipeline as pl
 from paperful.cookies import (
     cookies_for_playwright_inject,
@@ -402,7 +404,9 @@ def test_ensure_sessions_dir_chmod(cfg):
     d = ensure_sessions_dir(cfg)
     assert d.is_dir()
     mode = d.stat().st_mode & 0o777
-    assert mode == 0o700 or mode == 0o755  # umask may strip bits on some hosts
+    # Windows reports directories as 0o777; chmod cannot store Unix mode bits.
+    if os.name != "nt":
+        assert mode == 0o700 or mode == 0o755  # umask may strip bits on some hosts
     try:
         dump_profile_cookies(cfg)
         raise AssertionError("expected SessionError")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import os
 from collections.abc import Callable
 
 import httpx
@@ -13,6 +14,46 @@ from paperful.sources.base import Context
 from paperful.zot import Item
 
 PDF_BYTES = b"%PDF-1.4\n" + b"x" * 20_000 + b"\n%%EOF"
+
+
+def pytest_configure() -> None:
+    """Make Windows tests see the same paths and text Unix CI sees.
+
+    TOML basic strings treat ``\\U`` as a unicode escape, so ``C:\\Users\\...``
+    cannot be interpolated into ``config.toml``. Forward slashes are valid
+    paths and valid TOML. Source files are UTF-8; the Windows locale encoding
+    is not.
+    """
+    if os.name != "nt":
+        return
+    import pathlib
+
+    def _posix(self: pathlib.PurePath) -> str:
+        return self.as_posix()
+
+    pathlib.PurePath.__str__ = _posix  # type: ignore[method-assign]
+    pathlib.PureWindowsPath.__str__ = _posix  # type: ignore[method-assign]
+    pathlib.WindowsPath.__str__ = _posix  # type: ignore[method-assign]
+
+    read = pathlib.Path.read_text
+    write = pathlib.Path.write_text
+
+    def read_text(
+        self: pathlib.Path, encoding: str = "utf-8", errors: str | None = None
+    ) -> str:
+        return read(self, encoding=encoding, errors=errors)
+
+    def write_text(
+        self: pathlib.Path,
+        data: str,
+        encoding: str = "utf-8",
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> int:
+        return write(self, data, encoding=encoding, errors=errors, newline=newline)
+
+    pathlib.Path.read_text = read_text  # type: ignore[method-assign]
+    pathlib.Path.write_text = write_text  # type: ignore[method-assign]
 
 
 def pytest_collection_modifyitems(items):

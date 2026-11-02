@@ -109,6 +109,12 @@ def is_public_fetch_host(
     except ValueError:
         pass
 
+    # Decimal, hex, octal, and short dotted forms (127.1) are loopback on some
+    # resolvers and fail open on others. Decide from the literal, not DNS.
+    literal = _ipv4_literal(raw)
+    if literal is not None:
+        return not _ip_is_blocked(literal)
+
     if not resolve:
         return True
 
@@ -126,6 +132,43 @@ def is_public_fetch_host(
         except ValueError:
             continue
     return True
+
+
+def _ipv4_literal(host: str) -> ipaddress.IPv4Address | None:
+    """Parse a non-canonical IPv4 host, or None when ``host`` is a name."""
+    if host.startswith("0x"):
+        hexpart = host[2:]
+        if not hexpart or any(c not in "0123456789abcdef" for c in hexpart):
+            return None
+        value = int(hexpart, 16)
+        if value > 0xFFFFFFFF:
+            return None
+        return ipaddress.IPv4Address(value)
+    if host.isdigit():
+        try:
+            value = (
+                int(host, 8)
+                if host.startswith("0") and len(host) > 1
+                else int(host, 10)
+            )
+        except ValueError:
+            return None
+        if value > 0xFFFFFFFF:
+            return None
+        return ipaddress.IPv4Address(value)
+    parts = host.split(".")
+    if len(parts) not in {2, 3} or not all(part.isdigit() for part in parts):
+        return None
+    nums = [int(part, 10) for part in parts]
+    if any(n > 255 for n in nums[:-1]):
+        return None
+    rest_bits = 8 * (4 - len(nums))
+    if nums[-1] >= 1 << rest_bits:
+        return None
+    acc = 0
+    for n in nums[:-1]:
+        acc = (acc << 8) | n
+    return ipaddress.IPv4Address((acc << rest_bits) | nums[-1])
 
 
 def _resolve_host_ips(host: str) -> list[str]:

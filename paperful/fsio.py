@@ -6,6 +6,7 @@ import itertools
 import json
 import os
 import threading
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
@@ -22,14 +23,33 @@ def _part_path(path: Path) -> Path:
     return path.with_name(f"{path.name}.{tag}.part")
 
 
+def _replace(src: Path, dest: Path) -> None:
+    """Replace ``dest`` with ``src``. Retry when Windows still has the file open."""
+    delay = 0.02
+    last: BaseException | None = None
+    for _ in range(10):
+        try:
+            os.replace(src, dest)
+            return
+        except PermissionError as exc:
+            last = exc
+            time.sleep(delay)
+            delay = min(delay * 2, 0.2)
+    if last is not None:
+        raise last
+
+
 def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = _part_path(path)
     try:
         tmp.write_text(text, encoding=encoding)
-        os.replace(tmp, path)
+        _replace(tmp, path)
     finally:
-        tmp.unlink(missing_ok=True)
+        try:
+            tmp.unlink(missing_ok=True)
+        except PermissionError:
+            pass
 
 
 def atomic_write_bytes(path: Path, data: bytes) -> None:
@@ -37,9 +57,12 @@ def atomic_write_bytes(path: Path, data: bytes) -> None:
     tmp = _part_path(path)
     try:
         tmp.write_bytes(data)
-        os.replace(tmp, path)
+        _replace(tmp, path)
     finally:
-        tmp.unlink(missing_ok=True)
+        try:
+            tmp.unlink(missing_ok=True)
+        except PermissionError:
+            pass
 
 
 def atomic_write_json(path: Path, payload: Any, *, indent: int = 2) -> None:
@@ -94,6 +117,7 @@ def lock_path(state_dir: Path, name: str) -> Path:
 def file_lock(state_dir: Path, name: str, *, timeout: float = 120.0) -> Iterator[None]:
     """Cross-process lock under ``state/.locks/``."""
     path = lock_path(state_dir, name)
-    lock = FileLock(str(path), timeout=timeout)
+    # Windows filelock unlinks the lock file on release unless asked to keep it.
+    lock = FileLock(str(path), timeout=timeout, preserve_lock_file=True)
     with lock:
         yield

@@ -12,10 +12,23 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "release" / "pre_release.sh"
 
 
+def _bash() -> str:
+    """A real bash. On Windows, ``bash`` on PATH is often the WSL stub."""
+    if os.name == "nt":
+        for candidate in (
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+        ):
+            if Path(candidate).is_file():
+                return candidate
+    found = shutil.which("bash")
+    return found or "bash"
+
+
 def _run(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
     env = {"PAPERFUL_RELEASE_ROOT": str(root)}
     return subprocess.run(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
-        ["bash", str(SCRIPT), *args],  # noqa: S607 -- operator tool resolved via PATH on purpose
+        [_bash(), str(SCRIPT), *args],  # noqa: S607 -- Git bash on Windows, PATH bash elsewhere
         cwd=root,
         env={**os.environ, **env},
         capture_output=True,

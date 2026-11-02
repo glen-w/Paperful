@@ -151,6 +151,28 @@ def _same_bytes(a: Path, b: Path) -> bool:
         return False
 
 
+def _rename_in_place(src: Path, dest: Path) -> None:
+    """Rename ``src`` to ``dest``, including a case-only change.
+
+    Windows accepts ``ANALYSIS`` → ``Analysis`` and then keeps the old
+    spelling. A second rename through a temporary name stores the new one.
+    """
+    src.rename(dest)
+    try:
+        matches = [
+            path
+            for path in dest.parent.iterdir()
+            if path.name.casefold() == dest.name.casefold() and path.name != dest.name
+        ]
+    except OSError:
+        return
+    if not matches:
+        return
+    bridge = dest.parent / f"{dest.name}.paperful-case"
+    matches[0].rename(bridge)
+    bridge.rename(dest)
+
+
 def same_place(a: Path, b: Path) -> bool:
     """Two spellings of one directory.
 
@@ -230,7 +252,7 @@ def place_item_dirs(
         if here is not None and here != target:
             # Same folder, other spelling (a title recased). Take the new one.
             try:
-                here.rename(target)
+                _rename_in_place(here, target)
             except OSError:
                 pass
             index.move(item.key, here, target)
@@ -241,7 +263,7 @@ def place_item_dirs(
                 stale = left[0] if left else _trashed_folder(out_dir, item.key)
             if stale is not None:
                 target.parent.mkdir(parents=True, exist_ok=True)
-                stale.rename(target)
+                _rename_in_place(stale, target)
                 index.move(item.key, stale, target)
             else:
                 target.mkdir(parents=True, exist_ok=True)

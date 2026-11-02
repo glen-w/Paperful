@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 from pathlib import Path
 
@@ -548,7 +549,10 @@ def test_host_hello_unknown_and_install(tmp_path, monkeypatch):
     assert manifest["type"] == "stdio"
     assert manifest["allowed_extensions"] == ["addon@paperful.local"]
     script = (tmp_path / "capture" / "paperful-host").read_text(encoding="utf-8")
-    assert script.startswith("#!/bin/sh\nexec ")
+    if os.name == "nt":
+        assert script.startswith("@echo off")
+    else:
+        assert script.startswith("#!/bin/sh\nexec ")
     assert "--stdio" in script
     assert "shell" not in script
 

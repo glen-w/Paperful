@@ -6,6 +6,10 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.8.3 — 2026-11-02
+
+- **Windows CI.** Test configs write paths with forward slashes so TOML does not treat `\U` as an escape. Atomic replace retries when Windows still has the destination open. Obfuscated loopback hosts are blocked without DNS. A case-only folder rename keeps the PDF.
+
 ## 1.8.2 — 2026-11-02
 
 - **Types.** A client built with `retries=0` stays an `httpx.Client` for the type checker. Grey probe status no longer reuses the candidate status name.

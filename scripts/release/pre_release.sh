@@ -14,7 +14,11 @@ if [[ "${1:-}" == "--dist-only" ]]; then
 fi
 
 read_version() {
-  python3 - <<'PY'
+  local py=python3
+  if ! command -v python3 >/dev/null 2>&1; then
+    py=python
+  fi
+  "$py" - <<'PY'
 import tomllib
 from pathlib import Path
 print(tomllib.load(Path("pyproject.toml").open("rb"))["project"]["version"])

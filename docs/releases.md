@@ -1,6 +1,6 @@
 # Releases and stability
 
-**1.8.2** is the current release (`pipx install paperful` / `uv tool install paperful`
+**1.8.3** is the current release (`pipx install paperful` / `uv tool install paperful`
 after this tag is published; `pip install paperful` still works). Optional extras:
 `[browser]`, `[llm]`, `[rag]`, `[rag-docling]`, `[serve]`, `[browser-agent]`, `[openxml]`, `[network]`. **1.1.0** introduced PyPI and
 trusted publishing. For campus login and HTML PDF paths, install

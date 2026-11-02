@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -876,7 +877,8 @@ def test_write_resumable_cites_build_script(tmp_path: Path):
     assert "file=" in text
     assert "/mnt/works" in text
     assert "/mnt/cites" in text
-    assert Path(path).stat().st_mode & 0o111
+    if os.name != "nt":
+        assert Path(path).stat().st_mode & 0o111
 
 
 def test_store_from_config_cites_index_glob(tmp_path: Path):
