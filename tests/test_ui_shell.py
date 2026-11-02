@@ -56,12 +56,14 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert "/repair" not in wanted.text
     assert "/critique" not in wanted.text
     assert "/rewrite" not in wanted.text
+    assert "/stuff" not in wanted.text
     assert 'href="/index"' not in wanted.text
     client.cookies.set("pf_advanced", "1")
     res = client.get("/wanted")
     assert "/repair" in res.text
     assert "/critique" in res.text
     assert "/rewrite" in res.text
+    assert "/stuff" in res.text
     assert "/v1/ask" not in res.text
     assert client.get("/repair").status_code == 200
     critique = client.get("/critique")
@@ -71,6 +73,13 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert "Suggest edits" in rewrite.text
     assert "Run Critique first" in rewrite.text
     assert 'href="/critique"' in rewrite.text
+    stuff = client.get("/stuff")
+    assert stuff.status_code == 200
+    assert "Extra citations you already hold" in stuff.text
+    assert 'name="item_key"' in stuff.text
+    assert 'name="file"' in stuff.text
+    assert 'name="lane"' in stuff.text
+    assert ">Stuff</a>" in res.text
     assert "name=\"pack_dir\"" not in rewrite.text
     assert ">Rewrite</a>" not in res.text
     assert ">Suggest edits</a>" in res.text
@@ -510,6 +519,11 @@ def test_pages_include_beginner_help(tmp_path, monkeypatch):
     assert "Run Critique first" in rewrite.text
     assert "Turn a critique pack into tracked changes" in rewrite.text
 
+    stuff = client.get("/stuff")
+    assert stuff.status_code == 200
+    assert "no library write" in stuff.text
+    assert "paperful stuff" in stuff.text
+
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
@@ -594,6 +608,100 @@ def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
         assert seen[0]["grobid"] is True
     finally:
         jobs.critique_fn = None
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_stuff_workbench_item_or_file(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    from paperful.ui import jobs
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.rag_enabled = True
+    monkeypatch.setattr(ops, "doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        ops,
+        "collections_tree",
+        lambda _cfg: {"ok": True, "collections": []},
+    )
+    seen: list[dict] = []
+
+    def fake(cfg, cmd_id, **kw):
+        seen.append(kw)
+        return {
+            "ok": True,
+            "pack_dir": str(tmp_path / "pack"),
+            "stuff_id": "file-draft",
+            "counts": {"units": 2, "hits": 4, "skips": 0, "unique_sources": 1},
+            "units": 2,
+            "lane": kw.get("lane") or "manuscript",
+        }
+
+    jobs.stuff_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        client.cookies.set("pf_advanced", "1")
+        page = client.get("/stuff")
+        assert page.status_code == 200
+        assert 'name="lane"' in page.text
+        assert 'value="manuscript"' in page.text
+        assert 'value="outline"' in page.text
+        assert 'name="k"' in page.text
+        assert "Write child note" not in page.text
+        assert 'name="apply"' not in page.text
+        empty = client.post("/stuff", data={}, follow_redirects=False)
+        assert empty.status_code == 303
+        assert "error=target" in (empty.headers.get("location") or "")
+        res = client.post(
+            "/stuff",
+            data={"lane": "outline", "k": "2"},
+            files={
+                "file": (
+                    "draft.md",
+                    b"Coastal states must consult on BBNJ area-based tools.",
+                    "text/markdown",
+                )
+            },
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        loc = res.headers.get("location") or ""
+        assert "run=" in loc
+        deadline = time.time() + 3.0
+        rec = {}
+        cmd_id = loc.split("run=")[1].split("&")[0]
+        while time.time() < deadline:
+            rec = client.get(f"/v1/runs/{cmd_id}").json()
+            if rec.get("status") in {"done", "failed"}:
+                break
+            time.sleep(0.02)
+        assert rec.get("status") == "done", rec
+        assert seen
+        assert seen[0]["lane"] == "outline"
+        assert seen[0]["k"] == 2
+        assert seen[0]["item_key"] == ""
+        assert seen[0]["staged_path"] is not None
+        both = client.post(
+            "/stuff",
+            data={"item_key": "ABCD1234", "lane": "manuscript"},
+            files={
+                "file": ("draft.md", b"hello", "text/markdown"),
+            },
+            follow_redirects=False,
+        )
+        assert both.status_code == 303
+        assert "error=target" in (both.headers.get("location") or "")
+        jail = client.get(
+            "/stuff/download/pack.md",
+            params={"pack_dir": "/tmp"},
+            follow_redirects=False,
+        )
+        assert jail.status_code in {303, 307, 302}
+    finally:
+        jobs.stuff_fn = None
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")

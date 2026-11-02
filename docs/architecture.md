@@ -146,6 +146,7 @@ flowchart LR
 | `state/gui/uploads/` | Workbench uploads (Discover import, Index prompt/questions files); basename only |
 | `state/critiques/<id>/<stamp>/` | `critique` pack (`paperful.critique.pack.v1`, `pack.md`: findings, metrics, optional reviewer notes). `<id>` is a library item key or `file-<filename-stem>` for uploads. Dismissals: `state/critiques/<id>/dismissed.jsonl`. Uploads: `state/critiques/uploads/` |
 | `state/rewrites/<id>/<stamp>/` | `rewrite` pack (`paperful.rewrite.pack.v1`, `plan.json` `paperful.rewrite.plan.v1`, optional sidecar / `tracked.docx` / `.pptx` / `.odt` / `.pdf`). Never overwrites the source manuscript |
+| `state/stuff/<id>/<stamp>/` | `stuff` pack (`paperful.stuff.pack.v1`, `pack.md`). Extra library cites per claim. No manager writes |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
 | `state/reports/<slug>-authors.json` | `authors --apply` creator frequency (`paperful.authors_report.v1`); seeds proposed field packs |
 | `state/author-packs/` | Proposed / promoted field author packs (`paperful.author_pack.v1`). From `authors --apply`, snowball preflight, or `twenty lookup --apply` |

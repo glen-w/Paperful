@@ -67,6 +67,7 @@ def test_discover_handlers_are_module_level():
         ("shell_routes", "handle_page_library", "register_shell"),
         ("repair_routes", "handle_page_repair", "register_repair"),
         ("critique_routes", "handle_page_critique", "register_critique"),
+        ("stuff_routes", "handle_page_stuff", "register_stuff"),
     ],
 )
 def test_desk_handlers_are_module_level(mod_name, handle, register):
@@ -90,6 +91,7 @@ def test_mount_ui_has_no_inline_wanted_or_discover_routes():
     assert "register_repair" in src
     assert "register_shell" in src
     assert "register_critique" in src
+    assert "register_stuff" in src
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
@@ -165,6 +167,9 @@ def test_post_smokes_per_family(tmp_path, monkeypatch):
     assert res.status_code < 500
 
     res = client.post("/rewrite", data={}, follow_redirects=False)
+    assert res.status_code < 500
+
+    res = client.post("/stuff", data={}, follow_redirects=False)
     assert res.status_code < 500
 
 

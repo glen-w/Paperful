@@ -216,6 +216,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     from .shell_routes import register_shell
     from .critique_routes import register_critique
     from .rewrite_routes import register_rewrite
+    from .stuff_routes import register_stuff
 
     templates = Jinja2Templates(directory=str(_ui_dir() / "templates"))
     static_dir = _ui_dir() / "static"
@@ -228,3 +229,4 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     register_index(ui)
     register_critique(ui)
     register_rewrite(ui)
+    register_stuff(ui)

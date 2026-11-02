@@ -33,7 +33,7 @@ Three jobs sit on the default nav:
 | **Ask** | `ask`, `ask --from-file` | Cited answers from PDFs already copied to disk (`simple` / `advanced`; needs `[rag]` + `[llm]` and an index) |
 
 **Library**, **Activity**, and **System** support the loop. **Repair**, **Mirror**,
-**Index** (ingest / search / extract), **Briefs**, **Critique**, **Suggest edits**, and **Settings** appear only
+**Index** (ingest / search / extract), **Briefs**, **Critique**, **Suggest edits**, **Stuff**, and **Settings** appear only
 when **Advanced** is on (reveal only; does not enable Scholar, Sci-Hub, or LLM).
 
 ```text
@@ -213,6 +213,11 @@ area/output/comments controls. Writes `state/rewrites/` (edit plan, optional
 sidecar, tracked-changes Word / OpenDocument / PDF). Never overwrites the source. Empty state:
 **Run Critique first**. Style glossary/Vale swaps run with `[llm]` off. See
 [rewrite.md](rewrite.md).
+**Stuff** (Advanced; `/stuff`, CLI `paperful stuff`): pick a collection item
+**or** drop a draft. Extra library cites per sentence (`manuscript`) or
+outline section. Writes `state/stuff/` (`pack.md` / `pack.json`). Needs
+`[rag]` and a built index; does **not** need `[llm]`. Never writes Zotero.
+`--apply` stays later. See [stuff.md](stuff.md).
 
 **Stays CLI** (no GUI control): `session login`, `doctor --guide`, mid-run
 EZProxy re-login, snowball `approve-each`, `collections add`, Sci-Hub source
@@ -307,6 +312,9 @@ are mounted by `paperful.ui` (`mount_ui`).
 | GET | `/rewrite` | Advanced Suggest edits: recent critique packs, optional draft, area/output/comments; empty state Run Critique first |
 | POST | `/rewrite` | Enqueue `rewrite` for a pack (optional staged `--file`); redirect `?run=` |
 | GET | `/rewrite/download/{name}` | Download `pack.md` / `plan.json` / sidecar / `tracked.docx` / `.pptx` / `.odt` / `.pdf` from `state/rewrites/` |
+| GET | `/stuff` | Advanced Stuff: item picker, upload, lane/k, last pack |
+| POST | `/stuff` | Enqueue `stuff` for `--item` or a staged `--file`; redirect `?run=` |
+| GET | `/stuff/download/{name}` | Download `pack.md` / `pack.json` from `state/stuff/` |
 | POST | `/repair/preview` | Dry-run repair verb + review token |
 | POST | `/repair/apply` | Consume token; apply repair verb |
 | POST | `/mirror/preview` | Dry-run mirror verb + review token |

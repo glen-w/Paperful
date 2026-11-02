@@ -1379,7 +1379,7 @@ as `[summarize].model`, `[browser_agent].model`, `[rag].model`).
    the embedding model is unavailable, or the index is behind the mirror.
 7. **Per-claim extra citations (`stuff`)** — **Shipped (CLI pack):** batch
    `rag search` over manuscript sentences or outline sections; no Ask
-   narrative. Workbench / `--apply` still later. Detail:
+   narrative. Workbench **shipped**; `--apply` still later. Detail:
    [`stuff`](#stuff-later-extra-citations-from-the-library).
 
 **Non-goals for this lane:** replacing Zotero’s reader; cloud-default RAG;
@@ -1396,8 +1396,8 @@ the evidence-linked Q&A layer. `stuff` is the writing-side reuse of `rag search`
 (stuff-later-extra-citations-from-the-library)=
 ### `stuff` (CLI pack shipped; workbench later)
 
-**Status:** CLI pack shipped (`paperful stuff`, [stuff.md](stuff.md)).
-Workbench and `--apply` stay later. Needs `[rag].enabled` and a built
+**Status:** CLI pack and Advanced workbench shipped (`paperful stuff`,
+[stuff.md](stuff.md), [gui.md](gui.md)). `--apply` stays later. Needs `[rag].enabled` and a built
 index. Does **not** need `[llm]` or Ask: no reviewer note, no grounded
 paragraph, no claim rewrite.
 
@@ -1424,8 +1424,8 @@ of the reference section.
    quote, locator, up to `k` hits. Fail closed when the index is missing
    or empty. Zero manager writes. `--format json` → `paperful.agent.json.v1`.
    Read-only MCP tool `stuff`.
-2. **Workbench** — Advanced sibling of Critique: pick item or upload,
-   background job, download pack.md. Not on the default nav.
+2. **Workbench** — **Shipped.** Advanced sibling of Critique: pick item or
+   upload, background job, download pack.md. Not on the default nav.
 3. **Later (parked until the pack is boring)** — optional `--apply` child
    note on the item; stance labels (supports / contrasts / mentions);
    auto-insert into the manuscript. Those are writing-product bets, not
@@ -2322,5 +2322,5 @@ that page when Advanced is on. **Index** (Advanced) runs `rag ingest`,
 `summarize` and `synthesize`. CLI `ask` remains for scripts, TTY multi-turn,
 `--ask-mode`, and run profiles.
 See [Zotero-RAG integration](#zotero-rag-integration-later-question-centric-layer).
-Later: Advanced **Stuff** as a Critique sibling — per-sentence `rag search`,
-no Ask chat ([`stuff`](#stuff-later-extra-citations-from-the-library)).
+**Stuff** (Advanced, shipped): per-sentence `rag search`, no Ask chat
+([`stuff`](#stuff-later-extra-citations-from-the-library)). `--apply` stays later.

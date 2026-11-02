@@ -79,8 +79,15 @@ See [config.md](config.md).
 - Not `ask` (no grounded paragraph).
 - Not [`refs gap`](commands.md) (cited-in-PDF works you do not own).
 - Not `precedent` (no OpenAlex / public-metadata-only rows).
-- Not auto-insert into the manuscript. `--apply`, stance labels, and the
-  workbench page stay later.
+- Not auto-insert into the manuscript. `--apply` and stance labels stay later.
+
+## Workbench
+
+Advanced **Stuff** (next to Suggest edits; CLI is still `paperful stuff`):
+pick a library item **or** upload a draft, choose lane (`manuscript` /
+`outline`) and `k`, download `pack.md`. Needs `[rag]` and a built index.
+Does not need `[llm]`. Never writes Zotero. Uploads stay under
+`state/critiques/uploads/` like Critique.
 
 Read-only MCP tool `stuff` (`item` or `file`, `lane`, `k`, `collection`)
 returns the same envelope as `--format json`.

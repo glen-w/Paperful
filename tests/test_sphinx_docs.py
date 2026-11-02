@@ -92,6 +92,7 @@ def test_gui_md_documents_discover_and_wanted_routes():
         "/repair/preview",
         "/critique",
         "/rewrite",
+        "/stuff",
         "/mirror/apply",
         "/briefs/summarize",
         "/ask",

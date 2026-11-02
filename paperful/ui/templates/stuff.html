@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% from "_help.html" import info %}
+{% from "_job_status.html" import job_status %}
+{% block title %}Stuff — Paperful{% endblock %}
+{% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
+{% block content %}
+<h1>Stuff</h1>
+<p class="page-lede">Extra citations you already hold, one row per sentence or outline section. Same retriever as <code>paperful rag search</code>. No Ask narrative, no invented BibTeX, and no library write. Writes <code>state/stuff/</code>. CLI is <code>paperful stuff</code>.</p>
+<p class="section-lede">{{ honesty }}</p>
+{% if error_code == 'target' %}<div class="error-banner">Pick a library item <em>or</em> upload a file, not both and not neither.</div>{% endif %}
+{% if error_code == 'format' %}<div class="error-banner">That file type is not supported. Use pdf, txt, md, html, rtf, docx, odt, pptx (legacy .doc needs a converter on PATH).</div>{% endif %}
+{% if error_code == 'size' %}<div class="error-banner">The upload is larger than 40 MB.</div>{% endif %}
+{% if error_code == 'rag' %}<div class="error-banner">Turn on [rag] in config.toml and build the local PDF index first.</div>{% endif %}
+{% if error_code == 'lane' %}<div class="error-banner">Lane must be manuscript or outline.</div>{% endif %}
+{% if error_code == 'k' %}<div class="error-banner">k must be a positive integer (capped by [rag].top_k).</div>{% endif %}
+{% if error and error_code not in ('target', 'format', 'size', 'rag', 'lane', 'k') %}<div class="error-banner">{{ error }}</div>{% endif %}
+{% if not rag_on %}<div class="error-banner">[rag] is off. Stuff needs a built local index. It does not need [llm].</div>{% endif %}
+{% if rag_on and not can_search %}<div class="error-banner">The local PDF index is empty or unavailable. Build it on Advanced Index, or run <code>paperful rag ingest</code>.</div>{% endif %}
+
+{{ job_status(run_rec, 'Stuff') }}
+
+<section class="panel">
+  <h2>Library item</h2>
+  <p class="section-lede">Scope follows the collection chip. The source item is never listed as a hit for itself.</p>
+  <form method="post" action="/stuff" class="toolbar" enctype="multipart/form-data">
+    <label>Item {{ info("A paper already mirrored under out/. --item on the CLI.") }}
+      <select name="item_key">
+        <option value="">Choose an item</option>
+        {% for it in items %}
+        <option value="{{ it.key }}">{{ it.title }}{% if it.year %} ({{ it.year }}){% endif %} — {{ it.key }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Lane {{ info("manuscript = sentences; outline = section queries. --lane on the CLI.") }}
+      <select name="lane">
+        {% for lane in stuff_lanes %}
+        <option value="{{ lane }}"{% if lane == stuff_lane %} selected{% endif %}>{{ lane }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>k {{ info("Hits per claim. Default [stuff].k, capped by [rag].top_k.") }}
+      <input type="number" name="k" min="1" value="{{ stuff_k }}">
+    </label>
+    <button type="submit">Stuff item</button>
+    {{ info("Writes state/stuff/<item-key>/<stamp>/pack.json and pack.md. Does not fetch, attach, or write Zotero.") }}
+  </form>
+  {% if not items %}
+  <p class="section-lede">No items in the current collection chip. Set a collection on Library, or upload a draft below.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Upload a draft</h2>
+  <p class="section-lede">Drop a manuscript you have not imported. The copy stays under <code>state/critiques/uploads/</code>. Hits come from the collection chip’s index, not from the upload.</p>
+  <form method="post" action="/stuff" class="toolbar" enctype="multipart/form-data">
+    <label class="drop-zone">Drop a draft (pdf, docx, odt, html, rtf, txt, md, pptx) or choose a file
+      <input type="file" name="file" accept="{{ accept }}">
+    </label>
+    <label>Lane {{ info("manuscript = sentences; outline = section queries.") }}
+      <select name="lane">
+        {% for lane in stuff_lanes %}
+        <option value="{{ lane }}"{% if lane == stuff_lane %} selected{% endif %}>{{ lane }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>k {{ info("Hits per claim. Default [stuff].k.") }}
+      <input type="number" name="k" min="1" value="{{ stuff_k }}">
+    </label>
+    <button type="submit">Stuff file</button>
+    {{ info("Same as --file. Collection chip is the search scope.") }}
+  </form>
+</section>
+
+{% if result and result.counts %}
+<section class="panel">
+  <h2>This pack</h2>
+  <p>Units: {{ result.units or result.counts.units or 0 }}
+    · hits: {{ result.counts.hits or 0 }}
+    · unique: {{ result.counts.unique_sources or 0 }}
+    · skips: {{ result.counts.skips or 0 }}
+    {% if result.stuff_id %}· id <code>{{ result.stuff_id }}</code>{% endif %}
+    {% if result.lane %}· {{ result.lane }}{% endif %}
+  </p>
+  {% if downloads %}
+  <p>
+    {% for f in downloads %}
+    <a href="/stuff/download/{{ f.name }}?pack_dir={{ result.pack_dir }}">{{ f.name }}</a>{% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
+  {% if pack_md %}
+  <pre class="pack-md">{{ pack_md }}</pre>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if recent %}
+<section class="panel">
+  <h2>Recent packs</h2>
+  <p class="section-lede">On disk under <code>state/stuff/</code>. Similarity is not proof the source supports the claim.</p>
+  <table class="wb-table">
+    <thead><tr><th>Title</th><th>Id</th><th>Units</th><th>Stamp</th></tr></thead>
+    <tbody>
+    {% for row in recent %}
+      <tr>
+        <td>{{ row.title }}</td>
+        <td><code>{{ row.stuff_id }}</code></td>
+        <td>{{ row.units }}</td>
+        <td>{{ row.stamp }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

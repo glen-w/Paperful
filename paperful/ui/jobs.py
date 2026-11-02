@@ -33,6 +33,7 @@ summarize_fn: Callable[..., dict[str, Any]] | None = None
 synthesize_fn: Callable[..., dict[str, Any]] | None = None
 critique_fn: Callable[..., dict[str, Any]] | None = None
 rewrite_fn: Callable[..., dict[str, Any]] | None = None
+stuff_fn: Callable[..., dict[str, Any]] | None = None
 noop_sleep: float = 0.05
 
 from .index_jobs import (
@@ -750,6 +751,198 @@ def rewrite(
             "counts": counts,
             "edits": counts.get("edits", 0),
             "skips": counts.get("skips", 0),
+        },
+    )
+
+
+def stuff(
+    cfg: Config,
+    cmd_id: str,
+    *,
+    item_key: str = "",
+    staged_path: Any | None = None,
+    collection: str = "",
+    lane: str | None = None,
+    k: int | None = None,
+) -> None:
+    if stuff_fn is not None:
+        result = stuff_fn(
+            cfg,
+            cmd_id,
+            item_key=item_key,
+            staged_path=staged_path,
+            collection=collection,
+            lane=lane,
+            k=k,
+        )
+        if result is not None:
+            _attach_result(cfg, cmd_id, result)
+        return
+    from pathlib import Path
+
+    from ..critique_extract import ExtractError, extract_path
+    from ..lint import resolve_pdf_path
+    from ..llm.validate import LlmConfigError
+    from ..rag.index import (
+        Index,
+        IndexMismatch,
+        IndexMissing,
+        RagUnavailable,
+        ledger_path,
+    )
+    from ..rag.ledger import Ledger
+    from ..rag.retrieve import scope_keys
+    from ..rag.retrieve import search as rag_search
+    from ..store import Manifest
+    from ..stuff import (
+        collect_pack,
+        pack_payload,
+        resolve_k,
+        resolve_lane,
+        stuff_id,
+        write_pack,
+    )
+
+    rec = commands.read_command(cfg, cmd_id) or {}
+
+    def fail(msg: str) -> None:
+        row = commands.read_command(cfg, cmd_id) or rec
+        row["status"] = "failed"
+        row["error"] = msg
+        commands.write_command(cfg, row)
+
+    def on_status(msg: str) -> None:
+        row = commands.read_command(cfg, cmd_id) or {}
+        row["detail"] = msg
+        commands.write_command(cfg, row)
+
+    if not cfg.rag_enabled:
+        fail("Turn on [rag] in config.toml.")
+        return
+    try:
+        lane_id = resolve_lane(cfg, lane)
+        per_k = resolve_k(cfg, k)
+    except ValueError as exc:
+        fail(str(exc))
+        return
+    target = None
+    src: Path | None = Path(staged_path) if staged_path else None
+    kind = "file"
+    key = (item_key or "").strip()
+    coll = (collection or "").strip()
+    title = ""
+    if key:
+        kind = "item"
+        items, _manifest = _load_scope_items(cfg, coll)
+        target = next((it for it in items if it.key == key), None)
+        if target is None:
+            try:
+                from ..catalogue import open_library
+                from ..scope import load_scope
+
+                backend = open_library(cfg)
+                loaded = load_scope(
+                    backend, collections=[], library=True, item_keys=[key]
+                )
+                items = loaded.items
+                target = items[0] if items else None
+            except Exception:
+                target = None
+        if target is None:
+            fail("item not in the mirror / scope")
+            return
+        key = target.key
+        title = target.title or target.key
+        manifest = Manifest(cfg.manifest_path)
+        src = resolve_pdf_path(cfg, target, manifest)
+        if src is None:
+            fail(f"No PDF on disk for {key}.")
+            return
+    elif src is None or not src.is_file():
+        fail("Pick a library item or upload a file.")
+        return
+    else:
+        title = src.name
+
+    try:
+        from ..llm import validate_embedder
+
+        embedder = validate_embedder(cfg)
+        index, ledger = Index.open(cfg), Ledger(ledger_path(cfg))
+    except (LlmConfigError, RagUnavailable, IndexMissing, IndexMismatch) as exc:
+        fail(str(exc))
+        return
+    if int(index.count() or 0) <= 0:
+        fail("RAG index is empty — paperful rag ingest")
+        return
+    collections = [coll] if coll else None
+    keys = scope_keys(ledger, collections=collections)
+    scope = coll or "index"
+    cid = stuff_id(
+        kind=kind,
+        item_key=key if kind == "item" else "",
+        original_name=src.name if kind == "file" else "",
+    )
+    try:
+        on_status(f"Extracting {src.name}…")
+        doc = extract_path(src)
+        on_status(
+            f"Extracted {len((doc.text or '').split()):,} words "
+            f"({doc.format or 'unknown'})"
+        )
+
+        def search_fn(query: str, *, k: int, keys: set[str] | None) -> list[Any]:
+            return rag_search(
+                cfg,
+                query,
+                k=k,
+                keys=keys,
+                embedder=embedder,
+                index=index,
+                ledger=ledger,
+            )
+
+        rows, skips, outline = collect_pack(
+            cfg,
+            doc,
+            lane=lane_id,
+            k=per_k,
+            keys=keys,
+            exclude_key=key if kind == "item" else "",
+            search_fn=search_fn,
+            on_status=on_status,
+        )
+    except (ExtractError, ValueError) as exc:
+        fail(str(exc))
+        return
+    inp = {
+        "kind": kind,
+        "item_key": key if kind == "item" else "",
+        "path": str(src),
+        "title": title,
+        "format": doc.format,
+    }
+    payload = pack_payload(
+        cid=cid,
+        scope=scope,
+        lane=lane_id,
+        k=per_k,
+        inp=inp,
+        rows=rows,
+        skips=skips,
+        ledger=outline,
+    )
+    folder = write_pack(cfg, payload)
+    counts = payload.get("counts") or {}
+    _attach_result(
+        cfg,
+        cmd_id,
+        {
+            "pack_dir": str(folder),
+            "stuff_id": cid,
+            "counts": counts,
+            "units": counts.get("units", 0),
+            "lane": lane_id,
         },
     )
 

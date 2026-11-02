@@ -345,3 +345,41 @@ def test_cli_file_writes_pack(cfg, tmp_path, monkeypatch):
     md = packs[0].with_name("pack.md").read_text(encoding="utf-8")
     assert "Stuff pack" in md
     assert HONESTY_BANNER.split(".")[0] in md
+
+
+def test_list_recent_stuff_and_markdown_jail(tmp_path):
+    from paperful.ui.ask_rows import list_recent_stuff, stuff_pack_markdown
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    folder = cfg.state_dir / "stuff" / "file-draft" / "20261102T000000Z"
+    folder.mkdir(parents=True)
+    (folder / "pack.json").write_text(
+        '{"input": {"title": "Draft"}, "counts": {"units": 3}}',
+        encoding="utf-8",
+    )
+    (folder / "pack.md").write_text("# Stuff pack\n", encoding="utf-8")
+    rows = list_recent_stuff(cfg)
+    assert len(rows) == 1
+    assert rows[0]["stuff_id"] == "file-draft"
+    assert rows[0]["units"] == 3
+    assert stuff_pack_markdown(cfg, str(folder)).startswith("# Stuff pack")
+    assert stuff_pack_markdown(cfg, str(tmp_path / "other")) == ""
+
+
+def test_jobs_stuff_fails_when_rag_off(tmp_path):
+    from paperful.ui import commands, jobs
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.rag_enabled = False
+    rec = {
+        "id": "abc123def456",
+        "verb": "stuff",
+        "status": "running",
+        "args": {},
+    }
+    commands.write_command(cfg, rec)
+    jobs.stuff(cfg, rec["id"], item_key="", staged_path=None, collection="")
+    out = commands.read_command(cfg, rec["id"]) or {}
+    assert out.get("status") == "failed"
+    assert "[rag]" in (out.get("error") or "")
