@@ -7,6 +7,7 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -15,23 +16,42 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --group dev
-      # Curated gate: undefined names + high-signal security rules that are clean today.
-      # Broader ruff (full E/F/S) is still noisy; expand selects deliberately.
       - run: uv run ruff check paperful tests
+      - run: uv run ruff format --check paperful tests
+      - run: uv run mypy
 
-  suite:
+  audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+      - run: uv sync --group dev
+      - run: uv pip install pip-audit
+      - run: uv run pip-audit
+
+  suite:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python }}
       - run: uv sync --group dev --extra serve
-      - run: uv run pytest -m "not docs" --cov=paperful --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=0
+      - run: uv run pytest -m "not docs" --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,::1,localhost --cov=paperful --cov-report=term-missing --cov-report=json:coverage.json
       - name: Upload coverage report
-        if: success()
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.11'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-json
@@ -41,6 +61,7 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Build local image
@@ -48,13 +69,9 @@ jobs:
       - name: Compose config
         run: docker compose config >/dev/null
       - name: Smoke help and doctor without Zotero
-        # Compose-first claim: this job is the proof, not pytest-only.
-        # No live Zotero on the runner → doctor exit 2 (Zotero row red).
-        # Must not fail the workflow solely because the API is missing.
         run: |
           data="$(mktemp -d)"
           out="$(mktemp -d)"
-          # Image runs as uid 1000; mktemp is 0700 for the runner uid — open the mounts.
           chmod 0777 "$data" "$out"
           cp config.example.toml "$data/config.toml"
           export PAPERFUL_DATA="$data"

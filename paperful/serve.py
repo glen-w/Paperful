@@ -74,6 +74,9 @@ def create_app(cfg: Config) -> Any:
         )
 
     from .ui.app import mount_ui
+    from .ui.origin_guard import OriginGuardMiddleware
+
+    app.add_middleware(OriginGuardMiddleware)
 
     mount_ui(app, cfg)
 

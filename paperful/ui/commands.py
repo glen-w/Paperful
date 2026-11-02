@@ -11,11 +11,17 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable
 
+import logging
+
 from ..config import Config
+
+log = logging.getLogger(__name__)
 
 TERMINAL_STATUSES = frozenset({"done", "failed"})
 # secrets.token_urlsafe charset; reject path separators / traversal.
 _REVIEW_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
+
+MAX_QUEUED_JOBS = 20
 
 _watch_lock = threading.Lock()
 _watch_cond = threading.Condition(_watch_lock)
@@ -132,7 +138,7 @@ def _worker_loop() -> None:
         try:
             fn()
         except Exception:
-            pass
+            log.exception("GUI job worker failed for %s", cmd_id)
 
 
 def enqueue(
@@ -157,6 +163,10 @@ def enqueue(
     if args:
         record["args"] = args
     write_command(cfg, record)
+
+    with _queue_cond:
+        if len(_queue) >= MAX_QUEUED_JOBS:
+            raise RuntimeError(f"too many queued jobs (max {MAX_QUEUED_JOBS})")
 
     def _run() -> None:
         rec = read_command(cfg, cmd_id) or record

@@ -334,6 +334,20 @@ glossary_app = typer.Typer(
 )
 app.add_typer(glossary_app, name="glossary")
 
+config_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Validate config.toml keys and secret placement.",
+)
+app.add_typer(config_app, name="config")
+
+sr_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Systematic review protocol and screening (local; no scheduler).",
+)
+app.add_typer(sr_app, name="sr")
+
 # Canonical top-level verbs. tests/test_cli.py asserts this matches `paperful --help`.
 JOBS: dict[str, tuple[str, ...]] = {
     "library": (
@@ -380,6 +394,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "coverage",
         "precedent",
         "stuff",
+        "sr",
         "acronyms",
         "glossary",
         "authors",
@@ -389,6 +404,7 @@ JOBS: dict[str, tuple[str, ...]] = {
     "mirror": ("sync", "snapshot", "restore", "cache"),
     "control": (
         "doctor",
+        "config",
         "session",
         "mirrors",
         "ezproxy",
@@ -884,6 +900,70 @@ def doctor(
         probe=probe,
         as_json=as_json,
     )
+
+
+@config_app.command("check")
+def config_check(
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Report unknown config.toml keys and secrets that belong in the environment."""
+    from .sr_cmd import run_config_check
+
+    cfg = _cfg(config)
+    raise typer.Exit(run_config_check(cfg, config))
+
+
+@sr_app.command("init")
+def sr_init(
+    slug: str = typer.Option(..., "--slug", "-s", help="Review id (folder under state/sr/)"),
+    title: str = typer.Option("", "--title", help="Short review title"),
+    question: str = typer.Option("", "--question", "-q", help="Review question"),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Create or overwrite a review protocol under state/sr/<slug>/."""
+    from .sr_cmd import run_sr_init
+
+    cfg = _cfg(config)
+    raise typer.Exit(run_sr_init(cfg, slug=slug, title=title, question=question))
+
+
+@sr_app.command("screen")
+def sr_screen(
+    slug: str = typer.Option(..., "--slug", "-s"),
+    identity: str = typer.Option(
+        ..., "--identity", "-i", help="Work identity (OpenAlex id or DOI)"
+    ),
+    decision: str = typer.Option(..., "--decision", "-d", help="include | exclude | maybe"),
+    reason: str = typer.Option("", "--reason", "-r", help="Reason code or note"),
+    reviewer: str = typer.Option("", "--reviewer", help="Reviewer id (default operator)"),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Append one screening decision to the review ledger."""
+    from .sr_cmd import run_sr_screen
+
+    cfg = _cfg(config)
+    raise typer.Exit(
+        run_sr_screen(
+            cfg,
+            slug=slug,
+            identity=identity,
+            decision=decision,
+            reason=reason,
+            reviewer=reviewer,
+        )
+    )
+
+
+@sr_app.command("status")
+def sr_status(
+    slug: str = typer.Option(..., "--slug", "-s"),
+    config: Path | None = ConfigOpt,
+) -> None:
+    """Show protocol summary and screening counts."""
+    from .sr_cmd import run_sr_status
+
+    cfg = _cfg(config)
+    raise typer.Exit(run_sr_status(cfg, slug=slug))
 
 
 @collections_app.callback(invoke_without_command=True)

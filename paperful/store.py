@@ -465,12 +465,9 @@ def record_path(item_dir: Path) -> Path:
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".part")
-    tmp.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    os.replace(tmp, path)
+    from .fsio import atomic_write_json
+
+    atomic_write_json(path, payload)
 
 
 def load_json(path: Path) -> dict[str, Any] | None:

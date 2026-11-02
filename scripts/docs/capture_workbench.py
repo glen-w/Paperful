@@ -281,7 +281,8 @@ def main() -> None:
         _ready(page)
         _shot(page, "activity.png")
 
-        page.goto(f"{BASE}/system", wait_until="domcontentloaded")
+        # System runs doctor (network probes) on a cold cache; allow longer.
+        page.goto(f"{BASE}/system", wait_until="domcontentloaded", timeout=180_000)
         _ready(page)
         _redact_emails(page)
         _shot(page, "system.png")

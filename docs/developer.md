@@ -308,9 +308,9 @@ serve` on Ubuntu, then runs three jobs:
   this job.
 - **docker** (required): Compose image, `paperful --help`, and `paperful doctor`
   without Zotero (exit 2).
-- **suite** (advisory): full `pytest -m "not docs"` with coverage. It does not
-  fail the workflow. Coverage uploads when the suite is green; Actions overrides
-  the local 80% `fail_under` with `--cov-fail-under=0`.
+- **suite** (required): full `pytest -m "not docs"` with coverage on Ubuntu,
+  macOS, and Windows (Python 3.10–3.13). Coverage uploads from the Ubuntu 3.11
+  cell when green. Local gate: `fail_under = 80` in `pyproject.toml`.
 
 Reproduce the required gate with `uv run pytest -m smoke`. The full local suite
 is still `uv run pytest` (80% coverage gate in `pyproject.toml`).

@@ -39,6 +39,8 @@ test:
 
 lint:
 	uv run ruff check paperful tests
+	uv run ruff format --check paperful tests
+	uv run mypy
 
 docker-build:
 	docker compose build

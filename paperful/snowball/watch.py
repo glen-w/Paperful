@@ -31,7 +31,7 @@ from .openalex_epoch import EPOCH_AFTER, TOPIC_MIGRATION, predates_migration
 from .profile import load_profile, request_from_profile
 from .prisma import prisma_counts
 from .queue import load_queue
-from .response_cache import classify_rows
+from .response_cache import classify_drift
 
 SCHEMA = "paperful.snowball.watch.v1"
 TAG = "paperful-snowball"
@@ -626,7 +626,7 @@ def run_watch(
         rows = []
 
     seen = load_seen(cfg, name)
-    drift = classify_rows(watch_dir(cfg, name), rows)
+    drift = classify_drift(watch_dir(cfg, name), rows)
     if is_baseline:
         for row in rows:
             key = row.identity

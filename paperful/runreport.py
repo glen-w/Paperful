@@ -459,10 +459,12 @@ def write_run_report(
         stamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         cmd = str(report.get("command") or "run")
         path = runs_dir / f"{stamp}-{cmd}.json"
+        from .fsio import atomic_write_text
+
         text = json.dumps(report, indent=2, ensure_ascii=False)
-        path.write_text(text)
+        atomic_write_text(path, text)
         if as_last_run:
-            (cfg.state_dir / "last-run.json").write_text(text)
+            atomic_write_text(cfg.state_dir / "last-run.json", text)
         from .pack import note_pack_step
 
         note_pack_step(cfg, report, path)

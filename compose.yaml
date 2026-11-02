@@ -34,6 +34,7 @@ services:
     ports:
       # Localhost only (no LAN). Same workbench as host `paperful serve`.
       - "127.0.0.1:8765:8765"
+    stop_grace_period: 30s
     # `compose up` → GUI. CLI one-shots: docker compose run --rm paperful <cmd>
     # 0.0.0.0 is required inside the container; publish stays 127.0.0.1:8765.
     # --allow-remote-bind is the explicit opt-in for non-loopback bind (no auth).

@@ -15,6 +15,12 @@ from paperful.zot import Item
 PDF_BYTES = b"%PDF-1.4\n" + b"x" * 20_000 + b"\n%%EOF"
 
 
+def pytest_collection_modifyitems(items):
+    for item in items:
+        if "grey_live" in item.keywords or "e2e_live" in item.keywords:
+            item.add_marker(pytest.mark.enable_socket)
+
+
 @pytest.fixture(autouse=True)
 def _no_real_zotero(monkeypatch):
     """Tests never talk to a Zotero that happens to be running on this machine.

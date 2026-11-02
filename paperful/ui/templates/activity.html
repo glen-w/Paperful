@@ -8,13 +8,14 @@
   <h2>Commands</h2>
   <p class="section-lede">Newest first. Queued and running rows keep polling until they finish. The ID is the run you can also see in the URL after Preview or Grab.</p>
 <table class="wb-table">
-  <thead><tr><th>ID</th><th>Verb</th><th>Status</th></tr></thead>
+  <thead><tr><th>ID</th><th>Verb</th><th>Status</th><th>Error</th></tr></thead>
   <tbody>
   {% for cmd in commands %}
   <tr data-run-id="{{ cmd.id }}">
     <td>{{ cmd.id }}</td>
     <td>{{ cmd.verb }}</td>
     <td class="cmd-status">{{ cmd.status }}</td>
+    <td class="cmd-error">{% if cmd.error %}{{ cmd.error }}{% endif %}</td>
   </tr>
   {% endfor %}
   </tbody>

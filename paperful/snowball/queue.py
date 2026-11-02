@@ -45,14 +45,16 @@ def write_queue(
     }
     if client.deferred:
         summary["deferred"] = True
-        (dest / "deferred.json").write_text(
-            json.dumps(client.deferred, indent=2) + "\n", encoding="utf-8"
-        )
+        from ..fsio import atomic_write_json
+
+        atomic_write_json(dest / "deferred.json", client.deferred)
     if meta:
         summary.update(meta)
     screened = prisma_from_stop(summary, dest)
     summary["prisma"] = prisma_counts(rows, screened=screened)
-    (dest / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    from ..fsio import atomic_write_json
+
+    atomic_write_json(dest / "summary.json", summary)
     from .citation_graph import write_graph
 
     write_graph(

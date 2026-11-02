@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..fsio import atomic_write_json
 from .candidate import Candidate
 
 SCHEMA = "paperful.snowball.watch.responses.v1"
@@ -66,7 +67,7 @@ def save_cache(watch_folder: Path, cache: dict[str, Any]) -> Path:
         "entries": cache.get("entries") if isinstance(cache.get("entries"), dict) else {},
     }
     path = cache_path(watch_folder)
-    path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
+    atomic_write_json(path, body)
     return path
 
 
@@ -98,7 +99,7 @@ def record_row(cache: dict[str, Any], row: Candidate, digest: str, drift: str) -
     }
 
 
-def classify_rows(watch_folder: Path, rows: list[Candidate]) -> dict[str, int]:
+def classify_drift(watch_folder: Path, rows: list[Candidate]) -> dict[str, int]:
     """Update the watch response cache. Returns drift class counts."""
     cache = load_cache(watch_folder)
     counts = {name: 0 for name in DRIFT_CLASSES}

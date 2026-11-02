@@ -21,7 +21,7 @@ from paperful.snowball.response_cache import (
     SCHEMA,
     candidate_hash,
     classify_row,
-    classify_rows,
+    classify_drift,
     load_cache,
 )
 from paperful.config import load_config
@@ -153,17 +153,17 @@ def test_classify_row_new_unchanged_metadata_reassigned():
     )
 
 
-def test_classify_rows_persists_responses_json(tmp_path: Path):
+def test_classify_drift_persists_responses_json(tmp_path: Path):
     folder = tmp_path / "watch"
-    first = classify_rows(folder, [_row(), _row(doi="10.1000/b", oa="W2")])
+    first = classify_drift(folder, [_row(), _row(doi="10.1000/b", oa="W2")])
     assert first[DRIFT_NEW] == 2
     cache = load_cache(folder)
     assert cache["schema"] == SCHEMA
     assert len(cache["entries"]) == 2
-    second = classify_rows(folder, [_row(), _row(doi="10.1000/b", oa="W2")])
+    second = classify_drift(folder, [_row(), _row(doi="10.1000/b", oa="W2")])
     assert second[DRIFT_UNCHANGED] == 2
     assert second[DRIFT_NEW] == 0
-    third = classify_rows(
+    third = classify_drift(
         folder,
         [_row(title="Alpha renamed"), _row(doi="10.1000/b", oa="W2")],
     )
