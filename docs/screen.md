@@ -21,7 +21,10 @@ uv run paperful screen -C "My Collection" --apply  # tag + child note
 uv run paperful screen --refresh                   # bypass status cache; re-fetch CSVs
 ```
 
-Reports land in `state/runs/<stamp>-screen.json`. Status lookups are cached under `state/pps/status/`; fingerprint CSVs under `state/pps/fingerprints/`.
+Scope flags (`--library`, `--year-from` / `--year-to`, `-T`, `--limit` /
+`-n`, `--profile`) and `--format json` match the other completeness verbs
+(`--json` is the legacy findings array). Reports land in
+`state/runs/<stamp>-screen.json`. Status lookups are cached under `state/pps/status/`; fingerprint CSVs under `state/pps/fingerprints/`.
 
 Matching is **fully local** once lists are on disk. Run `paperful screen --refresh` (or any online screen/critique that fetches CSVs) to populate the cache; copy the four families from PPS into `[screen].fingerprint_dir` as `tortured.csv`, `scigen.csv`, `mathgen.csv`, and `suspect.csv` if you want an air-gapped source of truth. Offline critique and screen use cache or `fingerprint_dir` and do not call IRIT.
 

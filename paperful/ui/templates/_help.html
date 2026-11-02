@@ -1,11 +1,14 @@
-{# Hover/focus (i) tip. Pass beginner-facing prose; Jinja auto-escapes. #}
+{# Hover/focus (i) tip. Pass beginner-facing prose; Jinja auto-escapes.
+   A real button so keyboard and screen-reader users reach it; the prose is
+   a tooltip the button is described by, not a 300-character accessible name. #}
 {% macro info(text, danger=false) -%}
-<span class="help-tip{% if danger %} help-tip--danger{% endif %}" tabindex="0" role="img" aria-label="{{ text }}">
+{%- set tid = tip_id() -%}
+<button type="button" class="help-tip{% if danger %} help-tip--danger{% endif %}" aria-label="{% if danger %}Caution{% else %}Help{% endif %}" aria-describedby="{{ tid }}">
   <svg class="help-tip-glyph" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
     <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.35"/>
     <path fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" d="M8 7.35v3.9"/>
     <circle cx="8" cy="5.2" r="0.75" fill="currentColor"/>
   </svg>
-  <span class="help-tip-bubble">{{ text }}</span>
-</span>
+  <span class="help-tip-bubble" role="tooltip" id="{{ tid }}">{{ text }}</span>
+</button>
 {%- endmacro %}

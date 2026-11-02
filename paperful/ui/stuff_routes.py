@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from . import commands, jobs
 from .context import UiContext
+from .page_common import picker_title
 from .pages import (
     ASK_ERROR_MESSAGES,
     ask_page_flags,
@@ -30,13 +31,13 @@ from ..stuff import KNOWN_LANES, HONESTY_BANNER, resolve_k, resolve_lane
 
 
 def _picker_items(ui: UiContext, collection: str) -> list[dict[str, Any]]:
-    items, _manifest = jobs._load_scope_items(ui.cfg, collection)
+    items, _manifest = jobs.load_scope_items_cached(ui.cfg, collection)
     rows: list[dict[str, Any]] = []
     for it in items[:300]:
         rows.append(
             {
                 "key": it.key,
-                "title": it.title or it.key,
+                "title": picker_title(it.title, it.key),
                 "year": getattr(it, "year", None),
             }
         )

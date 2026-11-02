@@ -117,7 +117,7 @@ def run_forensics(
             cmd = _scan_cmd(exe, paths, out, doi=doi_flag or None)
             env = os.environ.copy()
             env["PAPERGUARD_LANG"] = "en"
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
                 cmd,
                 capture_output=True,
                 timeout=timeout_s,

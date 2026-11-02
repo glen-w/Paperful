@@ -264,7 +264,9 @@ app.add_typer(keepup_app, name="keepup")
 class _SearchGroup(TyperGroup):
     """`paperful search Gjerde` stays a query; `search watch` is the sub-app."""
 
-    def resolve_command(self, ctx: typer.Context, args: list[str]):
+    def resolve_command(  # type: ignore[override]
+        self, ctx: typer.Context, args: list[str]
+    ):
         args = list(args or [])
         names = set(self.list_commands(ctx))
         if args and args[0] in names:
@@ -845,8 +847,14 @@ def serve(
         "--allow-remote-bind",
         help=(
             "Allow binding a non-loopback address (e.g. 0.0.0.0). "
-            "The workbench has no HTTP auth."
+            "Set PAPERFUL_UI_TOKEN or --ui-token to require a bearer token."
         ),
+    ),
+    ui_token: str = typer.Option(
+        "",
+        "--ui-token",
+        envvar="PAPERFUL_UI_TOKEN",
+        help="Require this bearer token on workbench requests (except /health).",
     ),
     config: Path | None = ConfigOpt,
 ) -> None:
@@ -862,6 +870,7 @@ def serve(
             host=host,
             port=port,
             allow_remote_bind=allow_remote_bind,
+            ui_token=ui_token or None,
         )
     except RuntimeError as exc:
         console.print(f"[red]{exc}[/]")
@@ -6012,7 +6021,7 @@ def _reconcile_jobs() -> None:
     """
     from typer.main import get_command
 
-    registered = set(get_command(app).commands)
+    registered = set(getattr(get_command(app), "commands", {}))
     listed = [verb for verbs in JOBS.values() for verb in verbs]
     if len(listed) != len(set(listed)):
         dupes = sorted({v for v in listed if listed.count(v) > 1})

@@ -37,6 +37,8 @@ ASK_QUESTION = os.environ.get(
 )
 PEOPLE_LIST = os.environ.get("PAPERFUL_SHOT_LIST", "bbnj-test-voices")
 FOLLOW_ORCID = os.environ.get("PAPERFUL_SHOT_ORCID", "0000-0001-9025-7632")
+# Title order floats "(untitled)" rows to the top; newest-first reads better.
+WANTED_ORDER = os.environ.get("PAPERFUL_SHOT_ORDER", "year_new")
 VIEWPORT = {"width": 1440, "height": 900}
 
 # Docs filename → website copy (homepage gallery).
@@ -229,12 +231,12 @@ def main() -> None:
         context.add_cookies(_cookies(advanced=False))
         page = context.new_page()
 
-        page.goto(f"{BASE}/wanted", wait_until="domcontentloaded")
+        page.goto(f"{BASE}/wanted?order={WANTED_ORDER}", wait_until="domcontentloaded")
         _ready(page)
         _tick_first(page, 3)
         _shot(page, "wanted.png")
 
-        page.goto(f"{BASE}/wanted?tab=held", wait_until="domcontentloaded")
+        page.goto(f"{BASE}/wanted?tab=held&order={WANTED_ORDER}", wait_until="domcontentloaded")
         _ready(page)
         _tick_first(page, 2)
         _shot(page, "wanted-held.png")
@@ -256,6 +258,20 @@ def main() -> None:
                 _scroll_below_chrome(page, heading)
                 break
         _shot(page, "discover-people.png")
+
+        page.goto(f"{BASE}/discover?tab=queue", wait_until="domcontentloaded")
+        _ready(page)
+        try:
+            page.wait_for_selector("#citationCanvas circle", timeout=30_000)
+            page.wait_for_timeout(1500)  # let the force layout settle
+            _scroll_below_chrome(page, "Map")
+            _shot(page, "discover-queue.png")
+        except Exception:
+            print("skip discover-queue.png (no citation map; run a Topic search first)")
+
+        page.goto(f"{BASE}/discover?tab=following", wait_until="domcontentloaded")
+        _ready(page)
+        _shot(page, "discover-following.png")
 
         page.goto(f"{BASE}/library", wait_until="domcontentloaded")
         _ready(page)
@@ -353,6 +369,22 @@ def main() -> None:
         _fill(page, "form[action='/briefs/synthesize'] input[name='year_from']", "2020")
         _fill(page, "form[action='/briefs/synthesize'] input[name='year_to']", "2026")
         _shot(page, "briefs.png")
+
+        # Manuscript aids (Advanced). Forms only; nothing is submitted.
+        page.goto(f"{BASE}/critique", wait_until="domcontentloaded")
+        _ready(page)
+        _shot(page, "critique.png")
+
+        page.goto(f"{BASE}/rewrite", wait_until="domcontentloaded")
+        _ready(page)
+        packs = page.locator("select[name='pack'] option")
+        if packs.count() > 1:
+            page.locator("select[name='pack']").first.select_option(index=1)
+        _shot(page, "rewrite.png")
+
+        page.goto(f"{BASE}/stuff", wait_until="domcontentloaded")
+        _ready(page)
+        _shot(page, "stuff.png")
 
         browser.close()
 

@@ -8,6 +8,8 @@ import subprocess
 import tempfile
 import zipfile
 import xml.etree.ElementTree as ET
+
+from defusedxml import ElementTree as _DET
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -136,7 +138,7 @@ def extract_path(path: Path) -> ExtractedDoc:
             finding="empty_extract",
             error="could not parse file",
         )
-    except ET.ParseError:
+    except (ET.ParseError, ValueError):
         return ExtractedDoc(
             text="",
             format=suffix.lstrip("."),
@@ -232,7 +234,7 @@ def _from_docx(path: Path) -> ExtractedDoc:
             xml = zf.read("word/document.xml")
     except (OSError, KeyError, zipfile.BadZipFile) as exc:
         raise ExtractError(f"not a readable .docx: {path.name}") from exc
-    root = ET.fromstring(xml)
+    root = _DET.fromstring(xml)
     paras: list[str] = []
     for p in root.iter(f"{_W_NS}p"):
         bits = [t.text or "" for t in p.iter(f"{_W_NS}t")]
@@ -248,7 +250,7 @@ def _from_odt(path: Path) -> ExtractedDoc:
             xml = zf.read("content.xml")
     except (OSError, KeyError, zipfile.BadZipFile) as exc:
         raise ExtractError(f"not a readable .odt: {path.name}") from exc
-    root = ET.fromstring(xml)
+    root = _DET.fromstring(xml)
     paras: list[str] = []
     for p in root.iter(f"{_TEXT_NS}p"):
         line = "".join(p.itertext()).strip()
@@ -274,7 +276,7 @@ def _from_rtf(path: Path) -> ExtractedDoc:
                 return bytes.fromhex(token[2:]).decode("latin-1", errors="replace")
             except ValueError:
                 return ""
-        if token in "{}":
+        if token in "{}":  # noqa: S105 -- name only, not a credential
             return ""
         if token.startswith("\\par"):
             return "\n"
@@ -304,8 +306,8 @@ def _from_pptx(path: Path) -> ExtractedDoc:
     with zf:
         for name in names:
             try:
-                root = ET.fromstring(zf.read(name))
-            except ET.ParseError as exc:
+                root = _DET.fromstring(zf.read(name))
+            except (ET.ParseError, ValueError) as exc:
                 raise ExtractError(f"not a readable .pptx: {path.name}") from exc
             bits = [t.text or "" for t in root.iter(f"{_A_NS}t")]
             line = "\n".join(b.strip() for b in bits if b.strip())
@@ -323,7 +325,7 @@ def _from_legacy_doc(path: Path) -> ExtractedDoc:
         if not exe:
             continue
         try:
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
                 [exe, *cmd[1:]],
                 capture_output=True,
                 timeout=60,
@@ -340,7 +342,7 @@ def _from_legacy_doc(path: Path) -> ExtractedDoc:
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
             try:
-                proc = subprocess.run(
+                proc = subprocess.run(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
                     [
                         soffice,
                         "--headless",

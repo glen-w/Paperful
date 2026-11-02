@@ -136,7 +136,7 @@ def test_resolve_unique_ambiguous_miss(cfg):
     add_person(cfg, "ocean", display_name="Unique Person")
     add_person(cfg, "ocean", display_name="Common Name")
     add_person(cfg, "ocean", display_name="Ghost Author")
-    people = load_people(cfg, "ocean")
+    load_people(cfg, "ocean")
 
     class Switching(FakeOA):
         def search_authors(self, name, *, limit=8):
@@ -452,7 +452,7 @@ def test_briefing_includes_coauthors_and_recent(cfg):
         "authorships": [
             {
                 "author": {
-                    "id": f"https://openalex.org/A1",
+                    "id": "https://openalex.org/A1",
                     "display_name": "Josiah Carberry",
                     "orcid": f"https://orcid.org/{ORCID}",
                 }

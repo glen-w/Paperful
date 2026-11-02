@@ -62,7 +62,7 @@ def _item(key="ABCD1234", paths=None):
 
 def test_save_pdf_writes_primary_and_hardlinks_extras(tmp_path):
     content = b"%PDF-1.4 fake"
-    md5 = hashlib.md5(content).hexdigest()
+    md5 = hashlib.md5(content, usedforsecurity=False).hexdigest()
     item = _item(paths=["BBNJ/sub", "AO"])
     primary, extras = save_pdf(tmp_path, item, content, md5)
     folder = item_dirname(item)
@@ -79,7 +79,7 @@ def test_write_fetch_records_sits_beside_each_copy(tmp_path):
     from paperful.store import ITEM_SCHEMA, record_path, write_fetch_records
 
     content = b"%PDF-1.4 fake"
-    md5 = hashlib.md5(content).hexdigest()
+    md5 = hashlib.md5(content, usedforsecurity=False).hexdigest()
     item = _item(paths=["BBNJ/sub", "AO"])
     item.publication_title = "Marine Policy"
     item.date = "2020-03"
@@ -122,9 +122,11 @@ def test_write_fetch_records_sits_beside_each_copy(tmp_path):
 def test_unique_path_reuses_identical_and_suffixes_different(tmp_path):
     existing = tmp_path / "x.pdf"
     existing.write_bytes(b"same")
-    same_md5 = hashlib.md5(b"same").hexdigest()
+    same_md5 = hashlib.md5(b"same", usedforsecurity=False).hexdigest()
     assert unique_path(tmp_path, "x.pdf", same_md5) == existing
-    other = unique_path(tmp_path, "x.pdf", hashlib.md5(b"other").hexdigest())
+    other = unique_path(
+        tmp_path, "x.pdf", hashlib.md5(b"other", usedforsecurity=False).hexdigest()
+    )
     assert other.name == "x (2).pdf"
 
 
@@ -362,7 +364,7 @@ def test_write_fetch_fills_missing_required_keys(tmp_path):
     from paperful.store import ITEM_RECORD_KEYS, record_path, write_fetch_records
 
     content = b"%PDF-1.4 fake"
-    md5 = hashlib.md5(content).hexdigest()
+    md5 = hashlib.md5(content, usedforsecurity=False).hexdigest()
     item = _item()
     primary, _extras = save_pdf(tmp_path, item, content, md5)
     dest = record_path(primary.parent)

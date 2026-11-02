@@ -454,7 +454,7 @@ def sample_ids(
     cleaned = unique_ids(ids)
     if limit <= 0 or len(cleaned) <= limit:
         return cleaned
-    picker = rng or random.Random()
+    picker = rng or random.Random()  # noqa: S311 -- jitter/sampling/shuffle, not security-sensitive
     return picker.sample(cleaned, limit)
 
 
@@ -474,7 +474,7 @@ def select_works_by_citations(
         return list(works)
     mode = (rank or "most-cited").strip().lower()
     if mode == "random":
-        picker = rng or random.Random()
+        picker = rng or random.Random()  # noqa: S311 -- jitter/sampling/shuffle, not security-sensitive
         return picker.sample(list(works), limit)
     reverse = mode != "least-cited"
 

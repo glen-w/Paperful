@@ -59,6 +59,7 @@ ezproxy
 research-ops
 sessions
 scihub
+legal-privacy
 serpapi
 camofox
 grobid

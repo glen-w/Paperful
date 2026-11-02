@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from paperful import cli
@@ -115,7 +114,6 @@ def test_write_and_load_item(cfg: Config):
     cfg.out_dir.mkdir(parents=True, exist_ok=True)
     folder = cfg.out_dir / "coll" / "item -- KEY1"
     folder.mkdir(parents=True)
-    text = "\n\n".join(_imrad_pages())
     (folder / "paper.pdf").write_bytes(b"%PDF-1.4\n")  # may fail parse; use cache
     from paperful.rag.extract import TEXT_SCHEMA, text_cache_path
 
@@ -215,12 +213,6 @@ def test_fill_missing_llm_grounding(cfg: Config):
 def test_extract_scope_skips_existing_without_force(cfg: Config):
     from paperful.sections.command import extract_scope, write_item, ItemSections
 
-    entry = MirrorEntry(
-        key="SKIP1",
-        dirs=["c/x -- SKIP1"],
-        record={"abstract": "", "title": "T", "year": 2019},
-        pdfs=[],
-    )
     cfg.out_dir.mkdir(parents=True, exist_ok=True)
     (cfg.out_dir / "c" / "x -- SKIP1").mkdir(parents=True)
     from paperful.rag.extract import TEXT_SCHEMA, text_cache_path

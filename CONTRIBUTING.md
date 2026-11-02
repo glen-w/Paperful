@@ -20,14 +20,23 @@ cp config.example.toml config.toml   # personal — never commit config.toml
 Hosted docs: `uv sync --extra docs && make docs` (Sphinx HTML) or
 `make pages-site` (`website/` + `/guide/` in `_site/`). The guide corpus is
 only `docs/*.md`; every page must appear in `docs/index.md` toctrees
-(`tests/test_sphinx_docs.py`). CI and Pages deploy use `DOCS_STRICT=1` (Sphinx
-`-W`). Live site: [paperful.app](https://paperful.app/) with the guide at
+(`tests/test_sphinx_docs.py`). The docs workflow is advisory (warnings
+allowed) and Pages deploys without `-W`, so run `DOCS_STRICT=1 make docs`
+locally before pushing guide changes. Live site: [paperful.app](https://paperful.app/) with the guide at
 [paperful.app/guide/](https://paperful.app/guide/). Workbench screenshots:
 run `docker compose up`, then
-`.venv/bin/python scripts/docs/capture_workbench.py` (writes
-`docs/_static/workflows/` and homepage copies under `website/images/`).
+`uv run python scripts/docs/capture_workbench.py` (writes
+`docs/_static/workflows/*.png` and homepage copies under `website/images/`).
 The script fills demo values and ticks rows; it does not submit Grab or
-Apply. Do not capture Settings (email) or Sci-Hub.
+Apply. Do not capture Settings (email) or Sci-Hub. Workflow GIFs:
+`uv run python scripts/docs/record_workflows.py [flow …]` (needs `ffmpeg`;
+writes `docs/_static/workflows/*.gif` from still frames with a drawn
+cursor). Its only writes are a Wanted **Preview** dry-run and the Library
+**Set scope** cookie. Point either script at a non-default port with
+`PAPERFUL_UI=http://127.0.0.1:8766`. Both open Wanted with
+`order=year_new` (`PAPERFUL_SHOT_ORDER`) so untitled stubs, which sort first
+by title, stay off the pictures. Re-run both after a visible UI change
+and commit the images with it.
 
 Zotero must be running with the local API enabled for integration tests that touch the CLI; most tests use stubs and run offline.
 
@@ -36,7 +45,9 @@ Zotero must be running with the local API enabled for integration tests that tou
 ```sh
 uv sync --group dev --extra serve
 make test                 # pytest -m "not docs" (CI suite parity)
-make lint                 # ruff (undefined-name + curated security rules)
+make lint                 # ruff check + ruff format --check + mypy (CI lint job parity)
+                          # mypy covers only [tool.mypy].files in pyproject.toml;
+                          # add a new module there once it is typed end to end
 DOCS_STRICT=1 make docs   # after: uv sync --extra docs
 ```
 

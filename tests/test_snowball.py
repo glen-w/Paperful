@@ -328,10 +328,12 @@ def test_stop_rules_clamp_and_cap():
     low = select_works_by_citations(works, 2, "least-cited", id_of=lambda w: w["id"])
     assert [w["id"] for w in low] == ["W2", "W1"]
     assert len(select_works_by_citations(works, 0, "most-cited")) == 3
-    assert sample_ids(["a", "b", "c"], 2, rng=random.Random(0)) == sample_ids(
-        ["a", "b", "c"], 2, rng=random.Random(0)
+    assert sample_ids(["a", "b", "c"], 2, rng=random.Random(0)) == sample_ids(  # noqa: S311 -- jitter/sampling/shuffle, not security-sensitive
+        ["a", "b", "c"],
+        2,
+        rng=random.Random(0),  # noqa: S311 -- jitter/sampling/shuffle, not security-sensitive
     )
-    assert len(sample_ids(["a", "b", "c"], 2, rng=random.Random(1))) == 2
+    assert len(sample_ids(["a", "b", "c"], 2, rng=random.Random(1))) == 2  # noqa: S311 -- jitter/sampling/shuffle, not security-sensitive
     rows = [
         Candidate(
             "r",
@@ -1448,6 +1450,7 @@ def test_fill_resume_creates_rows_the_fill_added(tmp_path: Path, monkeypatch):
         "auto",
     )
     client = OpenAlexClient(email="t@example.org", sleep_s=0)
+    monkeypatch.setattr(client, "works_by_dois", lambda dois, select=None: [])
     dest = write_queue(cfg.state_dir, "run1", [seed], client, library_unread=False)
     (dest / "deferred.json").write_text(
         json.dumps({"kind": "fill", "direction": "refs", "per_hop_limit": 15}),

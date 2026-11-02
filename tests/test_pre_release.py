@@ -14,8 +14,8 @@ SCRIPT = ROOT / "scripts" / "release" / "pre_release.sh"
 
 def _run(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
     env = {"PAPERFUL_RELEASE_ROOT": str(root)}
-    return subprocess.run(
-        ["bash", str(SCRIPT), *args],
+    return subprocess.run(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
+        ["bash", str(SCRIPT), *args],  # noqa: S607 -- operator tool resolved via PATH on purpose
         cwd=root,
         env={**os.environ, **env},
         capture_output=True,

@@ -326,7 +326,7 @@ class E2ERunner:
     ) -> subprocess.CompletedProcess[str]:
         cmd = [*_paperful_command(self.root), *args]
         cwd = str(self.root)
-        proc = subprocess.Popen(
+        proc = subprocess.Popen(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
             cmd,
             cwd=cwd,
             env=self.env,
@@ -437,7 +437,6 @@ class E2ERunner:
             proc.stderr or "", encoding="utf-8"
         )
         payload = self._parse_agent_json(proc.stdout or "") if want_json else None
-        ok = proc.returncode == 0 or (proc.returncode == 3 and not required)
         status = "ok" if proc.returncode in (0, 3) else "fail"
         # exit 3 = partial; treat as ok for required phases that allow partial
         if proc.returncode == 3:

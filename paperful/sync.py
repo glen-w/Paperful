@@ -303,7 +303,7 @@ def _cache_is_current(cached: Path, record: dict[str, Any]) -> bool:
     }
     if not known:
         return True
-    return hashlib.md5(cached.read_bytes()).hexdigest() in known
+    return hashlib.md5(cached.read_bytes(), usedforsecurity=False).hexdigest() in known
 
 
 def copy_pdfs(

@@ -669,6 +669,7 @@ def test_pipeline_records_browser_agent_source(cfg, stub_runner, monkeypatch):
     monkeypatch.setattr(
         "paperful.sources.browser_agent.browser_agent_extra_available", lambda: True
     )
+    monkeypatch.setattr("paperful.pipeline.prepare_identifiers", lambda *a, **k: [])
     stub_runner(RecoverResult(PDF_BYTES, "stub"))
     manifest = Manifest(cfg.manifest_path)
     pipe = Pipeline(

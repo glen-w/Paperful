@@ -271,7 +271,7 @@ def collect_patches(
             findings = lint_item(
                 client, cfg, item, backend=backend, manifest=manifest, cache=cache
             )
-        except Exception:
+        except Exception:  # noqa: S112 -- best-effort loop; intentionally continues
             continue
         patch = propose_patch(
             client,

@@ -144,7 +144,7 @@ def _run_ocrmypdf(
     mode = "--redo-ocr" if thin else "--skip-text"
     cmd = [exe, mode, "-l", langs, "--output-type", "pdf", "-q", str(src), str(dest)]
     try:
-        proc = subprocess.run(
+        proc = subprocess.run(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
             cmd,
             capture_output=True,
             timeout=timeout_s,
@@ -314,7 +314,9 @@ def ocr_text_for_match(cfg: Config, src: Path) -> str:
     if not src.is_file() or not ocrmypdf_available():
         return ""
     cfg.pdf_cache_dir.mkdir(parents=True, exist_ok=True)
-    digest = hashlib.md5(str(src.resolve()).encode()).hexdigest()[:16]
+    digest = hashlib.md5(
+        str(src.resolve()).encode(), usedforsecurity=False
+    ).hexdigest()[:16]
     dest = cfg.pdf_cache_dir / f"inbox-ocr-{digest}.pdf"
     if dest.is_file() and dest.stat().st_size > 0:
         return text_from_pdf(dest, max_pages=2)

@@ -355,7 +355,7 @@ def suggested_from_claims(
                 detail = str(item_row.get("detail") or "").strip()
                 if detail and grounded(detail, hay or excerpt.lower()):
                     by_id[cid]["detail"] = detail[:400]
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass
 
     extra: list[Finding] = []

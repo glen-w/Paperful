@@ -18,10 +18,11 @@ lists that lane, not the full `sources` list.
 | `semanticscholar` | DOI or arXiv id |
 | `core` | DOI and `core_api_key` (in default `sources`; skipped until the key is set. `doctor` reports whether it is set — green either way). Register at [core.ac.uk/services/api](https://core.ac.uk/services/api) |
 | `scholar` | DOI, or title at least 20 characters (**opt-in** — not in default `sources`). Policy order runs it late, paired with `browser_agent` when that lane is on (separate phases when `camofox` is also on) |
-| `camofox` | DOI or URL. **Opt-in:** `[camofox].enabled` and a reachable camofox-browser server at `[camofox].base_url`. Policy order after vault lanes, before `browser_agent`. Scripted PDF grab; no vault SSO. See [Camofox](camofox.md) |
+| `camofox` | Any item with a recover start URL (DOI landing or linked URL). **Opt-in:** `[camofox].enabled` and a reachable camofox-browser server at `[camofox].base_url`. Policy order after vault lanes, before `browser_agent`. Scripted PDF grab; no vault SSO. See [Camofox](camofox.md) |
 | `serpapi` | Same query as Scholar. **Opt-in:** `[serpapi].enabled` and env `SERPAPI_API_KEY`. Policy order after local Scholar / agent. Cap with `[serpapi].max_calls` / `--serpapi-max`. See [SerpApi](serpapi.md) |
 | `direct` | HTTP(S) URL that is not a resolver/aggregator/video host after playbook rewrite/synthesize, **or** Extra/title match from a `synthesize` playbook (e.g. UN symbol → undocs) |
 | `ezproxy` | `ezproxy_base` plus a session (vault or cookie file), **and** a DOI or a URL on a [known publisher host](ezproxy.md#what-ezproxy-will-try) |
+| `author_site` | A creator with a known listing page: a promoted field author pack (`state/author-packs/`, see [workflows §6](workflows.md#field-author-packs-corpus-frequency-author-site)), a cached contact listing, or an opt-in Twenty CRM person (`[twenty]`). Late grey lane; provenance `grey:author_site` |
 | `htmlpdf` | `webpage` / `blogPost` / `newspaperArticle` / `magazineArticle` / `forumPost` (or DOI-less `document` / `report`) with an HTTP(S) URL; needs Playwright Chromium — see [HTML→PDF](#htmlpdf-web-news-blogs) |
 
 Indexes can **find** a publisher PDF URL that then **403s** on httpx (bronze/hybrid Elsevier is the usual case). With a session profile, that GET is retried in Chromium: SSO hops, citation PDF links, and download controls are followed before the miss. Wins can become local playbooks (`paperful playbooks`); see [sessions](sessions.md). The same publisher host is not downloaded again by the next OA source.

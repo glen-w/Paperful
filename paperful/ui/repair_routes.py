@@ -90,8 +90,6 @@ from .app import (
     _health_tooltip,
     _trust_line,
     _load_wanted,
-    _patch_config_field,
-    _patch_section_assignment,
 )
 
 
@@ -280,7 +278,6 @@ async def handle_mirror_apply_route(
 ) -> JSONResponse | RedirectResponse:
     prefs = prefs_from_request(request)
     form = await request.form()
-    verb = str(form.get("verb") or "")
     token = str(form.get("review_token") or "")
     if not token:
         return JSONResponse(

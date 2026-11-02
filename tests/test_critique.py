@@ -22,7 +22,6 @@ from paperful.critique import (
     build_critique,
     dismiss_finding,
     load_dismissed,
-    load_pack,
     make_finding,
     note_html,
     render_markdown,

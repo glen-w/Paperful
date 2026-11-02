@@ -21,11 +21,11 @@ ARG PAPERFUL_IMAGE_MODE=light
 RUN --mount=type=cache,target=/root/.cache/uv \
     case "${PAPERFUL_IMAGE_MODE}" in \
       light) \
-        uv sync --no-dev --no-editable --extra serve \
+        uv sync --no-dev --no-editable --extra serve --extra browser \
           --reinstall-package paperful ;; \
       heavy) \
         uv sync --no-dev --no-editable \
-          --extra serve --extra llm --extra rag --extra browser-agent \
+          --extra serve --extra browser --extra llm --extra rag --extra browser-agent \
           --reinstall-package paperful ;; \
       *) \
         echo "Unknown PAPERFUL_IMAGE_MODE=${PAPERFUL_IMAGE_MODE} (use light|heavy)" >&2; \

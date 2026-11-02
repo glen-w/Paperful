@@ -435,7 +435,7 @@ def _cdp_cookies_from_context(context: Any) -> list[dict[str, Any]]:
                     cookie["expires"] = int(exp_f)
                 out.append(cookie)
             return out
-    except Exception:
+    except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
         pass
     try:
         return list(context.cookies())
@@ -460,7 +460,7 @@ def _probe_and_collect_cookies(
             page.goto(probe, wait_until="domcontentloaded", timeout=_PROBE_WAIT_MS)
             try:
                 page.wait_for_load_state("networkidle", timeout=15_000)
-            except Exception:
+            except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
                 pass
             # Allow one SSO hop to settle.
             deadline = time.time() + 20.0
@@ -524,7 +524,7 @@ def _login_via_system_chrome(
             f"Opening system browser ({chrome.name}) — Google blocks "
             "Playwright-launched Chrome; this window is your normal browser."
         )
-    proc = subprocess.Popen(
+    proc = subprocess.Popen(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
         cmd,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -677,7 +677,7 @@ def _apply_cookies_to_context(
     try:
         context.add_cookies(prepared)
         return len(prepared), 0
-    except Exception:
+    except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
         pass
     ok = 0
     failed = 0
@@ -839,7 +839,7 @@ def collect_pdf_from_page(
         if resp is not None:
             try:
                 _take(resp.body(), str(getattr(resp, "url", target)))
-            except Exception:
+            except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
                 pass
         elif not found:
             deadline = time.time() + min(8.0, timeout_ms / 1000)
@@ -854,7 +854,7 @@ def collect_pdf_from_page(
             return found[0]
         try:
             page.wait_for_load_state("networkidle", timeout=_NETWORKIDLE_MS)
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass
         if found:
             return found[0]
@@ -912,7 +912,7 @@ def collect_pdf_from_page(
                 pending["win"] = win
                 loc.first.click(timeout=5_000)
                 clicked = True
-            except Exception:
+            except Exception:  # noqa: S112 -- best-effort loop; intentionally continues
                 continue
             click_deadline = time.time() + 10.0
             while time.time() < click_deadline and not found:
@@ -925,7 +925,7 @@ def collect_pdf_from_page(
                 if loc.count() == 0:
                     continue
                 src = loc.first.get_attribute("src")
-            except Exception:
+            except Exception:  # noqa: S112 -- best-effort loop; intentionally continues
                 continue
             if not src:
                 continue
@@ -939,7 +939,7 @@ def collect_pdf_from_page(
         for event, handler in (("download", on_download), ("response", on_response)):
             try:
                 page.remove_listener(event, handler)
-            except Exception:
+            except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
                 pass
 
 
@@ -1064,13 +1064,13 @@ class BrowserSession:
         if self._ctx is not None:
             try:
                 self._ctx.close()
-            except Exception:
+            except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
                 pass
             self._ctx = None
         if self._pw is not None:
             try:
                 self._pw.stop()
-            except Exception:
+            except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
                 pass
             self._pw = None
 
@@ -1081,7 +1081,7 @@ class BrowserSession:
             page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
             try:
                 page.wait_for_load_state("networkidle", timeout=15_000)
-            except Exception:
+            except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
                 pass
             return page.content(), str(page.url)
 
@@ -1123,12 +1123,12 @@ class BrowserSession:
             page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
             try:
                 page.wait_for_load_state("networkidle", timeout=15_000)
-            except Exception:
+            except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
                 pass
             body = ""
             try:
                 body = page.inner_text("body")[:8000]
-            except Exception:
+            except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
                 pass
             if capture is not None:
                 capture["body"] = body

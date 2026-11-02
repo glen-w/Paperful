@@ -1,22 +1,41 @@
 {% extends "base.html" %}
+{% from "_help.html" import info %}
+{% from "_job_status.html" import job_status %}
 {% block title %}System — Paperful{% endblock %}
+{% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>System</h1>
-<p class="page-lede">Health checks for Zotero, disk, models, and logins. This page is the one that refreshes the green/amber/red dot in the header. Red usually has to be fixed before fetching will work. Follow the Next step column rather than guessing.</p>
+<p class="page-lede">Health checks for Zotero, disk, models, and logins. Red usually has to be fixed before fetching will work. Follow the Next step column rather than guessing.</p>
+{{ job_status(job, 'Re-check') }}
 <section class="panel">
-  <h2>Health</h2>
-  <p class="section-lede">Each row is one dependency. Status is green (ok), amber (warning), or red (blocked). The header dot shows the worst of these after you visit this page.</p>
-<table class="wb-table">
-  <thead><tr><th>Check</th><th>Status</th><th>Next step</th></tr></thead>
+  <div class="lib-items-head">
+    <h2>Health</h2>
+    <form method="post" action="/system/recheck" class="toolbar">
+      <span class="counts">Checked <span data-ts="{{ checked_at }}">{{ checked_at|int }}</span>{% if stale %} · <span class="stale">stale</span>{% endif %}</span>
+      <button type="submit" class="secondary"{% if job and job.status in ('queued', 'running') %} data-poll-button disabled{% endif %}>Re-check</button>
+      {{ info("Run every check again in the background. Camofox, EZProxy, and GROBID probes can take a minute; the page refreshes when they finish.") }}
+    </form>
+  </div>
+  <p class="section-lede">Each row is one dependency. The header dot shows the worst of these.</p>
+<div class="table-wrap">
+<table class="wb-table system-table">
+  <caption class="sr-only">Doctor checks</caption>
+  <thead><tr><th scope="col">Check</th><th scope="col">Status</th><th scope="col">Next step</th></tr></thead>
   <tbody>
   {% for row in checks %}
-  <tr>
+  <tr class="status-row status-row--{{ row.status }}">
     <td>{{ row.name }}</td>
-    <td>{{ row.status }}</td>
-    <td>{{ row.next }}</td>
+    <td><span class="status-dot status-{{ row.status }}" aria-hidden="true"></span> {{ row.status }}</td>
+    <td>
+      {% if row.next %}<strong>{{ row.next }}</strong>{% if row.detail and row.detail != row.next %}<br><span class="muted">{{ row.detail }}</span>{% endif %}
+      {% else %}<span class="muted">{{ row.detail }}</span>{% endif %}
+    </td>
   </tr>
+  {% else %}
+  <tr><td colspan="3" class="counts">No checks reported. Press Re-check.</td></tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
 </section>
 {% endblock %}

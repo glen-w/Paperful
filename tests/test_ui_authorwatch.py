@@ -168,7 +168,6 @@ def test_aw_suggest_enqueues(tmp_path, monkeypatch):
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_aw_delete_list(tmp_path, monkeypatch):
-    import time
 
     from fastapi.testclient import TestClient
 

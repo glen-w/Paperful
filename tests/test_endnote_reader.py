@@ -57,7 +57,7 @@ def _library(
         or "CREATE TABLE groups (group_id INTEGER, group_name TEXT, parent_id INTEGER, group_type INTEGER)"
     )
     for g in groups:
-        conn.execute(f"INSERT INTO groups VALUES ({','.join('?' * len(g))})", g)
+        conn.execute(f"INSERT INTO groups VALUES ({','.join('?' * len(g))})", g)  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
     conn.execute("CREATE TABLE group_refs (refs_id INTEGER, group_id INTEGER)")
     conn.executemany("INSERT INTO group_refs VALUES (?, ?)", members)
     conn.execute(

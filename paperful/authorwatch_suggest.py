@@ -275,7 +275,7 @@ def _coauthor_candidates(
                 )
             except OpenAlexBudgetExceeded:
                 raise
-            except Exception:
+            except Exception:  # noqa: S112 -- best-effort loop; intentionally continues
                 continue
             seed_key = _dedupe_key(person)
             part_counts, part_nodes = accumulate_coauthors_from_works(

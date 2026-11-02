@@ -184,7 +184,7 @@ def _biblio_hay(doc: ExtractedDoc) -> str:
                 bits.append(title.lower())
             if doi:
                 bits.append(doi.lower())
-    except Exception:
+    except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
         pass
     return "\n".join(bits)
 
@@ -392,7 +392,7 @@ def suggested_from_verify(
                 comments.extend(
                     c for c in (adata.get("comments") or []) if isinstance(c, dict)
                 )
-            except Exception:
+            except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
                 pass
         for c in comments:
             tagged = dict(c)
@@ -435,7 +435,7 @@ def suggested_from_verify(
             refined = [c for c in (data.get("comments") or []) if isinstance(c, dict)]
             if refined:
                 all_comments = refined
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass
 
     cached_dois: set[str] = set()

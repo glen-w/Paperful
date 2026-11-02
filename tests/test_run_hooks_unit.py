@@ -6,7 +6,6 @@ from pathlib import Path
 
 from rich.console import Console
 
-from paperful.config import Config
 from paperful.run_hooks import (
     confirm_session_login,
     flush_backend,

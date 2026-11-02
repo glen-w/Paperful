@@ -12,6 +12,7 @@ from typing import Any, Callable
 from rich.console import Console
 from rich.table import Table
 
+from ..fsio import atomic_write_json, atomic_write_text
 from ..config import Config
 from ..identity import from_seed_tag
 from ..run_config import RunConfigError, check_profile_name
@@ -103,7 +104,7 @@ def save_watch(cfg: Config, name: str, profile: str) -> Path:
             "last_run_at": None,
             "last_run_id": None,
         }
-    path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
+    atomic_write_json(path, body)
     for leaf, body in (
         ("seen.json", json.dumps({"identities": []}, indent=2) + "\n"),
         ("applied.json", json.dumps({"identities": []}, indent=2) + "\n"),
@@ -111,7 +112,7 @@ def save_watch(cfg: Config, name: str, profile: str) -> Path:
     ):
         target = dest / leaf
         if not target.is_file():
-            target.write_text(body, encoding="utf-8")
+            atomic_write_text(target, body)
     return path
 
 
@@ -140,9 +141,7 @@ def save_seen(cfg: Config, name: str, identities: set[str]) -> None:
     dest = watch_dir(cfg, name)
     dest.mkdir(parents=True, exist_ok=True)
     ordered = sorted(identities)
-    (dest / "seen.json").write_text(
-        json.dumps({"identities": ordered}, indent=2) + "\n", encoding="utf-8"
-    )
+    atomic_write_json(dest / "seen.json", {"identities": ordered})
 
 
 def append_inbox(cfg: Config, name: str, rows: list[Candidate]) -> None:
@@ -475,9 +474,7 @@ def rebaseline_watch(
                 "rebaselined_for": REBASELINE_EPOCH,
             }
         )
-        (watch_dir(cfg, name) / "watch.json").write_text(
-            json.dumps(body, indent=2) + "\n", encoding="utf-8"
-        )
+        atomic_write_json(watch_dir(cfg, name) / "watch.json", body)
         result["applied"] = True
     return result
 
@@ -592,7 +589,7 @@ def _rewrite_candidates(
         by_status[row.status] = by_status.get(row.status, 0) + 1
     summary["by_status"] = by_status
     summary.update(meta)
-    summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    atomic_write_json(summary_path, summary)
 
 
 def run_watch(
@@ -669,9 +666,7 @@ def run_watch(
                 "last_run_id": run_id,
             }
         )
-        (watch_dir(cfg, name) / "watch.json").write_text(
-            json.dumps(body, indent=2) + "\n", encoding="utf-8"
-        )
+        atomic_write_json(watch_dir(cfg, name) / "watch.json", body)
         console.print(f"baseline {len(seen)} · proposed 0")
         return WatchResult(
             run_dir=result.run_dir,

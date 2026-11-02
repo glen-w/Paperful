@@ -119,7 +119,7 @@ def _pdftotext(path: Path, max_pages: int | None) -> str:
     if max_pages is not None:
         cmd = [exe, "-f", "1", "-l", str(max_pages), "-enc", "UTF-8", str(path), "-"]
     try:
-        proc = subprocess.run(
+        proc = subprocess.run(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
             cmd,
             capture_output=True,
             timeout=30,
@@ -149,7 +149,7 @@ def _pypdf_text(path: Path, max_pages: int | None) -> str:
     for page in pages:
         try:
             chunks.append(page.extract_text() or "")
-        except Exception:
+        except Exception:  # noqa: S112 -- best-effort loop; intentionally continues
             continue
     return "\n".join(chunks)
 

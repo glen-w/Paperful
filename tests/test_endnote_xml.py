@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from xml.etree import ElementTree as ET
+from defusedxml import ElementTree as ET
 
 import pytest
 
@@ -55,8 +55,8 @@ def test_external_entities_are_not_resolved(tmp_path):
     )
     try:
         recs = parse_endnote_xml(xml)
-    except ET.ParseError:
-        return  # refusing the document outright is also fine
+    except (ET.ParseError, ValueError):
+        return  # refusing the document outright is also fine (defusedxml)
     assert all("TOP-SECRET-CONTENT" not in (r["title"] or "") for r in recs)
 
 

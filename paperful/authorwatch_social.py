@@ -103,7 +103,7 @@ def _rows_from_html(text: str, source: str) -> list[SocialRow]:
     collector = _LinkCollector()
     try:
         collector.feed(text)
-    except Exception:
+    except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
         pass
     seen: set[str] = set()
     out: list[SocialRow] = []

@@ -88,7 +88,7 @@ def find(item: Item, ctx: Context) -> Candidate:
     require = mode in {"gated", "auto"}
     capture: dict[str, str] = {}
     try:
-        if use_browser:
+        if use_browser and ctx.browser is not None:
             pdf_bytes, final_url, note = ctx.browser.render_pdf(
                 url,
                 _PAYWALL_HINTS,
@@ -150,12 +150,12 @@ def _render_pdf(
             page.goto(url, wait_until="domcontentloaded", timeout=45_000)
             try:
                 page.wait_for_load_state("networkidle", timeout=15_000)
-            except Exception:
+            except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
                 pass
             body = ""
             try:
                 body = page.inner_text("body")[:8000]
-            except Exception:
+            except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
                 pass
             if capture is not None:
                 capture["body"] = body

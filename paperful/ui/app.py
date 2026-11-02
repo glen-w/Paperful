@@ -157,53 +157,9 @@ def _trust_line(cfg: Config) -> str:
 
 
 def _load_wanted(cfg: Config, collection: str) -> dict[str, Any]:
-    items, manifest = jobs._load_scope_items(cfg, collection)
+    """Wanted page rows (page render only; jobs load scope fresh)."""
+    items, manifest = jobs.load_scope_items_cached(cfg, collection)
     return wanted_rows(cfg, items, manifest)
-
-
-def _patch_section_assignment(text: str, section: str, key: str, literal: str) -> str:
-    """Insert or replace ``key = literal`` inside one TOML table."""
-    line = f"{key} = {literal}"
-    header = re.compile(rf"^\[{re.escape(section)}\]\s*$", re.MULTILINE)
-    found = header.search(text)
-    if not found:
-        return text.rstrip() + f"\n\n[{section}]\n{line}\n"
-    start = found.end()
-    nxt = re.search(r"^\[", text[start:], re.MULTILINE)
-    end = start + nxt.start() if nxt else len(text)
-    block = text[start:end]
-    key_re = re.compile(rf"^[ \t]*{re.escape(key)}\s*=.*$", re.MULTILINE)
-    if key_re.search(block):
-        block = key_re.sub(line, block, count=1)
-    else:
-        if block and not block.endswith("\n"):
-            block += "\n"
-        block += line + "\n"
-    return text[:start] + block + text[end:]
-
-
-def _patch_config_field(cfg: Config, section: str, key: str, value: str) -> None:
-    path = cfg.config_path
-    if path is None or not path.is_file():
-        return
-    text = path.read_text(encoding="utf-8")
-    line = f'{key} = "{value}"'
-    pattern = re.compile(rf"^\s*{re.escape(key)}\s*=.*$", re.MULTILINE)
-    if section:
-        sec_pattern = re.compile(rf"^\[{re.escape(section)}\]\s*$", re.MULTILINE)
-        if sec_pattern.search(text):
-            if pattern.search(text):
-                text = pattern.sub(line, text, count=1)
-            else:
-                text = text.rstrip() + f"\n{line}\n"
-        else:
-            text = text.rstrip() + f"\n\n[{section}]\n{line}\n"
-    else:
-        if pattern.search(text):
-            text = pattern.sub(line, text, count=1)
-        else:
-            text = line + "\n" + text
-    path.write_text(text, encoding="utf-8")
 
 
 def mount_ui(app: FastAPI, cfg: Config) -> None:
@@ -217,10 +173,19 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     from .rewrite_routes import register_rewrite
     from .stuff_routes import register_stuff
 
+    commands.reconcile_orphans(cfg)
     templates = Jinja2Templates(directory=str(_ui_dir() / "templates"))
+    import itertools
+
+    _tip_counter = itertools.count(1)
+    # Unique ids for help-tip tooltips (aria-describedby targets).
+    templates.env.globals["tip_id"] = lambda: f"tip-{next(_tip_counter)}"
     static_dir = _ui_dir() / "static"
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
     ui = UiContext(app=app, cfg=cfg, templates=templates)
+    from .errors import install_error_pages
+
+    install_error_pages(app, templates, ui.ctx)
     register_wanted(ui)
     register_discover(ui)
     register_shell(ui)

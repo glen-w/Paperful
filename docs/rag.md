@@ -34,10 +34,12 @@ and a typed cover in front of a scan does not hide it.
 
 ## Coverage depends on the mirror
 
-Only PDFs that are in `out_dir` can be indexed. With the default
-`[mirror].pdfs = "additional"`, PDFs that live only in the reference manager
-are not in the mirror, so those items are indexed from their abstract (or not at
-all when they have none). `paperful rag status` counts them. To bring them in:
+Only PDFs that are in `out_dir` can be indexed. The default
+`[mirror].pdfs = "all"` copies every library PDF into the mirror on refresh;
+with `"lazy"` or `"none"` (the legacy `"additional"` loads as `lazy`),
+PDFs that live only in the reference manager are not yet in the mirror, so
+those items are indexed from their abstract (or not at all when they have
+none). `paperful rag status` counts them. To bring them in:
 
 ```bash
 uv run paperful snapshot --library --pdfs all
@@ -317,22 +319,25 @@ Heading synonyms ship in the tree; merge publisher-specific titles from
 [config.md](config.md#section-extract-extract-sections).
 
 (workbench-advanced-index)=
-### Workbench (Advanced Index)
+### Workbench (Ask and Advanced Index)
 
 **Ask** is on the default nav. With `[rag]` and `[llm]` on, that page runs
 threaded Ask. A **Mode** select (`simple` / `advanced`) starts at
 `[rag].ask_mode`; changing it is this run only and is not written back to
 config. After an advanced answer the page shows how many passages were scored
 and how many were kept. Batch Ask is on the same page when Advanced is on
-(same Mode select). Advanced **Index** covers ingest, search, extract
-questions, already-answered checks, and synthesize. Scope follows the
+(same Mode select). With an empty index, Ask shows an **Ingest first** panel
+(**Dry-run ingest** / **Ingest**) and warns when the embedding or answer
+model is remote. A **Focus** select and **New thread** link sit above the
+question box. Advanced **Index** covers ingest, search, extract
+questions, already-answered checks, **Extract sections**, and synthesize. Scope follows the
 collection chip (plus optional item keys, years, types, top-k). Custom system
 prompts on Ask/batch, in order:
 
 1. Inline textarea
 2. Uploaded `.md`/`.txt` (stored under `state/gui/uploads/`)
 3. Path field (resolved like `[rag].prompt`, relative to the config file)
-4. Saved file from `state/prompts/` (optional “Save as…” on the form)
+4. Saved file from `state/prompts/` (**Save inline/upload as** + **Save name** on the form)
 5. Else `[rag].prompt` / focus preset
 
 Batch packs list under `state/ask-batch/`; answered packs under

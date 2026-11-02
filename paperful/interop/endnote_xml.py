@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
+from defusedxml import ElementTree as _DET
+
 from .types import endnote_to_zotero, zotero_to_endnote
 
 
@@ -16,7 +18,12 @@ def parse_endnote_xml(
     """Parse EndNote-generated XML. Resolves internal-pdf:// against xml_path parent."""
     if text.startswith("\ufeff"):
         text = text[1:]
-    root = ET.fromstring(text)
+    try:
+        root = _DET.fromstring(text)
+    except ValueError as exc:
+        # defusedxml rejects DTDs/entities with ValueError subclasses; keep
+        # the historical ParseError contract for callers.
+        raise ET.ParseError(str(exc)) from exc
     records: list[dict[str, Any]] = []
     base = xml_path.parent if xml_path is not None else None
     for rec_el in root.iter("record"):
@@ -41,8 +48,9 @@ def _from_record(el: ET.Element, base: Path | None) -> dict[str, Any]:
     ref = el.find("ref-type")
     name = (ref.get("name") if ref is not None else None) or ""
     number = None
-    if ref is not None and (ref.text or "").strip().isdigit():
-        number = int(ref.text.strip())
+    ref_text = (ref.text or "") if ref is not None else ""
+    if ref_text.strip().isdigit():
+        number = int(ref_text.strip())
     title = _style_text(el.find("./titles/title"))
     year_s = _style_text(el.find("./dates/year"))
     year = int(year_s) if year_s.isdigit() else None
@@ -78,8 +86,8 @@ def _from_record(el: ET.Element, base: Path | None) -> dict[str, Any]:
             }
         )
     pdfs: list[str] = []
-    for url in el.findall("./urls/pdf-urls/url"):
-        href = (url.text or "").strip()
+    for url_el in el.findall("./urls/pdf-urls/url"):
+        href = (url_el.text or "").strip()
         if not href:
             continue
         resolved = _resolve_pdf(href, base)

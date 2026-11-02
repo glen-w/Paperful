@@ -59,7 +59,7 @@ mounts (`PAPERFUL_DATA`).
 ## Quick start
 
 ```sh
-git clone --branch v1.6.5 https://github.com/glen-w/Paperful.git
+git clone --branch v1.7.0 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
 ```
@@ -101,7 +101,7 @@ dir. Absolute host paths (e.g. `/Users/...`) will not land on the volumes.
 
 | File | Role |
 | --- | --- |
-| [`.env.example`](https://github.com/glen-w/Paperful/blob/main/.env.example) | Copy to `.env` — `PAPERFUL_DATA`, `PAPERFUL_OUT`, `PAPERFUL_ZOTERO_HOST`, `PAPERFUL_IMAGE_MODE` |
+| [`.env.example`](https://github.com/glen-w/Paperful/blob/main/.env.example) | Copy to `.env` — `PAPERFUL_DATA`, `PAPERFUL_OUT`, `PAPERFUL_ZOTERO_HOST`, `PAPERFUL_IMAGE_MODE`; optional `PAPERFUL_OLLAMA_HOST`, `PAPERFUL_GROBID_HOST`, and API keys |
 | [`compose.yaml`](https://github.com/glen-w/Paperful/blob/main/compose.yaml) | Default service: `compose up` → GUI; `compose run` → CLI |
 | [`compose.override.example.yaml`](https://github.com/glen-w/Paperful/blob/main/compose.override.example.yaml) | Optional local Compose tweaks |
 
@@ -251,6 +251,10 @@ docker compose run --rm paperful run --collection interesting
 docker compose run --rm paperful report
 ```
 
+`docker compose stop` (or Ctrl-C on `up`) gives the container 30 s
+(`stop_grace_period`) to finish the job it is writing before it is killed;
+a Grab interrupted after that is resumable like any `run`.
+
 `--no-attach` writes to `out/` only. `--library` walks the whole library
 (resumable; Ctrl-C then rerun). Same flags as [Commands](commands.md),
 including `--year-from` / `--year-to` and `--type` / `-T`.
@@ -273,7 +277,7 @@ docker compose run --rm paperful run --collection interesting
 docker compose run --rm paperful report
 make docker-build          # uses PAPERFUL_IMAGE_MODE from .env
 make docker-build-heavy    # force heavy pack
-make docker-doctor
+make docker-doctor         # doctor --guide (interactive Enter walk)
 ```
 
 Pass any CLI flag after the service name; the image `ENTRYPOINT` is `paperful`.

@@ -337,7 +337,6 @@ def test_idle_stops_watch_loop(cfg, tmp_path: Path):
     cfg.out_dir = tmp_path / "out"
     cfg.state_dir.mkdir()
     ensure_inbox_dirs(cfg)
-    sleeps: list[float] = []
 
     class Backend:
         def supports_write(self):
@@ -636,7 +635,6 @@ def test_create_auto_title_only_fail_closed(cfg, tmp_path: Path, monkeypatch):
 
 
 def test_llm_when_thin_logs_without_auto_attach(cfg, tmp_path: Path, monkeypatch):
-    from paperful.inbox_match import match_ladder
     from tests.test_llm_verbs import StubLLM
 
     cfg.llm_enabled = True

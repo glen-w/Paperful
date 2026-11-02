@@ -18,7 +18,7 @@ from paperful.sync import run_sync, sync_state
 from paperful.zot import Collection, Item
 
 PDF = b"%PDF-1.4 the bytes"
-PDF_MD5 = hashlib.md5(PDF).hexdigest()
+PDF_MD5 = hashlib.md5(PDF, usedforsecurity=False).hexdigest()
 
 
 @pytest.fixture(autouse=True)
@@ -72,7 +72,9 @@ class FakeZotero:
             linkMode="imported_file",
             contentType="application/pdf",
             filename="paper.pdf",
-            md5=hashlib.md5(bytes_).hexdigest() if bytes_ else "0" * 32,
+            md5=hashlib.md5(bytes_, usedforsecurity=False).hexdigest()
+            if bytes_
+            else "0" * 32,
             title="Full Text PDF",
         )
         if bytes_ is not None:

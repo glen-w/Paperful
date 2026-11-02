@@ -386,3 +386,48 @@ def test_discover_shows_stop_rule_and_next_hop(tmp_path, monkeypatch):
     assert queue.status_code == 200
     assert "Next hop" in queue.text
     assert "Waiting on Keep or Skip." in queue.text
+
+
+@pytest.mark.skipif(
+    __import__("paperful.serve", fromlist=["fastapi_available"]).fastapi_available()
+    is False,
+    reason="paperful[serve] extra missing",
+)
+def test_discover_topic_bad_knob_bounces_not_500(tmp_path, monkeypatch):
+    """A knob that does not parse is a form error, and an empty search is refused."""
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    from paperful.serve import create_app
+    from paperful.ui import commands
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    queued: list[str] = []
+    monkeypatch.setattr(
+        commands,
+        "enqueue",
+        lambda _c, verb, fn, *, args=None: queued.append(verb) or "x",
+    )
+    client = TestClient(create_app(cfg), raise_server_exceptions=False)
+    client.cookies.set("pf_advanced", "1")
+    res = client.post(
+        "/discover/topic",
+        data={"kind": "search", "query": "ocean", "depth": "abc"},
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    assert "tab=topic" in res.headers["location"]
+    assert "error=" in res.headers["location"]
+    page = client.get(res.headers["location"])
+    assert "Check the Topic form" in page.text
+    res = client.post(
+        "/discover/topic", data={"kind": "search", "query": ""}, follow_redirects=False
+    )
+    assert res.status_code == 303
+    assert "Type+a+topic" in res.headers["location"]
+    assert queued == []

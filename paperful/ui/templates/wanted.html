@@ -7,115 +7,204 @@
 {% block body_attrs %}{% if request.query_params.get('run') or request.query_params.get('poll') %} data-poll-run="{{ request.query_params.get('run') or request.query_params.get('poll') }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Wanted</h1>
-<p class="page-lede">Find PDFs for items in the collection shown in the header. <strong>Missing</strong> means no file yet. <strong>Held</strong> means Paperful found a file but has not attached it, or the DOI does not match. <strong>Have</strong> means a matching PDF is already in the library. Preview shows what would happen; Grab downloads; Attach writes held files into Zotero.</p>
+<p class="page-lede">PDFs for items in <strong>{{ prefs.collection or 'the collection in the header' }}</strong>. <strong>Missing</strong> has no file yet; <strong>Held</strong> has a file that is not attached or does not match; <strong>Have</strong> is done. Preview shows what would happen, Grab downloads to <code>out/</code>, Attach writes held files into the library.</p>
 {% if coach %}<div class="coach-banner">{{ coach }} <a href="/system">System</a></div>{% endif %}
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
 {{ job_status(job) }}
-<p class="counts">Have {{ counts.have }} · Held {{ counts.held }} · Missing {{ counts.missing }}{% if prefs.collection %} · <a href="/wanted/report?format=md">Report</a>{% endif %}</p>
-{% if pending and (pending.total or pending.error) %}
-<section class="panel pending-fill" id="pending-fill">
-  <h2>Waiting from Discover <span class="counts">{{ pending.total }}</span></h2>
-  {% if pending.error %}<div class="error-banner">{{ pending.error }}</div>{% endif %}
-  <p class="section-lede">Papers you kept, or that a watch or keepup digest proposed, and that are not in this collection yet. Preview add → Apply creates metadata parents in this collection; they then appear under <strong>Missing</strong> for Preview and Grab.
-    <a href="/discover?tab=queue">Open queue</a> · <a href="/discover?tab=following">Following</a></p>
-  {% if pending.total %}
-  <form method="post" action="/wanted/pending-preview" class="form-stack" id="pending-fill-form">
-    <ul class="pending-list">
-      {% for row in pending.rows[:10] %}
-      <li data-pending-source="{{ row.source }}">
-        {% if row.doi %}
-        <label><input type="checkbox" name="pending_dois" value="{{ row.doi }}" class="pending-select" checked> {{ row.title or row.doi }}</label>
-        {% else %}
-        <span>{{ row.title }}</span> <span class="chip-summary">no DOI — add in Discover</span>
-        {% endif %}
-        <span class="chip-summary">{{ row.source_plain }}</span>{% if row.why %}<span class="row-why">Why suggested: {{ row.why }}</span>{% endif %}
-      </li>
-      {% endfor %}
-    </ul>
-    {% if pending.total > 10 %}<p class="section-lede">and {{ pending.total - 10 }} more (open Discover to add the rest).</p>{% endif %}
-    <div class="toolbar">
-      <button type="submit">Preview add</button>
-      {{ info("Classify the ticked DOIs against this collection without writing. Rows without a DOI stay for Discover.") }}
-      {% if pending_token %}
-      <button type="submit" formaction="/wanted/pending-apply" formmethod="post" class="secondary">Apply add</button>
-      <input type="hidden" name="review_token" value="{{ pending_token }}">
-      {{ info("Create metadata parents for the last successful Preview add. They land under Missing.") }}
-      {% endif %}
-    </div>
-  </form>
-  {% endif %}
+<p class="counts">Have {{ counts.have }} · Held {{ counts.held }} · Missing {{ counts.missing }}{% if prefs.collection %} · <a href="/wanted/report?format=md">Report</a>{% endif %}{% if pending and pending.total %} · <a href="#pending-fill">Waiting from Discover {{ pending.total }}</a>{% endif %}</p>
+
+{% if not prefs.collection %}
+<section class="panel empty-state">
+  <h2>Pick a collection first</h2>
+  <p class="section-lede">Wanted works on one collection at a time. Open <a href="/library">Library</a> and press the target icon next to the collection you want to fill.</p>
+</section>
+{% elif counts.have + counts.held + counts.missing == 0 and not error %}
+<section class="panel empty-state">
+  <h2>Nothing to fetch here</h2>
+  <p class="section-lede">This collection has no items, or the library did not return any. Try another collection on <a href="/library">Library</a>, or add papers on <a href="/discover">Discover</a>.</p>
 </section>
 {% endif %}
-<div class="tabs">
+
+<div class="tabs" role="tablist" aria-label="Wanted buckets">
   <span class="tab-with-help">
-    <a href="{{ wanted_pagination.tab_urls.missing }}" {% if tab == 'missing' %}class="active"{% endif %}>Missing</a>
+    <a href="{{ wanted_pagination.tab_urls.missing }}" {% if tab == 'missing' %}class="active" aria-current="page"{% endif %}>Missing <span class="tab-count">{{ counts.missing }}</span></a>
     {{ info("Items with no stored PDF. This is the usual list to Preview and Grab.") }}
   </span>
   <span class="tab-with-help">
-    <a href="{{ wanted_pagination.tab_urls.held }}" {% if tab == 'held' %}class="active"{% endif %}>Held</a>
+    <a href="{{ wanted_pagination.tab_urls.held }}" {% if tab == 'held' %}class="active" aria-current="page"{% endif %}>Held <span class="tab-count">{{ counts.held }}</span></a>
     {{ info("A PDF was downloaded or linked, but it is not attached yet, the DOI does not match, or the file still needs a check.") }}
   </span>
   <span class="tab-with-help">
-    <a href="{{ wanted_pagination.tab_urls.have }}" {% if tab == 'have' %}class="active"{% endif %}>Have</a>
+    <a href="{{ wanted_pagination.tab_urls.have }}" {% if tab == 'have' %}class="active" aria-current="page"{% endif %}>Have <span class="tab-count">{{ counts.have }}</span></a>
     {{ info("A PDF whose DOI matches the library item is already on the record.") }}
   </span>
 </div>
-<section class="panel">
+
+<section class="panel fetch-panel" id="fetch">
   <h2>Fetch</h2>
-  <p class="section-lede">Work on the current collection, or on rows you tick in the table below. With no rows ticked, Preview and Grab use the whole Missing list. {% if attach_mode == 'auto' %}Grab saves PDFs to the <code>out/</code> folder on this computer and attaches them when the library can be written (Zotero 10 or newer). On Zotero 7–9 the files stay on disk. Change this under Settings.{% else %}Grab saves PDFs to the <code>out/</code> folder on this computer only. Press Attach for the copies you trust.{% if show_auto_attach_setting %} Settings can make Grab attach automatically.{% endif %}{% endif %}</p>
+  <p class="section-lede">{% if attach_mode == 'auto' %}Grab saves PDFs to <code>out/</code> and attaches them when the library can be written (Zotero 10 or newer; on 7–9 the files stay on disk). Change this under Settings.{% else %}Grab saves PDFs to <code>out/</code> only. Press Attach for the copies you trust.{% if show_auto_attach_setting %} Settings can make Grab attach automatically.{% endif %}{% endif %} Tick rows below to work on a subset; with nothing ticked, Preview and Grab use the whole Missing list.</p>
 <form method="post" action="/wanted/preview" id="wanted-form" class="form-stack">
   <input type="hidden" name="grab_review_token" value="{{ grab_token }}">
   {% if prefs.advanced %}
-  <div class="field-group">
-    <p class="field-legend">Filters {{ info("Narrow which items this run considers. Leave blank to use the whole Missing list (or your ticked rows).") }}</p>
+  <details class="field-group field-group--details">
+    <summary class="field-legend">Filters {{ info("Narrow which items this run considers. Leave blank to use the whole Missing list (or your ticked rows).") }}</summary>
     <p class="section-lede">Optional limits. Undated items are dropped when you set a year range.</p>
-    <label>Year from {{ info("Only items dated this year or later. Undated items are excluded.") }} <input name="year_from" type="number"></label>
-    <label>Year to {{ info("Only items dated this year or earlier. Undated items are excluded.") }} <input name="year_to" type="number"></label>
-    <label>Type {{ info("Limit to a Zotero item type such as journalArticle or report.") }} <input name="item_type" placeholder="journalArticle"></label>
-    <label>Limit {{ info("Stop after this many items. Leave blank to consider every matching row.") }} <input name="limit" type="number" min="1"></label>
-    <label><input type="checkbox" name="retry_failed" value="1"> Retry failed {{ info("Try again on items that already came back empty on a previous run.") }}</label>
-    <label><input type="checkbox" name="try_all" value="1"> Try all sources {{ info("Try every configured PDF source even when metadata looks like a source would not apply — for example a journal source on a report.") }}</label>
-    <label><input type="checkbox" name="upgrade_linked" value="1"> Upgrade linked {{ info("Also fetch items that only have a linked PDF URL in Zotero, not a stored file.") }}</label>
-    <label><input type="checkbox" name="upgrade_snapshot" value="1"> Upgrade snapshot {{ info("Re-fetch items whose only PDF is an HTML page print. A native publisher PDF replaces the snapshot.") }}</label>
-    <label><input type="checkbox" name="browser_agent" value="1"> Browser agent {{ info("After other sources miss, let a headed browser try the publisher page. Needs LLM config and the browser-agent extra. Slow, and can hit captchas.") }}</label>
-  </div>
+    <div class="field-row">
+      <label>Year from {{ info("Only items dated this year or later. Undated items are excluded.") }} <input name="year_from" type="number" inputmode="numeric"></label>
+      <label>Year to {{ info("Only items dated this year or earlier. Undated items are excluded.") }} <input name="year_to" type="number" inputmode="numeric"></label>
+      <label>Type {{ info("Limit to a Zotero item type such as journalArticle or report.") }} <input name="item_type" placeholder="journalArticle"></label>
+      <label>Limit {{ info("Stop after this many items. Leave blank to consider every matching row.") }} <input name="limit" type="number" min="1" inputmode="numeric"></label>
+    </div>
+    <div class="field-row">
+      <label><input type="checkbox" name="retry_failed" value="1"> Retry failed {{ info("Try again on items that already came back empty on a previous run.") }}</label>
+      <label><input type="checkbox" name="try_all" value="1"> Try all sources {{ info("Try every configured PDF source even when metadata looks like a source would not apply — for example a journal source on a report.") }}</label>
+      <label><input type="checkbox" name="upgrade_linked" value="1"> Upgrade linked {{ info("Also fetch items that only have a linked PDF URL in Zotero, not a stored file.") }}</label>
+      <label><input type="checkbox" name="upgrade_snapshot" value="1"> Upgrade snapshot {{ info("Re-fetch items whose only PDF is an HTML page print. A native publisher PDF replaces the snapshot.") }}</label>
+      <label><input type="checkbox" name="browser_agent" value="1"> Browser agent {{ info("After other sources miss, let a headed browser try the publisher page. Needs LLM config and the browser-agent extra. Slow, and can hit captchas.") }}</label>
+    </div>
+  </details>
   {% endif %}
-  <div class="field-group">
-    <p class="field-legend">Actions {{ info("Preview is safe. Grab downloads to Paperful. Attach writes held files into Zotero.") }}</p>
+  <div class="field-group action-bar">
+    <p class="field-legend">Actions {{ info("Preview is safe. Grab downloads to Paperful. Attach writes held files into the library.") }} <span class="counts" id="wanted-selected-count" aria-live="polite"></span></p>
     <button type="submit" id="preview-btn" data-label-all="Preview all" data-label-sel="Preview selected">Preview all</button>
     {{ info("Show which items would be fetched, without downloading.") }}
     <button type="submit" formaction="/wanted/grab" id="grab-btn" data-label-all="Grab all" data-label-sel="Grab selected">Grab all</button>
     {% if attach_mode == 'auto' %}
     {{ info("Download PDFs into the out/ folder on this computer and attach them into the library when write access is available (Zotero 10 or newer).") }}
     {% else %}
-    {{ info("Download PDFs into the out/ folder on this computer. They are not attached to Zotero until you Attach.") }}
+    {{ info("Download PDFs into the out/ folder on this computer. They are not attached until you Attach.") }}
     {% endif %}
     <button type="submit" formaction="/wanted/attach" id="attach-btn" class="secondary"
       data-attach-count="{{ counts.attach }}"
       {% if counts.attach == 0 %}disabled{% endif %}
-      data-label-all="{% if counts.attach %}Attach {{ counts.attach }} PDF{% if counts.attach != 1 %}s{% endif %} to Zotero{% else %}Attach PDFs to Zotero{% endif %}"
-      data-label-sel="Attach selected PDFs">{% if counts.attach %}Attach {{ counts.attach }} PDF{% if counts.attach != 1 %}s{% endif %} to Zotero{% else %}Attach PDFs to Zotero{% endif %}</button>
-    {{ info("Write PDFs from the out/ folder into Zotero. Needs Zotero 10 or newer; on 7–9, attach those files in Zotero. Skips PDFs whose DOI does not match the item (use Advanced to override). CLI paperful run attaches mismatches unless you pass --strict-pdf-doi.") }}
+      data-label-all="{% if counts.attach %}Attach {{ counts.attach }} PDF{% if counts.attach != 1 %}s{% endif %} to {{ library_label or 'Zotero' }}{% else %}Attach PDFs to {{ library_label or 'Zotero' }}{% endif %}"
+      data-label-sel="Attach selected PDFs">{% if counts.attach %}Attach {{ counts.attach }} PDF{% if counts.attach != 1 %}s{% endif %} to {{ library_label or 'Zotero' }}{% else %}Attach PDFs to {{ library_label or 'Zotero' }}{% endif %}</button>
+    {{ info("Write PDFs from the out/ folder into the library. Needs Zotero 10 or newer; on 7–9, attach those files in Zotero. Skips PDFs whose DOI does not match the item (use Advanced to override). CLI paperful run attaches mismatches unless you pass --strict-pdf-doi.") }}
   </div>
 </form>
 </section>
+
+<section class="panel" id="items">
+  <div class="lib-items-head">
+    <h2>Items</h2>
+    <form class="lib-pager" method="get" action="/wanted">
+      <span class="counts">
+        {% if wanted_pagination.total %}
+        {{ wanted_pagination.range_start }}–{{ wanted_pagination.range_end }}
+        of {{ wanted_pagination.total }}
+        {% else %}
+        0 of 0
+        {% endif %}
+      </span>
+      <input type="hidden" name="tab" value="{{ tab }}">
+      <input type="hidden" name="page" value="1">
+      <label>
+        Order by {{ info("Sort this tab. Year sorts put undated items last.") }}
+        <select name="order" data-autosubmit>
+          {% for value, label in wanted_pagination.orders %}
+          <option value="{{ value }}"{% if value == wanted_pagination.order %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Per page {{ info("How many rows to show. Larger pages are heavier to render.") }}
+        <select name="per_page" data-autosubmit>
+          {% for n in wanted_pagination.page_sizes %}
+          <option value="{{ n }}"{% if n == wanted_pagination.per_page %} selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Filter {{ info("With summary: items that already have a Paperful summary. Without summary: the rest.") }}
+        <select name="filter" data-autosubmit>
+          {% for value, label in wanted_pagination.filter_options %}
+          <option value="{{ value }}"{% if value == wanted_pagination.filt %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Search {{ info("Match title, Zotero item key, or DOI. Applied with the other filters on this tab.") }}
+        <input type="search" name="q" value="{{ wanted_pagination.q }}" placeholder="Title, key, or DOI">
+      </label>
+      <button type="submit" class="secondary">Apply</button>
+      {% if wanted_pagination.prev_url %}
+      <a class="secondary lib-pager-nav" href="{{ wanted_pagination.prev_url }}">Previous</a>
+      {% endif %}
+      <span class="counts">Page {{ wanted_pagination.page }} / {{ wanted_pagination.page_count }}</span>
+      {% if wanted_pagination.next_url %}
+      <a class="secondary lib-pager-nav" href="{{ wanted_pagination.next_url }}">Next</a>
+      {% endif %}
+    </form>
+  </div>
+  <p class="section-lede">Tick rows to limit Fetch (and Advanced attach, recover, handoff, or reachout) to those items. The icon on the right says why an item is missing or held — hover or focus it.</p>
+<div class="table-wrap">
+<table class="wb-table wanted-table">
+  <caption class="sr-only">{{ tab|capitalize }} items in {{ prefs.collection }}</caption>
+  <thead><tr><th scope="col"><span class="sr-only">Select</span></th><th scope="col">Title</th><th scope="col">Detail</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+  <tr>
+    <td><input type="checkbox" name="keys" value="{{ row.key }}" form="wanted-form" class="row-select"
+      aria-label="Select {{ row.title }}"
+      {% if row.attachable %}data-attachable="1"{% endif %}
+      {% if row.ticked %}checked{% endif %}></td>
+    <td>{{ row.title }}
+      {% if row.miss_plain %}<span class="miss-reason" data-miss-surface="{{ row.miss_surface }}">{{ row.miss_plain }}</span>{% endif %}
+      <template id="d-{{ row.key }}" data-drawer-title="{{ row.title }}">
+        <p><strong>{{ row.title }}</strong></p>
+        <p>Key {{ row.key }}{% if row.year %} · {{ row.year }}{% endif %}</p>
+        {% if row.doi %}<p>DOI {{ row.doi }}</p>{% endif %}
+        {% if row.source %}<p>Source {{ row.source }}</p>{% endif %}
+        {% if row.state %}<p>Verification {{ row.state }}{% if row.reason %} ({{ row.reason }}){% endif %}</p>{% endif %}
+        {% if row.miss_plain %}<p>{{ row.miss_plain }}</p>{% endif %}
+        {% if row.has_summary %}
+        <p><a href="/briefs/summary/{{ row.key }}">Open summary</a></p>
+        <iframe class="summary-frame" sandbox="" data-src="/item/{{ row.key }}/summary" title="Summary"></iframe>
+        {% endif %}
+        {% if prefs.advanced and briefs.llm_on and tab != 'missing' %}
+        <form method="post" action="/wanted/summarize" class="toolbar">
+          <input type="hidden" name="key" value="{{ row.key }}">
+          <label>Dest {{ info("disk: HTML under out/summaries only. zotero: a child note on this item. both: files and a note.") }} <select name="dest">{% for d in dest_options %}<option value="{{ d }}">{{ d }}</option>{% endfor %}</select></label>
+          <label><input type="checkbox" name="force" value="1"> Force {{ info("Regenerate even when a summary already exists, and summarize when the PDF identity check would skip this item.") }}</label>
+          <button type="submit">Summarize this</button>
+        </form>
+        {% endif %}
+      </template>
+    </td>
+    <td class="detail-cell">
+      {% if row.miss_plain %}{{ status_icon(row.miss_surface, row.miss_plain, row.miss_detail) }}
+      {% elif row.state %}{{ verify_stamp(row.stamp) }}{{ status_icon(row.state, row.verify_plain, row.verify_tip) }}
+      {% endif %}
+      {% if row.has_summary %}<span class="chip-summary">summary</span>{% endif %}
+      {{ icon_button('Detail', 'detail', drawer='d-' ~ row.key) }}
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="3" class="counts">No {{ tab }} items{% if wanted_pagination.q %} match “{{ wanted_pagination.q }}”{% endif %}.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+</section>
+
 {% if prefs.advanced %}
 <section class="panel">
-  <h2>Advanced</h2>
-  <p class="section-lede">Overrides and recovery. These can attach a PDF that is the wrong paper, or open many browser tabs. Preview first when a Preview button is offered.</p>
+  <details class="panel-details">
+  <summary class="panel-summary">Advanced <span class="counts">overrides and recovery</span></summary>
+  <p class="section-lede">These can attach a PDF that is the wrong paper, or open many browser tabs. Preview first when a Preview button is offered.</p>
   <div class="cluster">
-    <p class="field-legend">Attach {{ info("Write held PDFs into Zotero, including files the usual Attach button would refuse.") }}</p>
+    <p class="field-legend">Attach {{ info("Write held PDFs into the library, including files the usual Attach button would refuse.") }}</p>
     <p class="section-lede">Use these only when you have looked at the held file and still want it on the item.</p>
     <form method="post" action="/wanted/attach/preview" class="toolbar keys-form">
       <label><input type="checkbox" name="allow_mismatch" value="1"> Allow DOI mismatch {{ info("Attach a PDF whose DOI does not match the library item. The file may be a different paper.", danger=true) }}</label>
       <label><input type="checkbox" name="allow_short" value="1"> Allow short PDF {{ info("Attach a dense one-page PDF that Paperful held back because it often looks like a landing page, not a full article.", danger=true) }}</label>
       <button type="submit" class="secondary">Preview attach</button>
-      {{ info("Show which held files would be attached with the overrides above, without writing to Zotero.") }}
+      {{ info("Show which held files would be attached with the overrides above, without writing to the library.") }}
     </form>
     <form method="post" action="/wanted/attach" class="toolbar">
       <input type="hidden" name="review_token" value="{{ attach_token }}">
-      <button type="submit">Attach held PDFs</button>
-      {{ info("Apply the last successful attach preview to Zotero.") }}
+      <button type="submit"{% if not attach_token %} disabled title="Preview attach first"{% endif %}>Attach held PDFs</button>
+      {{ info("Apply the last successful attach preview. Disabled until a Preview attach has finished.") }}
     </form>
   </div>
   <div class="cluster">
@@ -130,14 +219,14 @@
           <option value="browser_agent_not_found">browser_agent_not_found</option>
         </select>
       </label>
-      <label>Limit {{ info("Cap how many items Recover tries this time.") }} <input name="recover_limit" type="number" min="1"></label>
+      <label>Limit {{ info("Cap how many items Recover tries this time.") }} <input name="recover_limit" type="number" min="1" inputmode="numeric"></label>
       <button type="submit" class="secondary">Preview recover</button>
       {{ info("Show which items would be sent to the browser agent, without opening a browser.") }}
     </form>
     <form method="post" action="/wanted/recover" class="toolbar">
       <input type="hidden" name="review_token" value="{{ recover_token }}">
-      <button type="submit">Recover</button>
-      {{ info("Run the last successful recover preview in a headed browser.") }}
+      <button type="submit"{% if not recover_token %} disabled title="Preview recover first"{% endif %}>Recover</button>
+      {{ info("Run the last successful recover preview in a headed browser. Disabled until a Preview recover has finished.") }}
     </form>
   </div>
   <form method="post" action="/wanted/handoff" class="toolbar keys-form">
@@ -174,130 +263,42 @@
     </label>
     <button type="submit" class="secondary">Reachout</button>
   </form>
+  </details>
 </section>
 {% endif %}
-<section class="panel">
-  <div class="lib-items-head">
-    <h2>Items</h2>
-    <form class="lib-pager" method="get" action="/wanted">
-      <span class="counts">
-        {% if wanted_pagination.total %}
-        {{ wanted_pagination.range_start }}–{{ wanted_pagination.range_end }}
-        of {{ wanted_pagination.total }}
+
+{% if pending and (pending.total or pending.error) %}
+<section class="panel pending-fill" id="pending-fill">
+  <details class="panel-details"{% if pending.error %} open{% endif %}>
+  <summary class="panel-summary">Waiting from Discover <span class="counts">{{ pending.total }}</span></summary>
+  {% if pending.error %}<div class="error-banner">{{ pending.error }}</div>{% endif %}
+  <p class="section-lede">Papers you kept on Discover, or that a watch or keepup digest proposed, that are not in this collection yet. Preview add → Apply add creates metadata parents here; they then appear under <strong>Missing</strong>. These come from every topic run, not only ones about this collection.
+    <a href="/discover?tab=queue">Open queue</a> · <a href="/discover?tab=following">Following</a></p>
+  {% if pending.total %}
+  <form method="post" action="/wanted/pending-preview" class="form-stack" id="pending-fill-form">
+    <ul class="pending-list">
+      {% for row in pending.rows[:10] %}
+      <li data-pending-source="{{ row.source }}">
+        {% if row.doi %}
+        <label><input type="checkbox" name="pending_dois" value="{{ row.doi }}" class="pending-select" checked> {{ row.title or row.doi }}</label>
         {% else %}
-        0 of 0
+        <span>{{ row.title }}</span> <span class="chip-summary">no DOI — add in Discover</span>
         {% endif %}
-      </span>
-      <input type="hidden" name="tab" value="{{ tab }}">
-      <input type="hidden" name="page" value="1">
-      <label>
-        Order by {{ info("Sort this tab. Year sorts put undated items last.") }}
-        <select name="order" onchange="this.form.submit()">
-          {% for value, label in wanted_pagination.orders %}
-          <option value="{{ value }}"{% if value == wanted_pagination.order %} selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>
-        Per page {{ info("How many rows to show. Larger pages are heavier to render.") }}
-        <select name="per_page" onchange="this.form.submit()">
-          {% for n in wanted_pagination.page_sizes %}
-          <option value="{{ n }}"{% if n == wanted_pagination.per_page %} selected{% endif %}>{{ n }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>
-        Filter {{ info("With summary: items that already have a Paperful summary. Without summary: the rest.") }}
-        <select name="filter" onchange="this.form.submit()">
-          {% for value, label in wanted_pagination.filter_options %}
-          <option value="{{ value }}"{% if value == wanted_pagination.filt %} selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>
-        Search {{ info("Match title, Zotero item key, or DOI. Applied with the other filters on this tab.") }}
-        <input type="search" name="q" value="{{ wanted_pagination.q }}" placeholder="Title, key, or DOI">
-      </label>
-      <button type="submit" class="secondary">Apply</button>
-      {% if wanted_pagination.prev_url %}
-      <a class="secondary lib-pager-nav" href="{{ wanted_pagination.prev_url }}">Previous</a>
-      {% endif %}
-      <span class="counts">Page {{ wanted_pagination.page }} / {{ wanted_pagination.page_count }}</span>
-      {% if wanted_pagination.next_url %}
-      <a class="secondary lib-pager-nav" href="{{ wanted_pagination.next_url }}">Next</a>
-      {% endif %}
-    </form>
-  </div>
-  <p class="section-lede">Tick rows to limit Fetch (and Advanced attach, recover, handoff, or reachout) to those items. With none ticked, Fetch uses the whole tab. The icon in Detail explains why an item is missing or held — hover it.</p>
-<table class="wb-table">
-  <thead><tr><th></th><th>Title</th><th>Detail</th></tr></thead>
-  <tbody>
-  {% for row in rows %}
-  <tr>
-    <td><input type="checkbox" name="keys" value="{{ row.key }}" form="wanted-form" class="row-select"
-      {% if row.attachable %}data-attachable="1"{% endif %}
-      {% if row.ticked %}checked{% endif %}></td>
-    <td>{{ row.title }}
-      {% if row.miss_plain %}<span class="miss-reason" data-miss-surface="{{ row.miss_surface }}">{{ row.miss_plain }}</span>{% endif %}
-      {{ icon_button('Detail', 'detail', onclick="openDrawer('d-" ~ row.key ~ "')") }}
-      <dialog class="wb-drawer" id="d-{{ row.key }}">
-        <p><strong>{{ row.title }}</strong></p>
-        <p>Key {{ row.key }}{% if row.year %} · {{ row.year }}{% endif %}</p>
-        {% if row.doi %}<p>DOI {{ row.doi }}</p>{% endif %}
-        {% if row.source %}<p>Source {{ row.source }}</p>{% endif %}
-        {% if row.state %}<p>Verification {{ row.state }}{% if row.reason %} ({{ row.reason }}){% endif %}</p>{% endif %}
-        {% if row.miss_plain %}<p>{{ row.miss_plain }}</p>{% endif %}
-        {% if row.has_summary %}
-        <p><a href="/briefs/summary/{{ row.key }}">Open summary</a></p>
-        <iframe class="summary-frame" sandbox="" data-src="/item/{{ row.key }}/summary" title="Summary"></iframe>
-        {% endif %}
-        {% if prefs.advanced and briefs.llm_on and tab != 'missing' %}
-        <form method="post" action="/wanted/summarize" class="toolbar">
-          <input type="hidden" name="key" value="{{ row.key }}">
-          <label>Dest {{ info("disk: HTML under out/summaries only. zotero: a child note on this item. both: files and a note.") }} <select name="dest">{% for d in dest_options %}<option value="{{ d }}">{{ d }}</option>{% endfor %}</select></label>
-          <label><input type="checkbox" name="force" value="1"> Force {{ info("Regenerate even when a summary already exists, and summarize when the PDF identity check would skip this item.") }}</label>
-          <button type="submit">Summarize this</button>
-        </form>
-        {% endif %}
-        <form method="dialog"><button class="secondary">Close</button></form>
-      </dialog>
-    </td>
-    <td>
-      {% if row.miss_plain %}{{ status_icon(row.miss_surface, row.miss_plain, row.miss_detail) }}
-      {% elif row.state %}{{ verify_stamp(row.stamp) }}{{ status_icon(row.state, row.verify_plain, row.verify_tip) }}
-      {% endif %}
-      {% if row.has_summary %}<span class="chip-summary">summary</span>{% endif %}
-    </td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
+        <span class="chip-summary">{{ row.source_plain }}</span>{% if row.why %}<span class="row-why">Why suggested: {{ row.why }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% if pending.total > 10 %}<p class="section-lede">and {{ pending.total - 10 }} more (open Discover to add the rest).</p>{% endif %}
+    <div class="toolbar">
+      <button type="submit" class="secondary">Preview add</button>
+      {{ info("Classify the ticked DOIs against this collection without writing. Rows without a DOI stay for Discover.") }}
+      <button type="submit" formaction="/wanted/pending-apply" formmethod="post"{% if not pending_token %} disabled title="Preview add first"{% endif %}>Apply add</button>
+      <input type="hidden" name="review_token" value="{{ pending_token }}">
+      {{ info("Create metadata parents for the last successful Preview add. They land under Missing. Disabled until a Preview add has finished.") }}
+    </div>
+  </form>
+  {% endif %}
+  </details>
 </section>
-{% endblock %}
-{% block scripts %}
-<script>
-(function () {
-  var main = document.getElementById("wanted-form");
-  if (!main) return;
-  document.querySelectorAll("form.keys-form").forEach(function (form) {
-    form.addEventListener("submit", function () {
-      main.querySelectorAll(".row-select:checked").forEach(function (box) {
-        var input = document.createElement("input");
-        input.type = "hidden";
-        input.name = "keys";
-        input.value = box.value;
-        form.appendChild(input);
-      });
-      var lim = form.querySelector("[name=recover_limit]");
-      if (lim && lim.value) {
-        var hidden = document.createElement("input");
-        hidden.type = "hidden";
-        hidden.name = "limit";
-        hidden.value = lim.value;
-        form.appendChild(hidden);
-      }
-    });
-  });
-})();
-</script>
+{% endif %}
 {% endblock %}

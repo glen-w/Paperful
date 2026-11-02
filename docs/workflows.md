@@ -124,11 +124,10 @@ uv run paperful all -C BBNJ --skip summarize
 
 `--steps` replaces the list. `--skip` removes names from it. Unknown names
 exit 1. Optional names you can add, which are **not** in the default chain:
-`snapshot`, `dedupe`, `synthesize`, `ocr`.
+`snapshot`, `dedupe`, `synthesize`, `ocr`, `gaps_handoff`.
 
-`dedupe` and `restore` honor `apply` only when `all` is running them. A
-direct `paperful dedupe --profile …` does not trash unless you also pass
-`--apply`.
+`dedupe` honors `apply` only when `all` is running it. A direct
+`paperful dedupe --profile …` does not trash unless you also pass `--apply`.
 
 ## 3. Save the slice
 

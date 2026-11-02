@@ -7,7 +7,6 @@ import json
 import pytest
 
 from paperful.config import Config
-from paperful.llm.client import LLMClientError
 from paperful.rag.answer import NO_HITS, answer, looks_insufficient
 from paperful.rag.cites import neighbor_keys
 from paperful.rag.evidence import expand_queries, filter_evidence, summarize_hits

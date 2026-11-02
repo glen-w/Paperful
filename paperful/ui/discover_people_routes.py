@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from . import commands, jobs
 from .context import UiContext
+from .discover_common import bad_list_name, safe_list_name
 from .prefs import prefs_from_request
 
 
@@ -79,7 +80,9 @@ async def handle_discover_packs_promote(
 async def handle_discover_follow(ui: UiContext, request: Request) -> RedirectResponse:
     form = await request.form()
     orcid = str(form.get("orcid") or "").strip()
-    list_name = str(form.get("list_name") or "followed").strip()
+    list_name = safe_list_name(form.get("list_name"), default="followed")
+    if list_name is None:
+        return bad_list_name()
     backfill = str(form.get("backfill_from") or "").strip() or None
     if not orcid:
         return RedirectResponse(
@@ -97,7 +100,9 @@ async def handle_discover_follow(ui: UiContext, request: Request) -> RedirectRes
 
 async def handle_discover_aw_save(ui: UiContext, request: Request) -> RedirectResponse:
     form = await request.form()
-    name = str(form.get("name") or "").strip()
+    name = safe_list_name(form.get("name"))
+    if name is None:
+        return bad_list_name()
     if not name:
         return RedirectResponse(
             url=ui.page_url("/discover", tab="people"), status_code=303
@@ -112,7 +117,9 @@ async def handle_discover_aw_save(ui: UiContext, request: Request) -> RedirectRe
 
 async def handle_discover_aw_add(ui: UiContext, request: Request) -> RedirectResponse:
     form = await request.form()
-    name = str(form.get("list_name") or "followed").strip()
+    name = safe_list_name(form.get("list_name"), default="followed")
+    if name is None:
+        return bad_list_name()
     orcid = str(form.get("orcid") or "").strip()
     display = str(form.get("display_name") or "").strip()
     affiliation = str(form.get("affiliation") or "").strip()
@@ -130,7 +137,9 @@ async def handle_discover_aw_remove(
     ui: UiContext, request: Request
 ) -> RedirectResponse:
     form = await request.form()
-    name = str(form.get("list_name") or "").strip()
+    name = safe_list_name(form.get("list_name"))
+    if name is None:
+        return bad_list_name()
     person_id = str(form.get("person_id") or "").strip()
     orcid = str(form.get("orcid") or "").strip()
     from ..authorwatch import remove_person
@@ -145,7 +154,9 @@ async def handle_discover_aw_resolve(
     ui: UiContext, request: Request
 ) -> RedirectResponse:
     form = await request.form()
-    name = str(form.get("list_name") or "").strip()
+    name = safe_list_name(form.get("list_name"))
+    if name is None:
+        return bad_list_name()
 
     def work(_cmd_id: str) -> None:
         from ..authorwatch import resolve_people
@@ -158,7 +169,9 @@ async def handle_discover_aw_resolve(
 
 async def handle_discover_aw_run(ui: UiContext, request: Request) -> RedirectResponse:
     form = await request.form()
-    name = str(form.get("list_name") or "").strip()
+    name = safe_list_name(form.get("list_name"))
+    if name is None:
+        return bad_list_name()
     backfill = str(form.get("backfill_from") or "").strip() or None
     max_authors = form.get("max_authors")
     per_author = form.get("per_author_limit")
@@ -192,7 +205,9 @@ async def handle_discover_aw_run(ui: UiContext, request: Request) -> RedirectRes
 
 async def handle_discover_aw_import(ui: UiContext, request: Request):
     form = await request.form()
-    name = str(form.get("list_name") or "followed").strip()
+    name = safe_list_name(form.get("list_name"), default="followed")
+    if name is None:
+        return bad_list_name()
     source = str(form.get("source") or "csv").strip().lower()
     upload = form.get("file")
     filename = str(getattr(upload, "filename", "") or "")
@@ -214,7 +229,9 @@ async def handle_discover_aw_suggest(
 ) -> RedirectResponse:
     prefs = prefs_from_request(request)
     form = await request.form()
-    name = str(form.get("list_name") or "").strip()
+    name = safe_list_name(form.get("list_name"))
+    if name is None:
+        return bad_list_name()
     method = str(form.get("method") or "corpus").strip()
     limit = int(str(form.get("limit") or "15") or "15")
     collection = str(form.get("collection") or prefs.collection or "").strip()
@@ -232,7 +249,9 @@ async def handle_discover_aw_accept(
     ui: UiContext, request: Request
 ) -> RedirectResponse:
     form = await request.form()
-    name = str(form.get("list_name") or "").strip()
+    name = safe_list_name(form.get("list_name"))
+    if name is None:
+        return bad_list_name()
     ids = [str(v) for v in form.getlist("suggestion_id")]
     seed_from = str(form.get("seed_from") or "").strip() or None
 
@@ -249,7 +268,9 @@ async def handle_discover_aw_delete(
     ui: UiContext, request: Request
 ) -> RedirectResponse:
     form = await request.form()
-    name = str(form.get("list_name") or "").strip()
+    name = safe_list_name(form.get("list_name"))
+    if name is None:
+        return bad_list_name()
     from ..authorwatch import delete_list
 
     delete_list(ui.cfg, name, yes=True)
@@ -258,7 +279,9 @@ async def handle_discover_aw_delete(
 
 async def handle_discover_aw_edit(ui: UiContext, request: Request) -> RedirectResponse:
     form = await request.form()
-    name = str(form.get("list_name") or "").strip()
+    name = safe_list_name(form.get("list_name"))
+    if name is None:
+        return bad_list_name()
     person_id = str(form.get("person_id") or "").strip()
     display = str(form.get("display_name") or "").strip()
     affiliation = str(form.get("affiliation") or "").strip()
@@ -276,7 +299,9 @@ async def handle_discover_aw_briefing(
     ui: UiContext, request: Request
 ) -> RedirectResponse:
     form = await request.form()
-    name = str(form.get("list_name") or "").strip()
+    name = safe_list_name(form.get("list_name"))
+    if name is None:
+        return bad_list_name()
     if not name:
         return RedirectResponse(
             url=ui.page_url("/discover", tab="people"), status_code=303

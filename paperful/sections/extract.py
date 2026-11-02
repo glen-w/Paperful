@@ -183,8 +183,8 @@ def extract_fields(
             continue
 
         canonicals = MVP_CANONICALS.get(name, (name,))
-        sl = _pick_section_text(slices, canonicals)
-        if name == "abstract" and sl is None and record_abstract.strip():
+        picked: SectionSlice | None = _pick_section_text(slices, canonicals)
+        if name == "abstract" and picked is None and record_abstract.strip():
             ab = record_abstract.strip()
             if len(ab) >= MIN_SECTION_BODY_CHARS:
                 fields[name] = FieldValue(
@@ -194,18 +194,18 @@ def extract_fields(
                     pages="",
                 )
                 continue
-        if sl is None or not _body_usable(sl.body):
+        if picked is None or not _body_usable(picked.body):
             fields[name] = None
             missing.append(name)
             continue
-        text = sl.body.strip()
+        text = picked.body.strip()
         if len(text) > max_field_chars:
             text = text[:max_field_chars].rstrip() + "…"
         fields[name] = FieldValue(
             text=text,
             provenance="rule",
-            heading=sl.heading,
-            pages=_page_range(starts, sl.page_start, sl.page_end),
+            heading=picked.heading,
+            pages=_page_range(starts, picked.page_start, picked.page_end),
         )
 
     result.fields = _serialize_fields(fields)

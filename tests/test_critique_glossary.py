@@ -63,7 +63,7 @@ def test_scan_expansion_and_bare_phrase():
     )
     hits = scan_glossary(expansion_body, (BBNJ,))
     assert {h.code for h in hits} == {"acronym_expansion_mismatch"}
-    assert hits[0].token == "BBNJ"
+    assert hits[0].token == "BBNJ"  # noqa: S105 -- name only, not a credential
     assert "Areas Beyond National Jurisdiction" in hits[0].detail
     assert hits[0].suggested == "Areas Beyond National Jurisdiction (BBNJ)"
     assert not hits[0].quote.lower().startswith("the maritime")

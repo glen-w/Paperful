@@ -136,9 +136,9 @@ def library_per_page_from_request(request: Any, cfg: Config) -> int:
         text = str(raw).strip()
         if text.isdigit():
             return coerce_library_per_page(int(text), cfg)
-    from .prefs import COOKIE_LIBRARY_PER_PAGE
+    from .prefs import COOKIE_LIBRARY_PER_PAGE, read_cookie
 
-    cookie = (request.cookies.get(COOKIE_LIBRARY_PER_PAGE) or "").strip()
+    cookie = read_cookie(request, COOKIE_LIBRARY_PER_PAGE).strip()
     if cookie.isdigit():
         return coerce_library_per_page(int(cookie), cfg)
     return coerce_library_per_page(cfg.ui_library_page_size, cfg)
@@ -347,3 +347,15 @@ def queue_fingerprint(cfg: Config, verb: str) -> str:
         for name in row["files"]:
             lines.append(f"{verb}|{name}")
     return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+PICKER_TITLE_MAX = 90
+
+
+def picker_title(title: str | None, key: str, limit: int = PICKER_TITLE_MAX) -> str:
+    """Option text for an item picker: the title, clipped so a 200-character
+    title cannot stretch a ``<select>`` past the page width."""
+    text = " ".join(str(title or "").split()) or key
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"

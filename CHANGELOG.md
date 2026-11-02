@@ -6,6 +6,161 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+### Workbench hardening wave (GUI)
+
+Assessment and plan: `assessments/2026-11-02-gui-ux-assessment-and-hardening-wave.md`.
+
+- **Security.** Content Security Policy (`script-src 'self'`) plus `nosniff`,
+  `Referrer-Policy`, `X-Frame-Options`, and `Cache-Control` on every response
+  (`paperful.ui.security_headers`). All inline `on*=` handlers and inline
+  `<script>` blocks are gone from the templates (`data-*` attributes +
+  `workbench.js`); a test keeps them out. Fixes a reflected script injection
+  through the authorwatch `list_name` query parameter (now validated, `400`).
+  `Referer`/`next=` redirects are same-host only. Preference cookies are
+  `SameSite=Strict` and port-suffixed off 8765.
+- **Orphaned jobs.** Records left `queued`/`running` by a previous process
+  are marked `failed` at startup; Activity no longer opens an SSE stream for
+  them forever. Records gain `started`/`finished`; SSE reconnects are capped.
+- **Speed.** Collection counts and Wanted scope rows are cached per process
+  (ten / five minutes; any finished job or **Refresh counts** drops them).
+  System renders from cache with **Re-check** as a background `doctor` job.
+  Second visits: Library 36 s → <1 s, System 47 s → instant, Wanted 8 s → 1.5 s
+  on a 50k-item mirror.
+- **Layout.** Reflows at 1000 px and 720 px; tables scroll inside their
+  panel; hidden help-tip bubbles no longer widen the page (every page is
+  overflow-free at 390 px and 1440 px). Fonts self-hosted; no third-party
+  requests.
+- **Wanted.** Fetch actions sit above the item table with a selected-row
+  count; Filters, Advanced, and **Waiting from Discover** are collapsible
+  (the waiting panel now says it spans every topic run); empty states for
+  "no collection" and "nothing here"; one shared detail drawer instead of
+  one `<dialog>` per row; row checkboxes are labelled.
+- **Discover.** Topic Advanced knobs are grouped (Seeds / Graph / Stopping
+  rule / Keywords & filters / After create / Profile) with selects and
+  checkbox chips for fixed vocabularies instead of free text; the Queue
+  heading shows the run's query and target collection (`summary.json` now
+  records `query`); Keep/Skip is a segmented control (no raw `None`).
+- **Apply buttons** (Add selected, Apply inbox, Attach held PDFs, Recover,
+  Apply ingest-dois, Apply add) are disabled until their Preview has
+  finished, matching Repair/Mirror.
+- **Activity / System.** Started, duration, result, and a link back to the
+  page per job; status dots; green doctor rows show detail, amber/red the
+  next step.
+- **Settings.** Writes go through `paperful.ui.config_patch`: values
+  validated, TOML-escaped, written into the right table only, parsed, and
+  replaced atomically — or nothing is written and the page says so. The
+  preset is labelled as a browser setting.
+- **Errors.** HTML error pages for browser navigations (404, 403, 409, 422,
+  500) with the cause and links back; JSON stays for `/v1/*` and API clients.
+- **Accessibility.** Skip link, `<main id="main">`, table captions and
+  `scope="col"`, labelled row checkboxes, `aria-current` on the active nav
+  item, help tips as real buttons with `aria-describedby` tooltips,
+  `prefers-reduced-motion`.
+- **Nav.** Briefs is reached from Index (nav drops to 13 items when
+  Advanced); `/briefs` still works.
+- **Tests.** New opt-in `browser` lane (`uv run pytest -m browser`,
+  Playwright Chromium, `tests/browser/`): 22 pages × 2 widths checked for
+  status, console errors, third-party requests, inline handlers, unnamed
+  controls, missing captions, overflow; plus flow tests for ticks/labels,
+  the shared drawer, Preview-gated Apply, Keep/Skip, orphan reconciliation,
+  Re-check, mobile stacking, and help-tip focus. CI job `browser`.
+
+## 1.7.0 — 2026-11-02
+
+Hardening + platform wave: required security/supply-chain CI gates, an
+optional workbench token, a leaner core install, atomic ledger writes, and
+the backend conformance kit. Migration notes: Playwright moved from core
+dependencies to the `paperful[browser]` extra (the Compose image still
+installs it, so Docker operators are unaffected; `pip`/`pipx` users who run
+`session login` or htmlpdf need `pip install "paperful[browser]"` — `doctor`
+names the extra when it is missing).
+
+### Added
+
+- **Workbench token auth (opt-in).** `PAPERFUL_UI_TOKEN` or
+  `paperful serve --ui-token` requires `Authorization: Bearer …` (or
+  `X-Paperful-Token`) on everything except `/health`. Loopback remains the
+  default posture; this hardens a deliberately exposed
+  `--allow-remote-bind`. See `SECURITY.md`.
+- **Weekly SBOM + required audits.** CI now requires `pip-audit` (with a
+  CycloneDX SBOM artifact), a `--disable-socket` network-isolation job,
+  and a fresh-install smoke job (`paperful[serve]` from an isolated venv:
+  `doctor` exits 2 without Zotero, then the workbench answers `/health`).
+  Suite matrix spans Python 3.10–3.14.
+- **Opt-in update notice.** `[updates] check = true` asks `doctor` to
+  compare the installed version against PyPI at most once a day (cached,
+  never a background call, no telemetry).
+- **Backend conformance kit.** A protocol/behaviour contract suite
+  (`tests/test_wave17_conformance.py`) every `LibraryBackend` must pass;
+  promotion to "supported" still requires a real-library field report
+  (criteria in `docs/plans/1.7-wave.md`). Mendeley/EndNote wording is
+  unchanged — still seeking testers.
+- **Hostile-input parser tests + defusedxml.** EndNote/XML, arXiv, RIS,
+  and BibTeX parsers reject billion-laughs/XXE payloads; the five XML
+  parse sites now go through `defusedxml`.
+- **Synthetic-mirror benchmark** (`scripts/bench_synthetic.py`) for
+  offline scan-timing checks at 200–20k items.
+- **Atomic ledger writes.** Snowball/search watch, author-watch, keepup,
+  and search-store JSON now write via `paperful.fsio` (same `.part` +
+  `os.replace` contract as run reports); crash-resume tests pin that a
+  torn or half-written file never replaces the last good one.
+
+### Changed
+
+- **Playwright is an extra, not core** (`paperful[browser]`, also kept as
+  the `htmlpdf` alias). Core + `[serve]` installs are leaner; `doctor`
+  points at the extra on `session login`/htmlpdf paths.
+- **Quality gates ratcheted.** Coverage gate 80 → 82 (measured 82.3%;
+  the planned 85 is deferred, not claimed — see
+  `docs/plans/1.7-wave.md`); `mypy` scope 6 → 204 files; ruff gains the
+  full `F` family plus staged `S105/S110/S112/S311/S314/S324/S603/S606/
+  S607/S608` with justified `# noqa` comments at shell-out/SQL/secret
+  shape-check sites.
+- **Socket gate is required.** Four tests that dialled Crossref/OpenAlex/
+  Semantic Scholar for real now stub the module that actually calls out;
+  the whole suite passes under `--disable-socket`.
+- **Lockfile hardened.** Vulnerable transitive pins refreshed
+  (certifi/filelock/opentelemetry/docling stack); `pip-audit` reports no
+  known vulnerabilities on Python ≥3.11.
+- **Socket-offender fixes are stub-target fixes only** — no production
+  network behaviour changed to satisfy the gate.
+
+### Added (earlier in the cycle)
+
+- **`paperful config check`.** Reports unknown `config.toml` keys and
+  sections (did-you-mean hints) and secrets that belong in the environment.
+  Exit 1 when anything is flagged. Complements `doctor`.
+- **`paperful sr`.** Systematic-review scaffold: `init --slug` writes
+  `state/sr/<slug>/protocol.json` (`paperful.sr.protocol.v1`); `screen`
+  appends `screening.jsonl` (`paperful.sr.screen.v1`); `status` counts
+  include / exclude / maybe. Local only; no scheduler, no workbench page yet.
+- **Workbench origin guard.** Non-`GET` requests whose `Sec-Fetch-Site`,
+  `Origin`, or `Referer` point at another site return **403**. Same-origin
+  forms, `curl`, and the Firefox add-on are unaffected. Still no HTTP auth.
+- **Activity error column** and a cap of 20 queued GUI jobs
+  (`too many queued jobs` past that). Worker failures are logged instead of
+  swallowed.
+- **Docs: workflow GIFs** (`docs/_static/workflows/*.gif`, built by
+  `scripts/docs/record_workflows.py`) for Preview on Wanted, the Advanced
+  toggle, the Discover Queue map, and Library scope; new screenshots for the
+  Queue map, Following, Critique, Suggest edits, and Stuff. All workbench
+  screenshots refreshed.
+
+### Changed
+
+- **Atomic state writes.** Run reports, `last-run.json`, and mirror JSON go
+  through `paperful.fsio` (unique `.part` temp file + `os.replace`;
+  `file_lock` under `state/.locks/` via `filelock`, now a dependency).
+- **CI.** `lint` adds `ruff format --check` and `mypy` (typed-module list in
+  `[tool.mypy]`; the tree is now `ruff format` clean); `suite` is a required
+  matrix over Ubuntu / macOS / Windows × Python 3.10–3.13 (3.14 added in
+  1.7.0 — see above). Dependabot watches pip and GitHub Actions weekly.
+  `make lint` matches the lint job.
+- **Dependency floors.** `pypdf>=6.21.4` and `urllib3>=2.8` for published
+  CVEs.
+- **Compose** `stop_grace_period: 30s` so a running Grab can finish writing
+  its report on `docker compose down`.
+
 ## 1.6.5 — 2026-11-02
 
 ### Added

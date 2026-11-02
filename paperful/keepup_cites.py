@@ -151,7 +151,7 @@ def probe_cites(
 
             finder = _library_lookup(lib, scope="library", collection=dest)
             _mark_exists(rows, finder)
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass
 
     proposed = [row for row in rows if row.status == "new"]

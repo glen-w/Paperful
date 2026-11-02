@@ -60,7 +60,7 @@ def parse_page(html: str, base_url: str) -> PageResult:
     if meta and meta.get("content"):
         candidates.append(str(meta["content"]))
     for obj in soup.find_all("object"):
-        if "pdf" in (obj.get("type") or "").lower() and obj.get("data"):
+        if "pdf" in str(obj.get("type") or "").lower() and obj.get("data"):
             candidates.append(str(obj["data"]))
     for tag in soup.select("#pdf, embed, iframe"):
         if tag.get("src"):
@@ -69,7 +69,7 @@ def parse_page(html: str, base_url: str) -> PageResult:
     if dl:
         candidates.append(str(dl["href"]))
     for btn in soup.find_all(onclick=True):
-        m = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)", btn["onclick"])
+        m = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)", str(btn["onclick"]))
         if m:
             candidates.append(m.group(1))
 

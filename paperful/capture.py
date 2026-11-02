@@ -197,7 +197,7 @@ def list_collection_paths(cfg: Config, live: Any | None = None) -> list[str]:
             path = str(getattr(coll, "path", "") or "").strip()
             if path and not path.startswith("_"):
                 paths.add(path)
-    except Exception:
+    except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
         pass
     try:
         if cfg.out_dir.is_dir():
@@ -552,11 +552,11 @@ def reveal_path(path: Path, opener: Any = None) -> None:
 def _reveal(path: Path) -> None:
     target = str(path)
     if sys.platform == "darwin":
-        subprocess.Popen(["open", target], start_new_session=True)
+        subprocess.Popen(["open", target], start_new_session=True)  # noqa: S603, S607 -- fixed argv, no shell, operator-configured tool; operator tool resolved via PATH on purpose
     elif sys.platform == "win32":
-        os.startfile(target)  # type: ignore[attr-defined]
+        os.startfile(target)  # type: ignore[attr-defined]  # noqa: S606 -- fixed argv, no shell
     else:
-        subprocess.Popen(["xdg-open", target], start_new_session=True)
+        subprocess.Popen(["xdg-open", target], start_new_session=True)  # noqa: S603, S607 -- fixed argv, no shell, operator-configured tool; operator tool resolved via PATH on purpose
 
 
 def open_target(
@@ -1010,7 +1010,7 @@ def _place_pdf(
     if dest.exists():
         return "kept"
     dest.write_bytes(content)
-    digest = hashlib.md5(content).hexdigest()
+    digest = hashlib.md5(content, usedforsecurity=False).hexdigest()
     source = _pdf_source(cfg, page_url)
     Manifest(cfg.manifest_path).write(
         Record(

@@ -191,15 +191,15 @@ def build_works_sql(
     if dois is not None:
         cleaned = [normalize_store_doi(d) for d in dois if normalize_store_doi(d)]
         if not cleaned:
-            return f"SELECT {cols} FROM {source} WHERE 1 = 0"
+            return f"SELECT {cols} FROM {source} WHERE 1 = 0"  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
         where = f"{doi_sql_expr()} IN ({_sql_str_list(cleaned)})"
     else:
         assert openalex_ids is not None
         cleaned = [normalize_store_id(i) for i in openalex_ids if normalize_store_id(i)]
         if not cleaned:
-            return f"SELECT {cols} FROM {source} WHERE 1 = 0"
+            return f"SELECT {cols} FROM {source} WHERE 1 = 0"  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
         where = f"{id_sql_expr()} IN ({_sql_str_list(cleaned)})"
-    return f"SELECT {cols} FROM {source} WHERE {where}"
+    return f"SELECT {cols} FROM {source} WHERE {where}"  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
 
 
 def build_citing_sql(
@@ -220,7 +220,7 @@ def build_citing_sql(
     if not cited:
         cols = ", ".join(f"w.{c}" for c in cols_list)
         return (
-            f"SELECT {cols} FROM read_parquet({_sql_str(works_glob)}, "
+            f"SELECT {cols} FROM read_parquet({_sql_str(works_glob)}, "  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
             f"union_by_name := true) AS w WHERE 1 = 0"
         )
     cap = max(0, int(limit))
@@ -252,7 +252,7 @@ def build_citing_sql(
         order = " ORDER BY w.cited_by_count ASC NULLS LAST"
     lim = f" LIMIT {cap}" if cap > 0 else ""
     return (
-        f"SELECT {cols} FROM {cites} "
+        f"SELECT {cols} FROM {cites} "  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
         f"INNER JOIN {works} ON {id_sql_expr('w.id')} = c.citer_id "
         f"WHERE {' AND '.join(where)}{order}{lim}"
     )
@@ -413,7 +413,7 @@ class _DuckDbWorksStore:
             return self._parquet_columns
         target = self._sample_parquet_path() or self.parquet_glob
         sql = (
-            "DESCRIBE SELECT * FROM "
+            "DESCRIBE SELECT * FROM "  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
             f"read_parquet({_sql_str(target)}, union_by_name := true)"
         )
         try:
@@ -632,7 +632,7 @@ class SshDuckDbStore(_DuckDbWorksStore):
     def _ssh_run(self, remote: str, *, timeout_s: float = 120.0) -> str:
         cmd = [*_ssh_argv(self._ssh_target()), remote]
         try:
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
                 cmd,
                 capture_output=True,
                 text=True,
@@ -845,7 +845,7 @@ def _run_ssh_duckdb_exec(
 
 def _run_duckdb_cmd(cmd: list[str], *, sql: str, timeout_s: float, label: str) -> str:
     try:
-        proc = subprocess.run(
+        proc = subprocess.run(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
             cmd,
             input=sql + "\n",
             capture_output=True,

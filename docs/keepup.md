@@ -39,6 +39,10 @@ paperful keepup digest field
 paperful keepup apply field            # dry-run
 paperful keepup apply field --apply
 paperful keepup dismiss field --doi 10.1000/x
+paperful keepup dismiss field --identity openalex:W123   # DOI-less work
+paperful keepup list                   # jobs on disk, without opening the library
+paperful keepup show field
+paperful keepup delete field --yes     # removes state/keepup/field/
 ```
 
 First run is a **baseline**: advances source cursors / records current citers

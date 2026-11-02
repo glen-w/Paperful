@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 import typer
 from rich.console import Console
 from typer.testing import CliRunner
 
-from paperful import cli, cli_runtime, gaps_cmd, ocr_ignore_cmd, screen_cmd
+from paperful import cli, gaps_cmd, ocr_ignore_cmd, screen_cmd
 from tests.conftest import make_item
 
 runner = CliRunner()

@@ -49,6 +49,8 @@ KNOWN_TOP_LEVEL = frozenset(
     }
 )
 
+# Sections read by ``config_tables`` / ``Config._from_dict`` (keep in sync;
+# every ``[section]`` documented in docs/config.md belongs here).
 KNOWN_SECTIONS = frozenset(
     {
         "mirror",
@@ -57,6 +59,12 @@ KNOWN_SECTIONS = frozenset(
         "mendeley",
         "endnote",
         "fetch",
+        "scholar",
+        "handoff",
+        "request",
+        "htmlpdf",
+        "playbooks",
+        "oa_honesty",
         "ui",
         "llm",
         "rag",
@@ -69,8 +77,17 @@ KNOWN_SECTIONS = frozenset(
         "authorwatch",
         "keepup",
         "inbox",
+        "ingest",
+        "gaps",
+        "attachments",
+        "ocr",
+        "screen",
+        "summarize",
+        "synthesize",
         "critique",
         "rewrite",
+        "stuff",
+        "precedent",
         "fix_metadata",
         "lint",
         "extract_sections",
@@ -78,6 +95,8 @@ KNOWN_SECTIONS = frozenset(
         "exclude",
         "twenty",
         "searxng",
+        "search",
+        "updates",
         "network",
         "glossary",
     }
@@ -111,6 +130,11 @@ def check_config(path: Path | None = None) -> list[str]:
         ]
     issues: list[str] = []
     for key, val in raw.items():
+        if isinstance(val, list) and val and all(isinstance(v, dict) for v in val):
+            # Array of tables, e.g. [[exclude]] or [[critique.reviewers]].
+            if key not in KNOWN_SECTIONS:
+                issues.append(f"unknown section {key!r}")
+            continue
         if isinstance(val, dict):
             if key == "profiles":
                 continue

@@ -57,6 +57,8 @@ Walkthroughs: [first fill](docs/first-fill.md), [grow the library](docs/grow-lib
 2. Choose a collection on **Library**.
 3. **Preview** what can be found, then **Grab** the files. They are saved in a folder on this computer (`out/`). By default you open that folder and **Attach** the copies you want. In Settings you can have Grab attach them for you on Zotero 10 or newer. On Zotero 7–9 the files stay in the folder; attach them in Zotero.
 
+![Wanted: tick rows, Preview selected, wait for the dry-run, Grab is ready](https://raw.githubusercontent.com/glen-w/Paperful/main/docs/_static/workflows/wanted-preview.gif)
+
 Full walkthrough: [First fill](docs/first-fill.md). How a search works:
 [How it works](docs/how-it-works.md). The same actions from the command line:
 [Commands](docs/commands.md).
@@ -83,7 +85,7 @@ No campus access: choose **Open access**. Campus library login: choose
 [Configuration](docs/config.md).
 
 ```sh
-git clone --branch v1.6.5 https://github.com/glen-w/Paperful.git
+git clone --branch v1.7.0 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env          # PAPERFUL_DATA=. PAPERFUL_OUT=./out keeps data here
                               # .env.example sets PAPERFUL_IMAGE_MODE=heavy
@@ -160,15 +162,17 @@ For a **CLI on the host** (Zotero local API on this machine; no Docker
 workbench image):
 
 ```sh
-pip install paperful
-playwright install chromium    # once; needed for campus login / HTML PDF
+pipx install paperful          # or: uv tool install paperful, or pip install paperful
+pip install "paperful[browser]"   # for campus login / HTML PDF (Playwright)
+playwright install chromium    # once
 cp config.minimal.toml config.toml   # set email — see docs/config.md
 paperful doctor
 ```
 
-Optional extras: `[llm]`, `[rag]`, `[browser-agent]`, `[openxml]`. The `[serve]` extra
-(workbench) is untested without Docker; the operator path tested in CI is
-**clone + Compose** ([Docker](docs/docker.md)).
+Optional extras: `[browser]` (Playwright; session login / htmlpdf), `[llm]`, `[rag]`, `[rag-docling]`, `[browser-agent]` (Python 3.11+), `[openxml]`, `[network]`. The `[serve]` extra
+(workbench) runs without Docker; the operator path tested end to end in CI is
+**clone + Compose** ([Docker](docs/docker.md)), and CI also smoke-tests a fresh
+`paperful[serve]` install (`doctor` exit 2 without Zotero, then `/health`).
 
 ## Develop
 
@@ -183,8 +187,11 @@ uv run pytest
 ```
 
 Local docs preview: `uv sync --extra docs && make pages-site`.
-Workbench screenshots: `.venv/bin/python scripts/docs/capture_workbench.py`
-against a running `docker compose up`. See [CONTRIBUTING](CONTRIBUTING.md).
+Workbench screenshots: `uv run python scripts/docs/capture_workbench.py`;
+workflow GIFs: `uv run python scripts/docs/record_workflows.py` (needs
+`ffmpeg`). Both run against a live workbench (`docker compose up`, or
+`PAPERFUL_UI=http://127.0.0.1:<port>` for `paperful serve --port`).
+See [CONTRIBUTING](CONTRIBUTING.md).
 
 ## License
 

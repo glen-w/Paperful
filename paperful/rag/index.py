@@ -195,7 +195,7 @@ class Index:
                     )
                     for row in rows
                 ]
-            except Exception:
+            except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
                 pass
         query = self._table.search(vector)
         if where:

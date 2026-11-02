@@ -41,7 +41,6 @@ def test_pause_live_noop_when_not_started_or_none():
 
 
 def test_ensure_ezproxy_session_pauses_live_progress(monkeypatch):
-    from paperful import cli
     from paperful.config import Config
 
     progress = _live_progress()

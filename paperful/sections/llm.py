@@ -70,13 +70,13 @@ def fill_missing_llm(
     model = (cfg.rag_model or cfg.llm_model).strip()
     request = ChatRequest(
         model=model,
-        messages=[
+        messages=(
             {"role": "system", "content": _LLM_SYSTEM},
             {
                 "role": "user",
                 "content": f"Missing fields: {', '.join(missing)}\n\nExcerpt:\n\n{excerpt}",
             },
-        ],
+        ),
         timeout_seconds=cfg.llm_timeout_s,
         num_ctx=ctx_tokens_for(excerpt, max_num_ctx=cfg.llm_max_num_ctx),
     )

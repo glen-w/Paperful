@@ -42,6 +42,7 @@ from .discover_rows import (
     newest_snowball_queue,
     resolve_discover_tab,
     snowball_deferred_run_id,
+    snowball_run_label,
     snowball_stop_view,
 )
 from .page_common import (

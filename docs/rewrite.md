@@ -117,10 +117,12 @@ drafts should not assume them. See [llm.md](llm.md).
 
 ## Workbench
 
+![Suggest edits in the workbench: pack picker, areas, outputs, comments](_static/workflows/rewrite.png)
+
 Advanced **Suggest edits** (next to Critique; CLI is still `paperful rewrite`):
 pick a recent critique pack, optional replacement draft, area/output/comments
-controls, download the result. With no pack on disk, the page is empty except
-**Run Critique first**.
+controls, download the result. With no pack on disk, the page shows only
+**Run Critique first** with an **Open Critique** link.
 
 ## See also
 

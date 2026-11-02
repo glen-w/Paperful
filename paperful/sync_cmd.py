@@ -148,9 +148,9 @@ def run_import_library(
         file_fmt = None
     try:
         records = load_records(path, file_fmt)
-    except ValueError as exc:
+    except (ValueError, OSError) as exc:
         console.print(f"[red]{exc}[/]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
     n_pdf = sum(1 for r in records if r.get("pdfs"))
     n_notes = sum(len(r.get("notes") or []) for r in records)
     if not apply:

@@ -16,7 +16,7 @@ help:
 	@echo ""
 	@echo "Test / lint (contributor path; CI parity):"
 	@echo "  test              uv run pytest -m \"not docs\" (needs: uv sync --group dev --extra serve)"
-	@echo "  lint              uv run ruff check paperful tests"
+	@echo "  lint              ruff check + ruff format --check + mypy (CI lint job)"
 	@echo ""
 	@echo "Release:"
 	@echo "  pre-release       Version/changelog/dist checks before tag or PyPI upload"

@@ -1,10 +1,11 @@
 # Releases and stability
 
-**1.6.5** is the current release (`pip install paperful` after this tag is published; optional extras
-`[llm]`, `[rag]`, `[serve]`, `[browser-agent]`, `[openxml]`, `[network]`). **1.1.0** introduced PyPI and
-trusted publishing. After install, run `playwright install chromium` once for
-campus login and HTML PDF paths. The **operator** install tested in CI is still
-clone plus `docker compose build` on your computer (see [Docker](docker.md)).
+**1.7.0** is the current release (`pip install paperful` after this tag is published; optional extras
+`[browser]`, `[llm]`, `[rag]`, `[rag-docling]`, `[serve]`, `[browser-agent]`, `[openxml]`, `[network]`). **1.1.0** introduced PyPI and
+trusted publishing. For campus login and HTML PDF paths, install
+`paperful[browser]` and run `playwright install chromium` once. The **operator** install tested in CI is still
+clone plus `docker compose build` on your computer (see [Docker](docker.md));
+CI also smoke-tests a fresh `paperful[serve]` pip install.
 
 **1.0.0** is tagged. Required schemas are frozen in this tree.
 Image packs: **light** (`[serve]` only; CI default
@@ -31,7 +32,10 @@ be added. Required `paperful.run_report.v1` keys and imported-file attach
 (typed `attach_failed`, provenance note) are the contract. **1.1.1** shipped
 Wanted stop-ship hygiene (Grab scope, Attach at zero, copy). Everything after
 that is a buffet by area (Wanted excellence foundation shipped; residual polish).
-**1.6.5** adds the Stuff workbench, synthesize `--layout conflict`/`review`,
+**1.7.0** is the hardening + platform wave (workbench token auth, required
+pip-audit/socket/fresh-install CI gates, Playwright as the `[browser]`
+extra, atomic ledger writes, defusedxml, backend conformance kit — details
+in the changelog). **1.6.5** adds the Stuff workbench, synthesize `--layout conflict`/`review`,
 additive PRISMA counts and snowball watch drift hashes, `paperful search watch`
 (URL poll, no scheduler), and the Wanted `og-v2.png` share card.
 **1.6.4** thins snowball execute/apply, splits Discover routes and doctor

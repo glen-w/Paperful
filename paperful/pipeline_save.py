@@ -73,7 +73,7 @@ def try_download(
             return False
         dl = Download(
             content=content,
-            md5=hashlib.md5(content).hexdigest(),
+            md5=hashlib.md5(content, usedforsecurity=False).hexdigest(),
             final_url=cand.url or item.url or "",
         )
     else:
@@ -154,7 +154,7 @@ def commit_download(
     if mismatch:
         pipe._log_item(
             item,
-            f"[yellow]pdf DOI {escape(pdf_doi)} differs from {escape(item.doi)}[/]",
+            f"[yellow]pdf DOI {escape(pdf_doi or '')} differs from {escape(item.doi or '')}[/]",
         )
     defer_mismatch = mismatch and pipe.strict_pdf_doi
     defer_short = short_verdict == "dense_short"

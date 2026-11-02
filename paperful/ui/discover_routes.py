@@ -60,6 +60,7 @@ from .pages import (
     summary_meta,
     list_threads,
     newest_snowball_queue,
+    snowball_run_label,
     snowball_stop_view,
     command_by_id,
     repair_queues,
@@ -92,8 +93,6 @@ from .app import (
     _health_tooltip,
     _trust_line,
     _load_wanted,
-    _patch_config_field,
-    _patch_section_assignment,
 )
 
 
@@ -137,7 +136,11 @@ from .discover_search_routes import (
     handle_discover_search_watch_save,
 )
 
-from .discover_common import last_review_token as _last_review_token
+from .discover_common import (
+    bad_list_name,
+    last_review_token as _last_review_token,
+    safe_list_name,
+)
 
 
 def _search_watches(cfg: Config) -> list[dict[str, Any]]:
@@ -174,10 +177,13 @@ def _discover_page(
     status_code: int = 200,
 ) -> HTMLResponse:
     prefs = prefs_from_request(request)
+    checked_list = safe_list_name(list_name, default="followed")
+    if checked_list is None:
+        return bad_list_name()
     run_id, all_candidates = newest_snowball_queue(ui.cfg)
     stop_pending, stop_note = snowball_stop_view(ui.cfg, run_id)
     list_requested = bool((list_name or "").strip())
-    active_list = (list_name or "followed").strip()
+    active_list = checked_list
     following = following_lists(ui.cfg)
     picks = explore_picks or []
     web_on = ui.cfg.ui_web_search != "off"
@@ -297,6 +303,7 @@ def _discover_page(
             candidates=candidates,
             stop_pending=stop_pending,
             stop_note=stop_note,
+            run_label=snowball_run_label(ui.cfg, run_id),
             following=following,
             inbox=authorwatch_inbox_rows(ui.cfg) if tab_name == "people" else [],
             aw_lists=authorwatch_lists(ui.cfg) if tab_name == "people" else [],
@@ -410,7 +417,24 @@ async def handle_discover_explore(ui: UiContext, request: Request):
 async def handle_discover_topic(ui: UiContext, request: Request) -> RedirectResponse:
     prefs = prefs_from_request(request)
     form = await request.form()
-    payload = parse_discover_topic(form, advanced=prefs.advanced)
+    try:
+        payload = parse_discover_topic(form, advanced=prefs.advanced)
+    except ValueError as exc:
+        # A knob that did not parse (bad number, unknown study design, …) is
+        # a form error, not a server error: bounce back to Topic with the text.
+        return RedirectResponse(
+            url=ui.page_url(
+                "/discover", tab="topic", error=f"Check the Topic form: {exc}"[:200]
+            ),
+            status_code=303,
+        )
+    if payload.kind == "search" and not payload.query and not payload.seeds:
+        return RedirectResponse(
+            url=ui.page_url(
+                "/discover", tab="topic", error="Type a topic to search for first."
+            ),
+            status_code=303,
+        )
 
     def work(cmd_id: str) -> None:
         jobs.snowball_run(ui.cfg, cmd_id, payload=payload, collection=prefs.collection)
@@ -502,14 +526,14 @@ async def handle_discover_ingest_apply(ui: UiContext, request: Request):
     return RedirectResponse(url=ui.page_url("/discover", tab="grow"), status_code=303)
 
 
-async def handle_discover_apply_preview(
-    ui: UiContext, request: Request
-) -> RedirectResponse:
+async def handle_discover_apply_preview(ui: UiContext, request: Request):
     prefs = prefs_from_request(request)
     form = await request.form()
     kind = str(form.get("kind") or "snowball")
     run_id = str(form.get("run_id") or "")
-    list_name = str(form.get("list_name") or "followed")
+    list_name = safe_list_name(form.get("list_name"), default="followed")
+    if list_name is None:
+        return bad_list_name()
 
     def work(cmd_id: str) -> None:
         jobs.discover_apply_preview(
@@ -541,7 +565,9 @@ async def handle_discover_apply(ui: UiContext, request: Request):
     form = await request.form()
     kind = str(form.get("kind") or "snowball")
     run_id = str(form.get("run_id") or "")
-    list_name = str(form.get("list_name") or "followed")
+    list_name = safe_list_name(form.get("list_name"), default="followed")
+    if list_name is None:
+        return bad_list_name()
     token = str(form.get("review_token") or "")
     if not token:
         if kind == "authorwatch":

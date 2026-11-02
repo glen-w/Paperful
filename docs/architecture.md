@@ -12,6 +12,17 @@ and stages an XML import bundle instead of editing the database. Both are
 **seeking testers** — do not treat them as proven. The disk mirror is what
 you keep if the manager changes. See [Why Paperful](why.md).
 
+**Package layout.** Flat modules under `paperful/` hold one verb or one
+concern each (`*_cmd.py` is the body of a CLI verb after flag parsing; the
+module it names does the work). Subpackages: `sources/` (fetch lanes),
+`resolve/` (identifiers), `snowball/` (crawl, watches, citation graph),
+`search/` (SearXNG grey search), `network/` (co-author SNA), `rag/` (index,
+Ask), `sections/` (IMRaD extract), `critique_checks/` (deterministic
+manuscript checks), `llm/` (providers), `interop/` (RIS / BibTeX / EndNote
+XML), `sr/` (systematic-review protocol and screening ledger), `ui/` (the
+workbench), `data/` (shipped grey-lit packs). The module-by-module map is in
+[developer.md](developer.md#module-map).
+
 `run` never rewrites bibliographic fields. On Zotero, attach,
 `fix-metadata --apply`, and `dedupe --apply` use the Zotero 10+ write API.
 Dedupe merges the extra parent's PDF, notes, and better fields onto the keeper, then moves that parent to the Zotero trash. It does not delete files under `out/`.
@@ -108,6 +119,10 @@ flowchart LR
 
 ## Disk artifacts
 
+JSON and ledger writes under `out/` and `state/` go through `paperful.fsio`
+(unique temp file, then `os.replace`), so a crash or two concurrent writers
+never leave a half-written `record.json` or run report.
+
 | Path | Role |
 | --- | --- |
 | `out/<collection>/<stem -- KEY>/` | Per-item restore folder |
@@ -162,6 +177,8 @@ flowchart LR
 | `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `reachout`, `lint`, `screen`, `critique`, `rewrite`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, `extract-sections`, `ask`, and `snapshot` |
 | `state/packs/<id>.json` | Parent witness (`paperful.pack.v1`) listing those reports for one `pack open` … `pack close` sequence. `state/packs/current` names the open id |
 | `state/mendeley-oauth.json` | Mendeley tokens after `session login mendeley` (mode `0600`) |
+| `state/sr/<slug>/` | `sr` protocol (`protocol.json`) and screening ledger (`screening.jsonl`). Local; no scheduler |
+| `state/network/<run-id>/`, `state/search/<run-id>/`, `state/keepup/<name>/`, `state/authorwatch/<name>/`, `state/precedent/<stamp>/`, `state/htmlpdf/proposals/`, `state/ocr-ignore.jsonl` | Per-verb packs and ledgers; schema ids and writers in [developer.md](developer.md#disk-schemas) |
 | `state/endnote-import/<stamp>/` | EndNote XML+PDF bundle for File → Import. Never an edit of `.enl` |
 
 `doi_verified` is `ok` (≥ `crossref_min_score`), `suspect` (< `doi_suspect_score`), `swapped` (in-memory replacement), `unknown` (API down, mid-range match, or `verify_doi = false`), or `missing`. `unknown` never swaps.
@@ -197,7 +214,7 @@ Opt-in **`camofox`** is a registered **serial** source (never in `DEFAULT_SOURCE
 
 ## Identifiers and lint
 
-[`paperful/resolve.py`](../paperful/resolve.py) `prepare_identifiers` is shared by `run` and `lint`. Swap is in memory only. PubMed uses NCBI ID Converter on `PMID:` / `PubMed PMID:` in Extra.
+[`paperful/resolve/ids.py`](../paperful/resolve/ids.py) `prepare_identifiers` is shared by `run` and `lint`. Swap is in memory only. PubMed uses NCBI ID Converter on `PMID:` / `PubMed PMID:` in Extra.
 
 [`paperful/lint.py`](../paperful/lint.py) finding codes (manager-agnostic “library DOI”):
 
@@ -260,6 +277,12 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
 
 ## Operator tooling
 
+- `paperful config check` — static pass over `config.toml`: unknown keys and
+  sections, secrets that belong in the environment. Exit 1 when anything is
+  flagged. Run it before `doctor` when a setting seems ignored.
+- `paperful sr init` / `screen` / `status` — systematic-review scaffold under
+  `state/sr/<slug>/` (protocol + append-only screening ledger). No scheduler;
+  no workbench page yet.
 - `paperful doctor` — preflight. Colours: **green** = ready; **amber** = usable with
   a degraded path (empty email, missing session, expired session when `--probe`,
   no `pdftotext`, missing `vale` (optional critique house style), rewrite areas
@@ -354,7 +377,9 @@ and `--pdfs`. Prefer `… --format json`
 from a shell. `paperful serve` (`paperful[serve]`) binds localhost HTTP: JSON
 capability routes (health, doctor, collections, last-run, dry-run `refs-gap` /
 `ask`) plus the server-rendered workbench (`paperful.ui` — Wanted, Discover,
-Ask, Library, Activity, System; Advanced Repair / Mirror / Index / Briefs / Settings).
+Ask, Library, Activity, System; Advanced Repair / Mirror / Index / Briefs / Critique /
+Suggest edits / Stuff / Settings). An origin guard (`ui/origin_guard.py`) refuses
+cross-origin non-GET requests with 403 before any route runs; there is still no login.
 `mount_ui` registers HTML/form routes from `*_routes.py` modules; shared helpers stay in `app.py`.
 GUI long jobs enqueue under `state/gui/commands/`; Activity and post-submit pages
 subscribe to `GET /v1/runs/{id}/events` (SSE) with `GET /v1/runs/{id}` as JSON

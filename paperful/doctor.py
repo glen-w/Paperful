@@ -387,11 +387,11 @@ def _probe_ezproxy_session_check(cfg: Config, where: str) -> Check:
     finally:
         try:
             client.close()
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass
         try:
             browser.close()
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass
     if ok and warn:
         return Check(
@@ -428,11 +428,11 @@ def _probe_scholar_session_check(cfg: Config, where: str) -> Check:
     finally:
         try:
             client.close()
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass
         try:
             browser.close()
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass
     if ok:
         return Check("Scholar session", "green", detail)
@@ -552,7 +552,31 @@ def _disk_checks(cfg: Config) -> list[Check]:
         checks.append(docker_paths)
     checks.append(_mirror_check(cfg))
     checks.append(_playwright_check())
+    update = _update_check(cfg)
+    if update is not None:
+        checks.append(update)
     return checks
+
+
+def _update_check(cfg: Config) -> Check | None:
+    """Opt-in PyPI notice ([updates] check); never a failure, never telemetry."""
+    if not cfg.update_check:
+        return None
+    from . import __version__
+    from .update_check import check_for_update
+
+    try:
+        latest = check_for_update(__version__, cfg.state_dir)
+    except Exception:
+        return None
+    if latest:
+        return Check(
+            "update",
+            "amber",
+            f"paperful {latest} is available (installed {__version__})",
+            code="update_available",
+        )
+    return Check("update", "green", f"paperful {__version__} is current")
 
 
 def _session_checks(cfg: Config, *, probe: bool) -> list[Check]:
@@ -1006,7 +1030,7 @@ def _probe_openalex(email: str) -> str:
             headers=headers,
         )
         return _openalex_probe_status(resp.status_code, keyed=bool(key))
-    except Exception:
+    except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
         pass
     return "unreachable"
 
@@ -1266,7 +1290,7 @@ def _playwright_check() -> Check:
         return Check(
             "Playwright",
             "amber",
-            "missing — run: uv sync (needed for session login / htmlpdf)",
+            "missing — install paperful[browser] (needed for session login / htmlpdf)",
         )
     if sess.chromium_installed():
         return Check("Playwright", "green", "package + Chromium ready")

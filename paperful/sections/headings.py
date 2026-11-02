@@ -152,6 +152,7 @@ def _load_overlay(cfg: Config | None) -> dict[str, tuple[str, ...]]:
             canon = key.strip().lower()
             if not canon:
                 continue
+            syns: tuple[str, ...]
             if isinstance(value, str):
                 syns = (value.strip().lower(),)
             elif isinstance(value, list):

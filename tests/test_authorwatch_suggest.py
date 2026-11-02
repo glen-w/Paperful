@@ -175,7 +175,7 @@ def test_enrich_cited_ranks_by_citations_and_labels_why(cfg):
                 _row(
                     "Bob High",
                     id="https://openalex.org/A11",
-                    orcid=f"https://orcid.org/0000-0003-0000-0001",
+                    orcid="https://orcid.org/0000-0003-0000-0001",
                     cited_by_count=1000,
                 )
             ],

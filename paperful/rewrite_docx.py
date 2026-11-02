@@ -6,6 +6,8 @@ import io
 import re
 import zipfile
 import xml.etree.ElementTree as ET
+
+from defusedxml import ElementTree as _DET
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -25,7 +27,7 @@ _NS_DECL = re.compile(rb'xmlns:([A-Za-z0-9]+)="([^"]+)"')
 _XML_DECL = re.compile(rb"<\?xml[^?]*\?>")
 _IGNORABLE = re.compile(r'\s(?:mc:)?Ignorable="([^"]+)"')
 
-_CONTENT_TYPES = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+_CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
@@ -33,7 +35,7 @@ _CONTENT_TYPES = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
   <Override PartName="/word/comments.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"/>
 </Types>
 """
-_RELS = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+_RELS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
 </Relationships>
@@ -135,8 +137,8 @@ def docx_structural_issues(path: Path) -> list[str]:
         issues.append("document.xml uses ns0: prefixes")
     issues.extend(_undeclared_ignorable(raw))
     try:
-        root = ET.fromstring(raw)
-    except ET.ParseError as exc:
+        root = _DET.fromstring(raw)
+    except (ET.ParseError, ValueError) as exc:
         return issues + [f"document.xml: {exc}"]
     stack: list[str] = []
     starts: list[str] = []
@@ -179,8 +181,8 @@ def docx_structural_issues(path: Path) -> list[str]:
         if b"ns0:" in comments_raw:
             issues.append("comments.xml uses ns0: prefixes")
         try:
-            croot = ET.fromstring(comments_raw)
-        except ET.ParseError as exc:
+            croot = _DET.fromstring(comments_raw)
+        except (ET.ParseError, ValueError) as exc:
             issues.append(f"comments.xml: {exc}")
         else:
             bodies = [el.get(f"{W}id") or "" for el in croot.iter(_w("comment"))]
@@ -195,8 +197,8 @@ def _parse_comments(raw: bytes | None) -> ET.Element | None:
         return None
     try:
         _register_prefixes(raw)
-        return ET.fromstring(raw)
-    except ET.ParseError:
+        return _DET.fromstring(raw)
+    except (ET.ParseError, ValueError):
         return None
 
 
@@ -204,8 +206,8 @@ def _ensure_comments_rel(rels: bytes) -> bytes:
     if b"comments.xml" in rels:
         return rels
     try:
-        root = ET.fromstring(rels)
-    except ET.ParseError:
+        root = _DET.fromstring(rels)
+    except (ET.ParseError, ValueError):
         return _DOC_RELS_TMPL.encode("utf-8")
     existing = {el.get("Id") for el in root}
     rid = "rIdCmt1"
@@ -423,8 +425,8 @@ def apply_tracked_docx(src: Path, dest: Path, edits: list[RewriteEdit]) -> list[
         return ["docx: missing word/document.xml"]
     try:
         _register_prefixes(xml)
-        root = ET.fromstring(xml)
-    except ET.ParseError as exc:
+        root = _DET.fromstring(xml)
+    except (ET.ParseError, ValueError) as exc:
         return [f"docx: {exc}"]
     existing_comments = parts.get("word/comments.xml")
     comments_root = _parse_comments(existing_comments)
@@ -440,7 +442,7 @@ def apply_tracked_docx(src: Path, dest: Path, edits: list[RewriteEdit]) -> list[
     if comments:
         merged = _comments_xml(comments, when, existing=existing_comments)
         if existing_comments:
-            merged_root = ET.fromstring(merged)
+            merged_root = _DET.fromstring(merged)
             parts["word/comments.xml"] = _serialize_part(
                 existing_comments, merged_root, local="comments"
             )
@@ -452,7 +454,9 @@ def apply_tracked_docx(src: Path, dest: Path, edits: list[RewriteEdit]) -> list[
         if b"word/comments.xml" not in ctypes:
             try:
                 ct_root = (
-                    ET.fromstring(ctypes) if ctypes else ET.fromstring(_CONTENT_TYPES)
+                    _DET.fromstring(ctypes)
+                    if ctypes
+                    else _DET.fromstring(_CONTENT_TYPES)
                 )
                 ET.SubElement(
                     ct_root,
@@ -468,7 +472,7 @@ def apply_tracked_docx(src: Path, dest: Path, edits: list[RewriteEdit]) -> list[
                 parts["[Content_Types].xml"] = ET.tostring(
                     ct_root, encoding="utf-8", xml_declaration=True
                 )
-            except ET.ParseError:
+            except (ET.ParseError, ValueError):
                 parts["[Content_Types].xml"] = _CONTENT_TYPES.encode("utf-8")
     dest.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED) as zout:

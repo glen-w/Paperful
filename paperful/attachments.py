@@ -577,7 +577,7 @@ def _keeper(group: list[PdfChild], *, prefer_linked: bool) -> PdfChild:
 
 
 def _md5(path: Path) -> str:
-    digest = hashlib.md5()
+    digest = hashlib.md5(usedforsecurity=False)
     with path.open("rb") as fh:
         for chunk in iter(lambda: fh.read(8192), b""):
             digest.update(chunk)

@@ -33,7 +33,7 @@ Three jobs sit on the default nav:
 | **Ask** | `ask`, `ask --from-file` | Cited answers from PDFs already copied to disk (`simple` / `advanced`; needs `[rag]` + `[llm]` and an index) |
 
 **Library**, **Activity**, and **System** support the loop. **Repair**, **Mirror**,
-**Index** (ingest / search / extract), **Briefs**, **Critique**, **Suggest edits**, **Stuff**, and **Settings** appear only
+**Index** (ingest / search / extract; **Briefs** is reached from it), **Critique**, **Suggest edits**, **Stuff**, and **Settings** appear only
 when **Advanced** is on (reveal only; does not enable Scholar, Sci-Hub, or LLM).
 
 ```text
@@ -54,13 +54,20 @@ browser-agent. No built-in scheduler — **Check again** on Discover, not cron.
 
 | Control | Role |
 | --- | --- |
-| **Logo** | Product lockup (box + Nunito wordmark) links to Wanted; fonts match the public site (Fraunces / Nunito / Source Sans 3) |
+| **Logo** | Product lockup (box + Nunito wordmark) links to Wanted; fonts match the public site (Fraunces / Nunito / Source Sans 3), self-hosted under `/static/fonts` — no third-party requests |
 | **Collection** chip | Scoped collection (remembered in a cookie) |
-| **Preset** chip | Open access (`oa`) or Campus (`eoi`) — the simple source choice |
-| **Health** dot | Worst cached `doctor` status (amber until **System** runs doctor; pages never block on a full doctor) |
+| **Preset** chip | Open access (`oa`) or Campus (`eoi`) — the simple source choice; a browser cookie, not `config.toml` |
+| **Health** dot | Worst cached `doctor` status; links to **System**. Amber until the first System visit; pages never block on a full doctor |
 | **Advanced** toggle | Cookie only; reveals extra nav and form fields |
-| **Row actions** | Icon buttons (detail drawer, set collection scope) with the action name as the tooltip |
-| **Long lists** | Discover uses tabs (Explore / Topic / Grow / People / Web / Queue / Following); Queue paginates. Ask threads and batches, Briefs archives, and the Repair queue fold into collapsible sections |
+| **Cookies** | `SameSite=Strict`, suffixed with the port when it is not 8765, so two workbenches on one host keep separate chips |
+| **Row actions** | Icon buttons (detail drawer, set collection scope) with the action name as the tooltip; one shared `<dialog>` is filled from each row's inert `<template>` |
+| **Help tips** | `(i)` buttons (keyboard-reachable, `aria-describedby` tooltip). The prose is the help; ledes stay short |
+| **Apply buttons** | Any button that posts a review token (Add selected, Apply inbox, Attach held, Recover, Apply ingest-dois, Apply add) is **disabled until its Preview has finished** |
+| **Long lists** | Discover uses tabs (Explore / Topic / Grow / People / Web / Queue / Following); Queue paginates. Ask threads and batches, Briefs archives, Wanted Advanced and Waiting-from-Discover, and the Repair queue fold into collapsible sections |
+| **Errors** | Browser navigations get an HTML error page (404, 403, 409 stale preview, 500 with the one-line cause and links back); API paths keep JSON |
+| **Layout** | Reflows at 1000 px (nav wraps) and 720 px (forms stack, tables scroll inside their panel); `prefers-reduced-motion` honoured |
+
+![Advanced toggle: the nav grows from six pages to thirteen; nothing else changes](_static/workflows/advanced-nav.gif)
 
 Layout: table-first rows, native `<dialog>` drawer (no embedded PDF viewer).
 Long jobs return a **command id**; Activity subscribes to `GET /v1/runs/{id}/events` (SSE), with JSON poll fallback via `GET /v1/runs/{id}`.
@@ -99,8 +106,9 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still ha
    Zotero (`doi_match` and hand-ticked rows on **Held** with a pending file).
    The main button skips DOI mismatches and short PDFs (use Advanced Attach
    to override). CLI `paperful run` still attaches mismatches unless you pass
-   `--strict-pdf-doi`.    The label shows **Attach N PDFs** when N are pending;
-   the button is disabled when N is 0 and no **attachable** rows are ticked
+   `--strict-pdf-doi`. The label reads **Attach N PDFs to Zotero** when N are
+   pending, **Attach selected PDFs** once rows are ticked, and **Attach PDFs to
+   Zotero** (disabled) when N is 0 and no **attachable** rows are ticked
    (mismatch/short ticks alone stay disabled on the main button). **Attach** needs
    Zotero 10 or newer; on 7–9, attach files in Zotero. **Automatic** (Settings
    → **After Grab**, shown only after at least one successful Attach): Grab
@@ -108,6 +116,9 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still ha
    the file from Paperful. DOI mismatch and short PDF still wait for Attach.
 2. **Discover** — Tabs: **Explore**, **Topic**, **Grow** (Advanced),
    **People**, **Web**, **Queue** (map + paginated candidates), **Following**.
+   **Explore:** paste a DOI or a title and **Open map** (an ambiguous title
+   offers a picker and **Open map for selected**) to land on Queue with a
+   citation map seeded from that one paper.
    **Topic:** keyword search (`snowball search` dry-run queue), then open
    **Queue** for per-row Keep/Skip and **Preview apply** → **Add selected**
    (`snowball apply`, metadata only). Queue rows show **Why suggested** when
@@ -123,31 +134,62 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still ha
    When a [stopping rule](snowball.md#stopping-rules)
    is on, **Next hop** scores those marks and fetches one more hop
    (`snowball continue`). **Fill PDFs** opens Wanted.
-   **Briefing** / **Digest** write `briefing.md` / `digest.md` on the queue
-   (shown on Queue; digests are not auto-created). Advanced can tick
+   **Briefing** / **Digest** (buttons on **Topic** once a run exists) write
+   `briefing.md` / `digest.md` on the queue (shown on Queue; digests are not
+   auto-created). Search itself redirects to Queue. Advanced can tick
    **File collection note** (`--apply` + collection chip) to file a Zotero
    collection note tagged `paperful:frontier-briefing`. **Keep an eye on this**
-   saves a topic watch only when a snowball **profile** is chosen. **People:**
+   (on Queue) saves a topic watch only when a snowball **profile** is chosen;
+   with no saved profile the click returns an error banner — save one on
+   Advanced Topic first. **People:**
    create/delete a list, Follow (ORCID + optional backfill), add/edit/remove,
-   resolve, run, **Get suggestions** (method + limit + collection) → checkbox
-   **Accept** (+ optional seed date), import CSV/JSON/ORCID or saved social
+   resolve, **Run list**, **Get suggestions** (method + limit + collection) →
+   tick rows → **Accept selected** (+ optional **Initial seed from** date), import CSV/JSON/ORCID or saved social
    HTML, **people briefing** (inbox plus OpenAlex recent works / co-authors for
    pollable members; same markdown as CLI `authorwatch briefing`); **Network**
-   panel (ORCID ego co-authorship map, phase slices, D3; `[ui].coauthor_network`);
+   panel (ORCID ego co-authorship map, phase slices, D3; `[ui].coauthor_network`
+   or the Settings checkbox **Co-author network on People**);
    inbox uses the same Preview → apply pattern
    (`authorwatch apply`). **Web:** SearXNG grey query (hosts, filetype, max);
    hit table; **Preview apply** → **Add selected** creates metadata parents
    (`paperful search --apply`). **Save watch** / **Run** stores a URL poll
-   (`search watch`; you still cron it). Hide with `[ui].web_search = "off"`. Unset
+   (`search watch`; you still cron it). Hide with `[ui].web_search = "off"` or the
+   Settings checkbox **Web search on Discover**. Unset
    SearXNG shows an amber hint (no enqueue). PDFs still need Wanted.
    **Check again** re-runs a saved topic watch or
    person list. Topic watches also offer **Preview apply** / **Apply inbox**
    (`snowball watch apply`). Advanced topic watches offer **Watch briefing** /
    **Watch digest** (same optional collection note). Cron alert loop:
    [`keepup`](keepup.md).
-3. **Library** — Nested collection collapsibles with item / missing-PDF counts; target icon sets scope (collection chip). Scoped items paginate (default 50 per page; sizes in `[ui]` — see `config.example.toml`).
-4. **Activity** — Command history + trust line from `last-run.json`.
-5. **System** — `doctor` rows with one next step each.
+
+   ![Discover Queue: citation map of the last topic run, with read-first list and study-design chips](_static/workflows/discover-queue.png)
+
+   ![Discover Following: saved topic watches and people lists, each with Check again](_static/workflows/discover-following.png)
+
+3. **Library** — Nested collection collapsibles with item / missing-PDF counts; target icon sets scope (collection chip) and lands on Wanted. Counts are cached for ten minutes per process (**Refresh counts** or `POST /library/refresh` recomputes). Scoped items paginate (default 50 per page; sizes in `[ui]` — see `config.example.toml`).
+
+   ![Library: collection tree with item and missing-PDF counts; the target icon sets the chip](_static/workflows/library.png)
+
+4. **Activity** — Command history (started, verb linking back to its page,
+   status dot, duration, result summary or error text) + trust line from
+   `last-run.json`. Queued and running rows keep polling until they finish
+   (SSE, three reconnects, then JSON; rows older than 30 minutes are left
+   alone). Records left `queued`/`running` by a previous process are marked
+   `failed` ("server restarted before this job finished") when the
+   workbench starts. The GUI queue holds at most 20 pending jobs; a form
+   submitted past that limit fails (`too many queued jobs`) rather than
+   silently queueing. `?all=1` shows up to 500 rows.
+
+   ![Activity: newest jobs first, with status and error columns](_static/workflows/activity.png)
+
+5. **System** — `doctor` rows with a status dot; amber/red rows show the
+   next step, green rows show the detail. The first visit runs doctor
+   inline; later visits render from the process cache ("Checked 3 min ago",
+   **stale** after ten minutes) and **Re-check** (`POST /system/recheck`)
+   runs doctor as a background job, so a slow Camofox or GROBID probe no
+   longer blanks the page.
+
+   ![System: doctor rows, each with a one-line next step](_static/workflows/system.png)
 
 ---
 
@@ -159,12 +201,18 @@ stop rule, stop eps, stop k, stop max screened, and
 **Twenty writeback** → `cfg.twenty_writeback_listings`), profile save/run,
 resume, briefing, frontier digest, **refs gap**, **ingest-dois**
 (Preview → Apply token), **authors**, and **packs promote**.
-Wanted adds attach (mismatch/short), `recover` (from last run:
-`browser_agent_miss`, `missing`, `browser_agent_not_found` — same as
-`recover --from-last-run-mode`), handoff, inbox drain, `reachout`,
+Wanted adds attach overrides (**Allow DOI mismatch** / **Allow short PDF** →
+**Preview attach** → **Attach held PDFs**), **Preview recover** / **Recover**
+(from last run: `browser_agent_miss`, `missing`, `browser_agent_not_found` —
+same as `recover --from-last-run-mode`), **Handoff**, **Drain inbox**,
+**Reachout**,
 plus Grab filters (`year` / type / retry / try-all / browser-agent / upgrade).
 **Repair** Preview runs dry-run then Apply writes: `lint` (read-only report),
-`fix-metadata`, `dedupe`, `versions`, `attachments`, `ocr`.
+`fix-metadata`, `dedupe` (Phase select + **Include title+year merges**),
+`versions`, `attachments` (**Fix broken** / **Merge files** / **Rename** /
+**Link (personal library)**), `ocr`, and `screen` (retractions, PubPeer,
+tortured phrases; Apply adds the tag and child note). Apply appears only
+after a successful Preview of that same verb.
 **Mirror** Preview/Apply: `sync`, `snapshot`, `restore`, `cache clean`.
 **Ask**: cited Ask when `[rag]` and `[llm]` are on and the index has rows.
 **Mode** (`simple` / `advanced`) starts at `[rag].ask_mode`; a change is this
@@ -177,7 +225,8 @@ and a questions file upload. If the index is empty, Ask offers a compact
 ingest. Details: [rag.md](rag.md#ask-modes). **Index** (Advanced): `rag ingest` / `search` when
 `[rag]` is on; **Extract questions** (`rag questions`) and **Already answered?**
 (`rag answered`, `state/rq-answered/`) use the same scope. Collection chip is
-the scope. **Synthesize** on Index when `[llm]` is on. **Extract sections**
+the scope. **Synthesize** on Index when `[llm]` is on (**Preview** / **Write
+report**; Briefs labels the same pair **Dry-run** / **Write report**). **Extract sections**
 (`extract-sections` → `state/sections/`) is on Index too — mirror PDFs, no
 `[rag].enabled` required; optional GROBID checkbox. See
 [rag.md](rag.md#structured-sections-mirror-only) and [GROBID](grobid.md).
@@ -189,8 +238,16 @@ the scope. **Synthesize** on Index when `[llm]` is on. **Extract sections**
 **Briefs**: collection **summarize** / **synthesize** when `[llm]` is on.
 Synthesize has a **Layout** control (`default`, `conflict`, `review`; CLI
 `--layout`). Ask `--focus` stays on `/ask`.
-Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
-`config.toml`; it does not enable `[rag]` or `[llm]`.
+Per-item **Summarize this** / **Summarize** in Wanted (Held / Have rows) and
+Library (rows with a PDF) drawers, Advanced and `[llm]` on.
+**Settings** writes `config.toml`; it does not enable `[rag]` or `[llm]`.
+Fields: **Unpaywall email**, **out/ path**, **Preset** (Open access / Campus),
+**After Grab** (Manual / Automatic; shown after the first Attach), **Citation
+map edits** (Both / Sidebar only / Popup only / Off), **Auto-search PDF after
+Add to library**, **Co-author network on People**, **Web search on Discover**.
+
+![Briefs: summarize a collection, then synthesize a review with a Layout choice](_static/workflows/briefs.png)
+
 **Critique** (Advanced): pick a collection item **or** drop a draft
 (pdf/docx/odt/html/rtf/txt/md/pptx, 40 MB). Writes `state/critiques/` (`pack.md`).
 Uploads stay under `state/critiques/uploads/` and are not imported to `out/`
@@ -210,17 +267,25 @@ runs house-style lint when `vale` is on PATH. The box is not pre-checked;
 checkbox runs `paperguard scan` when that binary is on PATH
 (`[critique].forensics = true` still runs the pass). Show-dismissed is
 item-only. Not a score. See [critique.md](critique.md).
+
+![Critique: library item or uploaded draft, lane checkboxes, recent packs](_static/workflows/critique.png)
+
 **Suggest edits** (Advanced; `/rewrite`, CLI `paperful rewrite`): pick a
 recent critique pack, optional replacement draft if the file moved,
 area/output/comments controls. Writes `state/rewrites/` (edit plan, optional
 sidecar, tracked-changes Word / OpenDocument / PDF). Never overwrites the source. Empty state:
 **Run Critique first**. Style glossary/Vale swaps run with `[llm]` off. See
 [rewrite.md](rewrite.md).
+
+![Suggest edits: pick a critique pack, choose areas and outputs, optional comments](_static/workflows/rewrite.png)
+
 **Stuff** (Advanced; `/stuff`, CLI `paperful stuff`): pick a collection item
 **or** drop a draft. Extra library cites per sentence (`manuscript`) or
 outline section. Writes `state/stuff/` (`pack.md` / `pack.json`). Needs
 `[rag]` and a built index; does **not** need `[llm]`. Never writes Zotero.
 `--apply` stays later. See [stuff.md](stuff.md).
+
+![Stuff: library item or uploaded draft, lane and k, recent packs](_static/workflows/stuff.png)
 
 **Stays CLI** (no GUI control): `session login`, `doctor --guide`, mid-run
 EZProxy re-login, snowball `approve-each`, `collections add`, Sci-Hub source
@@ -240,7 +305,9 @@ are mounted by `paperful.ui` (`mount_ui`).
 | GET | `/v1/doctor` | Same as `doctor --json` |
 | GET | `/v1/collections` | Collection tree |
 | GET | `/v1/runs/last` | `state/last-run.json` |
-| GET | `/v1/runs/{id}` | GUI command record under `state/gui/commands/` |
+| GET | `/v1/runs/{id}` | GUI command record under `state/gui/commands/` (`created`, `started`, `finished`, `result`) |
+| POST | `/system/recheck` | Enqueue `doctor`; redirect `/system?run=` |
+| POST | `/library/refresh` | Drop collection-count + scope caches; redirect `/library?refresh=1` |
 | GET | `/v1/runs/{id}/events` | SSE `status` events until `done` or `failed` |
 | POST | `/v1/refs-gap` | Dry-run `refs gap` envelope |
 | POST | `/v1/ask` | Same as MCP `ask` (optional `ask_mode`; not linked from simple HTML) |
@@ -260,7 +327,8 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/wanted/summarize` | Enqueue single-item `summarize`; redirect `?run=` |
 | GET | `/item/{key}/summary` | Per-item HTML under `state/summaries/` |
 | POST | `/discover/explore` | Resolve a DOI or title into an explore queue; open Map (picker when title is ambiguous) |
-| POST | `/discover/topic` | Enqueue snowball kind (Advanced) or keyword search |
+| POST | `/discover/topic` | Enqueue snowball kind (Advanced) or keyword search; redirect `/discover?tab=queue&run=` |
+| POST | `/discover/continue` | **Next hop**: score Keep/Skip marks and fetch one more hop (`snowball continue`); redirect `?tab=queue&run=` |
 | POST | `/discover/profile-save` | Save snowball profile from the topic form |
 | POST | `/discover/refs-gap` | Dry-run refs gap pack for the collection chip |
 | POST | `/discover/ingest-preview` | Classify DOIs / refs-gap pack; review token |
@@ -268,7 +336,6 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/discover/authors` | Authors frequency (optional `--apply` pack seed) |
 | POST | `/discover/packs-promote` | Promote a proposed field author pack |
 | POST | `/discover/follow` | Follow ORCID into a list (`authorwatch` run) |
-| POST | `/discover/keep` | Mark queue DOI keep/skip |
 | GET | `/discover/graph` | Citation map JSON for `run_id` (`paperful.citation_graph.v1`); optional `watch_name`, `compare_run` |
 | GET | `/discover/graph/meta` | Collections/tags plus `[ui].citation_map_*` prefs for the map panel |
 | POST | `/discover/graph/expand` | One OpenAlex hop (`refs`, `cites`, or `both`) merged into that queue |
@@ -278,7 +345,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/discover/graph/add` | Add one new candidate to the library; optional Find PDF when `citation_map_auto_search` |
 | POST | `/discover/graph/find-pdf` | Grab PDF for one `item_key` |
 | POST | `/discover/graph/remove` | Trash library item for a map node (`citation_map_remove = trash`) |
-| POST | `/discover/keep` | `format=json` or `Accept: application/json` returns `{ graph, keep, doi }` for the map panel |
+| POST | `/discover/keep` | Mark a queue DOI keep/skip (form POST reloads; `format=json` or `Accept: application/json` returns `{ graph, keep, doi }` for the map panel) |
 | POST | `/discover/check-again` | Re-run topic watch or person list |
 | POST | `/discover/resume` | Enqueue `snowball resume` |
 | POST | `/discover/profile-run` | Enqueue snowball from a named profile |
@@ -336,6 +403,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/index/rag-answered` | Enqueue `rag answered`; redirect `?run=` |
 | GET | `/index/answered/{stamp}` | `pack.md` under `state/rq-answered/<stamp>/` |
 | POST | `/index/synthesize` | Enqueue `synthesize` (dry-run or write); redirect `?run=` |
+| POST | `/index/extract-sections` | Enqueue `extract-sections` (dry-run or write; optional GROBID / LLM fill); redirect `?run=` |
 | GET | `/index/report/{slug}` | HTML under `state/reports/` |
 | POST | `/briefs/summarize` | Enqueue `summarize`; redirect `/briefs?run=` |
 | POST | `/briefs/synthesize` | Enqueue `synthesize` (dry-run or write); redirect `?run=` |
@@ -343,12 +411,23 @@ are mounted by `paperful.ui` (`mount_ui`).
 | GET | `/briefs/report/{slug}` | HTML under `state/reports/` |
 
 HTML routes: `/discover`, `/wanted`, `/ask`, `/library`, `/activity`, `/system`, plus
-advanced `/repair`, `/mirror`, `/index`, `/briefs`, `/settings`. `GET /` → `/wanted`.
+advanced `/repair`, `/mirror`, `/index`, `/briefs`, `/critique`, `/rewrite`,
+`/stuff`, `/settings`. `GET /` → `/wanted`.
 `/repair/preview` and `/mirror/preview` enqueue work and redirect with `?run=`; Apply
 posts `review_token` from that command record (stale previews return HTTP 409).
 `GET /index?thread=` redirects to `/ask?thread=`. `POST /ask` enqueues a cited Ask
 turn; `POST /index/ask` is the same handler.
 
+Every `POST` passes an origin guard first: a request whose `Sec-Fetch-Site`
+is `cross-site`, or whose `Origin` / `Referer` host differs from `Host`,
+returns **403** `{"ok": false, "error": "cross-origin request blocked"}`
+(same-origin forms and header-less `curl` pass). Every response carries a
+Content Security Policy (`script-src 'self'`); the templates have no inline
+scripts or `on*=` handlers, and authorwatch `list_name` values are validated
+(`400`) before they reach a template. `POST /library/refresh` drops the
+collection-count and scope caches; `POST /system/recheck` enqueues `doctor`. The GUI job queue holds at
+most 20 pending jobs; a submit past that fails (`too many queued jobs`,
+HTTP 500) instead of growing the queue — wait for Activity to drain.
 Writes over HTTP use review tokens under `state/gui/reviews/`; stale library
 fingerprints return **409**. Discover **Add selected** / inbox apply, ingest-dois
 Apply, and Wanted **Grab** / recover require **Preview** first (tokens

@@ -144,7 +144,8 @@ def _same_bytes(a: Path, b: Path) -> bool:
         if a.stat().st_size != b.stat().st_size:
             return False
         return (
-            hashlib.md5(a.read_bytes()).digest() == hashlib.md5(b.read_bytes()).digest()
+            hashlib.md5(a.read_bytes(), usedforsecurity=False).digest()
+            == hashlib.md5(b.read_bytes(), usedforsecurity=False).digest()
         )
     except OSError:
         return False

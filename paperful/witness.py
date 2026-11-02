@@ -217,7 +217,7 @@ def _rag_index_block(cfg: Config) -> dict[str, Any]:
         block["items"] = status.get("items")
         if status.get("embed_model"):
             block["embed_model"] = status.get("embed_model")
-    except Exception:
+    except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
         pass
     return block
 

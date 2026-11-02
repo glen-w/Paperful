@@ -44,7 +44,7 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
         assert 'class="brand-logo"' in res.text
         assert 'class="brand-mark"' in res.text
         assert 'src="/static/icon.png"' in res.text
-        assert "Source+Sans+3" in res.text
+        assert "/static/fonts/fonts.css" in res.text
     logo = client.get("/static/icon.png")
     assert logo.status_code == 200
     assert logo.headers["content-type"].startswith("image/")
@@ -96,7 +96,9 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert client.get("/mirror").status_code == 200
     assert client.get("/index").status_code == 200
     assert client.get("/briefs").status_code == 200
-    assert "/briefs" in res.text
+    # Briefs is reached from Index, not from the nav (13 Advanced nav items).
+    assert 'href="/briefs"' not in res.text
+    assert 'href="/briefs"' in client.get("/index").text
     wanted_adv = client.get("/wanted")
     assert "Recover" in wanted_adv.text
     assert "Handoff" in wanted_adv.text
@@ -397,7 +399,7 @@ def test_library_nests_collections(tmp_path, monkeypatch):
     assert "built-in method items" not in res.text
     assert ">267<" in res.text
     assert 'class="icon-btn"' in res.text
-    assert 'aria-label="Set scope"' in res.text
+    assert 'aria-label="Set scope to ' in res.text
     assert ">Set scope</button>" not in res.text
 
 
@@ -457,7 +459,7 @@ def test_pages_include_beginner_help(tmp_path, monkeypatch):
     wanted = client.get("/wanted")
     assert wanted.status_code == 200
     assert 'class="page-lede"' in wanted.text
-    assert "Missing</strong> means no file yet" in wanted.text
+    assert "Missing</strong> has no file yet" in wanted.text
     assert 'class="help-tip"' in wanted.text
     assert 'class="help-tip-bubble"' in wanted.text
     assert "Zotero collection currently in scope" in wanted.text
@@ -746,3 +748,150 @@ def test_dockerfile_includes_serve_extra():
 
     text = Path("Dockerfile").read_text(encoding="utf-8")
     assert "--extra serve" in text
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_html_404_and_500_pages(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    client = TestClient(create_app(cfg), raise_server_exceptions=False)
+    html = client.get("/nope", headers={"Accept": "text/html"})
+    assert html.status_code == 404
+    assert "Page not found" in html.text
+    assert 'href="/activity"' in html.text
+    api = client.get("/nope", headers={"Accept": "application/json"})
+    assert api.status_code == 404
+    assert api.json()["ok"] is False
+    assert client.get("/v1/runs/zzz").json() == {"ok": False, "error": "not found"}
+    # A job-queue overflow surfaces as a readable 500, not a trace page.
+    from paperful.ui import commands
+
+    monkeypatch.setattr(commands, "MAX_QUEUED_JOBS", 0)
+    res = client.post(
+        "/system/recheck",
+        headers={"Accept": "text/html", "Referer": "http://testserver/system"},
+        follow_redirects=False,
+    )
+    assert res.status_code == 500
+    assert "Something went wrong" in res.text
+    assert "too many queued jobs" in res.text
+    assert 'href="/system"' in res.text
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_system_renders_from_cache_and_recheck_is_a_job(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    calls = {"n": 0}
+
+    def counting_doctor(_cfg, probe=False):
+        calls["n"] += 1
+        return [
+            {
+                "name": "Zotero",
+                "status": "red",
+                "code": "zotero_down",
+                "detail": "down",
+            },
+            {"name": "email", "status": "green", "code": "", "detail": "a@b.org"},
+        ]
+
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", counting_doctor)
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    client = TestClient(create_app(cfg))
+    first = client.get("/system")
+    assert first.status_code == 200
+    assert calls["n"] == 1
+    assert 'action="/system/recheck"' in first.text
+    assert "status-red" in first.text
+    # Green rows show detail, not an instruction; red rows show the next step.
+    assert "<strong>" in first.text
+    second = client.get("/system")
+    assert calls["n"] == 1, "second visit must render from the process cache"
+    assert "data-ts=" in second.text
+    res = client.post("/system/recheck", follow_redirects=False)
+    assert res.status_code == 303
+    assert res.headers["location"].startswith("/system?run=")
+    cmd_id = res.headers["location"].split("run=")[1]
+    from paperful.ui import commands
+
+    for _ in range(200):
+        rec = commands.read_command(cfg, cmd_id)
+        if rec and rec["status"] in ("done", "failed"):
+            break
+        time.sleep(0.01)
+    assert rec["status"] == "done"
+    assert rec["verb"] == "doctor"
+    assert rec["result"]["health"] == "red"
+    assert calls["n"] == 2
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_library_counts_cached_and_refreshable(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    calls = {"n": 0}
+
+    def counting_tree(_cfg):
+        calls["n"] += 1
+        return {
+            "ok": True,
+            "collections": [
+                {"path": "A", "name": "A", "key": "K1", "items": 3, "missing_pdf": 1}
+            ],
+        }
+
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr("paperful.ui.app.collections_tree", counting_tree)
+    client = TestClient(create_app(cfg))
+    assert client.get("/library").status_code == 200
+    assert client.get("/library").status_code == 200
+    assert calls["n"] == 1
+    res = client.post("/library/refresh", follow_redirects=False)
+    assert res.status_code == 303
+    assert client.get(res.headers["location"]).status_code == 200
+    assert calls["n"] == 2
+
+
+def test_prefs_advanced_never_redirects_off_host(tmp_path, monkeypatch):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    client = TestClient(create_app(cfg))
+    res = client.post(
+        "/prefs/advanced",
+        data={"advanced": "1"},
+        headers={"Referer": "http://testserver/discover?tab=people"},
+        follow_redirects=False,
+    )
+    assert res.headers["location"] == "/discover?tab=people"
+    res = client.post(
+        "/prefs/collection",
+        data={"collection": "A", "next": "//evil.example/x"},
+        follow_redirects=False,
+    )
+    assert res.headers["location"] == "/library"
+    res = client.post(
+        "/prefs/collection",
+        data={"collection": "A", "next": "/wanted?tab=held"},
+        follow_redirects=False,
+    )
+    assert res.headers["location"] == "/wanted?tab=held"

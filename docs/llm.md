@@ -153,6 +153,7 @@ max_wall_s = 300
 # model = "qwen2.5:14b"             # override [llm].model for browsing only
 # fallback_model = "qwen3:30b"      # one retry before final not_found (not on captcha)
 # use_vision = false                # true needs a VL tag; see browser-agent-models.md
+# use_thinking = true               # false for tags that reject thinking=True
 ```
 
 Full key table: [Configuration § LLM](config.md#llm-optional-local-first).

@@ -3,22 +3,42 @@
 {% block content %}
 <h1>Activity</h1>
 <p class="page-lede">Jobs this workbench has started — fetches, repairs, indexing, and the rest. Status updates while a run is in progress. If a job stays failed, open System and fix the red check first.</p>
-{% if trust_line %}<p class="counts">{{ trust_line }}</p>{% endif %}
+{% if trust_line %}<p class="counts">Last fetch run: {{ trust_line }}</p>{% endif %}
 <section class="panel">
-  <h2>Commands</h2>
-  <p class="section-lede">Newest first. Queued and running rows keep polling until they finish. The ID is the run you can also see in the URL after Preview or Grab.</p>
-<table class="wb-table">
-  <thead><tr><th>ID</th><th>Verb</th><th>Status</th><th>Error</th></tr></thead>
+  <div class="lib-items-head">
+    <h2>Commands</h2>
+    {% if verbs %}
+    <form class="lib-pager" method="get" action="/activity">
+      {% if show_all %}<input type="hidden" name="all" value="1">{% endif %}
+      <label>Verb
+        <select name="verb" data-autosubmit>
+          <option value="">all</option>
+          {% for v in verbs %}<option value="{{ v }}"{% if v == verb_filter %} selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </label>
+    </form>
+    {% endif %}
+  </div>
+  <p class="section-lede">Newest first. Queued and running rows keep polling until they finish. Open a row to return to the page that started it.</p>
+<div class="table-wrap">
+<table class="wb-table activity-table">
+  <caption class="sr-only">Workbench jobs, newest first</caption>
+  <thead><tr><th scope="col">Started</th><th scope="col">Verb</th><th scope="col">Status</th><th scope="col">Took</th><th scope="col">Result</th></tr></thead>
   <tbody>
   {% for cmd in commands %}
-  <tr data-run-id="{{ cmd.id }}">
-    <td>{{ cmd.id }}</td>
-    <td>{{ cmd.verb }}</td>
-    <td class="cmd-status">{{ cmd.status }}</td>
-    <td class="cmd-error">{% if cmd.error %}{{ cmd.error }}{% endif %}</td>
+  <tr data-run-id="{{ cmd.id }}" data-created="{{ cmd.created_ts }}" data-run-status="{{ cmd.status }}">
+    <td><span data-ts="{{ cmd.created_ts }}" title="{{ cmd.id }}">{{ cmd.id }}</span></td>
+    <td>{% if cmd.link %}<a href="{{ cmd.link }}">{{ cmd.verb }}</a>{% else %}{{ cmd.verb }}{% endif %}</td>
+    <td><span class="status-dot status-{{ cmd.status }}" aria-hidden="true"></span> <span class="cmd-status">{{ cmd.status }}</span></td>
+    <td>{{ cmd.duration }}</td>
+    <td class="cmd-error">{% if cmd.error %}<span class="cmd-error-text">{{ cmd.error }}</span>{% elif cmd.result_summary %}{{ cmd.result_summary }}{% endif %}</td>
   </tr>
+  {% else %}
+  <tr><td colspan="5" class="counts">No jobs yet. Preview on Wanted or Search on Discover starts one.</td></tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
+{% if not show_all and commands|length >= 50 %}<p class="counts"><a href="/activity?all=1{% if verb_filter %}&amp;verb={{ verb_filter }}{% endif %}">Show all</a></p>{% endif %}
 </section>
 {% endblock %}

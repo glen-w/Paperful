@@ -55,6 +55,7 @@ and [architecture](architecture.md).
 | `[grobid].allow_remote` | `false` | Permit a non-local host. PDF bytes then leave this machine |
 | `[grobid].consolidate_header` | `0` | GROBID Crossref header consolidate. Keep `0` to stay local |
 | `[grobid].consolidate_citations` | `0` | GROBID Crossref citation consolidate. Keep `0` to stay local |
+| `[updates].check` | `false` | Opt-in: `doctor` asks PyPI for the latest paperful version and notes when a newer one exists. No telemetry; the answer is cached in `state/update-check.json` for 24h. Off by default |
 | `[handoff].scholar` | `true` | Put a Scholar results URL on miss rows and open it in the system browser when there is no direct PDF URL |
 | `[request].channels` | `off` | Author-request policy: `off` \| `rg` \| `email` \| `both` \| `rg_then_email_after_days`. **`rg` is handoff-only:** opens an existing ResearchGate publication URL in your system browser so **you** click Request full-text (RG ToS). Paperful never clicks and does not search RG. `email` / delay are recorded for later mail-merge; Paperful does not send mail. Override one `gaps` / `run --handoff` / `reachout` with `--request-rg` / `--no-request-rg`. `--re-request` ignores the `state/author-requests.jsonl` ledger |
 | `[request].email_after_days` | `14` | Used when `channels = rg_then_email_after_days` (policy only until a draft verb exists) |
@@ -76,6 +77,7 @@ and [architecture](architecture.md).
 | `[ui].citation_map_remove` | `trash` | Map **Remove from library** behaviour (trash only for now) |
 | `[ui].coauthor_network` | `on` | Discover People co-author map: `on` / `off` |
 | `[ui].web_search` | `on` | Discover Web tab (SearXNG grey search): `on` / `off` |
+| `[ui].library_page_size` / `library_page_sizes` | `50` / `25, 50, 100, 200` | Rows per page on Library and Wanted, and the choices in the per-page select |
 | `[search].max` | `20` | Default kept hits for `paperful search` / Discover Web. CLI `--max` overrides |
 | `[search].probe` | `true` | HEAD/GET first bytes for PDF vs HTML. CLI `--no-probe` skips |
 | `app_name` | `paperful` | Name shown in Zotero's authorisation dialog |
@@ -253,7 +255,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[llm].api_base` | `""` | OpenAI-compatible base when `provider = litellm` |
 | `[fix_metadata].llm_title` | `false` | Grounded title proposals in `fix-metadata` |
 | `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding; `summarize` and critique review lanes refuse flagged items unless `--force` |
-| `[screen].detectors` | retracted, withdrawal, EoC, pubpeer, tortured, scigen, mathgen, suspect | Which lanes run. PubPeer needs `[screen].pubpeer = true` and `PUBPEER_DEVKEY` |
+| `[screen].detectors` | `retracted`, `withdrawn`, `expression_of_concern`, `pubpeer`, `tortured`, `scigen`, `mathgen`, `suspect` | Which lanes run (these are the ids the config accepts). PubPeer needs `[screen].pubpeer = true` and `PUBPEER_DEVKEY` |
 | `[screen].tortured_min` | `5` | Minimum tortured-phrase hits before flagging (obvious phrases always flag) |
 | `[screen].pubpeer` | `false` | PubPeer batch lookup |
 | `[screen].fingerprint_max_age_days` | `14` | Re-download PPS CSV dumps after this age (`doctor` ambers when stale) |
@@ -359,10 +361,11 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[searxng].base_url` | `""` | SearXNG JSON endpoint for `paperful search` / Discover Web and author-site remainder discovery, or `SEARXNG_BASE_URL`. Never a default `run` source. Exit 2 from `search` when unset. [Web grey search](search.md), [Twenty and SearXNG](#twenty-and-searxng) |
 | `[ingest].dedupe_scope` | `library` | `library` or `collection` when skipping `exists` |
 | `[ocr].languages` | `eng` | Tesseract languages for `paperful ocr` (`eng+fra` or `eng fra`) |
+| `[ocr].auto_ignore_failures` | `true` | After `ocr --apply`, add failed or missing items to `state/ocr-ignore.jsonl` (`--no-auto-ignore-failures` skips for one run; `ocr-ignore` edits the list) |
 | `[rag].enabled` | `false` | Master switch for `paperful rag` and `paperful ask`. Needs `paperful[rag]` (host `uv sync --extra rag` or **heavy** image). See [rag.md](rag.md) |
 | `[rag].auto_ingest` | `false` | Index new PDFs after `run`, `attach`, `inbox`, `snapshot`, `ocr --apply` and `snowball` |
 | `[rag].ocr` | `auto` | `auto` runs OCRmyPDF on scans during ingest and rewrites them under `out_dir`; `off` leaves them alone. PDFs with a text layer are never OCR'd |
-| `[rag].parser` | `light` | `light` (`pdftotext` / `pypdf`) or `docling` (needs `paperful[rag-docling]`) |
+| `[rag].parser` | `light` | `light` (`pdftotext` / `pypdf`), `docling` (needs `paperful[rag-docling]`), or `grobid` (needs `[grobid].enabled`; see [GROBID](grobid.md)) |
 | `[rag].embed_provider` | `ollama` | `ollama` or `litellm` |
 | `[rag].embed_model` | `nomic-embed-text` | Embedding model. `bge-m3` for multilingual libraries. Each model keeps its own index under `state/rag/` |
 | `[rag].embed_base_url` / `embed_api_base` | `""` | Ollama root / LiteLLM base URL for embeddings; empty uses `[llm].base_url` / `[llm].api_base` |
@@ -491,6 +494,7 @@ run misbehaves or you host infrastructure yourself.
 | `[browser_agent].model` | (`[llm].model`) | Larger tool-capable model for browsing only; `doctor` warns under ~10B; see [browser-agent-models.md](browser-agent-models.md) |
 | `[browser_agent].fallback_model` | `""` | One retry with this tag before final `not_found` (skipped after captcha / bot wall). LiteLLM ids (`provider/model`) need `llm.allow_remote` when `llm.provider` is Ollama |
 | `[browser_agent].use_vision` | `false` | Send page screenshots to the model; requires a vision-capable tag (`qwen2.5vl`, etc.) |
+| `[browser_agent].use_thinking` | `true` | Pass `thinking=True` to browser-use; set `false` for non-thinking tags that reject the option |
 | `[ocr].timeout_s` | `600` | Seconds allowed per PDF |
 | `[attachments].fix_broken` | `false` | With `attachments --apply`, refill a ghost or broken link from `out/` when the MD5 matches |
 | `[attachments].merge_files` | `false` | With `--apply`, trash extra PDF children on the same parent that share an MD5 |

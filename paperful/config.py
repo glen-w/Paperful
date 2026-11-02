@@ -146,6 +146,8 @@ class Config:
     grobid_allow_remote: bool = False
     grobid_consolidate_header: int = 0
     grobid_consolidate_citations: int = 0
+    # Opt-in PyPI update notice (doctor only; no telemetry). Off by default.
+    update_check: bool = False
     handoff_scholar: bool = True
     request_channels: str = "off"  # off | rg | email | both | rg_then_email_after_days
     request_email_after_days: int = 14

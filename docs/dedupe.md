@@ -62,13 +62,14 @@ placeholder, and missing years are skipped. These groups are marked
 | Flag | Effect |
 | --- | --- |
 | `--dry-run` | Write the pack only. This is the default. Do not combine with `--apply`. |
-| `--apply` | Write a spare-copy line on each extra parent, then merge `high_doi` extras onto the keeper and trash the emptied parent. If that line cannot be written, the merge does not run. Needs Zotero 10+ (same gate as attach). |
-| `--apply-medium` | Also merge title+year extras. |
-| `--phase` | `high_doi`, `medium_title_year`, or `all`. |
+| `--apply` | Write a spare-copy line on each extra parent, then merge `high_doi` and `grey_id` extras onto the keeper and trash the emptied parent. If that line cannot be written, the merge does not run. Needs Zotero 10+ (same gate as attach). |
+| `--apply-medium` | Also merge `grey_host` and title+year extras. |
+| `--phase` | `high_doi`, `grey_id`, `grey_host`, `medium_title_year`, or `all` (default). `grey_id` is a shared ISBN or report number (merged with `--apply`, held when titles diverge); `grey_host` is the same title, year, and grey host, `needs_review` until `--apply-medium`. |
 | `--limit` / `-n` | Only the first N items in scope. |
 | `--year-from` / `--year-to` | Inclusive publication-year range; undated items excluded. |
 | `--type` / `-T` | Only these Zotero item types (repeatable or comma-separated). |
-| `--json` | Pack paths and counts on stdout (`dedupe`), or the four gap counts (`gaps`). |
+| `--format json` | Agent envelope (`paperful.agent.json.v1`) with pack paths and counts. |
+| `--json` | Legacy pack-path array; prefer `--format json`. |
 
 The spare-copy line ("Same paper as …") is written only with `--apply`, on each extra parent. `[remarks].surface` chooses a child note, a parent tag, or `off`. Omitting `--apply` and passing `--dry-run` both leave the library untouched.
 

@@ -93,8 +93,6 @@ from .app import (
     _health_tooltip,
     _trust_line,
     _load_wanted,
-    _patch_config_field,
-    _patch_section_assignment,
 )
 
 

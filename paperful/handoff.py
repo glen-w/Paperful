@@ -498,7 +498,7 @@ def attach_pdf_file(
         raise LibraryError("This library has no write support.")
     import hashlib
 
-    md5 = hashlib.md5(content).hexdigest()
+    md5 = hashlib.md5(content, usedforsecurity=False).hexdigest()
     primary, extras = save_pdf(cfg.out_dir, item, content, md5)
     note = provenance_stamp(source)
     res = backend.attach(item.key, primary, note=note)

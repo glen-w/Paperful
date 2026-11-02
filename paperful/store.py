@@ -423,12 +423,15 @@ def unique_path(directory: Path, filename: str, md5: str) -> Path:
     dest = directory / filename
     if not dest.exists():
         return dest
-    if hashlib.md5(dest.read_bytes()).hexdigest() == md5:
+    if hashlib.md5(dest.read_bytes(), usedforsecurity=False).hexdigest() == md5:
         return dest
     stem, suffix = os.path.splitext(filename)
     for i in range(2, 100):
         alt = directory / f"{stem} ({i}){suffix}"
-        if not alt.exists() or hashlib.md5(alt.read_bytes()).hexdigest() == md5:
+        if (
+            not alt.exists()
+            or hashlib.md5(alt.read_bytes(), usedforsecurity=False).hexdigest() == md5
+        ):
             return alt
     return directory / f"{stem} ({md5[:8]}){suffix}"
 

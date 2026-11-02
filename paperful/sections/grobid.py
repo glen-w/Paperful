@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+
+from defusedxml import ElementTree as _DET
 from pathlib import Path
 from typing import Any
 
@@ -159,7 +161,7 @@ def process_pdf(
         )
         return tei
     finally:
-        if owns:
+        if owns and client is not None:
             client.close()
 
 
@@ -221,8 +223,8 @@ def _div_type(div: ET.Element) -> str:
 
 def parse_tei_tree(tei: str) -> ET.Element:
     try:
-        root = ET.fromstring(tei)
-    except ET.ParseError as exc:
+        root = _DET.fromstring(tei)
+    except (ET.ParseError, ValueError) as exc:
         raise GrobidError(f"invalid TEI: {exc}") from exc
     return root
 

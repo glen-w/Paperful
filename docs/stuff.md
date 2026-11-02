@@ -83,9 +83,11 @@ See [config.md](config.md).
 
 ## Workbench
 
+![Stuff in the workbench: Library item form, Upload a draft form, Recent packs](_static/workflows/stuff.png)
+
 Advanced **Stuff** (next to Suggest edits; CLI is still `paperful stuff`):
 pick a library item **or** upload a draft, choose lane (`manuscript` /
-`outline`) and `k`, download `pack.md`. Needs `[rag]` and a built index.
+`outline`) and `k`, download `pack.md` / `pack.json`. Needs `[rag]` and a built index.
 Does not need `[llm]`. Never writes Zotero. Uploads stay under
 `state/critiques/uploads/` like Critique.
 

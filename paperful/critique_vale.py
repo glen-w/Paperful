@@ -71,7 +71,7 @@ def run_vale(cfg: Config, doc: ExtractedDoc) -> tuple[list[Finding], dict[str, A
         with tempfile.TemporaryDirectory(prefix="paperful-vale-") as tmp:
             src = Path(tmp) / "manuscript.txt"
             src.write_text(text, encoding="utf-8")
-            proc = subprocess.run(
+            proc = subprocess.run(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
                 [
                     exe,
                     "--output=JSON",

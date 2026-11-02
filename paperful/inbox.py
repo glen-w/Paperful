@@ -143,7 +143,7 @@ def _fingerprint(path: Path) -> str:
         return f"{path.resolve()}|missing"
     digest = ""
     try:
-        h = hashlib.md5()
+        h = hashlib.md5(usedforsecurity=False)
         with path.open("rb") as fh:
             for chunk in iter(lambda: fh.read(1024 * 1024), b""):
                 h.update(chunk)

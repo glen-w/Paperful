@@ -2,27 +2,44 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import os
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
 from filelock import FileLock
 
+_part_seq = itertools.count()
+
+
+def _part_path(path: Path) -> Path:
+    # Unique per process / thread / call so concurrent writers of the same
+    # file (GUI worker + request thread) never race on one ``.part`` name.
+    tag = f"{os.getpid()}-{threading.get_ident()}-{next(_part_seq)}"
+    return path.with_name(f"{path.name}.{tag}.part")
+
 
 def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".part")
-    tmp.write_text(text, encoding=encoding)
-    os.replace(tmp, path)
+    tmp = _part_path(path)
+    try:
+        tmp.write_text(text, encoding=encoding)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def atomic_write_bytes(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".part")
-    tmp.write_bytes(data)
-    os.replace(tmp, path)
+    tmp = _part_path(path)
+    try:
+        tmp.write_bytes(data)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def atomic_write_json(path: Path, payload: Any, *, indent: int = 2) -> None:

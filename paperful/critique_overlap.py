@@ -179,7 +179,7 @@ def rag_hybrid_boost(
     for phrase, _score, _df in phrases[:12]:
         try:
             rows = search(cfg, phrase, k=5, keys=keys, index=index)
-        except Exception:
+        except Exception:  # noqa: S112 -- best-effort loop; intentionally continues
             continue
         for row in rows:
             if row.item_key == exclude_key:

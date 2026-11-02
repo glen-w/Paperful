@@ -38,6 +38,8 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
    counts. Use the target icon on a row to set the collection chip (it
    sticks as a cookie).
 
+![Library: expand a parent collection, press the target icon, the chip in the header changes](_static/workflows/library-scope.gif)
+
 2. Open **Wanted**. `GET /` lands here. Counts at the top are Have · Held ·
    Missing. The default tab is the first non-empty bucket. Missing rows use
    miss-surface icons (hover for the plain-language reason).
@@ -45,8 +47,13 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
 ![Wanted: missing PDFs in ocean/BBNJ, rows selected for Preview / Grab](_static/workflows/wanted.png)
 
 3. Tick the rows you want, then **Preview selected** (or **Preview all**).
-   Activity records the command. If the library changed since preview, Grab
-   refuses (HTTP 409) — preview again.
+   The button labels switch from *all* to *selected* as you tick. Preview
+   runs as a background job (the status line under the heading says
+   *running*), then the page reloads with Grab armed. Activity records the
+   command. If the library changed since preview, Grab refuses (HTTP 409) —
+   preview again.
+
+![Wanted: tick three rows, Preview selected, wait for the dry-run, Grab is ready](_static/workflows/wanted-preview.gif)
 
 4. Choose **Grab selected** (or Grab all). Files land in the `out/` folder on
    this computer with a provenance stamp (`paperful oa:unpaywall`, …). On
@@ -63,7 +70,9 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
 
 7. Tick the copies you trust and choose **Attach selected PDFs** (or **Attach N
    PDFs to Zotero** when nothing is ticked). The main button does not attach
-   DOI mismatches or short PDFs — use Advanced on Wanted for those. On Zotero
+   DOI mismatches or short PDFs — for those, turn on Advanced, tick **Allow
+   DOI mismatch** / **Allow short PDF**, then **Preview attach** → **Attach
+   held PDFs**. On Zotero
    7–9 the files stay on disk until you attach them in Zotero (`paperful attach`
    on the CLI once you are on Zotero 10 or newer). After your first Attach,
    Settings → **After Grab** can switch manual and automatic.

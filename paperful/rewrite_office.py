@@ -9,6 +9,8 @@ from __future__ import annotations
 import re
 import zipfile
 import xml.etree.ElementTree as ET
+
+from defusedxml import ElementTree as _DET
 from pathlib import Path
 
 from .rewrite_plan import RewriteEdit
@@ -112,8 +114,8 @@ def pptx_structural_issues(path: Path) -> list[str]:
         if b"ns0:" in raw:
             issues.append(f"{name} uses ns0: prefixes")
         try:
-            ET.fromstring(raw)
-        except ET.ParseError as exc:
+            _DET.fromstring(raw)
+        except (ET.ParseError, ValueError) as exc:
             issues.append(f"{name}: {exc}")
     return issues
 
@@ -129,8 +131,8 @@ def odt_structural_issues(path: Path) -> list[str]:
     if b"ns0:" in raw:
         issues.append("content.xml uses ns0: prefixes")
     try:
-        ET.fromstring(raw)
-    except ET.ParseError as exc:
+        _DET.fromstring(raw)
+    except (ET.ParseError, ValueError) as exc:
         issues.append(f"content.xml: {exc}")
     return issues
 
@@ -167,8 +169,8 @@ def apply_pptx(src: Path, dest: Path, edits: list[RewriteEdit]) -> list[str]:
         raw = parts[name]
         try:
             _register_prefixes(raw)
-            parsed.append((name, raw, ET.fromstring(raw)))
-        except ET.ParseError as exc:
+            parsed.append((name, raw, _DET.fromstring(raw)))
+        except (ET.ParseError, ValueError) as exc:
             return [f"pptx: {exc}"]
     skips: list[str] = []
     rewritten: set[int] = set()
@@ -231,8 +233,8 @@ def apply_odt(src: Path, dest: Path, edits: list[RewriteEdit]) -> list[str]:
         return ["odt: missing content.xml"]
     try:
         _register_prefixes(raw)
-        root = ET.fromstring(raw)
-    except ET.ParseError as exc:
+        root = _DET.fromstring(raw)
+    except (ET.ParseError, ValueError) as exc:
         return [f"odt: {exc}"]
     skips = _apply_odt_edits(list(root.iter(f"{TEXT}p")), edits)
     parts["content.xml"] = _serialize_part(raw, root, local="document-content")

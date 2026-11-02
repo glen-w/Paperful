@@ -202,7 +202,7 @@ def chat_reviewer_stream(
         if callable(close):
             try:
                 close()
-            except Exception:
+            except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
                 pass
     return "".join(parts)
 

@@ -667,14 +667,14 @@ def apply_screen(
         tag_line = f"{_TAG_PREFIX} {summary}"
         try:
             backend.replace_prefixed_tag(item.key, _TAG_PREFIX, tag_line)
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass
         body = _note_body(group, item)
         html = wrap(body, note_type="screen", verb="pps", extra=summary[:80])
         try:
             backend.create_or_update_note(item.key, html, tag_note)
             updated += 1
-        except Exception:
+        except Exception:  # noqa: S112 -- best-effort loop; intentionally continues
             continue
     return updated
 

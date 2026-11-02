@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from rich.console import Console
 from rich.table import Table
 
+from ..fsio import atomic_write_json, atomic_write_text
 from ..config import Config
 from ..keepup import days_until_due
 from .apply import apply_candidates, mark_exists
@@ -157,7 +158,7 @@ def save_watch(
             "interval_days": interval,
         }
     )
-    path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
+    atomic_write_json(path, body)
     for leaf, payload in (
         ("seen.json", json.dumps({"urls": []}, indent=2) + "\n"),
         ("applied.json", json.dumps({"urls": []}, indent=2) + "\n"),
@@ -165,7 +166,7 @@ def save_watch(
     ):
         target = dest / leaf
         if not target.is_file():
-            target.write_text(payload, encoding="utf-8")
+            atomic_write_text(target, payload)
     return path
 
 
@@ -272,11 +273,7 @@ def run_watch(
     backend: Any = None,
 ) -> WatchResult:
     body = load_watch(cfg, name)
-    interval = int(
-        body.get("interval_days")
-        if body.get("interval_days") is not None
-        else DEFAULT_INTERVAL
-    )
+    interval = int(body.get("interval_days") or DEFAULT_INTERVAL)
     if not force and body.get("last_run_at"):
         left = days_until_due(str(body.get("last_run_at") or ""), interval)
         if left > 0:
@@ -467,11 +464,7 @@ def apply_watch(
 
 def show_watch(cfg: Config, name: str, *, console: Console) -> None:
     body = load_watch(cfg, name)
-    interval = int(
-        body.get("interval_days")
-        if body.get("interval_days") is not None
-        else DEFAULT_INTERVAL
-    )
+    interval = int(body.get("interval_days") or DEFAULT_INTERVAL)
     last = str(body.get("last_run_at") or "") or None
     console.print(f"search watch {name}")
     console.print(f"  query · {' '.join(str(t) for t in (body.get('query') or []))}")
@@ -492,7 +485,7 @@ def show_watch(cfg: Config, name: str, *, console: Console) -> None:
 def _write_watch(cfg: Config, name: str, body: dict[str, Any]) -> None:
     path = watch_dir(cfg, name) / "watch.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
+    atomic_write_json(path, body)
 
 
 def _load_url_set(path: Path) -> set[str]:
@@ -509,7 +502,4 @@ def _load_url_set(path: Path) -> set[str]:
 
 def _save_url_set(path: Path, urls: set[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps({"urls": sorted(u for u in urls if u)}, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    atomic_write_json(path, {"urls": sorted(u for u in urls if u)})

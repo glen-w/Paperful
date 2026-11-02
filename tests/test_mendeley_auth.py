@@ -26,7 +26,7 @@ from paperful.mendeley import (
 )
 from tests.conftest import mock_client
 
-TOKEN_FILE = "mendeley-oauth.json"
+TOKEN_FILE = "mendeley-oauth.json"  # noqa: S105 -- name only, not a credential
 
 
 @pytest.fixture(autouse=True)
@@ -126,11 +126,11 @@ def test_token_near_expiry_is_refreshed_and_rotated(cfg):
     )
     assert client.ensure_token() == "new-access"
     assert api.token_posts[0]["grant_type"] == "refresh_token"
-    assert api.token_posts[0]["refresh_token"] == "r1"
+    assert api.token_posts[0]["refresh_token"] == "r1"  # noqa: S105 -- name only, not a credential
     assert api.token_posts[0]["redirect_uri"] == cfg.mendeley_redirect_uri
     stored = _stored(cfg)
     assert (
-        stored["refresh_token"] == "new-refresh"
+        stored["refresh_token"] == "new-refresh"  # noqa: S105 -- name only, not a credential
         and stored["expires_at"] > time.time() + 3000
     )
 
@@ -141,7 +141,7 @@ def test_refresh_keeps_old_refresh_token_when_server_omits_it(cfg):
         cfg, api, access_token="old", refresh_token="keep-me", expires_at=0
     )
     client.ensure_token()
-    assert _stored(cfg)["refresh_token"] == "keep-me"
+    assert _stored(cfg)["refresh_token"] == "keep-me"  # noqa: S105 -- name only, not a credential
 
 
 @pytest.mark.parametrize("content", [None, "not json", "[1, 2]"])
@@ -165,7 +165,7 @@ def test_refresh_rejected_by_server_is_an_auth_error(cfg):
     with pytest.raises(MendeleyAuthError, match="token exchange 400"):
         client.ensure_token()
     assert (
-        _stored(cfg)["refresh_token"] == "revoked"
+        _stored(cfg)["refresh_token"] == "revoked"  # noqa: S105 -- name only, not a credential
     )  # a failed refresh never clobbers the stored token
 
 
@@ -492,11 +492,11 @@ def test_login_exchanges_code_and_stores_tokens(cfg, monkeypatch):
         callback_query=lambda state: f"/callback?code=THECODE&state={state}",
     )
     tokens = client.login()
-    assert tokens["access_token"] == "new-access"
+    assert tokens["access_token"] == "new-access"  # noqa: S105 -- name only, not a credential
     assert api.token_posts[0]["grant_type"] == "authorization_code"
     assert api.token_posts[0]["code"] == "THECODE"
     assert api.token_posts[0]["redirect_uri"] == cfg.mendeley_redirect_uri
-    assert _stored(cfg)["refresh_token"] == "new-refresh"
+    assert _stored(cfg)["refresh_token"] == "new-refresh"  # noqa: S105 -- name only, not a credential
     url = httpx.URL(opened[0])
     assert url.host == "api.mendeley.com" and url.params["response_type"] == "code"
     assert url.params["client_id"] == "cid" and url.params["scope"] == "all"

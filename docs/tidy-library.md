@@ -29,10 +29,15 @@ second copy of the same paper.
 ## Walkthrough
 
 1. Set the collection chip. Toggle **Advanced** in the header. Extra nav
-   appears: Repair, Mirror, Index, Briefs, Settings.
+   appears: Repair, Mirror, Index, Briefs, Critique, Suggest edits, Stuff,
+   Settings. The toggle is a cookie; it reveals pages and fields, it does
+   not enable Scholar, Sci-Hub, or a model.
+
+![Advanced: tick the header toggle, the nav grows, open one of the new pages](_static/workflows/advanced-nav.gif)
 
 2. Open **Repair**. Each verb is Preview (dry-run + review token) then
-   Apply (consumes the token). Stale previews return HTTP 409.
+   Apply (consumes the token). The Apply button appears only after a
+   successful Preview of that same verb; stale previews return HTTP 409.
 
 ![Repair: lint, fix-metadata, and dedupe with Preview / Apply](_static/workflows/repair.png)
 
@@ -46,15 +51,21 @@ second copy of the same paper.
 5. **dedupe** — Preview writes a review pack under `state/dedupe-packs/`.
    Read it. Apply copies the spare parent’s PDF, notes, and better fields
    onto the keeper, then moves that emptied parent to the Zotero trash.
-   Title+year merges need an extra confirmation (the **medium** checkbox).
+   The **Phase** select picks `all` / `high_doi` / `grey_id` / `grey_host` /
+   `medium_title_year`; title+year merges need **Include title+year merges**
+   ticked.
    Details: [Dedupe](dedupe.md).
 
 6. **attachments** (same page, further down) reports ghosts, broken links,
-   and duplicate files. It does not change Zotero unless you pass a surgery
-   flag **and** Apply. `--link` is that surgery, not the stranger path.
+   and duplicate files. It does not change Zotero unless you tick a surgery
+   box (**Fix broken**, **Merge files**, **Rename**, **Link (personal
+   library)**) **and** Apply. The same page also offers **versions**
+   (preprint ↔ published), **screen** (retractions, PubPeer, tortured
+   phrases), and **ocr**.
 
-7. **Mirror** (next nav item) is snapshot / restore / cache — the folder
-   copy, not metadata repair.
+7. **Mirror** (next nav item) is sync / snapshot / restore / cache — the
+   folder copy, not metadata repair. **Accept gone (dangerous)** on sync is
+   the only control there that can mark most of the mirror as left.
 
 ![Mirror: snapshot and restore for the on-disk copy](_static/workflows/mirror.png)
 

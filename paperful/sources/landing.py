@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET
+
+from defusedxml import ElementTree as _DET
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -183,26 +185,26 @@ def extract_pdf_urls(
         name = str(meta.get("name") or meta.get("property") or "").lower()
         content = meta.get("content")
         if name in {"citation_pdf_url", "bepress_citation_pdf_url"}:
-            add(content, prefer=True)
+            add(str(content) if content else None, prefer=True)
         elif (
             name in {"og:url", "dc.identifier", "dc.identifier.url"}
             and content
-            and looks_like_pdf_url(content)
+            and looks_like_pdf_url(str(content))
         ):
-            add(content, prefer=True)
+            add(str(content) if content else None, prefer=True)
 
     for link in soup.find_all("link", attrs={"type": "application/pdf"}):
-        add(link.get("href"), prefer=True)
+        add(str(link.get("href") or "") or None, prefer=True)
 
     for tag in soup.find_all(True):
         for attr in ("data-pdf-url", "data-download-url", "data-file-url"):
             if tag.has_attr(attr):
-                add(tag.get(attr), prefer=True)
+                add(str(tag.get(attr) or "") or None, prefer=True)
 
     for a in soup.find_all("a", href=True):
-        href = a["href"]
+        href = str(a["href"])
         text = a.get_text(" ", strip=True)
-        aria = (a.get("aria-label") or a.get("title") or "").strip()
+        aria = str(a.get("aria-label") or a.get("title") or "").strip()
         combined = f"{text} {aria}".strip()
         href_hit = bool(_PDF_HREF_RE.search(href)) or looks_like_pdf_url(href)
         text_hit = bool(_PDF_TEXT_RE.search(combined))
@@ -363,8 +365,8 @@ def _digital_commons_pdfs(ctx: Context, url: str, title: str | None) -> list[str
 
 def _oai_pdfs(xml_text: str, title: str | None) -> list[str]:
     try:
-        root = ET.fromstring(xml_text)
-    except ET.ParseError:
+        root = _DET.fromstring(xml_text)
+    except (ET.ParseError, ValueError):
         return []
     titles: list[str] = []
     idents: list[str] = []

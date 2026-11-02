@@ -158,7 +158,7 @@ def _raw_item(backend: Any, key: str) -> dict[str, Any] | None:
 
 
 def _file_md5(path: Path) -> str:
-    return hashlib.md5(path.read_bytes()).hexdigest()
+    return hashlib.md5(path.read_bytes(), usedforsecurity=False).hexdigest()
 
 
 def attachment_rows(children: list[dict[str, Any]]) -> list[dict[str, Any]]:

@@ -25,15 +25,14 @@ def test_cache_clean_dry_run_and_apply(tmp_path):
     absorbed.write_bytes(PDF)
     orphan = cache / "ORPHAN01.pdf"
     orphan.write_bytes(b"%PDF orphan")
-    stale = (
-        cache / "ITEM0001.pdf"
-    )  # already absorbed name; rewrite with wrong md5 after?
     # A second key that has a record MD5 but wrong cache bytes.
     zot.put("ITEM0002", title="Other", collections=["COLA"])
     zot.attach("ITEM0002", "ATT00002", bytes_=PDF)
     run_sync(cfg, zot, pdfs="all")
     wrong = cache / "ITEM0002.pdf"
-    wrong.write_bytes(b"%PDF not-matching-" + hashlib.md5(b"x").digest())
+    wrong.write_bytes(
+        b"%PDF not-matching-" + hashlib.md5(b"x", usedforsecurity=False).digest()
+    )
 
     report = clean_pdf_cache(cfg, apply=False)
     assert report["apply"] is False

@@ -228,7 +228,7 @@ def fetch_pdf(
                     raise DownloadError(f"too small ({len(content)} bytes)")
                 return Download(
                     content=content,
-                    md5=hashlib.md5(content).hexdigest(),
+                    md5=hashlib.md5(content, usedforsecurity=False).hexdigest(),
                     final_url=final_url,
                 )
             else:

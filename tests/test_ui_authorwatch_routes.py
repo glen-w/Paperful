@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 
 import pytest
 
@@ -259,3 +258,24 @@ def test_import_writes_upload_then_hands_off(env, monkeypatch):
     assert seen["path"].name == "people.csv"
     assert seen["path"].read_bytes() == b"name\nAda\n"
     assert seen["path"].parent == env.cfg.state_dir / "gui" / "uploads"
+
+
+def test_list_name_rejects_injection(env):
+    """A reflected list name must never reach a template or a directory name."""
+    payload = "a')||alert('xss')||confirm('"
+    res = env.client.get("/discover", params={"tab": "people", "list_name": payload})
+    assert res.status_code == 400
+    assert "alert(" not in res.text
+    for path in (
+        "/discover/aw/save",
+        "/discover/aw/delete",
+        "/discover/aw/run",
+        "/discover/follow",
+        "/discover/apply-preview",
+    ):
+        data = {"list_name": payload, "name": payload, "orcid": ORCID}
+        res = env.client.post(path, data=data, follow_redirects=False)
+        assert res.status_code == 400, path
+    assert env.queued == []
+    page = env.client.get("/discover", params={"tab": "people", "list_name": "ok-1"})
+    assert page.status_code == 200

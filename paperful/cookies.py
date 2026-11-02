@@ -43,7 +43,7 @@ def apply_netscape_cookies(client: httpx.Client, path: Path) -> None:
     if not path.is_file():
         return
     for c in load_netscape_cookies(path).jar:
-        client.cookies.set(c.name, c.value, domain=c.domain, path=c.path)
+        client.cookies.set(c.name, c.value or "", domain=c.domain, path=c.path)
 
 
 def has_domain_cookies(client: httpx.Client, *fragments: str) -> bool:

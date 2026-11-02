@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 
+from defusedxml import ElementTree as _DET
+
 import httpx
 
 from ..resolve import ARXIV_NEW_RE, ARXIV_OLD_RE, title_similarity
@@ -50,8 +52,8 @@ def _title_search(item: Item, ctx: Context) -> Candidate:
             timeout=30,
         )
         resp.raise_for_status()
-        root = ET.fromstring(resp.text)
-    except (httpx.HTTPError, ET.ParseError):
+        root = _DET.fromstring(resp.text)
+    except (httpx.HTTPError, ET.ParseError, ValueError):
         return Candidate.miss(NAME, Outcome.ERROR, "query failed")
     for entry in root.findall("a:entry", _NS):
         title = (entry.findtext("a:title", default="", namespaces=_NS) or "").strip()

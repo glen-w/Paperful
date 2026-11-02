@@ -33,39 +33,62 @@ The screenshots are the Discover page on a live `ocean/BBNJ` chip.
    dry-run queue). Advanced can filter by OpenAlex study designs or trusted
    journal lists (`listed_in`: DOAJ, MEDLINE, …).
 
-2. Type a query (for example `area based management`) and **Search**.
-   Per-row Keep / Skip marks the queue. Nothing is written to Zotero yet.
+2. Type a query (for example `area based management`) and **Search**. You
+   land on **Queue**, where per-row **Keep** / **Skip** marks the candidates.
+   Nothing is written to Zotero yet. (**Explore**, the first tab, skips the
+   keyword step: paste a DOI or title and **Open map**.)
 
 ![Discover: topic filled, ready to search or follow people](_static/workflows/discover.png)
 
-3. **Preview apply**, then **Add selected**. That is `snowball apply`
+3. Open **Queue**. The **Map** draws the candidates before you open a PDF:
+   older and highly cited is likely foundational, recent and highly cited is
+   influential now, recent with fewer citations may be emerging. Study-design
+   badges (evidence synthesis, trials, …) sit on top of those roles. Click a
+   paper to see why it is on the map, Keep or Skip it, or expand one hop
+   (**References** / **Cited by**). The paginated candidate table is below
+   the map.
+
+![Discover Queue: the citation map of the last topic run, read-first list on the left](_static/workflows/discover-queue.png)
+
+![Discover Queue: switch the map to Cited by, click a paper, read its card](_static/workflows/discover-map.gif)
+
+4. **Preview apply**, then **Add selected**. That is `snowball apply`
    (metadata only). A stale preview refuses if the library changed.
 
-4. Optional on the same panel: **Briefing** / **Digest** write
-   `briefing.md` / `digest.md` on the queue (shown on the page; not
-   auto-created). **Keep an eye on this** saves a topic watch only when a
-   snowball **profile** is chosen.
+5. Optional: back on **Topic**, **Briefing** / **Digest** write
+   `briefing.md` / `digest.md` for the last run (shown on Queue; not
+   auto-created). On **Queue**, **Keep an eye on this** saves a topic watch
+   — only when a snowball **profile** is chosen, so save one on Advanced
+   Topic first or the click returns an error banner. Saved watches and
+   people lists appear under **Following**, each with a **Check again**
+   button.
 
-5. **Fill PDFs** opens Wanted. Continue with [First fill](first-fill.md).
+![Discover Following: saved topic watches and people lists with Check again](_static/workflows/discover-following.png)
+
+6. **Fill PDFs** opens Wanted. Continue with [First fill](first-fill.md).
 
 Advanced (toggle, cookie only) adds crawl kinds (hybrid / DOI / ORCID /
 collection), hop knobs, a stopping rule (off unless you set it; **Next hop**
-between hops), profile save/run, **refs gap**, and **ingest-dois**.
+between hops), and profile save/run on Topic, plus a **Grow** tab with
+**refs gap**, **ingest-dois**, **Authors frequency**, and **Packs promote**.
 Those are the [research pack](research-pack.md) and [snowball](snowball.md)
-surfaces, not the first click.
+surfaces, not the first click. The **Web** tab (SearXNG grey search, with
+**Save watch** / **Run**) is the third default-nav way to grow; see
+[Web grey search](search.md).
 
 ### People
 
-Same page, lower panel. This is `authorwatch` — people you already follow,
+Same page, **People** tab. This is `authorwatch` — people you already follow,
 not a keyword hop.
 
 1. Create a named list.
 2. **Follow** with an ORCID (optional backfill date). Name-only rows stay
    unresolved until you confirm an iD.
-3. **Check again** re-runs the list. Inbox rows use the same Preview →
-   apply pattern as topic.
+3. **Run list** re-polls the list (**Check again** on the Following tab
+   does the same). Inbox rows use the same Preview → apply pattern as topic.
 4. **Get suggestions** ranks people already in the collection chip
-   (`suggest -C`). Tick **Accept** to put them on the list.
+   (`suggest -C`). Tick rows and **Accept selected** to put them on the list
+   (optional **Initial seed from** date).
 
 ![Discover People: suggestions ticked, members already on the list](_static/workflows/discover-people.png)
 

@@ -12,6 +12,8 @@ import sqlite3
 import struct
 import tempfile
 import xml.etree.ElementTree as ET
+
+from defusedxml import ElementTree as _DET
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -641,7 +643,7 @@ class EndNoteBackend(ExcludeMixin):
                 where = " WHERE trash_state = 0 OR trash_state IS NULL"
         elif trashed_only:
             return []
-        rows = conn.execute(f"SELECT * FROM refs{where}").fetchall()
+        rows = conn.execute(f"SELECT * FROM refs{where}").fetchall()  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
         return [dict(r) for r in rows]
 
     def _ref_ids(self, *, live_only: bool = True) -> set[str]:
@@ -655,7 +657,7 @@ class EndNoteBackend(ExcludeMixin):
         where = ""
         if live_only and "trash_state" in cols:
             where = " WHERE trash_state = 0 OR trash_state IS NULL"
-        rows = conn.execute(f"SELECT {id_col} FROM refs{where}").fetchall()
+        rows = conn.execute(f"SELECT {id_col} FROM refs{where}").fetchall()  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
         return {str(r[0]) for r in rows if r and r[0] is not None}
 
     def _ref_by_id(self, key: str) -> dict[str, Any] | None:
@@ -666,7 +668,7 @@ class EndNoteBackend(ExcludeMixin):
         id_col = "id" if "id" in cols else ("refs_id" if "refs_id" in cols else None)
         if id_col is None:
             return None
-        row = _fetchone(conn, f"SELECT * FROM refs WHERE {id_col} = ?", key)
+        row = _fetchone(conn, f"SELECT * FROM refs WHERE {id_col} = ?", key)  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
         return dict(row) if row is not None else None
 
     def attachment_children(
@@ -689,8 +691,10 @@ class EndNoteBackend(ExcludeMixin):
             if ref_col and path_col:
                 for d in (
                     dict(r)
-                    for r in _fetchall(
-                        conn, f"SELECT * FROM file_res WHERE {ref_col} = ?", key
+                    for r in _fetchall(  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
+                        conn,
+                        f"SELECT * FROM file_res WHERE {ref_col} = ?",  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
+                        key,
                     )
                 ):
                     stored = d.get(path_col)
@@ -771,7 +775,7 @@ class EndNoteBackend(ExcludeMixin):
             if ref_col and path_col:
                 rows = _fetchall(
                     conn,
-                    f"SELECT * FROM file_res WHERE {ref_col} = ?",
+                    f"SELECT * FROM file_res WHERE {ref_col} = ?",  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
                     key,
                 )
                 ranked: list[tuple[int, str]] = []
@@ -895,7 +899,7 @@ class EndNoteBackend(ExcludeMixin):
             if ref_col and group_col:
                 try:
                     mrows = conn.execute(
-                        f"SELECT {ref_col}, {group_col} FROM {member_table}"
+                        f"SELECT {ref_col}, {group_col} FROM {member_table}"  # noqa: S608 -- identifiers from schema introspection; values bound/escaped
                     ).fetchall()
                 except sqlite3.Error:
                     mrows = []
@@ -926,8 +930,8 @@ def _parse_group_spec(blob: object) -> dict[str, Any]:
         name = text.strip()
         return {"name": name} if name else {}
     try:
-        root = ET.fromstring(text)
-    except ET.ParseError:
+        root = _DET.fromstring(text)
+    except (ET.ParseError, ValueError):
         return {}
     name = None
     for el in root.iter():
@@ -958,7 +962,7 @@ def _endnote_member_ids(blob: bytes) -> list[int]:
 
 
 def _file_md5(path: Path) -> str:
-    digest = hashlib.md5()
+    digest = hashlib.md5(usedforsecurity=False)
     with path.open("rb") as fh:
         for chunk in iter(lambda: fh.read(8192), b""):
             digest.update(chunk)

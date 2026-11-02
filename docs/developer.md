@@ -82,7 +82,8 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `attach.py` | Authorize and upload | `zot` |
 | `library.py` | `LibraryBackend` protocol, `ZoteroBackend`, `MirroredBackend`, `ChangeSet` | `zot`, `attach` |
 | `mendeley.py`, `endnote.py` | Other adapters (seeking testers) | `library` types |
-| `store.py` | Manifest, filenames, record IO | `zot`, `attach` |
+| `store.py` | Manifest, filenames, record IO | `zot`, `attach`, `fsio` |
+| `fsio.py` | Atomic text / bytes / JSON writes (unique `.part` + `os.replace`) and `file_lock` under `state/.locks/` | `filelock` |
 | `mirror.py` | Folders by key, records → `Item`, PDFs on disk, gone policy. Calls no manager | `store`, `zot` |
 | `snapshot.py` | Write one item's folders from payloads (`write_item`); scoped full refresh | `mirror`, `library` |
 | `sync.py` | The refresh: delta or full, version last | `snapshot`, `mirror`, `library` |
@@ -93,6 +94,8 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `rewrite.py`, `rewrite_areas.py`, `rewrite_align.py`, `rewrite_plan.py`, `rewrite_llm.py`, `rewrite_render.py`, `rewrite_docx.py`, `rewrite_office.py`, `rewrite_pdf.py`, `rewrite_openxml.py` | Apply-from-critique (`paperful.rewrite.plan.v1`). Pack required; never overwrites the source; stdlib tracked-changes OOXML (Word), in-place pptx/odt copy or ODF/PDF spines; optional `openxml-audit` extra | `critique` pack + gated `llm` |
 | `critique.py`, `critique_lanes.py`, `critique_checks/` (`run`, `structure`, `biblio`, `floats`, `style`, `overlap`), `critique_extract.py`, `critique_llm.py` (`suggested_from_llm` dispatches `_run_reviewers` / `_run_optional_lane`), `critique_marg.py`, `critique_adversary.py`, `critique_outline.py`, `critique_claims.py`, `critique_verify.py`, `critique_units.py`, `critique_context.py`, `critique_metrics.py`, `critique_ai_tells.py`, `critique_ai_model.py`, `critique_vale.py`, `critique_overlap.py`, `critique_stats.py` | Local manuscript pack (`paperful.critique.pack.v1`). Checkers always; composable suggested review lanes (`reviewers`, MARG-S, adversary, outline, claims, verify, ScholarPeer-inspired context / context-web; no vendor); optional GROBID TEI chunks for `marg` / `claims` / `verify`; optional Binoculars extra (git overlay; no torch at import); optional Vale house-style pass (no vale at import); glossary expansions when `state/glossary/` has entries | `cli_runtime`, gated `llm`, optional `grobid_client` |
 | `config_tables.py` | Nested TOML sections applied onto `Config` | `config` parsers |
+| `config_check.py` | `config check`: unknown top-level keys and sections (did-you-mean), secrets that belong in the environment | `config` |
+| `sr/` (`protocol.py`, `screen.py`) / `sr_cmd.py` | Systematic-review scaffold: protocol (`paperful.sr.protocol.v1`) and screening ledger (`paperful.sr.screen.v1`) under `state/sr/<slug>/`; `sr init` / `screen` / `status` | `fsio`, `store` |
 | `sources/` | One fetch lane each. Return bytes or a miss | `sources.base` |
 | `camofox_client.py` / `camofox_recover.py` | Opt-in Camoufox REST recover (before `browser_agent`) | `sources.camofox`, [camofox.md](camofox.md) |
 | `pipeline.py` | Order the lanes, save, attach, write the manifest | most things |
@@ -156,7 +159,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `twenty.py` | Twenty People lookup (local cache) and `sync` (CRM create/enrich). User guide: [Twenty and SearXNG](snowball.md#twenty-and-searxng) | httpx |
 | `mcp_server.py` | Optional stdio MCP: read-only gaps, snowball preview / trends, export, proposal_export, refs_gap, ask (optional `ask_mode`) | `agent_ops` |
 | `serve.py` | Localhost FastAPI: JSON capability API + mounts `ui` when the `serve` extra is installed | `agent_ops`, `ui` |
-| `ui/` | Server-rendered workbench (Jinja). `app.py` owns shared helpers + `mount_ui`; routes live in `wanted_routes` / `discover_routes` (binder + snowball page; tab handlers in `discover_graph_routes` / `discover_search_routes` / `discover_people_routes`) / `shell_routes` / `repair_routes` / `index_routes` / `critique_routes` / `rewrite_routes` (each `register_*`). Desk HTTP bodies are module-level `handle_*` functions; each `register_*` only binds them. Row builders: `pages.py` re-exports `wanted_rows` / `discover_rows` / `ask_rows` plus `page_common` (pagination, dest, fingerprints). Long jobs: `jobs.py` re-exports `wanted_jobs` / `discover_jobs` / `repair_jobs` / `index_jobs` (RAG, ask, summarize, synthesize) and defines `critique` / `rewrite`. Ordinary pages do not run `doctor` (System does). Handlers resolve `doctor_payload` / `collections_tree` via `paperful.ui.app` so tests can monkeypatch there | CLI / MCP builders |
+| `ui/` | Server-rendered workbench (Jinja). `origin_guard.py` (`OriginGuardMiddleware`, added in `serve.create_app`) returns 403 on non-GET requests whose `Sec-Fetch-Site` / `Origin` / `Referer` is cross-origin. `app.py` owns shared helpers + `mount_ui`; routes live in `wanted_routes` / `discover_routes` (binder + snowball page; tab handlers in `discover_graph_routes` / `discover_search_routes` / `discover_people_routes`) / `shell_routes` / `repair_routes` / `index_routes` / `critique_routes` / `rewrite_routes` (each `register_*`). Desk HTTP bodies are module-level `handle_*` functions; each `register_*` only binds them. Row builders: `pages.py` re-exports `wanted_rows` / `discover_rows` / `ask_rows` plus `page_common` (pagination, dest, fingerprints). Long jobs: `jobs.py` re-exports `wanted_jobs` / `discover_jobs` / `repair_jobs` / `index_jobs` (RAG, ask, summarize, synthesize) and defines `critique` / `rewrite`. Ordinary pages do not run `doctor` (System does). Handlers resolve `doctor_payload` / `collections_tree` via `paperful.ui.app` so tests can monkeypatch there | CLI / MCP builders |
 | `authorwatch.py` | People lists → OpenAlex new works; `gather_briefing` / `write_briefing` / `write_digest`; `apply` creates parents + `ingested.md`; `accept` / `delete` | OpenAlex client, `identity`, `snowball.ingest`, `authorwatch_suggest` |
 | `network/` | ORCID ego co-authorship SNA (`paperful.network.v1` under `state/network/<run-id>/`); phase slices; optional NetworkX metrics | OpenAlex `works_by_author`, `AuthorRecord`; extra `paperful[network]` |
 | `search/` | Web grey search (`paperful.search.v1` under `state/search/<run-id>/`); SearXNG JSON; metadata apply | `snowball.searxng`, playbooks, `greyid` |
@@ -239,6 +242,9 @@ Tier policy (1.0 contract):
 | `paperful.network.v1` | `state/network/<run-id>/` | `network` | T2 | ORCID ego graph, phase slices, metrics, `attributes.csv`. Distinct from snowball `coauthors.v1`. |
 | `paperful.search.v1` | `state/search/<run-id>/` | `search` | T2 | SearXNG grey query, ranked hits, probe candidates. Metadata apply only. |
 | `paperful.search.watch.v1` | `state/search/watches/<name>/watch.json` | `search.watch` | T2 | URL seen set (not DOI). `interval_days` is a due-date hint; Paperful does not schedule. |
+| `paperful.sr.protocol.v1` | `state/sr/<slug>/protocol.json` | `sr.protocol` | T2 | Title, question, exclude reasons. No scheduler |
+| `paperful.sr.screen.v1` | `state/sr/<slug>/screening.jsonl` | `sr.screen` | T2 | One decision per line (`include` / `exclude` / `maybe`, reason, reviewer) |
+| `paperful.snowball.stop.v1` | `state/snowball/<run-id>/stop.json` | `snowball.stop` | T2 | Stopping-rule scores per hop |
 | `paperful.citation_graph.v1` | `state/snowball/<run-id>/citation_graph.json` | `snowball.citation_graph` | T2 | Discover map. Rebuilt from the queue. Nodes carry `role`, `in_library`, `item_key`, `has_pdf`, optional operator staging (`tags` / `note` / `target_collection` / `staged`), optional `watch_new` / `compare_new`, `thresholds`, and `triage` (read-first list). Library actions: `paperful.snowball.graph_library`. |
 | `paperful.htmlpdf.proposal.v1` | `state/htmlpdf/proposals/` | `sources.htmlpdf` | T2 | — |
 | `paperful.synthesis.v1` | synthesize sidecar | `synthesize` | T2 | — |
@@ -288,7 +294,11 @@ expose one. Without one, reads stay live.
 
 `uv run pytest` runs offline. `tests/conftest.py` refuses every request a
 real Zotero client makes, so a Zotero running on your machine is never read
-by a test.
+by a test. Since 1.7 the socket gate is a **required** CI job:
+`uv run pytest --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,::1,localhost`
+must pass (`tests/conftest.py` re-enables sockets for the `grey_live` /
+`e2e_live` markers). Tests that need Crossref/OpenAlex-shaped answers stub
+them; a test that dials out is a bug, not a fixture.
 
 | Fake | Use |
 | --- | --- |
@@ -300,20 +310,39 @@ Count requests when the point of a change is fewer of them: `FakeZotero.calls`.
 
 ### CI and local pitfalls
 
-GitHub Actions (`.github/workflows/ci.yml`) syncs with `--group dev --extra
-serve` on Ubuntu, then runs three jobs:
+GitHub Actions (`.github/workflows/ci.yml`) syncs with `uv`, then runs
+eight jobs (each with a `timeout-minutes` cap). All are required since 1.7:
 
 - **smoke** (required): `pytest -m smoke` — CLI version, shell pages boot, and
   workbench command/preview paths. Copy and tab layout changes should not fail
   this job.
+- **lint** (required): `ruff check` (full `F` plus the curated `S` set —
+  facade/re-export modules carry explicit `F401` per-file ignores in
+  `pyproject.toml`), `ruff format --check`, and `mypy` on the modules listed
+  under `[tool.mypy] files` in `pyproject.toml` (200+ files since 1.7; add a
+  file there when it is typed end to end). `make lint` runs the same three.
+- **audit** (required): `pip-audit` against the resolved environment on
+  Python 3.12, plus a CycloneDX SBOM artifact. (The Python 3.10 resolution
+  keeps pillow 12.x because pillow 13 needs 3.11+; see
+  `docs/plans/1.7-wave.md`.)
+- **socket** (required): the offline suite with sockets disabled (above).
+- **fresh-install** (required): an isolated `.[serve]` install runs
+  `doctor` without Zotero (exit 2) and serves `/health`.
 - **docker** (required): Compose image, `paperful --help`, and `paperful doctor`
   without Zotero (exit 2).
 - **suite** (required): full `pytest -m "not docs"` with coverage on Ubuntu,
-  macOS, and Windows (Python 3.10–3.13). Coverage uploads from the Ubuntu 3.11
-  cell when green. Local gate: `fail_under = 80` in `pyproject.toml`.
+  macOS, and Windows (Python 3.10–3.14). Coverage uploads from the Ubuntu 3.11
+  cell when green. Local gate: `fail_under` in `pyproject.toml`.
 
 Reproduce the required gate with `uv run pytest -m smoke`. The full local suite
 is still `uv run pytest` (80% coverage gate in `pyproject.toml`).
+
+**Atomic writes.** JSON and text under `state/` and `out/` go through
+`paperful.fsio` (`atomic_write_text` / `atomic_write_json`: unique
+`.part` temp file, then `os.replace`). Cross-process sections take
+`fsio.file_lock(state_dir, name)` (a `filelock` under `state/.locks/`).
+Use these instead of `Path.write_text` for anything another thread or
+process may read mid-write (run reports, `last-run.json`, mirror records).
 
 **CLI help assertions.** On CI, `CI` / `GITHUB_ACTIONS` is set and Typer/Rich
 style option names with ANSI codes. A flag like `--apply` is often split across
@@ -339,9 +368,12 @@ the full dev test suite. Reproduce CI with host `uv run pytest` or a
 expect host-only tests (for example default Zotero endpoint URLs) to pass when
 `PAPERFUL_ZOTERO_HOST` is set for container → host networking.
 
-**Docs CI.** Pushes that change `docs/` or `website/` also run strict Sphinx
-(`DOCS_STRICT=1`) and may deploy Pages; new guide pages must be linked from
-`docs/index.md` (`tests/test_sphinx_docs.py`).
+**Docs CI.** `docs.yml` builds the guide on every push and PR but is
+advisory (`continue-on-error`, warnings allowed); `pages.yml` deploys on
+`main` pushes that touch `docs/`, `website/`, or the Sphinx test. Neither
+sets `DOCS_STRICT`. Run `DOCS_STRICT=1 make docs` locally before pushing
+guide changes; new guide pages must be linked from `docs/index.md`
+(`tests/test_sphinx_docs.py`).
 
 ## PyPI releases
 

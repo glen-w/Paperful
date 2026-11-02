@@ -91,8 +91,6 @@ from .app import (
     _health_tooltip,
     _trust_line,
     _load_wanted,
-    _patch_config_field,
-    _patch_section_assignment,
 )
 
 
@@ -291,7 +289,7 @@ def handle_page_wanted(
         ),
     )
     if persist_per_page:
-        set_cookie(response, COOKIE_LIBRARY_PER_PAGE, str(per_page))
+        set_cookie(response, COOKIE_LIBRARY_PER_PAGE, str(per_page), request=request)
     return response
 
 

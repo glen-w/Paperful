@@ -231,7 +231,7 @@ class OpenAlexClient:
         if parsed is not None and parsed >= 0:
             return min(parsed, self.backoff_cap_s)
         base = self.backoff_base_s * (2**attempt)
-        return min(self.backoff_cap_s, base * (0.5 + random.random() / 2))
+        return min(self.backoff_cap_s, base * (0.5 + random.random() / 2))  # noqa: S311 -- jitter/sampling/shuffle, not security-sensitive
 
     def note(self, message: str) -> None:
         """Print a milestone. The live bar updates on every note."""

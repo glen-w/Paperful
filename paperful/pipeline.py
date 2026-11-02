@@ -462,7 +462,7 @@ class Pipeline:
         self.release_browser()
         try:
             self.client.close()
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass
         self.client = make_client(self.cfg)
         self.ctx = Context(config=self.cfg, client=self.client, browser=self.browser)
@@ -1012,7 +1012,7 @@ class Pipeline:
             )
             return Download(
                 content=content,
-                md5=hashlib.md5(content).hexdigest(),
+                md5=hashlib.md5(content, usedforsecurity=False).hexdigest(),
                 final_url=final or target,
             )
         return None

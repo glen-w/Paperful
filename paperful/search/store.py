@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..fsio import atomic_write_json
 from ..config import Config
 
 SCHEMA = "paperful.search.v1"
@@ -160,7 +161,7 @@ def list_runs(cfg: Config) -> list[dict[str, Any]]:
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    atomic_write_json(path, payload)
 
 
 def _read_json(path: Path) -> dict[str, Any]:

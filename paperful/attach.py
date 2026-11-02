@@ -37,7 +37,7 @@ class LocalZupload(Zupload):
     ) -> dict[str, Any]:
         att_path = Path(attachment)
         stat = att_path.stat()
-        digest = hashlib.md5()
+        digest = hashlib.md5(usedforsecurity=False)
         with att_path.open("rb") as fh:
             for chunk in iter(lambda: fh.read(8192), b""):
                 digest.update(chunk)
@@ -119,10 +119,11 @@ class Attacher:
         # The authorisation dialog blocks the HTTP response until the user clicks;
         # uploads of big PDFs also take a while. Reads are local and unaffected.
         try:
-            self.zl.zot.client.timeout = (
-                DIALOG_TIMEOUT_S  # pyzotero vendors httpx; a float avoids type mixing
-            )
-        except Exception:
+            client = self.zl.zot.client
+            if client is not None:
+                # pyzotero vendors httpx; a float avoids type mixing
+                client.timeout = DIALOG_TIMEOUT_S
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass
 
     # ---- capability -------------------------------------------------------

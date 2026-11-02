@@ -76,7 +76,8 @@
   <form method="post" action="/discover/topic" class="form-stack" id="discoverTopicForm">
     <div class="field-group">
       <p class="field-legend">Search {{ info("OpenAlex search. For DOI, ORCID, or collection kinds, put the identifier in Seeds as well.") }}</p>
-      <label>Track a topic {{ info("Keywords OpenAlex will search. Phrase it like a paper title or a few technical terms, not a whole paragraph.") }} <input name="query" id="discoverQuery"></label>
+      <div class="field-row">
+      <label class="grow">Track a topic {{ info("Keywords OpenAlex will search. Phrase it like a paper title or a few technical terms, not a whole paragraph.") }} <input name="query" id="discoverQuery" placeholder="area-based management tools high seas"></label>
       {% if prefs.advanced %}
       <label>Kind {{ info("search: keyword only. hybrid: keyword plus citation hops. doi / orcid / collection: start from those seeds instead of a keyword.") }}
         <select name="kind" id="discoverKind">
@@ -89,18 +90,53 @@
       </label>
       {% endif %}
       <button type="submit">Search</button>
-      {{ info("Run a dry-run graph and fill the Queue. Does not create Zotero items until you Apply below.") }}
+      {{ info("Run a dry-run graph and fill the Queue. Does not create library items until you Apply on Queue.") }}
+      </div>
     </div>
     {% if prefs.advanced %}
-    <div class="field-group">
-      <p class="field-legend">Graph {{ info("How far to walk references and citing papers from each seed. Leave defaults if you are unsure.") }}</p>
+    <details class="field-group field-group--details">
+      <summary class="field-legend">Seeds {{ info("Starting works or people for DOI, ORCID, collection, or hybrid runs.") }}</summary>
+      <label>Seeds {{ info("One DOI or ORCID per line. Used when Kind is doi, orcid, hybrid, or you want extra seeds beside a keyword.") }} <textarea name="seeds" id="discoverSeeds" rows="3" placeholder="DOIs / ORCIDs, one per line"></textarea></label>
+    </details>
+    <details class="field-group field-group--details">
+      <summary class="field-legend">Graph {{ info("How far to walk references and citing papers from each seed. Leave defaults if you are unsure.") }}</summary>
       <p class="section-lede">Citation hops find papers that a seed cites, or papers that cite it. Depth 0 is the seed set only. Higher depth explodes quickly — cap it with Max candidates.</p>
-      <label>Direction {{ info("refs: papers the seeds cite. cites: papers that cite the seeds. both: those two. keywords / similar add OpenAlex keyword or related-work expansion. Combinations such as refs+keywords are allowed.") }} <input name="direction" placeholder="refs"></label>
-      <label>Depth {{ info("How many hops from each seed. 0 is seeds only. 1 is the usual first ring of references or citers.") }} <input name="depth" type="number" min="0"></label>
-      <label>Year from {{ info("Drop candidate works published before this year.") }} <input name="year_from" type="number"></label>
-      <label>Year to {{ info("Drop candidate works published after this year.") }} <input name="year_to" type="number"></label>
-      <label>Max candidates {{ info("Stop after this many new-plus-already-in-library rows. Use all for every row (can be huge).") }} <input name="max_candidates" placeholder="all"></label>
-      <label>Per-hop limit {{ info("Neighbours kept per seed at each hop. Use all for every neighbour.") }} <input name="per_hop_limit" placeholder="all"></label>
+      <div class="field-row">
+      <label>Direction {{ info("refs: papers the seeds cite. cites: papers that cite the seeds. both: those two. keywords / similar add OpenAlex keyword or related-work expansion.") }}
+        <select name="direction">
+          <option value="">default (refs+keywords)</option>
+          <option value="refs">refs</option>
+          <option value="cites">cites</option>
+          <option value="both">both</option>
+          <option value="keywords">keywords</option>
+          <option value="similar">similar</option>
+          <option value="refs+keywords">refs+keywords</option>
+          <option value="cites+keywords">cites+keywords</option>
+          <option value="both+keywords">both+keywords</option>
+          <option value="refs+similar">refs+similar</option>
+          <option value="both+similar">both+similar</option>
+        </select>
+      </label>
+      <label>Depth {{ info("How many hops from each seed. 0 is seeds only. 1 is the usual first ring of references or citers.") }} <input name="depth" type="number" min="0" max="5" inputmode="numeric"></label>
+      <label>Year from {{ info("Drop candidate works published before this year.") }} <input name="year_from" type="number" inputmode="numeric"></label>
+      <label>Year to {{ info("Drop candidate works published after this year.") }} <input name="year_to" type="number" inputmode="numeric"></label>
+      <label>Max candidates {{ info("Stop after this many new-plus-already-in-library rows. Use all for every row (can be huge).") }} <input name="max_candidates" placeholder="all" pattern="\d+|all"></label>
+      <label>Per-hop limit {{ info("Neighbours kept per seed at each hop. Use all for every neighbour.") }} <input name="per_hop_limit" placeholder="all" pattern="\d+|all"></label>
+      <label>Per-hop rank {{ info("Which neighbours a numeric Per-hop limit keeps: most-cited, least-cited, or random. default uses the usual ranking.") }}
+        <select name="per_hop_rank">
+          <option value="">default</option>
+          <option value="most-cited">most-cited</option>
+          <option value="least-cited">least-cited</option>
+          <option value="random">random</option>
+        </select>
+      </label>
+      <label>Hybrid seeds {{ info("For hybrid kind: how many keyword hits become graph seeds. Leave blank for the default.") }} <input name="hybrid_seeds" type="number" min="1" inputmode="numeric"></label>
+      <label>Min seed citations {{ info("Ignore seed works cited fewer times than this. Filters noisy or very new seeds.") }} <input name="min_seed_citations" type="number" min="0" inputmode="numeric"></label>
+      </div>
+    </details>
+    <details class="field-group field-group--details">
+      <summary class="field-legend">Stopping rule {{ info("When to pause the walk so you can Keep or Skip before the next hop.") }}</summary>
+      <div class="field-row">
       <label>Stop rule {{ info("Off walks the whole depth in one search. marginal_yield pauses after each hop so you can Keep or Skip before the next hop. any also stops on a fitted coverage curve, a screening cap, or an empty frontier. Depth and max candidates still cap the walk.") }}
         <select name="stop_rule">
           <option value="">default</option>
@@ -111,61 +147,84 @@
           <option value="any">any</option>
         </select>
       </label>
-      <label>Stop eps {{ info("marginal_yield: fraction of screened works you Keep. Below this for stop-k hops in a row, and not before hop k+1. Default 0.01.") }} <input name="stop_eps" placeholder="0.01"></label>
-      <label>Stop k {{ info("How many low-yield hops in a row. Default 2, so the rule cannot fire before the third labeled hop.") }} <input name="stop_k" type="number" min="1"></label>
-      <label>Stop max screened {{ info("budget: stop after this many new rows have been screened. Leave blank for no cap.") }} <input name="stop_max_screened" type="number" min="0"></label>
-      <label>Hybrid seeds {{ info("For hybrid kind: how many keyword hits become graph seeds. Leave blank for the default.") }} <input name="hybrid_seeds" type="number"></label>
-      <label>Per-hop rank {{ info("Which neighbours a numeric Per-hop limit keeps: most-cited, least-cited, or random. default uses the usual ranking.") }}
-        <select name="per_hop_rank">
-          <option value="">default</option>
-          <option value="most-cited">most-cited</option>
-          <option value="least-cited">least-cited</option>
-          <option value="random">random</option>
-        </select>
-      </label>
-      <label>Fetch PDFs {{ info("After items are created: off leaves PDFs to Wanted. fast uses cheap public sources. full runs the usual fetch policy. Creating items still needs Apply below.") }}
+      <label>Stop eps {{ info("marginal_yield: fraction of screened works you Keep. Below this for stop-k hops in a row, and not before hop k+1. Default 0.01.") }} <input name="stop_eps" type="number" step="0.001" min="0" max="1" placeholder="0.01" inputmode="decimal"></label>
+      <label>Stop k {{ info("How many low-yield hops in a row. Default 2, so the rule cannot fire before the third labeled hop.") }} <input name="stop_k" type="number" min="1" inputmode="numeric"></label>
+      <label>Stop max screened {{ info("budget: stop after this many new rows have been screened. Leave blank for no cap.") }} <input name="stop_max_screened" type="number" min="0" inputmode="numeric"></label>
+      </div>
+    </details>
+    <details class="field-group field-group--details">
+      <summary class="field-legend">Keywords &amp; filters {{ info("OpenAlex keyword expansion, language and study-design filters, and which bibliographic backends to query.") }}</summary>
+      <p class="section-lede">Keyword expansion is a second graph beside citations. Leave these blank unless a previous run was too broad or too thin.</p>
+      <div class="field-row">
+      <label>Keyword limit {{ info("How many of a work’s OpenAlex keywords to expand (1–5). 5 uses every stored keyword.") }} <input name="keyword_limit" type="number" min="1" max="5" inputmode="numeric"></label>
+      <label>Keyword hop limit {{ info("Works kept per seed on the keyword side. A positive integer.") }} <input name="keyword_hop_limit" type="number" min="1" inputmode="numeric"></label>
+      <label>Keyword min score {{ info("Drop seed keywords below this similarity. 0 keeps whatever OpenAlex assigned.") }} <input name="keyword_min_score" type="number" step="0.01" min="0" max="1" inputmode="decimal"></label>
+      <label>Cites query {{ info("Only references and citing works that match this OpenAlex search. Needs refs or cites in Direction, and Depth of at least 1.") }} <input name="cites_query"></label>
+      <label>Languages {{ info("Comma-separated ISO language codes to keep, for example en,fr.") }} <input name="languages" placeholder="en,fr"></label>
+      </div>
+      <fieldset class="chip-set">
+        <legend>Study designs {{ info("OpenAlex study-design filter for the crawl. Untagged works never match.") }}</legend>
+        {% for v, label in (('randomized-controlled-trial','RCT'),('clinical-trial','clinical trial'),('observational-study','observational'),('case-report','case report'),('systematic-review','systematic review'),('meta-analysis','meta-analysis'),('study-protocol','protocol')) %}
+        <label class="chip-check"><input type="checkbox" name="study_designs" value="{{ v }}"> {{ label }}</label>
+        {% endfor %}
+      </fieldset>
+      <fieldset class="chip-set">
+        <legend>Listed in {{ info("OpenAlex trusted journal lists for the crawl. Membership is the maintainer’s list, not a quality score. Works with no journal list (preprints, repositories) never match.") }}</legend>
+        {% for v in ('doaj','medline','jufo','norway','ki-jl','jpps','abdc','cwts','latindex') %}
+        <label class="chip-check"><input type="checkbox" name="listed_in" value="{{ v }}"> {{ v }}</label>
+        {% endfor %}
+      </fieldset>
+      <fieldset class="chip-set">
+        <legend>Backends {{ info("Bibliographic sources to query. Default is openalex and crossref.") }}</legend>
+        {% for v in ('openalex','crossref','semanticscholar','orcid','europepmc','pdf') %}
+        <label class="chip-check"><input type="checkbox" name="backends" value="{{ v }}"> {{ v }}</label>
+        {% endfor %}
+      </fieldset>
+      <label>Map categories {{ info("Which literature categories appear on the citation map (badges and filters). Comma-separated ids: evidence-synthesis, trials, clinical-trials, observational, case-reports, protocols, narrative-reviews, preprints, books, commentary. Custom ids need [snowball].map_category_defs in config.") }} <input name="map_categories" placeholder="evidence-synthesis, trials, …"></label>
+    </details>
+    <details class="field-group field-group--details">
+      <summary class="field-legend">After create {{ info("What happens once Apply creates items: tags, PDFs, dedupe, notes, CRM writeback.") }}</summary>
+      <div class="field-row">
+      <label>Fetch PDFs {{ info("After items are created: off leaves PDFs to Wanted. fast uses cheap public sources. full runs the usual fetch policy. Creating items still needs Apply on Queue.") }}
         <select name="fetch_pdfs">
           <option value="">off</option>
           <option value="fast">fast</option>
           <option value="full">full</option>
         </select>
       </label>
-    </div>
-    <div class="field-group">
-      <p class="field-legend">Keywords &amp; sources {{ info("OpenAlex keyword expansion, language filters, and which bibliographic backends to query.") }}</p>
-      <p class="section-lede">Keyword expansion is a second graph beside citations. Leave these blank unless a previous run was too broad or too thin.</p>
-      <label>Keyword limit {{ info("How many of a work’s OpenAlex keywords to expand (1–5). 5 uses every stored keyword.") }} <input name="keyword_limit"></label>
-      <label>Keyword hop limit {{ info("Works kept per seed on the keyword side. A positive integer.") }} <input name="keyword_hop_limit"></label>
-      <label>Keyword min score {{ info("Drop seed keywords below this similarity. 0 keeps whatever OpenAlex assigned.") }} <input name="keyword_min_score"></label>
-      <label>Cites query {{ info("Only references and citing works that match this OpenAlex search. Needs refs or cites in Direction, and Depth of at least 1.") }} <input name="cites_query"></label>
-      <label>Languages {{ info("Comma-separated ISO language codes to keep, for example en,fr.") }} <input name="languages" placeholder="en,fr"></label>
-      <label>Study designs {{ info("OpenAlex study-design filter for the crawl. Comma-separated: rct, meta-analysis, systematic-review, observational, case-report, protocol, clinical-trial. Untagged works never match.") }} <input name="study_designs" placeholder="rct, meta-analysis"></label>
-      <label>Listed in {{ info("OpenAlex trusted journal lists for the crawl. Comma-separated source-list ids: doaj, medline, jufo-3, latindex. Family aliases jufo, norway, ki-jl, jpps, abdc, cwts expand to every level. Membership is the maintainer’s list, not a quality score. Works with no journal list (preprints, repositories) never match.") }} <input name="listed_in" placeholder="doaj, medline"></label>
-      <label>Map categories {{ info("Which literature categories appear on the citation map (badges and filters). Comma-separated ids: evidence-synthesis, trials, clinical-trials, observational, case-reports, protocols, narrative-reviews, preprints, books, commentary. Custom ids need [snowball].map_category_defs in config.") }} <input name="map_categories" placeholder="evidence-synthesis, trials, clinical-trials, observational, case-reports, protocols, narrative-reviews, preprints, books, commentary"></label>
-      <label>Min seed citations {{ info("Ignore seed works cited fewer times than this. Filters noisy or very new seeds.") }} <input name="min_seed_citations" type="number"></label>
-      <label>Backends {{ info("Bibliographic sources to query, comma-separated. Typical: openalex,crossref.") }} <input name="backends" placeholder="openalex,crossref"></label>
       <label>Tags {{ info("Extra Zotero tags on items created from this run, comma-separated. Combined with config defaults.") }} <input name="tags" placeholder="paperful:frontier"></label>
-      <label>Dedupe scope {{ info("Where to look for duplicates after create: library, collection, or none.") }} <input name="dedupe_scope"></label>
-      <label>Dedupe after {{ info("After create: off (default), classify (write a pack), or apply (merge). classify is safer.") }} <input name="dedupe_after"></label>
-    </div>
-    <div class="field-group">
-      <p class="field-legend">Options {{ info("Toggles that change matching, notes, ranking, and optional CRM writeback.") }}</p>
+      <label>Dedupe scope {{ info("Where to look for duplicates after create.") }}
+        <select name="dedupe_scope">
+          <option value="">default (library)</option>
+          <option value="library">library</option>
+          <option value="collection">collection</option>
+          <option value="none">none</option>
+        </select>
+      </label>
+      <label>Dedupe after {{ info("After create: off (default), classify (write a pack), or apply (merge). classify is safer.") }}
+        <select name="dedupe_after">
+          <option value="">off</option>
+          <option value="classify">classify</option>
+          <option value="apply">apply</option>
+        </select>
+      </label>
+      </div>
+      <div class="field-row">
       <label><input type="checkbox" name="or_mode" value="1"> OR keywords {{ info("Treat query words as OR instead of AND. Returns more, noisier hits.") }}</label>
       <label><input type="checkbox" name="note_provenance" value="1"> Note provenance {{ info("Write a Paperful note on created items explaining which seed and hop found them.") }}</label>
       <label><input type="checkbox" name="refine" value="1"> Refine {{ info("Second-pass ranking of candidates so weaker keyword matches drop. Costs a bit more time.") }}</label>
       <label><input type="checkbox" name="author_site_preflight" value="1"> Author-site preflight {{ info("Opt-in co-author graph and a proposed field pack from author pages. Off unless you need it.") }}</label>
       <label><input type="checkbox" name="twenty_writeback" value="1"> Twenty writeback {{ info("Append personal-page URLs onto a unique Twenty Person. Does not create People or send mail.") }}</label>
-    </div>
-    <div class="field-group">
-      <p class="field-legend">Seeds {{ info("Starting works or people for DOI, ORCID, collection, or hybrid runs.") }}</p>
-      <label>Seeds {{ info("One DOI or ORCID per line. Used when Kind is doi, orcid, hybrid, or you want extra seeds beside a keyword.") }} <textarea name="seeds" id="discoverSeeds" rows="3" placeholder="DOIs / ORCIDs, one per line"></textarea></label>
-    </div>
-    <div class="field-group">
-      <p class="field-legend">Profile {{ info("Save these knobs under a name so you can re-run the same topic later.") }}</p>
-      <label>Save as profile {{ info("File name for this topic’s knobs. Letters, numbers, and hyphens. Does not include API keys.") }} <input name="profile_name" placeholder="my-topic"></label>
+      </div>
+    </details>
+    <details class="field-group field-group--details">
+      <summary class="field-legend">Profile {{ info("Save these knobs under a name so you can re-run the same topic later.") }}</summary>
+      <div class="field-row">
+      <label>Save as profile {{ info("File name for this topic’s knobs. Letters, numbers, and hyphens. Does not include API keys.") }} <input name="profile_name" placeholder="my-topic" pattern="[A-Za-z0-9][A-Za-z0-9._-]*"></label>
       <label><input type="checkbox" name="force" value="1"> Overwrite {{ info("Replace an existing saved profile with the same name.") }}</label>
       <button type="submit" formaction="/discover/profile-save" class="secondary">Save profile</button>
-    </div>
+      </div>
+    </details>
     {% endif %}
   </form>
   {% if prefs.advanced and profiles %}
@@ -218,8 +277,8 @@
     </form>
     <form method="post" action="/discover/ingest-apply" class="toolbar">
       <input type="hidden" name="review_token" value="{{ ingest_token }}">
-      <button type="submit">Apply ingest-dois</button>
-      {{ info("Create the items from the last successful ingest preview.") }}
+      <button type="submit"{% if not ingest_token %} disabled title="Preview ingest-dois first"{% endif %}>Apply ingest-dois</button>
+      {{ info("Create the items from the last successful ingest preview. Disabled until a Preview has finished.") }}
     </form>
   </div>
   <form method="post" action="/discover/authors" class="toolbar">
@@ -279,8 +338,10 @@
   </form>
   {% if search_watches %}
   <p class="section-lede">Saved grey watches. Run is pull-only (inbox on disk). Apply from the CLI with <code>search watch apply -C</code>.</p>
-  <table class="wb-table">
-    <thead><tr><th>Name</th><th>Query</th><th>Due</th><th>Inbox</th><th></th></tr></thead>
+  <div class="table-wrap">
+<table class="wb-table">
+  <caption class="sr-only">Saved grey watches</caption>
+    <thead><tr><th scope="col">Name</th><th scope="col">Query</th><th scope="col">Due</th><th scope="col">Inbox</th><th scope="col"></th></tr></thead>
     <tbody>
     {% for w in search_watches %}
     <tr>
@@ -298,14 +359,17 @@
     {% endfor %}
     </tbody>
   </table>
+</div>
   {% endif %}
   {% endif %}
   {% if search_bundle %}
   <p class="section-lede">Run {{ search_bundle.run_id }} · kept {{ search_bundle.summary.kept or 0 }} · new {{ search_bundle.summary.new or 0 }} · exists {{ search_bundle.summary.exists or 0 }}{% if search_bundle.partial %} · partial (SearXNG returned no hits){% endif %}</p>
   <form method="post" action="/discover/search/apply" class="form-stack">
     <input type="hidden" name="run_id" value="{{ search_bundle.run_id }}">
-    <table class="wb-table">
-      <thead><tr><th></th><th>Title</th><th>Host</th><th>Score</th><th>Kind</th><th>Status</th></tr></thead>
+    <div class="table-wrap">
+<table class="wb-table">
+  <caption class="sr-only">Web search hits</caption>
+      <thead><tr><th scope="col"></th><th scope="col">Title</th><th scope="col">Host</th><th scope="col">Score</th><th scope="col">Kind</th><th scope="col">Status</th></tr></thead>
       <tbody>
       {% for row in search_bundle.candidates %}
       <tr>
@@ -319,12 +383,13 @@
       {% endfor %}
       </tbody>
     </table>
+</div>
     <div class="cluster">
       <button type="submit" class="secondary" name="preview" value="1">Preview apply</button>
       {{ info("Count which ticked rows would become new Zotero items. Writes nothing.") }}
-      <button type="submit">Add selected</button>
+      <button type="submit"{% if not search_token %} disabled title="Preview apply first"{% endif %}>Add selected</button>
       <input type="hidden" name="review_token" value="{{ search_token }}">
-      {{ info("Create metadata parents from the last successful web preview. PDFs stay Wanted.") }}
+      {{ info("Create metadata parents from the last successful web preview. PDFs stay Wanted. Disabled until a Preview apply has finished.") }}
       <a href="/wanted">Fill PDFs</a>
     </div>
   </form>
@@ -409,7 +474,7 @@
       <button type="submit" class="secondary">People briefing</button>
       {{ info("A short note of who is on the list and what the last poll found.") }}
     </form>
-    <form method="post" action="/discover/aw/delete" class="toolbar" onsubmit="return confirm('Delete list {{ aw_list }} and all ledger files?');">
+    <form method="post" action="/discover/aw/delete" class="toolbar" data-confirm="Delete list {{ aw_list }} and all ledger files?">
       <input type="hidden" name="list_name" value="{{ aw_list }}">
       <button type="submit" class="secondary">Delete list</button>
       {{ info("Permanently delete this people list and its on-disk ledger. Zotero items already created are not deleted.") }}
@@ -433,8 +498,10 @@
   <p class="section-lede">Tick who to add to the current list. Names marked resolve still need an ORCID before they can be polled.</p>
 <form method="post" action="/discover/aw/accept" class="form-stack">
   <input type="hidden" name="list_name" value="{{ aw_list }}">
-  <table class="wb-table">
-    <thead><tr><th></th><th>Name</th><th>ORCID</th><th>Score</th><th>Why</th></tr></thead>
+  <div class="table-wrap">
+<table class="wb-table">
+  <caption class="sr-only">Suggested people</caption>
+    <thead><tr><th scope="col"></th><th scope="col">Name</th><th scope="col">ORCID</th><th scope="col">Score</th><th scope="col">Why</th></tr></thead>
     <tbody>
     {% for s in aw_suggestions %}
     <tr>
@@ -447,6 +514,7 @@
     {% endfor %}
     </tbody>
   </table>
+</div>
   <div class="field-group">
     <label>Initial seed from {{ info("After accept, backfill each new person’s papers from this date.") }} <input name="seed_from" type="date"></label>
     <button type="submit">Accept selected</button>
@@ -458,8 +526,10 @@
 <section class="panel">
   <h2>Members</h2>
   <p class="section-lede">People on the current list. Save edits in place. Remove drops them from the list; it does not delete Zotero items.</p>
+<div class="table-wrap">
 <table class="wb-table">
-  <thead><tr><th>Name</th><th>ORCID</th><th>Status</th><th></th></tr></thead>
+  <caption class="sr-only">List members</caption>
+  <thead><tr><th scope="col">Name</th><th scope="col">ORCID</th><th scope="col">Status</th><th scope="col"></th></tr></thead>
   <tbody>
   {% for p in aw_people %}
   <tr>
@@ -485,20 +555,24 @@
   {% endfor %}
   </tbody>
 </table>
+</div>
 </section>
 {% endif %}
 {% if inbox %}
 <section class="panel">
   <h2>Person inbox</h2>
   <p class="section-lede">New papers from the last people poll. Preview apply shows what would be created; Apply inbox writes those items into Zotero. PDFs still need Wanted.</p>
+<div class="table-wrap">
 <table class="wb-table">
-  <thead><tr><th>List</th><th>Title</th><th>DOI</th></tr></thead>
+  <caption class="sr-only">Person inbox</caption>
+  <thead><tr><th scope="col">List</th><th scope="col">Title</th><th scope="col">DOI</th></tr></thead>
   <tbody>
   {% for row in inbox %}
   <tr><td>{{ row.list }}</td><td>{{ row.title }}</td><td>{{ row.doi }}</td></tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
   <div class="cluster">
     <p class="field-legend">Apply {{ info("Create Zotero parents for inbox rows. Does not fetch PDFs.") }}</p>
     <form method="post" action="/discover/apply-preview" class="toolbar">
@@ -511,8 +585,8 @@
       <input type="hidden" name="kind" value="authorwatch">
       <input type="hidden" name="list_name" value="{{ aw_list }}">
       <input type="hidden" name="review_token" value="{{ aw_token }}">
-      <button type="submit">Apply inbox ({{ aw_list }})</button>
-      {{ info("Create the items from the last successful inbox preview.") }}
+      <button type="submit"{% if not aw_token %} disabled title="Preview apply first"{% endif %}>Apply inbox ({{ aw_list }})</button>
+      {{ info("Create the items from the last successful inbox preview. Disabled until a Preview apply has finished.") }}
     </form>
   </div>
 </section>
@@ -631,7 +705,7 @@
 {% endif %}
 <section class="panel">
   <div class="lib-items-head">
-    <h2>Queue</h2>
+    <h2>Queue{% if run_label and run_label.query %} — {{ run_label.query }}{% endif %}</h2>
     {% if queue_pagination.total %}
     <form class="lib-pager" method="get" action="/discover">
       <input type="hidden" name="tab" value="queue">
@@ -641,7 +715,7 @@
       </span>
       <label>
         Per page {{ info("How many queue rows to show. Larger pages are heavier to render.") }}
-        <select name="per_page" onchange="this.form.submit()">
+        <select name="per_page" data-autosubmit>
           {% for n in queue_pagination.page_sizes %}
           <option value="{{ n }}"{% if n == queue_pagination.per_page %} selected{% endif %}>{{ n }}</option>
           {% endfor %}
@@ -658,7 +732,8 @@
     </form>
     {% endif %}
   </div>
-  <p class="section-lede">Candidates from the last topic search. Keep or Skip each row, then Preview apply and Add selected to create Zotero items. Fill PDFs on Wanted afterwards. Watch remembers this topic and checks it again later.</p>
+  {% if run_id %}<p class="counts">Run {{ run_id }}{% if run_label.when %} · {{ run_label.when }}{% endif %}{% if run_label.collection %} · for {{ run_label.collection }}{% endif %}{% if run_label.collection and prefs.collection and run_label.collection != prefs.collection %} · <strong>the header chip is {{ prefs.collection }}</strong>{% endif %}</p>{% endif %}
+  <p class="section-lede">Candidates from the last topic search. Keep or Skip each row, then Preview apply and Add selected to create library items. Fill PDFs on Wanted afterwards. Keep an eye on this remembers the topic and checks it again later.</p>
   {% if run_id %}
   <div class="cluster">
     <p class="field-legend">Apply this run {{ info("Create Zotero parents for rows you kept. Does not fetch PDFs unless Fetch PDFs was set on the search.") }}</p>
@@ -672,8 +747,8 @@
       <input type="hidden" name="run_id" value="{{ run_id }}">
       <input type="hidden" name="kind" value="snowball">
       <input type="hidden" name="review_token" value="{{ snowball_token }}">
-      <button type="submit">Add selected</button>
-      {{ info("Create the items from the last successful queue preview.") }}
+      <button type="submit"{% if not snowball_token %} disabled title="Preview apply first"{% endif %}>Add selected</button>
+      {{ info("Create the items from the last successful queue preview. Disabled until a Preview apply has finished.") }}
       <a href="/wanted">Fill PDFs</a>
     </form>
     {% if stop_pending %}
@@ -693,27 +768,31 @@
     </form>
   </div>
   {% endif %}
+<div class="table-wrap">
 <table class="wb-table">
-  <thead><tr><th>Title</th><th>DOI</th><th>Keep</th></tr></thead>
+  <caption class="sr-only">Queue candidates</caption>
+  <thead><tr><th scope="col">Title</th><th scope="col">DOI</th><th scope="col">Keep</th></tr></thead>
   <tbody>
   {% for row in candidates %}
   <tr>
     <td>{{ row.title }}{% if row.why %}<span class="row-why">Why suggested: {{ row.why }}</span>{% endif %}</td>
     <td>{{ row.doi }}</td>
     <td>
-      {{ row.keep }}
-      <form method="post" action="/discover/keep" style="display:inline">
+      <form method="post" action="/discover/keep" class="inline-form keep-toggle" role="group" aria-label="Keep or skip {{ row.title }}">
         <input type="hidden" name="run_id" value="{{ row.run_id }}">
         <input type="hidden" name="doi" value="{{ row.doi }}">
         <input type="hidden" name="page" value="{{ queue_pagination.page }}">
-        <button type="submit" name="keep" value="1" class="secondary">Keep</button>
-        <button type="submit" name="keep" value="0" class="secondary">Skip</button>
+        <button type="submit" name="keep" value="1" class="secondary{% if row.keep %} is-active{% endif %}" aria-pressed="{{ 'true' if row.keep else 'false' }}">Keep</button>
+        <button type="submit" name="keep" value="0" class="secondary{% if row.keep is sameas false %} is-active{% endif %}" aria-pressed="{{ 'true' if row.keep is sameas false else 'false' }}">Skip</button>
       </form>
     </td>
   </tr>
+  {% else %}
+  <tr><td colspan="3" class="counts">No candidates yet. Run a search on Topic or open a map on Explore.</td></tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
 </section>
 {% endif %}
 
@@ -725,34 +804,34 @@
 <ul>
   {% for f in following %}
   <li>{{ f.kind }}: {{ f.name }}
-    <form method="post" action="/discover/check-again" class="toolbar" style="display:inline">
+    <form method="post" action="/discover/check-again" class="toolbar inline-form">
       <input type="hidden" name="kind" value="{{ f.kind }}">
       <input type="hidden" name="name" value="{{ f.name }}">
       <button type="submit" class="secondary">Check again</button>
       {{ info("Poll this watch or list for new papers since the last run.") }}
     </form>
     {% if f.kind == 'topic' %}
-    <form method="post" action="/discover/apply-preview" class="toolbar" style="display:inline">
+    <form method="post" action="/discover/apply-preview" class="toolbar inline-form">
       <input type="hidden" name="kind" value="watch">
       <input type="hidden" name="list_name" value="{{ f.name }}">
       <button type="submit" class="secondary">Preview apply</button>
       {{ info("Count watch-inbox rows that would become new Zotero items. Writes nothing.") }}
     </form>
-    <form method="post" action="/discover/apply" class="toolbar" style="display:inline">
+    <form method="post" action="/discover/apply" class="toolbar inline-form">
       <input type="hidden" name="kind" value="watch">
       <input type="hidden" name="list_name" value="{{ f.name }}">
       <input type="hidden" name="review_token" value="{{ watch_token }}">
-      <button type="submit">Apply inbox</button>
-      {{ info("Create parents from this topic watch inbox (same as snowball watch apply --apply).") }}
+      <button type="submit"{% if not watch_token %} disabled title="Preview apply first"{% endif %}>Apply inbox</button>
+      {{ info("Create parents from this topic watch inbox (same as snowball watch apply --apply). Disabled until a Preview apply has finished.") }}
     </form>
     {% endif %}
     {% if prefs.advanced and f.kind == 'topic' %}
-    <form method="post" action="/discover/watch-briefing" class="toolbar" style="display:inline">
+    <form method="post" action="/discover/watch-briefing" class="toolbar inline-form">
       <input type="hidden" name="name" value="{{ f.name }}">
       <label><input type="checkbox" name="apply" value="1"> Note {{ info("Also file this briefing as a Zotero collection note.") }}</label>
       <button type="submit" class="secondary">Watch briefing</button>
     </form>
-    <form method="post" action="/discover/watch-digest" class="toolbar" style="display:inline">
+    <form method="post" action="/discover/watch-digest" class="toolbar inline-form">
       <input type="hidden" name="name" value="{{ f.name }}">
       <label><input type="checkbox" name="apply" value="1"> Note {{ info("Also file this digest as a Zotero collection note.") }}</label>
       <button type="submit" class="secondary">Watch digest</button>
@@ -778,32 +857,12 @@
 {% endif %}
 {% endblock %}
 {% block scripts %}
-<script>
-(function () {
-  var raw = sessionStorage.getItem("paperfulDiscoverPrefill");
-  if (!raw) return;
-  sessionStorage.removeItem("paperfulDiscoverPrefill");
-  try {
-    var data = JSON.parse(raw);
-    var query = document.getElementById("discoverQuery");
-    var kind = document.getElementById("discoverKind");
-    var seeds = document.getElementById("discoverSeeds");
-    if (query && data.title) query.value = data.title;
-    if (data.doi && seeds && kind) {
-      kind.value = "doi";
-      seeds.value = data.doi;
-    } else if (query && data.doi) {
-      query.value = data.doi;
-    }
-  } catch (e) {}
-})();
-</script>
 {% if tab == 'queue' and run_id %}
 <script src="/static/vendor/d3.v7.min.js"></script>
-<script src="/static/citation_map.js?v=9"></script>
+<script src="/static/citation_map.js?v={{ static_v }}"></script>
 {% endif %}
 {% if tab == 'people' and coauthor_network != 'off' %}
 <script src="/static/vendor/d3.v7.min.js"></script>
-<script src="/static/coauthor_network.js?v=1"></script>
+<script src="/static/coauthor_network.js?v={{ static_v }}"></script>
 {% endif %}
 {% endblock %}

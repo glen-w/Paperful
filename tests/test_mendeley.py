@@ -590,7 +590,7 @@ def test_mendeley_refresh_rotates_stored_tokens(cfg):
     stored = json.loads(
         (cfg.state_dir / "mendeley-oauth.json").read_text(encoding="utf-8")
     )
-    assert stored["refresh_token"] == "new-refresh"
+    assert stored["refresh_token"] == "new-refresh"  # noqa: S105 -- name only, not a credential
 
 
 def test_mendeley_collection_note_creates_generic_in_folder(cfg):

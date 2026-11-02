@@ -6,7 +6,7 @@
 {% block content %}
 <h1>Index</h1>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
-<p class="page-lede">{{ message }} The index is built from PDFs already copied to disk under <code>out/</code>, not live from Zotero. Ingest first, then Search here or <a href="/ask">Ask</a>.</p>
+<p class="page-lede">{{ message }} The index is built from PDFs already copied to disk under <code>out/</code>, not live from Zotero. Ingest first, then Search here or <a href="/ask">Ask</a>. Per-paper summaries and the collection review live on <a href="/briefs">Briefs</a>.</p>
 {% if flags.remote_llm %}<p class="warn-remote">Remote LLM — excerpts from your PDFs leave this machine.</p>{% endif %}
 {% if flags.remote_embed %}<p class="warn-remote">Remote embedding model — passage text leaves this machine.</p>{% endif %}
 {% if grobid_remote %}<p class="warn-remote">Remote GROBID — PDF bytes leave this machine.</p>{% endif %}
@@ -15,14 +15,17 @@
   <details>
     <summary class="panel-summary">Status</summary>
     <p class="section-lede">How many items and chunks are in the local index. If this is empty, run Ingest.</p>
-    <table class="wb-table">
-      <thead><tr><th>Field</th><th>Value</th></tr></thead>
+    <div class="table-wrap">
+<table class="wb-table">
+  <caption class="sr-only">Index status</caption>
+      <thead><tr><th scope="col">Field</th><th scope="col">Value</th></tr></thead>
       <tbody>
       {% for k, v in status.items() %}
       <tr><td>{{ k }}</td><td>{{ v }}</td></tr>
       {% endfor %}
       </tbody>
     </table>
+</div>
   </details>
 </section>
 {% endif %}
@@ -64,14 +67,17 @@
     {{ info("Retrieve matching passages. Does not call the chat model.") }}
   </form>
   {% if hits %}
-  <table class="wb-table">
-    <thead><tr><th>Score</th><th>Title</th><th>Excerpt</th></tr></thead>
+  <div class="table-wrap">
+<table class="wb-table">
+  <caption class="sr-only">Search hits</caption>
+    <thead><tr><th scope="col">Score</th><th scope="col">Title</th><th scope="col">Excerpt</th></tr></thead>
     <tbody>
     {% for h in hits %}
     <tr><td>{{ h.score }}</td><td>{{ h.title }} [{{ h.item_key }}]</td><td>{{ h.text }}</td></tr>
     {% endfor %}
     </tbody>
   </table>
+</div>
   {% endif %}
 </section>
 {% endif %}

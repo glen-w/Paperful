@@ -419,9 +419,11 @@ def version_from_arxiv_xml(
     """Read ``arxiv:doi`` from an Atom entry. A missing DOI is not a link."""
     import xml.etree.ElementTree as ET
 
+    from defusedxml import ElementTree as _DET
+
     try:
-        root = ET.fromstring(xml_text)
-    except ET.ParseError:
+        root = _DET.fromstring(xml_text)
+    except (ET.ParseError, ValueError):
         return None
     doi_el = root.find(f".//{{{_ARXIV_NS}}}doi")
     published = normalize_doi(doi_el.text if doi_el is not None else None)

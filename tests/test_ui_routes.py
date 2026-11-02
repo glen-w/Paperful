@@ -22,10 +22,16 @@ def test_index_jobs_reexported_from_jobs_module():
 def test_shell_routes_resolve_doctor_and_collections_via_app():
     from paperful.ui import shell_routes
 
+    from paperful.ui import context
+
     src = inspect.getsource(shell_routes)
     assert "_ui_app.doctor_payload(" in src
-    assert "_ui_app.collections_tree(" in src
     assert "from . import app as _ui_app" in src
+    # The collection tree is cached on UiContext; it still resolves through
+    # ``paperful.ui.app`` at call time so tests can monkeypatch it.
+    ctx_src = inspect.getsource(context.UiContext.collections)
+    assert "from .app import collections_tree" in ctx_src
+    assert "ui.collections(" in src
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")

@@ -21,8 +21,8 @@
 </svg>
 {% endmacro %}
 
-{% macro icon_button(label, icon, type='button', class='', onclick='') %}
-<button type="{{ type }}" class="icon-btn{% if class %} {{ class }}{% endif %}" title="{{ label }}" aria-label="{{ label }}"{% if onclick %} onclick="{{ onclick }}"{% endif %}>
+{% macro icon_button(label, icon, type='button', class='', drawer='') %}
+<button type="{{ type }}" class="icon-btn{% if class %} {{ class }}{% endif %}" title="{{ label }}" aria-label="{{ label }}"{% if drawer %} data-drawer="{{ drawer }}"{% endif %}>
   {{ icon_svg(icon) }}
 </button>
 {% endmacro %}

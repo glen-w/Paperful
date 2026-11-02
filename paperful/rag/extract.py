@@ -85,7 +85,7 @@ def _pdftotext_pages(path: Path) -> list[str]:
     if not exe:
         return []
     try:
-        proc = subprocess.run(
+        proc = subprocess.run(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
             [exe, "-enc", "UTF-8", str(path), "-"],
             capture_output=True,
             timeout=_PDFTOTEXT_TIMEOUT_S,

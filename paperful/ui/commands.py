@@ -23,6 +23,24 @@ _REVIEW_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
 
 MAX_QUEUED_JOBS = 20
 
+# Called with the terminal record after every job (done or failed). Used to
+# drop page caches that the job may have invalidated.
+_finish_hooks: list[Callable[[dict[str, Any]], None]] = []
+
+
+def register_finish_hook(fn: Callable[[dict[str, Any]], None]) -> None:
+    if fn not in _finish_hooks:
+        _finish_hooks.append(fn)
+
+
+def _run_finish_hooks(rec: dict[str, Any]) -> None:
+    for fn in list(_finish_hooks):
+        try:
+            fn(rec)
+        except Exception:  # pragma: no cover - hooks must never break a job
+            log.exception("GUI finish hook failed")
+
+
 _watch_lock = threading.Lock()
 _watch_cond = threading.Condition(_watch_lock)
 
@@ -121,6 +139,34 @@ def list_commands(cfg: Config, limit: int = 50) -> list[dict[str, Any]]:
     return [row[2] for row in loaded[:limit]]
 
 
+ORPHAN_ERROR = "server restarted before this job finished"
+
+
+def reconcile_orphans(cfg: Config) -> int:
+    """Mark records left ``queued``/``running`` by a previous process as failed.
+
+    The work queue is in-memory; after a restart nothing will ever pick those
+    jobs up, and the workbench would otherwise poll them forever. Call once at
+    mount time, before the worker thread accepts new work.
+    """
+    fixed = 0
+    for path in _commands_dir(cfg).glob("*.json"):
+        try:
+            rec = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(rec, dict) or rec.get("status") in TERMINAL_STATUSES:
+            continue
+        rec["status"] = "failed"
+        rec["error"] = ORPHAN_ERROR
+        rec["finished"] = time.time()
+        _atomic_write(path, rec)
+        fixed += 1
+    if fixed:
+        log.warning("GUI: marked %d orphaned job(s) as failed", fixed)
+    return fixed
+
+
 def _ensure_worker() -> None:
     global _worker_started
     with _worker_lock:
@@ -175,18 +221,22 @@ def enqueue(
     def _run() -> None:
         rec = read_command(cfg, cmd_id) or record
         rec["status"] = "running"
+        rec["started"] = time.time()
         write_command(cfg, rec)
         try:
             fn(cmd_id)
             rec = read_command(cfg, cmd_id) or rec
             if rec.get("status") == "running":
                 rec["status"] = "done"
+            rec["finished"] = time.time()
             write_command(cfg, rec)
         except Exception as exc:
             rec = read_command(cfg, cmd_id) or rec
             rec["status"] = "failed"
             rec["error"] = str(exc)
+            rec["finished"] = time.time()
             write_command(cfg, rec)
+        _run_finish_hooks(rec)
 
     with _queue_cond:
         _queue.append((cmd_id, _run))

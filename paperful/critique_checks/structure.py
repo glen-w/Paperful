@@ -183,7 +183,7 @@ def _pps_fingerprint_findings(
                 family=family,
                 tortured_min=cfg.screen_tortured_min,
             )
-        except Exception:
+        except Exception:  # noqa: S112 -- best-effort loop; intentionally continues
             continue
         if not hits:
             continue

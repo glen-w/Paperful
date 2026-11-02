@@ -278,7 +278,7 @@ def _watch_target(cfg: Config, body: dict[str, Any]) -> str:
             chosen = str(raw.get("target_collection") or "").strip()
             if chosen:
                 return chosen
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass
     return str(cfg.snowball_target_collection or "").strip()
 

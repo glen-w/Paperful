@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import pytest
 
 from paperful.agent_ops import (
     doctor_payload,
@@ -12,13 +11,11 @@ from paperful.agent_ops import (
     ingest_dois_exit,
     last_run,
     run_ask,
-    run_export,
     run_gaps,
     run_refs_gap,
     run_snowball_search,
     snowball_result_envelope,
 )
-from paperful.config import Config
 from tests.conftest import make_item
 
 

@@ -1199,8 +1199,6 @@ def _fill_metadata(
 def _write_cached_pdfs(cfg: Config, items: list[Any], rows: list[Candidate]) -> None:
     import hashlib
 
-    from pathlib import Path
-
     from ..store import save_pdf
 
     by_doi = {(row.ids.get("doi") or "").lower(): row for row in rows}
@@ -1215,7 +1213,12 @@ def _write_cached_pdfs(cfg: Config, items: list[Any], rows: list[Candidate]) -> 
         if not path.is_file():
             continue
         content = path.read_bytes()
-        save_pdf(cfg.out_dir, item, content, hashlib.md5(content).hexdigest())
+        save_pdf(
+            cfg.out_dir,
+            item,
+            content,
+            hashlib.md5(content, usedforsecurity=False).hexdigest(),
+        )
 
 
 def _summary_meta(
@@ -1243,6 +1246,9 @@ def _summary_meta(
     }
     if request.collection.strip():
         meta["target_collection"] = request.collection.strip()
+    if (refine_query or "").strip():
+        # Human label for the run (keyword query, seed DOI/ORCID, or collection).
+        meta["query"] = refine_query.strip()[:200]
     cites_query = (request.cites_query or "").strip()
     if cites_query:
         meta["cites_query"] = cites_query

@@ -97,7 +97,6 @@ def test_build_ego_graph_from_works():
     graph = build_ego_graph(WORKS, orcid=ORCID, max_alters=10)
     assert graph["schema"] == SCHEMA
     assert graph["ego"]["orcid"] == ORCID
-    ids = {n["id"] for n in graph["nodes"]}
     assert any(
         ORCID in i or n.get("ego") for n, i in ((n, n["id"]) for n in graph["nodes"])
     )

@@ -92,14 +92,12 @@ from .app import (
     _health_tooltip,
     _trust_line,
     _load_wanted,
-    _patch_config_field,
-    _patch_section_assignment,
 )
 
 
 def handle_page_library(ui: UiContext, request: Request) -> HTMLResponse:
     prefs = prefs_from_request(request)
-    tree = _ui_app.collections_tree(ui.cfg)
+    tree = ui.collections(force=request.query_params.get("refresh") == "1")
     error = ""
     rows = []
     nested: list[dict[str, Any]] = []
@@ -117,7 +115,9 @@ def handle_page_library(ui: UiContext, request: Request) -> HTMLResponse:
     persist_per_page = request.query_params.get("per_page") is not None
     if prefs.collection:
         try:
-            scope_items, manifest = jobs._load_scope_items(ui.cfg, prefs.collection)
+            scope_items, manifest = jobs.load_scope_items_cached(
+                ui.cfg, prefs.collection
+            )
             page = library_page_from_request(request)
             items, library_total, library_page, library_page_count = library_items_page(
                 ui.cfg,
@@ -158,6 +158,7 @@ def handle_page_library(ui: UiContext, request: Request) -> HTMLResponse:
             "library",
             collections=rows,
             collection_tree=nested,
+            collections_checked_at=ui.collections_checked_at(),
             items=items,
             library_pagination=library_pagination,
             error=error,
@@ -166,45 +167,191 @@ def handle_page_library(ui: UiContext, request: Request) -> HTMLResponse:
         ),
     )
     if persist_per_page:
-        set_cookie(response, COOKIE_LIBRARY_PER_PAGE, str(per_page))
+        set_cookie(response, COOKIE_LIBRARY_PER_PAGE, str(per_page), request=request)
     return response
 
 
+_VERB_PAGES: tuple[tuple[str, str], ...] = (
+    ("preview_run", "/wanted"),
+    ("grab", "/wanted"),
+    ("attach", "/wanted"),
+    ("recover", "/wanted"),
+    ("handoff", "/wanted"),
+    ("inbox_drain", "/wanted"),
+    ("reachout", "/wanted"),
+    ("pending_fill", "/wanted"),
+    ("summarize_item", "/wanted"),
+    ("snowball", "/discover?tab=queue"),
+    ("authorwatch", "/discover?tab=people"),
+    ("network", "/discover?tab=people"),
+    ("search", "/discover?tab=web"),
+    ("watch", "/discover?tab=following"),
+    ("check_again", "/discover?tab=following"),
+    ("refs_gap", "/discover?tab=grow"),
+    ("ingest_dois", "/discover?tab=grow"),
+    ("authors", "/discover?tab=grow"),
+    ("packs_promote", "/discover?tab=grow"),
+    ("repair", "/repair"),
+    ("mirror", "/mirror"),
+    ("ask", "/ask"),
+    ("rag", "/index"),
+    ("extract_sections", "/index"),
+    ("summarize", "/index"),
+    ("synthesize", "/index"),
+    ("critique", "/critique"),
+    ("rewrite", "/rewrite"),
+    ("stuff", "/stuff"),
+    ("doctor", "/system"),
+)
+
+
+def page_for_verb(verb: str) -> str:
+    """Workbench page that shows a job's outcome (longest prefix wins)."""
+    best = ""
+    best_len = -1
+    for prefix, page in _VERB_PAGES:
+        if verb == prefix or verb.startswith(prefix + "_") or verb.startswith(prefix):
+            if len(prefix) > best_len:
+                best, best_len = page, len(prefix)
+    return best
+
+
+def _result_summary(rec: dict[str, Any]) -> str:
+    """Compact one-line view of ``result`` for the Activity table."""
+    result = rec.get("result")
+    if not isinstance(result, dict):
+        return ""
+    parts: list[str] = []
+    for key, value in result.items():
+        if key in {"markdown", "rows", "candidates", "items", "errors"}:
+            if isinstance(value, (list, dict)):
+                parts.append(f"{key} {len(value)}")
+            continue
+        if isinstance(value, (str, int, float, bool)) and value not in ("", None):
+            text = str(value)
+            if len(text) > 48:
+                text = text[:45] + "…"
+            parts.append(f"{key} {text}")
+        if len(parts) >= 5:
+            break
+    return " · ".join(parts)
+
+
+def activity_rows(cfg: Config, limit: int = 50) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for rec in commands.list_commands(cfg, limit=limit):
+        created = float(rec.get("created") or 0.0)
+        started = float(rec.get("started") or 0.0)
+        finished = float(rec.get("finished") or 0.0)
+        duration = ""
+        if started and finished and finished >= started:
+            secs = finished - started
+            duration = f"{secs:.0f} s" if secs < 90 else f"{secs / 60:.1f} min"
+        verb = str(rec.get("verb") or "")
+        page = page_for_verb(verb)
+        link = ""
+        if page:
+            link = page + ("&" if "?" in page else "?") + "run=" + str(rec.get("id"))
+        rows.append(
+            {
+                **rec,
+                "created_ts": created,
+                "duration": duration,
+                "result_summary": _result_summary(rec),
+                "link": link,
+            }
+        )
+    return rows
+
+
 def handle_page_activity(ui: UiContext, request: Request) -> HTMLResponse:
+    show_all = request.query_params.get("all") == "1"
+    verb = str(request.query_params.get("verb") or "").strip()
+    rows = activity_rows(ui.cfg, limit=500 if show_all else 50)
+    verbs = sorted({str(r.get("verb") or "") for r in rows if r.get("verb")})
+    if verb:
+        rows = [r for r in rows if str(r.get("verb") or "") == verb]
     return ui.templates.TemplateResponse(
         request,
         "activity.html",
         ui.ctx(
             request,
             "activity",
-            commands=commands.list_commands(ui.cfg),
+            commands=rows,
+            verbs=verbs,
+            verb_filter=verb,
+            show_all=show_all,
             trust_line=_trust_line(ui.cfg),
         ),
     )
 
 
-def handle_page_system(ui: UiContext, request: Request) -> HTMLResponse:
-    raw = ui.remember_doctor(_ui_app.doctor_payload(ui.cfg))
-    checks = []
+DOCTOR_STALE_AFTER = 10 * 60  # seconds before System suggests a re-check
+
+
+def _doctor_rows(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows = []
     for row in raw:
-        checks.append(
+        code = str(row.get("code") or "")
+        detail = str(row.get("detail") or "")
+        status = str(row.get("status") or "")
+        step = next_step(code, detail)
+        rows.append(
             {
                 "name": row["name"],
-                "status": row["status"],
-                "next": next_step(
-                    str(row.get("code") or ""), str(row.get("detail") or "")
-                ),
+                "status": status,
+                "code": code,
+                "detail": detail,
+                # Only amber/red rows carry an action; green rows show detail.
+                "next": step if status in {"amber", "red"} else "",
             }
         )
+    return rows
+
+
+def handle_page_system(ui: UiContext, request: Request, run: str = "") -> HTMLResponse:
+    """Render doctor from the process cache.
+
+    The first visit (empty cache) runs doctor inline so the page is never
+    blank. Later visits render instantly; **Re-check** enqueues a ``doctor``
+    job and the page reloads when it finishes.
+    """
+    checked_at = float(ui.health_cache.get("at") or 0.0)
+    if not checked_at:
+        raw = ui.remember_doctor(_ui_app.doctor_payload(ui.cfg))
+        checked_at = float(ui.health_cache.get("at") or time.time())
+    else:
+        raw = ui.cached_doctor()
     return ui.templates.TemplateResponse(
         request,
         "system.html",
-        ui.ctx(request, "system", checks=checks),
+        ui.ctx(
+            request,
+            "system",
+            checks=_doctor_rows(raw),
+            checked_at=checked_at,
+            stale=(time.time() - checked_at) > DOCTOR_STALE_AFTER,
+            job=job_view(command_by_id(ui.cfg, (run or "").strip())),
+            poll_run=(run or "").strip(),
+        ),
     )
 
 
+def handle_system_recheck(ui: UiContext) -> RedirectResponse:
+    def work(cmd_id: str) -> None:
+        checks = _ui_app.doctor_payload(ui.cfg)
+        ui.remember_doctor(checks)
+        rec = commands.read_command(ui.cfg, cmd_id) or {}
+        worst = _health_status(checks)
+        rec["result"] = {"health": worst, "checks": len(checks)}
+        commands.write_command(ui.cfg, rec)
+
+    cmd_id = commands.enqueue(ui.cfg, "doctor", work)
+    return ui.after_job("/system", cmd_id)
+
+
 def handle_page_settings(
-    ui: UiContext, request: Request, saved: int = 0
+    ui: UiContext, request: Request, saved: int = 0, error: str = ""
 ) -> HTMLResponse:
     return ui.templates.TemplateResponse(
         request,
@@ -212,6 +359,8 @@ def handle_page_settings(
         ui.ctx(
             request,
             "settings",
+            error=error,
+            config_path=str(ui.cfg.config_path or ""),
             email=ui.cfg.email,
             zotero_host=__import__(
                 "paperful.zot", fromlist=["zotero_local_host"]
@@ -228,88 +377,108 @@ def handle_page_settings(
     )
 
 
+def _settings_error(ui: UiContext, message: str) -> RedirectResponse:
+    return RedirectResponse(
+        url=ui.page_url("/settings", error=message), status_code=303
+    )
+
+
 async def handle_save_settings(ui: UiContext, request: Request) -> RedirectResponse:
+    from .config_patch import ConfigPatchError, apply_patches
+
     form = await request.form()
-    email = str(form.get("email") or "")
-    host = str(form.get("zotero_host") or "")
-    out_dir = str(form.get("out_dir") or "")
+    email = str(form.get("email") or "").strip()
+    host = str(form.get("zotero_host") or "").strip()
+    out_dir = str(form.get("out_dir") or "").strip()
     preset = str(form.get("preset") or "oa")
-    if email:
-        _patch_config_field(ui.cfg, "", "email", email)
-    if host:
-        _patch_config_field(ui.cfg, "zotero", "host", host)
-    if out_dir:
-        _patch_config_field(ui.cfg, "", "out_dir", out_dir)
-    path = ui.cfg.config_path
     attach_mode = str(form.get("attach_mode") or "").strip().lower()
-    if attach_mode in {"manual", "auto"}:
-        ui.cfg.ui_attach_mode = attach_mode
-        if path is not None and path.is_file():
-            text = path.read_text(encoding="utf-8")
-            path.write_text(
-                _patch_section_assignment(
-                    text, "ui", "attach_mode", f'"{attach_mode}"'
-                ),
-                encoding="utf-8",
-            )
     edit = str(form.get("citation_map_edit") or "").strip().lower()
-    if edit in {"sidebar", "popup", "both", "off"}:
-        ui.cfg.ui_citation_map_edit = edit
-        if path is not None and path.is_file():
-            text = path.read_text(encoding="utf-8")
-            path.write_text(
-                _patch_section_assignment(text, "ui", "citation_map_edit", f'"{edit}"'),
-                encoding="utf-8",
-            )
     auto_search = form.get("citation_map_auto_search") == "1"
-    ui.cfg.ui_citation_map_auto_search = auto_search
-    if path is not None and path.is_file():
-        text = path.read_text(encoding="utf-8")
-        path.write_text(
-            _patch_section_assignment(
-                text,
-                "ui",
-                "citation_map_auto_search",
-                "true" if auto_search else "false",
-            ),
-            encoding="utf-8",
-        )
     network = "on" if form.get("coauthor_network") == "1" else "off"
-    ui.cfg.ui_coauthor_network = network
-    if path is not None and path.is_file():
-        text = path.read_text(encoding="utf-8")
-        path.write_text(
-            _patch_section_assignment(text, "ui", "coauthor_network", f'"{network}"'),
-            encoding="utf-8",
-        )
     web = "on" if form.get("web_search") == "1" else "off"
-    ui.cfg.ui_web_search = web
+
+    # Validate before touching anything.
+    if email and ("@" not in email or " " in email or len(email) > 254):
+        return _settings_error(ui, "Unpaywall email must look like name@example.org.")
+    if out_dir:
+        candidate = Path(out_dir).expanduser()
+        if not candidate.is_absolute():
+            candidate = (
+                ui.cfg.config_path.parent if ui.cfg.config_path else Path.cwd()
+            ) / candidate
+        if candidate.exists() and not candidate.is_dir():
+            return _settings_error(ui, f"out/ path is a file, not a folder: {out_dir}")
+        if not candidate.parent.exists():
+            return _settings_error(
+                ui, f"out/ path parent folder does not exist: {candidate.parent}"
+            )
+    if attach_mode and attach_mode not in {"manual", "auto"}:
+        return _settings_error(ui, "After Grab must be Manual or Automatic.")
+    if edit and edit not in {"sidebar", "popup", "both", "off"}:
+        return _settings_error(ui, "Citation map edits has an unknown value.")
+
+    patches: dict[tuple[str, str], object] = {}
+    if email:
+        patches[("", "email")] = email
+    if host:
+        patches[("zotero", "host")] = host
+    if out_dir:
+        patches[("", "out_dir")] = out_dir
+    if attach_mode:
+        patches[("ui", "attach_mode")] = attach_mode
+    if edit:
+        patches[("ui", "citation_map_edit")] = edit
+    patches[("ui", "citation_map_auto_search")] = auto_search
+    patches[("ui", "coauthor_network")] = network
+    patches[("ui", "web_search")] = web
+
+    path = ui.cfg.config_path
     if path is not None and path.is_file():
-        text = path.read_text(encoding="utf-8")
-        path.write_text(
-            _patch_section_assignment(text, "ui", "web_search", f'"{web}"'),
-            encoding="utf-8",
-        )
+        try:
+            apply_patches(path, patches)
+        except ConfigPatchError as exc:
+            return _settings_error(ui, str(exc))
+    # Mirror into the live config so the running process agrees with disk.
+    if attach_mode:
+        ui.cfg.ui_attach_mode = attach_mode
+    if edit:
+        ui.cfg.ui_citation_map_edit = edit
+    ui.cfg.ui_citation_map_auto_search = auto_search
+    ui.cfg.ui_coauthor_network = network
+    ui.cfg.ui_web_search = web
     resp = RedirectResponse(url="/settings?saved=1", status_code=303)
     if preset in {"oa", "eoi"}:
-        set_cookie(resp, COOKIE_PRESET, preset)
+        set_cookie(resp, COOKIE_PRESET, preset, request=request)
     return resp
+
+
+def _back_to(request: Request, default: str) -> str:
+    """Same-host Referer path, or ``default`` (never an off-site redirect)."""
+    from .errors import same_host_path
+
+    return (
+        same_host_path(
+            request.headers.get("referer") or "", request.headers.get("host") or ""
+        )
+        or default
+    )
 
 
 async def handle_prefs_advanced(ui: UiContext, request: Request) -> RedirectResponse:
     form = await request.form()
     on = form.get("advanced") == "1"
-    referer = request.headers.get("referer") or "/wanted"
-    resp = RedirectResponse(url=referer, status_code=303)
-    set_cookie(resp, COOKIE_ADVANCED, "1" if on else "0")
+    resp = RedirectResponse(url=_back_to(request, "/wanted"), status_code=303)
+    set_cookie(resp, COOKIE_ADVANCED, "1" if on else "0", request=request)
     return resp
 
 
 async def handle_prefs_collection(ui: UiContext, request: Request) -> RedirectResponse:
     form = await request.form()
     coll = str(form.get("collection") or "")
-    resp = RedirectResponse(url="/library", status_code=303)
-    set_cookie(resp, COOKIE_COLLECTION, coll)
+    nxt = str(form.get("next") or "").strip()
+    target = nxt if nxt.startswith("/") and not nxt.startswith("//") else "/library"
+    resp = RedirectResponse(url=target, status_code=303)
+    set_cookie(resp, COOKIE_COLLECTION, coll, request=request)
     return resp
 
 
@@ -562,17 +731,29 @@ def register_shell(ui: UiContext) -> None:
     def page_library(request: Request) -> HTMLResponse:
         return handle_page_library(ui, request=request)
 
+    @app.post("/library/refresh")
+    def library_refresh() -> RedirectResponse:
+        ui.invalidate_collections()
+        jobs.invalidate_scope_cache()
+        return RedirectResponse(url="/library?refresh=1", status_code=303)
+
     @app.get("/activity", response_class=HTMLResponse)
     def page_activity(request: Request) -> HTMLResponse:
         return handle_page_activity(ui, request=request)
 
     @app.get("/system", response_class=HTMLResponse)
-    def page_system(request: Request) -> HTMLResponse:
-        return handle_page_system(ui, request=request)
+    def page_system(request: Request, run: str = "") -> HTMLResponse:
+        return handle_page_system(ui, request=request, run=run)
+
+    @app.post("/system/recheck")
+    def system_recheck() -> RedirectResponse:
+        return handle_system_recheck(ui)
 
     @app.get("/settings", response_class=HTMLResponse)
-    def page_settings(request: Request, saved: int = 0) -> HTMLResponse:
-        return handle_page_settings(ui, request=request, saved=saved)
+    def page_settings(
+        request: Request, saved: int = 0, error: str = ""
+    ) -> HTMLResponse:
+        return handle_page_settings(ui, request=request, saved=saved, error=error)
 
     @app.post("/settings")
     async def save_settings(request: Request) -> RedirectResponse:

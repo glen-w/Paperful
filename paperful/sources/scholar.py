@@ -155,10 +155,10 @@ def extract_pdf_links(html: str, base_url: str) -> list[str]:
 
     # Sidebar / "All versions" PDF buttons
     for a in soup.select("div.gs_or_ggsm a, a.gs_or_ggsm"):
-        add(a.get("href"))
+        add(str(a.get("href") or "") or None)
     for a in soup.find_all("a", href=True):
         text = a.get_text(" ", strip=True).lower()
-        href = a["href"]
+        href = str(a["href"])
         if (
             text.startswith("[pdf]")
             or text == "pdf"

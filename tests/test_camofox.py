@@ -6,7 +6,6 @@ import base64
 from unittest.mock import MagicMock
 
 import httpx
-import pytest
 
 from paperful.camofox_client import CamofoxClient, CamofoxLink
 from paperful.camofox_recover import _rank_pdf_links, run_camofox_recover
@@ -256,7 +255,7 @@ def test_pipeline_camofox_skipped_without_browser_lane_failure(cfg, monkeypatch)
     from rich.console import Console
 
     from paperful.pipeline import Pipeline
-    from paperful.sources.base import Candidate, Outcome
+    from paperful.sources.base import Candidate
     from paperful.store import Manifest
     from tests.conftest import make_item
     from tests.test_pipeline import StubSource

@@ -50,7 +50,7 @@ def _ipv4_literal(hostname: str) -> str | None:
         return None
     if not infos:
         return None
-    return infos[0][4][0]
+    return str(infos[0][4][0])
 
 
 def resolve_ollama_base_url(url: str | None = None) -> str:

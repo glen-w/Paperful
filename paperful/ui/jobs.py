@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from typing import Any, Callable
 
@@ -71,6 +72,43 @@ def _load_scope_items(cfg: Config, collection: str) -> tuple[list[Any], Manifest
         return loaded.items, manifest
     except (LibraryError, ScopeError):
         return [], manifest
+
+
+# Page-render cache for scope items (Wanted tabs, Library items). Jobs always
+# load fresh so review-token fingerprints never see stale rows. Any finished
+# job drops the cache; so does ``/library/refresh``.
+SCOPE_CACHE_TTL = 5 * 60
+_scope_cache: dict[tuple[str, str], tuple[float, list[Any]]] = {}
+_scope_cache_lock = threading.Lock()
+
+
+def invalidate_scope_cache(_rec: dict[str, Any] | None = None) -> None:
+    with _scope_cache_lock:
+        _scope_cache.clear()
+
+
+commands.register_finish_hook(invalidate_scope_cache)
+
+
+def load_scope_items_cached(
+    cfg: Config, collection: str, *, force: bool = False
+) -> tuple[list[Any], Manifest]:
+    """``_load_scope_items`` with a short per-process cache for page renders."""
+    manifest = Manifest(cfg.manifest_path)
+    if not collection:
+        return [], manifest
+    key = (str(cfg.state_dir), collection)
+    now = time.time()
+    if not force:
+        with _scope_cache_lock:
+            hit = _scope_cache.get(key)
+        if hit and now - hit[0] < SCOPE_CACHE_TTL:
+            return list(hit[1]), manifest
+    items, manifest = _load_scope_items(cfg, collection)
+    if items:
+        with _scope_cache_lock:
+            _scope_cache[key] = (now, list(items))
+    return items, manifest
 
 
 def missing_items(cfg: Config, items: list[Any], manifest: Manifest) -> list[Any]:

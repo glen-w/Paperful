@@ -233,10 +233,6 @@ def hop_cites(
     """Expand one hop of citing works. True when the crawl must stop."""
     from . import crawl as c
 
-    unique_ids = c.unique_ids
-    referenced_ids = c.referenced_ids
-    recover_referenced_works = c.recover_referenced_works
-    FillPaused = c.FillPaused
     _defer = c._defer
     _emit = c._emit
     _cites_query = c._cites_query
@@ -248,7 +244,6 @@ def hop_cites(
     _cite_sort = c._cite_sort
     work_to_candidate = c.work_to_candidate
     short_id = c.short_id
-    sample_ids = c.sample_ids
     select_works_by_citations = c.select_works_by_citations
 
     citing_seeds = [

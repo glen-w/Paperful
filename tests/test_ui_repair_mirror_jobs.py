@@ -118,7 +118,6 @@ def test_repair_preview_dedupe_writes_pack(cfg, scoped_backend):
 
 
 def test_repair_apply_refuses_read_only_lint(cfg, scoped_backend, monkeypatch):
-    from paperful.lint import Finding
 
     monkeypatch.setattr("paperful.lint.lint_items", lambda *a, **k: [])
     monkeypatch.setattr(

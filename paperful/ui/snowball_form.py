@@ -84,6 +84,18 @@ def _opt_tuple(raw: object) -> tuple[str, ...] | None:
     return parts or None
 
 
+def _multi(form: Mapping[str, Any], name: str) -> str:
+    """Join repeated form fields (checkbox chips) or a comma list into one string.
+
+    Starlette ``FormData`` exposes ``getlist``; plain dicts (tests, profiles)
+    hold a single value that may already be comma-separated.
+    """
+    getlist = getattr(form, "getlist", None)
+    values = getlist(name) if callable(getlist) else [form.get(name)]
+    parts = [str(v).strip() for v in values if str(v or "").strip()]
+    return ",".join(parts)
+
+
 def _parse_study_designs(raw: object) -> tuple[str, ...] | None:
     text = str(raw or "").strip()
     if not text:
@@ -161,12 +173,12 @@ def parse_discover_topic(
         keyword_min_score=_opt_float(form.get("keyword_min_score")),
         cites_query=str(form.get("cites_query") or "").strip(),
         languages=_opt_tuple(form.get("languages")),
-        study_designs=_parse_study_designs(form.get("study_designs")),
-        listed_in=_parse_listed_in(form.get("listed_in")),
+        study_designs=_parse_study_designs(_multi(form, "study_designs")),
+        listed_in=_parse_listed_in(_multi(form, "listed_in")),
         map_categories=_parse_map_categories(form.get("map_categories")),
         min_seed_citations=_opt_int(form.get("min_seed_citations")),
         note_provenance=True if form.get("note_provenance") == "1" else None,
-        backends=_opt_tuple(form.get("backends")),
+        backends=_opt_tuple(_multi(form, "backends")),
         refine=True if form.get("refine") == "1" else None,
         tags=_opt_tuple(form.get("tags")) or (),
         dedupe_scope=_opt_str(form.get("dedupe_scope")),

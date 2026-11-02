@@ -12,6 +12,7 @@ from typing import Any, Callable
 from rich.console import Console
 from rich.table import Table
 
+from .fsio import atomic_write_json, atomic_write_text
 from .config import Config
 from .identity import from_seed_tag
 from .snowball.candidate import Candidate
@@ -182,7 +183,7 @@ def save_job(
             "sources": [src.to_dict() for src in cleaned],
         }
     )
-    path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
+    atomic_write_json(path, body)
     for leaf, content in (
         ("seen.json", json.dumps({"identities": []}, indent=2) + "\n"),
         ("applied.json", json.dumps({"identities": []}, indent=2) + "\n"),
@@ -191,7 +192,7 @@ def save_job(
     ):
         target = dest / leaf
         if not target.is_file():
-            target.write_text(content, encoding="utf-8")
+            atomic_write_text(target, content)
     return path
 
 
@@ -211,7 +212,7 @@ def _write_job(cfg: Config, name: str, body: dict[str, Any]) -> None:
     body = dict(body)
     body["schema"] = SCHEMA
     body["name"] = name
-    path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
+    atomic_write_json(path, body)
 
 
 def list_jobs(cfg: Config) -> list[str]:
@@ -353,6 +354,7 @@ def show_job(cfg: Config, name: str, *, console: Console) -> None:
 
 def write_digest(cfg: Config, name: str) -> Path:
     body = load_job(cfg, name)
+    collection = str(body.get("collection") or "")
     rows = load_inbox(cfg, name)
     applied = load_applied(cfg, name)
     muted = load_muted(cfg, name)
@@ -365,7 +367,6 @@ def write_digest(cfg: Config, name: str) -> Path:
         and row.status == "new"
     ]
     pending.sort(key=lambda row: row.score, reverse=True)
-    collection = str(body.get("collection") or "")
     quoted = f'"{collection}"' if any(ch.isspace() for ch in collection) else collection
     dest = job_dir(cfg, name)
     path = dest / "digest.md"
@@ -604,7 +605,6 @@ def run_job(
             return RunResult(skipped=True, days_left=left)
 
     is_baseline = not body.get("baseline_at")
-    collection = str(body.get("collection") or "")
     notes: list[str] = []
     merged: dict[str, Candidate] = {}
     seen = load_seen(cfg, name)

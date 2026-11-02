@@ -4,6 +4,7 @@
 {% block title %}Briefs — Paperful{% endblock %}
 {% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
+<p class="breadcrumb"><a href="/index">Index</a> › Briefs</p>
 <h1>Briefs</h1>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
 <p class="page-lede">{{ message }} Summaries are grounded in local PDF text. Synthesize then folds those notes into a collection review. Both follow the collection chip.</p>

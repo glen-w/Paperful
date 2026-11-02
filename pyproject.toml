@@ -1,6 +1,6 @@
 [project]
 name = "paperful"
-version = "1.6.5"
+version = "1.7.0"
 description = "Find missing PDFs for a Zotero library: clean records, summarise papers, keep a platform-agnostic mirror."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -32,11 +32,15 @@ dependencies = [
     "filelock>=3.18",
     "tomli>=2.0; python_version < '3.11'",
     "fonttools>=4.0",
-    "playwright>=1.60",  # htmlpdf + session login CDP no_defaults
+    "defusedxml>=0.7.1",  # hardened XML parsing for network/import surfaces
 ]
 
 [project.optional-dependencies]
-# Kept for older install docs (`pip install paperful[htmlpdf]`); Playwright is now core.
+# Playwright is imported lazily (session vault, htmlpdf, rewrite PDF) so the
+# core and [serve] installs stay lean. `paperful doctor` names this extra
+# when a browser lane is configured but the package is missing.
+browser = ["playwright>=1.60"]  # htmlpdf + session login CDP no_defaults
+# Kept for older install docs (`pip install paperful[htmlpdf]`).
 htmlpdf = ["playwright>=1.60"]
 llm = ["litellm>=1.70,<2"]
 # Library index for `paperful rag` / `paperful ask`. Embeddings go through [llm].
@@ -81,6 +85,7 @@ dev = [
     "pytest>=8",
     "pytest-cov>=6",
     "pytest-socket>=0.7",
+    "playwright>=1.60",
     "ruff>=0.9",
     "mypy>=1.11",
     "lancedb>=0.39,<1",
@@ -130,7 +135,9 @@ markers = [
     "e2e_live: opt-in all-in E2E (NBA 2025–2026); set PAPERFUL_E2E=1 — see docs/e2e-nba.md",
     "docs: guide corpus / Sphinx toctree hygiene (advisory in CI; see .github/workflows/docs.yml)",
     "smoke: install/boot/route smoke for CI gate",
+    "browser: opt-in Playwright Chromium lane over the workbench (uv run pytest -m browser)",
 ]
+addopts = "-m 'not browser'"
 
 [tool.coverage.run]
 source = ["paperful"]
@@ -150,7 +157,7 @@ omit = [
 show_missing = true
 skip_empty = true
 # Stretch goal 85%; gate tracks offline suite + scoped omits below.
-fail_under = 80
+fail_under = 82
 
 [tool.ruff]
 target-version = "py310"
@@ -159,11 +166,72 @@ src = ["paperful", "tests"]
 [tool.ruff.lint.per-file-ignores]
 # Tests assert bind-refusal behaviour with literal 0.0.0.0 hosts.
 "tests/**" = ["S104"]
+# DuckDB SQL is built from internal column expressions; DOI/id values are
+# escaped via _sql_str/_sql_str_list (see snowball/local_openalex.py).
+"paperful/snowball/local_openalex.py" = ["S608"]
+# Facade / re-export modules: cli.py, the *_cmd shims, ui/pages.py and the
+# route registrars import names so tests and sibling modules can reach them
+# through one namespace. F401 stays on everywhere else (1.7 wave).
+"paperful/attach_cmd.py" = ["F401"]
+"paperful/attachments_cmd.py" = ["F401"]
+"paperful/authors_cmd.py" = ["F401"]
+"paperful/authorwatch_cmd.py" = ["F401"]
+"paperful/cli.py" = ["F401"]
+"paperful/cli_runtime.py" = ["F401"]
+"paperful/coverage_cmd.py" = ["F401"]
+"paperful/critique.py" = ["F401"]
+"paperful/critique_cmd.py" = ["F401"]
+"paperful/critique_overlap.py" = ["F401"]
+"paperful/dedupe_cmd.py" = ["F401"]
+"paperful/export_cmd.py" = ["F401"]
+"paperful/fix_metadata_cmd.py" = ["F401"]
+"paperful/inbox_cmd.py" = ["F401"]
+"paperful/ingest_cmd.py" = ["F401"]
+"paperful/keepup_cmd.py" = ["F401"]
+"paperful/network/run.py" = ["F401"]
+"paperful/ocr_cmd.py" = ["F401"]
+"paperful/pipeline.py" = ["F401"]
+"paperful/pipeline_save.py" = ["F401"]
+"paperful/playbooks_cmd.py" = ["F401"]
+"paperful/profile_cmd.py" = ["F401"]
+"paperful/rag_cmd.py" = ["F401"]
+"paperful/refs_gap_cmd.py" = ["F401"]
+"paperful/report_cmd.py" = ["F401"]
+"paperful/rewrite.py" = ["F401"]
+"paperful/run_hooks.py" = ["F401"]
+"paperful/search/rank.py" = ["F401"]
+"paperful/search/run.py" = ["F401"]
+"paperful/sections_cmd.py" = ["F401"]
+"paperful/snowball/apply.py" = ["F401"]
+"paperful/snowball/command.py" = ["F401"]
+"paperful/snowball/crawl.py" = ["F401"]
+"paperful/snowball/explore.py" = ["F401"]
+"paperful/snowball_cmd.py" = ["F401"]
+"paperful/sr/screen.py" = ["F401"]
+"paperful/sr_cmd.py" = ["F401"]
+"paperful/summarize_cmd.py" = ["F401"]
+"paperful/sync_cmd.py" = ["F401"]
+"paperful/synthesize_cmd.py" = ["F401"]
+"paperful/twenty_cmd.py" = ["F401"]
+"paperful/ui/app.py" = ["F401"]
+"paperful/ui/context.py" = ["F401"]
+"paperful/ui/discover_graph_routes.py" = ["F401"]
+"paperful/ui/discover_routes.py" = ["F401"]
+"paperful/ui/discover_search_routes.py" = ["F401"]
+"paperful/ui/index_routes.py" = ["F401"]
+"paperful/ui/jobs.py" = ["F401"]
+"paperful/ui/pages.py" = ["F401"]
+"paperful/ui/repair_mirror_jobs.py" = ["F401"]
+"paperful/ui/repair_routes.py" = ["F401"]
+"paperful/ui/shell_routes.py" = ["F401"]
+"paperful/ui/wanted_routes.py" = ["F401"]
+"paperful/versions_cmd.py" = ["F401"]
 
 [tool.ruff.lint]
 # Start narrow: real undefined-name bugs + security rules that are already green.
 # Do not widen to full E/F/S without a dedicated cleanup PR.
 select = [
+    "F",
     "F821",
     "S102",
     "S103",
@@ -199,6 +267,19 @@ select = [
     "S610",
     "S611",
     "S612",
+    # 1.7 wave stage 2: XML parsing moved to defusedxml (S314) and md5 calls
+    # carry usedforsecurity=False (S324). S101 stays off until the remaining
+    # internal-invariant asserts are converted.
+    "S105",
+    "S110",
+    "S112",
+    "S311",
+    "S314",
+    "S324",
+    "S603",
+    "S606",
+    "S607",
+    "S608",
 ]
 
 [tool.mypy]
@@ -208,8 +289,157 @@ warn_unused_ignores = true
 files = [
     "paperful/fsio.py",
     "paperful/config_check.py",
+    "paperful/update_check.py",
     "paperful/sr_cmd.py",
-    "paperful/sr/protocol.py",
-    "paperful/sr/screen.py",
+    "paperful/sr",
+    "paperful/search",
+    "paperful/network",
+    "paperful/interop",
+    "paperful/sections",
+    "paperful/sources",
+    "paperful/llm",
     "paperful/ui/origin_guard.py",
+    "paperful/ui/token_guard.py",
+    "paperful/__init__.py",
+    "paperful/acronyms.py",
+    "paperful/acronyms_cmd.py",
+    "paperful/agent_json.py",
+    "paperful/agent_ops.py",
+    "paperful/attach.py",
+    "paperful/attachments.py",
+    "paperful/attachments_cmd.py",
+    "paperful/author_request.py",
+    "paperful/authors_cmd.py",
+    "paperful/authors_report.py",
+    "paperful/authorwatch_cmd.py",
+    "paperful/authorwatch_social.py",
+    "paperful/authorwatch_suggest.py",
+    "paperful/browser_agent.py",
+    "paperful/camofox_client.py",
+    "paperful/camofox_recover.py",
+    "paperful/circuit.py",
+    "paperful/cli.py",
+    "paperful/collections_add.py",
+    "paperful/collections_cmd.py",
+    "paperful/completeness_cmd.py",
+    "paperful/config_tables.py",
+    "paperful/cookies.py",
+    "paperful/coverage_cmd.py",
+    "paperful/critique_adversary.py",
+    "paperful/critique_ai_tells.py",
+    "paperful/critique_claims.py",
+    "paperful/critique_cmd.py",
+    "paperful/critique_context.py",
+    "paperful/critique_direct_quotes.py",
+    "paperful/critique_extract.py",
+    "paperful/critique_forensics.py",
+    "paperful/critique_lanes.py",
+    "paperful/critique_marg.py",
+    "paperful/critique_metrics.py",
+    "paperful/critique_outline.py",
+    "paperful/critique_overlap.py",
+    "paperful/critique_stats.py",
+    "paperful/critique_units.py",
+    "paperful/critique_vale.py",
+    "paperful/critique_verify.py",
+    "paperful/dedupe.py",
+    "paperful/dedupe_cmd.py",
+    "paperful/doctor.py",
+    "paperful/doctor_cmd.py",
+    "paperful/exclude.py",
+    "paperful/fix_metadata_cmd.py",
+    "paperful/gaps_cmd.py",
+    "paperful/glossary.py",
+    "paperful/glossary_cmd.py",
+    "paperful/grey_probe.py",
+    "paperful/greyid.py",
+    "paperful/grobid_client.py",
+    "paperful/grounding.py",
+    "paperful/handoff_rank.py",
+    "paperful/htmlpdf_cmd.py",
+    "paperful/identity.py",
+    "paperful/inbox_cmd.py",
+    "paperful/inbox_match.py",
+    "paperful/ingest_cmd.py",
+    "paperful/ingest_dois.py",
+    "paperful/keepup.py",
+    "paperful/keepup_cites.py",
+    "paperful/keepup_cmd.py",
+    "paperful/lint.py",
+    "paperful/lint_cmd.py",
+    "paperful/llm_pdf_match.py",
+    "paperful/llm_title.py",
+    "paperful/mcp_server.py",
+    "paperful/metadata.py",
+    "paperful/mirrors_cmd.py",
+    "paperful/miss_surface.py",
+    "paperful/notehtml.py",
+    "paperful/notes.py",
+    "paperful/notes_delete_cmd.py",
+    "paperful/oa_locations.py",
+    "paperful/ocr.py",
+    "paperful/ocr_cmd.py",
+    "paperful/ocr_ignore.py",
+    "paperful/ocr_ignore_cmd.py",
+    "paperful/osf_signal.py",
+    "paperful/pack.py",
+    "paperful/pack_bib.py",
+    "paperful/pack_cmd.py",
+    "paperful/page_signals.py",
+    "paperful/pdfid.py",
+    "paperful/pipeline.py",
+    "paperful/pipeline_attach.py",
+    "paperful/pipeline_browser.py",
+    "paperful/pipeline_phases.py",
+    "paperful/pipeline_save.py",
+    "paperful/playbooks_cmd.py",
+    "paperful/precedent_cmd.py",
+    "paperful/profile_cmd.py",
+    "paperful/progress.py",
+    "paperful/provenance.py",
+    "paperful/quotes.py",
+    "paperful/rag_cmd.py",
+    "paperful/reachout.py",
+    "paperful/reachout_cmd.py",
+    "paperful/recover_cmd.py",
+    "paperful/refs_gap_cmd.py",
+    "paperful/remarks.py",
+    "paperful/report_cmd.py",
+    "paperful/restore.py",
+    "paperful/restore_cmd.py",
+    "paperful/rewrite_align.py",
+    "paperful/rewrite_areas.py",
+    "paperful/rewrite_cmd.py",
+    "paperful/rewrite_docx.py",
+    "paperful/rewrite_llm.py",
+    "paperful/rewrite_office.py",
+    "paperful/rewrite_pdf.py",
+    "paperful/rewrite_plan.py",
+    "paperful/rewrite_render.py",
+    "paperful/routing.py",
+    "paperful/run_hooks.py",
+    "paperful/runreport.py",
+    "paperful/scope.py",
+    "paperful/screen.py",
+    "paperful/screen_cmd.py",
+    "paperful/sections_cmd.py",
+    "paperful/serve.py",
+    "paperful/session_cmd.py",
+    "paperful/snapshot_cmd.py",
+    "paperful/snowball_cmd.py",
+    "paperful/ste.py",
+    "paperful/stuff.py",
+    "paperful/stuff_cmd.py",
+    "paperful/summarize.py",
+    "paperful/summarize_cmd.py",
+    "paperful/sync_cmd.py",
+    "paperful/synthesis_layouts.py",
+    "paperful/synthesize.py",
+    "paperful/twenty_cmd.py",
+    "paperful/urls.py",
+    "paperful/versions.py",
+    "paperful/versions_cmd.py",
+    "paperful/wanted_cards.py",
+    "paperful/xfer.py",
+    "paperful/zot.py",
 ]

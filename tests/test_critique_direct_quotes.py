@@ -132,7 +132,7 @@ def test_vale_integration_skips_quoted_match(cfg, tmp_path: Path, monkeypatch):
     monkeypatch.setattr("paperful.critique_vale.subprocess.run", fake_run)
     path = tmp_path / "vale.txt"
     path.write_text(
-        f"Note \u201cplease utilize this\u201d here.\n",
+        "Note \u201cplease utilize this\u201d here.\n",
         encoding="utf-8",
     )
     pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)

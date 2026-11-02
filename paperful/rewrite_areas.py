@@ -108,7 +108,7 @@ def parse_rewrite_areas_list(raw: Any) -> tuple[str, ...]:
         token = str(name or "").strip().lower()
         if not token:
             continue
-        if token == "all":
+        if token == "all":  # noqa: S105 -- name only, not a credential
             return tuple(KNOWN_AREAS)
         if token not in KNOWN_AREAS:
             raise ValueError(

@@ -30,6 +30,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_serpapi(raw, cfg)
     apply_camofox(raw, cfg)
     apply_grobid(raw, cfg)
+    apply_updates(raw, cfg)
     apply_handoff(raw, cfg)
     apply_request(raw, cfg)
     apply_twenty(raw, cfg)
@@ -488,6 +489,14 @@ def apply_grobid(raw: dict[str, Any], cfg: "Config") -> None:
                 lambda v: max(0, min(2, int(v))),
             ),
         ],
+    )
+
+
+def apply_updates(raw: dict[str, Any], cfg: "Config") -> None:
+    _mod()._apply_config_table(
+        raw.get("updates"),
+        cfg,
+        [("check", "update_check", bool)],
     )
 
 

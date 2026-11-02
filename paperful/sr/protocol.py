@@ -1,4 +1,4 @@
-"""Review protocol on disk: ``state/sr/<slug>/protocol.toml``."""
+"""Review protocol on disk: ``state/sr/<slug>/protocol.json``."""
 
 from __future__ import annotations
 

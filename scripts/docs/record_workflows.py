@@ -32,6 +32,8 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "docs" / "_static" / "workflows"
 BASE = os.environ.get("PAPERFUL_UI", "http://127.0.0.1:8765").rstrip("/")
 COLLECTION = os.environ.get("PAPERFUL_SHOT_COLLECTION", "ocean/BBNJ")
+# Title order floats "(untitled)" rows to the top; newest-first reads better.
+WANTED_ORDER = os.environ.get("PAPERFUL_SHOT_ORDER", "year_new")
 VIEWPORT = {"width": 1280, "height": 800}
 GIF_WIDTH = 960
 FPS = 12
@@ -132,7 +134,9 @@ class Recorder:
         x, y = self.pos
         if navigates:
             # The click submits a form; wait for the new document.
-            with self.page.expect_navigation(wait_until="domcontentloaded", timeout=120_000):
+            with self.page.expect_navigation(
+                wait_until="domcontentloaded", timeout=120_000
+            ):
                 self.page.mouse.click(x, y)
             self.settle()
             return
@@ -200,7 +204,9 @@ class Recorder:
             cwd=str(self.workdir),
         )
         size_kb = dest.stat().st_size // 1024
-        print(f"wrote {dest.relative_to(ROOT)} ({len(self.frames)} frames, {size_kb} KB)")
+        print(
+            f"wrote {dest.relative_to(ROOT)} ({len(self.frames)} frames, {size_kb} KB)"
+        )
 
 
 def _context(browser, *, advanced: bool, collection: str | None = COLLECTION):
@@ -238,7 +244,7 @@ def flow_wanted_preview(browser, workdir: Path) -> None:
     ctx = _context(browser, advanced=False)
     page = ctx.new_page()
     rec = Recorder(page, workdir)
-    page.goto(f"{BASE}/wanted", wait_until="domcontentloaded")
+    page.goto(f"{BASE}/wanted?order={WANTED_ORDER}", wait_until="domcontentloaded")
     rec.settle()
     rec.frame(1.2)
     rec.scroll_to_heading("Items")
@@ -246,6 +252,14 @@ def flow_wanted_preview(browser, workdir: Path) -> None:
     boxes = page.locator("input.row-select")
     for i in range(min(3, boxes.count())):
         rec.click(boxes.nth(i), hold_before=0.25, hold_after=0.45)
+    page.evaluate(
+        """() => {
+          const b = document.getElementById('preview-btn');
+          if (b) window.scrollBy(0, b.getBoundingClientRect().top - 240);
+        }"""
+    )
+    page.wait_for_timeout(250)
+    rec.frame(0.6)
     rec.move_to(page.locator("#preview-btn"))
     rec.frame(1.0)
     rec.click(page.locator("#preview-btn"), hold_before=0.4, navigates=True)
@@ -255,11 +269,21 @@ def flow_wanted_preview(browser, workdir: Path) -> None:
     page.wait_for_timeout(200)
     rec.frame(1.6)
     _wait_job_done(page)
+    # The post-job reload drops ?order=; reopen the same ordered view so the
+    # closing frames do not fall back to title order ("(untitled)" first).
+    page.goto(f"{BASE}/wanted?order={WANTED_ORDER}", wait_until="domcontentloaded")
     rec.settle()
     page.evaluate("() => window.scrollTo(0, 0)")
     page.wait_for_timeout(200)
     rec.frame(1.2)
-    rec.scroll_to_heading("Items")
+    page.evaluate(
+        """() => {
+          const b = document.getElementById('preview-btn');
+          if (b) window.scrollBy(0, b.getBoundingClientRect().top - 240);
+        }"""
+    )
+    page.wait_for_timeout(250)
+    rec.move_to(page.locator("#grab-btn"))
     rec.frame(2.4)
     rec.write_gif(OUT / "wanted-preview.gif")
     ctx.close()
@@ -276,7 +300,9 @@ def flow_advanced_nav(browser, workdir: Path) -> None:
     toggle = page.locator("form.advanced-toggle input[name='advanced']")
     rec.click(toggle, hold_before=0.5, navigates=True)
     rec.frame(1.4)
-    rec.click(page.locator("nav.wb-nav a[href='/critique']"), hold_before=0.5, navigates=True)
+    rec.click(
+        page.locator("nav.wb-nav a[href='/critique']"), hold_before=0.5, navigates=True
+    )
     rec.frame(2.2)
     rec.write_gif(OUT / "advanced-nav.gif")
     ctx.close()
@@ -328,12 +354,17 @@ def flow_library_scope(browser, workdir: Path) -> None:
     rec.frame(1.0)
     parent, child = (COLLECTION.split("/", 1) + [""])[:2]
     parent_node = page.locator(
-        ".coll-tree > .coll-node", has=page.locator(":scope > summary .coll-name", has_text=parent)
+        ".coll-tree > .coll-node",
+        has=page.locator(":scope > summary .coll-name", has_text=parent),
     ).first
     if parent_node.count():
-        rec.click(parent_node.locator(":scope > summary .coll-name").first, hold_after=0.8)
+        rec.click(
+            parent_node.locator(":scope > summary .coll-name").first, hold_after=0.8
+        )
     target_name = child or parent
-    row = page.locator(".coll-head", has=page.locator(".coll-name", has_text=target_name)).first
+    row = page.locator(
+        ".coll-head", has=page.locator(".coll-name", has_text=target_name)
+    ).first
     if not row.count():
         print("skip library-scope.gif (collection not found in tree)")
         ctx.close()
@@ -345,7 +376,9 @@ def flow_library_scope(browser, workdir: Path) -> None:
     page.evaluate("() => window.scrollTo(0, 0)")
     page.wait_for_timeout(200)
     rec.frame(1.0)
-    rec.click(page.locator("nav.wb-nav a[href='/wanted']"), hold_before=0.4, navigates=True)
+    rec.click(
+        page.locator("nav.wb-nav a[href='/wanted']"), hold_before=0.4, navigates=True
+    )
     rec.frame(2.2)
     rec.write_gif(OUT / "library-scope.gif")
     ctx.close()

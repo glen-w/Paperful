@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ status_code }} — Paperful{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p class="page-lede">{{ message }}</p>
+<section class="panel">
+  <h2>What to do</h2>
+  <p class="section-lede">{{ hint }}</p>
+  <p class="toolbar">
+    {% if back %}<a class="btn secondary" href="{{ back }}">Go back</a>{% endif %}
+    <a class="btn secondary" href="/wanted">Wanted</a>
+    <a class="btn secondary" href="/activity">Activity</a>
+    <a class="btn secondary" href="/system">System</a>
+  </p>
+  {% if detail %}<details><summary>Details</summary><pre>{{ detail }}</pre></details>{% endif %}
+</section>
+{% endblock %}

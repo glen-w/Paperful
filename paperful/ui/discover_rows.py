@@ -90,6 +90,31 @@ def newest_snowball_queue(cfg: Config) -> tuple[str, list[dict[str, Any]]]:
     return run_id, rows
 
 
+def snowball_run_label(cfg: Config, run_id: str) -> dict[str, str]:
+    """Human label for a queue: query (when recorded), target collection, date.
+
+    Older runs have no ``query`` in ``summary.json``; the run id (a UTC
+    stamp) is still shown so two queues can be told apart.
+    """
+    out = {"run_id": run_id, "query": "", "collection": "", "when": ""}
+    if not run_id:
+        return out
+    path = cfg.state_dir / "snowball" / run_id / "summary.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    if isinstance(data, dict):
+        out["query"] = str(data.get("query") or "").strip()
+        out["collection"] = str(data.get("target_collection") or "").strip()
+    stamp = run_id.rstrip("Z")
+    if len(stamp) >= 13 and stamp[8] == "T":
+        out["when"] = (
+            f"{stamp[:4]}-{stamp[4:6]}-{stamp[6:8]} {stamp[9:11]}:{stamp[11:13]} UTC"
+        )
+    return out
+
+
 def snowball_stop_view(cfg: Config, run_id: str) -> tuple[bool, str]:
     """Whether the newest queue is waiting for Next hop, and any stop sentence."""
     if not run_id:
@@ -161,7 +186,7 @@ def list_snowball_profiles(cfg: Config) -> list[str]:
                 else:
                     import tomli as _toml
                 raw = _toml.loads(path.read_bytes())
-            except Exception:
+            except Exception:  # noqa: S112 -- best-effort loop; intentionally continues
                 continue
             if isinstance(raw, dict) and str(raw.get("kind") or "") == "snowball":
                 names.append(path.stem)

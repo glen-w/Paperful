@@ -135,7 +135,7 @@ def start_explore(
         backend = get_backend(cfg)
         finder = _library_lookup(backend, scope="library", collection="")
         _mark_exists(rows, finder)
-    except Exception:
+    except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
         pass
     write_queue(
         cfg.state_dir,

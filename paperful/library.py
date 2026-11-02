@@ -322,7 +322,7 @@ class MirroredBackend:
         key = self._inner.ensure_collection_path(path)
         try:
             write_collections(self._cfg.out_dir, self._inner.collections())
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass  # the tree is rewritten whole on the next refresh
         return key
 

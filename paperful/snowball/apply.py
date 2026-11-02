@@ -294,7 +294,7 @@ def run_continue(
         try:
             finder = _library_lookup(backend, scope="library", collection="")
             _mark_exists(new_rows, finder)
-        except Exception:
+        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
             pass
     if max_candidates > 0:
         new_rows = truncate(new_rows, max(0, room))
@@ -342,8 +342,6 @@ def run_resume(
         raise SnowballError(
             "Snowball is off. Set [snowball] enabled = true in config.toml."
         )
-    import json
-    from datetime import datetime, timezone
 
     from .crawl import _dedupe, continue_deferred
 
@@ -653,7 +651,6 @@ def run_apply(
     write_report(dest, report)
     failed = int(counts.get("failed") or 0)
     created = int(counts.get("created") or 0)
-    from ..agent_json import batch_exit
 
     return PathResult(
         dest,

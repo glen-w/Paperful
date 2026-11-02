@@ -191,13 +191,21 @@ class Item:
 class ZoteroLocal:
     """Thin wrapper over pyzotero pointed at the Zotero local API (:23119)."""
 
+    @property
+    def _client(self) -> Any:
+        """pyzotero's httpx client (typed optional upstream; always built here)."""
+        client = self.zot.client
+        if client is None:  # pragma: no cover - pyzotero always builds one
+            raise RuntimeError("pyzotero client was not initialised")
+        return client
+
     def __init__(self, local_api_key: str | None = None):
         self.zot = zotero.Zotero(0, "user", local=True, local_api_key=local_api_key)
         # pyzotero hardcodes localhost; Docker Desktop needs host.docker.internal.
         self.zot.endpoint = zotero_local_endpoint()
         # httpx omits Host from client.headers; set it on every request. Zotero's
         # local API requires Host: localhost:23119 even via host.docker.internal.
-        self.zot.client.event_hooks.setdefault("request", []).append(
+        self._client.event_hooks.setdefault("request", []).append(
             _force_zotero_local_host_header
         )
         self._collections: dict[str, Collection] | None = None
@@ -205,7 +213,7 @@ class ZoteroLocal:
     # ---- connectivity -------------------------------------------------
     def ping(self) -> dict[str, Any]:
         """Return server info; raises if the local API is disabled or Zotero is not running."""
-        resp = self.zot.client.get(self.zot.endpoint + "/")
+        resp = self._client.get(self.zot.endpoint + "/")
         if resp.status_code == 403:
             raise ConnectionError(
                 "Zotero local API is disabled. Enable Settings > Advanced > "
@@ -225,7 +233,7 @@ class ZoteroLocal:
     # ---- whole listings (mirror refresh) ---------------------------------
     def get(self, path: str, **params: Any) -> Any:
         """One GET under the library root. Raises on anything but 200."""
-        resp = self.zot.client.get(
+        resp = self._client.get(
             f"{self.zot.endpoint}/users/0{path}", params=params or None
         )
         resp.raise_for_status()
@@ -269,7 +277,7 @@ class ZoteroLocal:
         was given, or the path is on a filesystem this process cannot see
         (Zotero on the host, Paperful in a container).
         """
-        resp = self.zot.client.get(
+        resp = self._client.get(
             f"{self.zot.endpoint}/users/0/items/{key}/file", follow_redirects=False
         )
         location = resp.headers.get("Location") or ""

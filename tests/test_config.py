@@ -149,7 +149,7 @@ library = "{enl}"
     cfg = load_config(p)
     assert cfg.manager == "mendeley"
     assert cfg.mendeley_client_id == "cid"
-    assert cfg.mendeley_client_secret == "csec"
+    assert cfg.mendeley_client_secret == "csec"  # noqa: S105 -- name only, not a credential
     assert cfg.mendeley_redirect_uri == "http://127.0.0.1:9999/cb"
     assert cfg.endnote_library == enl.resolve()
 

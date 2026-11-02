@@ -1527,7 +1527,7 @@ def test_fix_metadata_apply(cfg_file, stub_zotero, monkeypatch):
         after={"doi": "10.1/x"},
         source="swap",
     )
-    monkeypatch.setattr("paperful.lint.lint_item", lambda *a, **k: [])
+    monkeypatch.setattr("paperful.metadata.lint_item", lambda *a, **k: [])
     monkeypatch.setattr("paperful.metadata.propose_patch", lambda *a, **k: patch)
     seen: list = []
 
@@ -2978,8 +2978,7 @@ def test_ask_format_json_needs_question(cfg_file):
 
 def test_all_format_json_one_envelope(cfg_file, stub_zotero, monkeypatch):
     monkeypatch.setattr(
-        cli,
-        "_dispatch_all_step",
+        "paperful.all_cmd._dispatch_all_step",
         lambda *a, **k: None,
     )
     res = runner.invoke(

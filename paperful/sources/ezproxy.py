@@ -64,7 +64,7 @@ def find(item: Item, ctx: Context) -> Candidate:
     status = 200
     content: bytes = b""
     try:
-        if use_browser:
+        if use_browser and ctx.browser is not None:
             html, final = ctx.browser.fetch_html(url)
         else:
             resp = ctx.client.get(url, timeout=45)
@@ -161,7 +161,7 @@ def session_ok(ctx: Context) -> tuple[bool, str]:
         return False, f"cookie file missing ({cookie_path})"
     probe = proxify(_PROBE_DOI, ctx.config.ezproxy_base)
     use_browser = ctx.browser is not None and ctx.browser.available()
-    if use_browser:
+    if use_browser and ctx.browser is not None:
         try:
             html, final = ctx.browser.fetch_html(probe, timeout_ms=30_000)
         except Exception as exc:

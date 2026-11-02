@@ -4,8 +4,8 @@ Short, outcome-focused jobs in the **workbench** (`docker compose up`, then
 http://127.0.0.1:8765). They complement the command reference; they do not
 replace it.
 
-The screenshots are a live `ocean/BBNJ` collection. Follow the same clicks
-on any collection chip.
+The screenshots and short animations are a live `ocean/BBNJ` collection.
+Follow the same clicks on any collection chip.
 
 CLI recipes for the same verbs live in [Workflows](workflows.md)
 (`paperful all`, named run configs). How a fill searches:

@@ -155,9 +155,9 @@ def phase_serial(
             continue
         if not first:
             if scihub_delay:
-                time.sleep(random.uniform(lo, hi))
+                time.sleep(random.uniform(lo, hi))  # noqa: S311 -- jitter/sampling/shuffle, not security-sensitive
             else:
-                time.sleep(random.uniform(min(lo, 1.0), min(hi, 3.0)))
+                time.sleep(random.uniform(min(lo, 1.0), min(hi, 3.0)))  # noqa: S311 -- jitter/sampling/shuffle, not security-sensitive
         first = False
         status, called = phase_one(self, name, item, attempts)
         if name == "serpapi" and called:
@@ -207,7 +207,7 @@ def phase_interleave(
             self._note_scholar_skipped(item, attempts)
         else:
             if first == "scholar" and need_gap:
-                time.sleep(random.uniform(min(lo, 1.0), min(hi, 3.0)))
+                time.sleep(random.uniform(min(lo, 1.0), min(hi, 3.0)))  # noqa: S311 -- jitter/sampling/shuffle, not security-sensitive
                 need_gap = False
             status, called = phase_one(self, first, item, attempts)
             if status == "hit":

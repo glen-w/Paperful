@@ -5,9 +5,11 @@ do not write the library. Workbench forms write only after a review token
 (Grab fetches to disk; Attach and Apply write the catalogue). Optional extra:
 ``paperful[serve]``.
 
-Trust model: bind loopback only unless ``--allow-remote-bind``. There is no
-HTTP auth — anyone who can reach the port can drive Grab/Attach/Settings.
-See SECURITY.md.
+Trust model: bind loopback only unless ``--allow-remote-bind``. By default
+there is no HTTP auth — anyone who can reach the port can drive
+Grab/Attach/Settings. Setting ``PAPERFUL_UI_TOKEN`` (or ``--ui-token``)
+requires a bearer token on every request except ``/health``, which makes a
+deliberately exposed bind safer. See SECURITY.md.
 """
 
 from __future__ import annotations
@@ -22,7 +24,8 @@ SERVE_HINT = "paperful serve needs FastAPI. Install with: uv sync --extra serve"
 REMOTE_BIND_HINT = (
     "Refusing to bind {host!r} (not loopback). "
     "Pass --allow-remote-bind if you intentionally expose the workbench "
-    "(no auth; anyone who can reach the port can Grab/Attach/change Settings)."
+    "(no auth by default; set PAPERFUL_UI_TOKEN so only token holders can "
+    "Grab/Attach/change Settings)."
 )
 
 
@@ -34,7 +37,7 @@ def fastapi_available() -> bool:
     return True
 
 
-def create_app(cfg: Config) -> Any:
+def create_app(cfg: Config, *, ui_token: str | None = None) -> Any:
     """ASGI app. Import FastAPI only when the extra is installed."""
     from fastapi import FastAPI
 
@@ -81,8 +84,16 @@ def create_app(cfg: Config) -> Any:
 
     from .ui.app import mount_ui
     from .ui.origin_guard import OriginGuardMiddleware
+    from .ui.security_headers import SecurityHeadersMiddleware
+    from .ui.token_guard import TokenGuardMiddleware, ui_token_from_env
 
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(OriginGuardMiddleware)
+    token = ui_token_from_env() if ui_token is None else ui_token.strip()
+    if token:
+        # Added last so it runs first: reject unauthenticated requests
+        # before any origin or route handling.
+        app.add_middleware(TokenGuardMiddleware, token=token)
 
     mount_ui(app, cfg)
 
@@ -106,6 +117,7 @@ def run_server(
     host: str = "127.0.0.1",
     port: int = 8765,
     allow_remote_bind: bool = False,
+    ui_token: str | None = None,
 ) -> None:
     if not fastapi_available():
         raise RuntimeError(SERVE_HINT)
@@ -113,4 +125,4 @@ def run_server(
         raise RuntimeError(REMOTE_BIND_HINT.format(host=host))
     import uvicorn
 
-    uvicorn.run(create_app(cfg), host=host, port=port)
+    uvicorn.run(create_app(cfg, ui_token=ui_token), host=host, port=port)

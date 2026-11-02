@@ -58,7 +58,7 @@ def parse_bibtex(text: str) -> list[dict[str, Any]]:
         extra = ""
         if fields.get("pmid"):
             extra = f"PMID: {fields['pmid']}"
-        rec = {
+        rec: dict[str, Any] = {
             "item_type": bibtex_to_zotero(entry_type),
             "title": title.strip("{} "),
             "creators": [c for c in creators if c.get("lastName")],
@@ -113,9 +113,10 @@ def records_to_bibtex(records: list[dict[str, Any]]) -> str:
         if rec.get("pmid"):
             fields.append(("pmid", str(rec["pmid"])))
         tags = [
-            t.get("tag") if isinstance(t, dict) else t for t in (rec.get("tags") or [])
+            str(t.get("tag") or "") if isinstance(t, dict) else str(t or "")
+            for t in (rec.get("tags") or [])
         ]
-        tags = [str(t) for t in tags if t]
+        tags = [t for t in tags if t]
         if tags:
             fields.append(("keywords", ", ".join(tags)))
         pdfs = rec.get("pdfs") or []

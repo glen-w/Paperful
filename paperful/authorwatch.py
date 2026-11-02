@@ -22,6 +22,7 @@ from urllib.parse import urlparse
 from rich.console import Console
 from rich.table import Table
 
+from .fsio import atomic_write_json, atomic_write_text
 from .config import Config
 from .identity import from_seed_tag, library_lookup
 from .resolve import normalize_doi
@@ -191,19 +192,15 @@ def save_list(cfg: Config, name: str) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
     path = dest / "watch.json"
     if not path.is_file():
-        path.write_text(
-            json.dumps(
-                {
-                    "schema": SCHEMA,
-                    "name": name,
-                    "baseline_at": None,
-                    "last_run_at": None,
-                    "backfill_from": None,
-                },
-                indent=2,
-            )
-            + "\n",
-            encoding="utf-8",
+        atomic_write_json(
+            path,
+            {
+                "schema": SCHEMA,
+                "name": name,
+                "baseline_at": None,
+                "last_run_at": None,
+                "backfill_from": None,
+            },
         )
     for leaf, body in (
         ("people.jsonl", ""),
@@ -214,7 +211,7 @@ def save_list(cfg: Config, name: str) -> Path:
     ):
         target = dest / leaf
         if not target.is_file():
-            target.write_text(body, encoding="utf-8")
+            atomic_write_text(target, body)
     return path
 
 
@@ -236,7 +233,7 @@ def _write_watch(cfg: Config, name: str, body: dict[str, Any]) -> None:
     body = dict(body)
     body["schema"] = SCHEMA
     body["name"] = name
-    path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
+    atomic_write_json(path, body)
 
 
 def load_people(cfg: Config, name: str) -> list[Person]:

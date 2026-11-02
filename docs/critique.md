@@ -58,7 +58,8 @@ appears in many library texts is dropped. Do not narrate misconduct.
 
 ## CLI
 
-`--item KEY` and `--file PATH` are mutually exclusive. `--file` also accepts
+`--item KEY` and `--file PATH` are mutually exclusive. `-C` (or `--library`
+for the whole library) is the corpus for the overlap and context lanes. `--file` also accepts
 `csv` / `xlsx` / `xls` so PaperGuard can scan a table without a manuscript
 wrapper (`xlsx`/`xls` have no text extract; checkers see an empty document).
 
@@ -437,6 +438,8 @@ The wrapper passes `--lang en` (and `PAPERGUARD_LANG=en`); some detector
 summaries may still arrive in PaperGuard’s bundled language.
 
 ## Workbench
+
+![Critique in the workbench: Library item form, Upload a draft form, Recent packs](_static/workflows/critique.png)
 
 Advanced **Critique** (not on the default Wanted/Discover/Ask nav): pick an
 item from the collection chip **or** drop a file. Same checkers as the CLI.
