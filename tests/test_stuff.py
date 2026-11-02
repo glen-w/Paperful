@@ -244,10 +244,16 @@ def test_stuff_config_from_toml(tmp_path):
     assert resolve_lane(cfg, "manuscript") == "manuscript"
 
 
-def test_cli_requires_item_or_file():
-    res = CliRunner().invoke(app, ["stuff"])
-    assert res.exit_code == 1
-    out = (res.stdout or "") + (res.output or "")
+def test_cli_requires_item_or_file(cfg, tmp_path):
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\n'
+        f'state_dir = "{cfg.state_dir}"\n',
+        encoding="utf-8",
+    )
+    res = CliRunner().invoke(app, ["stuff", "--config", str(cfg_path)])
+    assert res.exit_code == 1, (res.stdout, res.stderr, res.exception)
+    out = f"{res.stdout or ''}{res.stderr or ''}{res.output or ''}"
     assert "--item" in out and "--file" in out
 
 

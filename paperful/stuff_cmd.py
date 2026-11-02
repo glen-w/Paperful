@@ -47,12 +47,12 @@ def run_stuff(
         write_pack,
     )
 
-    cfg = cli_mod._cfg(config)
-    json_out = cli_mod._agent_json(fmt)
     item_keys = [tok.strip() for tok in item if tok and str(tok).strip()]
     if bool(item_keys) == bool(file_path):
         console.print("[red]Pass exactly one of --item KEY or --file PATH.[/]")
         raise typer.Exit(1)
+    cfg = cli_mod._cfg(config)
+    json_out = cli_mod._agent_json(fmt)
     if file_path is not None and file_path.suffix.lower() not in SUPPORTED:
         console.print(
             "[red]Unsupported format. Save as pdf, txt, md, html, rtf, docx, "
