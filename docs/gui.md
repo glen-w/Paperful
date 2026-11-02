@@ -111,7 +111,10 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and still ha
    **Topic:** keyword search (`snowball search` dry-run queue), then open
    **Queue** for per-row Keep/Skip and **Preview apply** → **Add selected**
    (`snowball apply`, metadata only). Queue rows show **Why suggested** when
-   the candidate carries a `why` line. **Map** (on Queue) draws that queue
+   the candidate carries a `why` line. Advanced Topic can also set OpenAlex
+   **study designs** and **listed in** (trusted journal lists such as DOAJ or
+   MEDLINE). Membership is the maintainer’s list, not a quality score; works
+   with no journal list never match. **Map** (on Queue) draws that queue
    before you open a PDF: older + highly cited is foundational, recent +
    highly cited is influential, recent + fewer citations may be emerging.
    OpenAlex study designs (RCT, meta-analysis, …) appear as category badges

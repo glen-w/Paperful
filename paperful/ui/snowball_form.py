@@ -40,6 +40,7 @@ class DiscoverTopicPayload:
     refine: bool | None = None
     tags: tuple[str, ...] = ()
     study_designs: tuple[str, ...] | None = None
+    listed_in: tuple[str, ...] | None = None
     map_categories: tuple[str, ...] | None = None
     dedupe_scope: str | None = None
     dedupe_after: str | None = None
@@ -85,6 +86,15 @@ def _parse_study_designs(raw: object) -> tuple[str, ...] | None:
     from ..snowball.expand import parse_study_designs
 
     return parse_study_designs(text)
+
+
+def _parse_listed_in(raw: object) -> tuple[str, ...] | None:
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    from ..snowball.expand import parse_listed_in
+
+    return parse_listed_in(text)
 
 
 def _parse_map_categories(raw: object) -> tuple[str, ...] | None:
@@ -145,6 +155,7 @@ def parse_discover_topic(form: Mapping[str, Any], *, advanced: bool) -> Discover
         cites_query=str(form.get("cites_query") or "").strip(),
         languages=_opt_tuple(form.get("languages")),
         study_designs=_parse_study_designs(form.get("study_designs")),
+        listed_in=_parse_listed_in(form.get("listed_in")),
         map_categories=_parse_map_categories(form.get("map_categories")),
         min_seed_citations=_opt_int(form.get("min_seed_citations")),
         note_provenance=True if form.get("note_provenance") == "1" else None,
@@ -181,6 +192,7 @@ def build_request(cfg: Config, payload: DiscoverTopicPayload, collection: str) -
         cites_query=payload.cites_query,
         languages=payload.languages,
         study_designs=payload.study_designs,
+        listed_in=payload.listed_in,
         map_categories=payload.map_categories,
         min_seed_citations=payload.min_seed_citations,
         note_provenance=payload.note_provenance,
@@ -267,6 +279,8 @@ def profile_body_from_payload(
         body["languages"] = list(payload.languages)
     if payload.study_designs:
         body["study_designs"] = list(payload.study_designs)
+    if payload.listed_in:
+        body["listed_in"] = list(payload.listed_in)
     if payload.map_categories:
         body["map_categories"] = list(payload.map_categories)
     if payload.tags:

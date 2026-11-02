@@ -1779,7 +1779,9 @@ Phases, in order. Each can stop without the next.
    Semantic Scholar recommendations; combinable e.g. `refs+similar`), plus
    depth above 1 under the same caps. A finished queue with no `deferred.json`
    resumes into create / PDF fetch without searching OpenAlex again.
-4. **Config. Shipped:** `dedupe_scope`, type and venue filters, profile save,
+4. **Config. Shipped:** `dedupe_scope`, type and venue filters, OpenAlex
+   `listed_in` source-list allow filter (`--listed-in` / `[snowball].listed_in`;
+   membership, not a quality score), profile save,
    and CLI `--dedupe-scope` on crawl / `run` / `resume` / `apply` / `watch run`
    (`apply` still defaults to the full library).
 5. **Last pass. Shipped:** `hybrid`, `approve-each`, overlap ranking,

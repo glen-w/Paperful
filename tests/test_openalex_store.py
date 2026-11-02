@@ -925,6 +925,54 @@ def test_works_citing_api_first_skips_store():
     assert store.cite_calls == []
 
 
+def test_works_citing_listed_in_skips_store_on_budget():
+    def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
+        raise OpenAlexBudgetExceeded("OpenAlex daily budget is spent")
+
+    store = FakeStore(
+        [
+            {
+                "id": "https://openalex.org/Wciter",
+                "display_name": "High seas governance",
+                "cited_by_count": 3,
+            }
+        ],
+        cites={"Wseed": ["Wciter"]},
+    )
+    client = OpenAlexClient(
+        email="t@example.org", api_key="", sleep_s=0, getter=getter, store=store
+    )
+    client.listed_in = ("doaj",)
+    with pytest.raises(OpenAlexBudgetExceeded):
+        client.get("/works", {"search": "burn"})
+    rows = client.works_citing("Wseed", limit=10)
+    assert rows == []
+    assert store.cite_calls == []
+
+
+def test_works_citing_listed_in_budget_mid_call_does_not_use_store():
+    def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
+        raise OpenAlexBudgetExceeded("OpenAlex daily budget is spent")
+
+    store = FakeStore(
+        [
+            {
+                "id": "https://openalex.org/Wciter",
+                "display_name": "Citer",
+                "cited_by_count": 3,
+            }
+        ],
+        cites={"Wseed": ["Wciter"]},
+    )
+    client = OpenAlexClient(
+        email="t@example.org", api_key="", sleep_s=0, getter=getter, store=store
+    )
+    client.listed_in = ("medline",)
+    with pytest.raises(OpenAlexBudgetExceeded):
+        client.works_citing("Wseed", limit=10)
+    assert store.cite_calls == []
+
+
 def test_works_citing_budget_uses_store():
     def getter(path: str, params: dict[str, Any]) -> dict[str, Any]:
         raise OpenAlexBudgetExceeded("OpenAlex daily budget is spent")

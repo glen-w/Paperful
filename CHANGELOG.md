@@ -8,6 +8,15 @@ may still be added). See [releases](docs/releases.md).
 
 ### Added
 
+- **OpenAlex trusted journal lists:** snowball `--listed-in` /
+  `[snowball].listed_in` (`doaj`, `medline`, `jufo-3`, …) pushes
+  `filter=primary_location.source.listed_in:…` into OpenAlex search, citing,
+  keyword, and author queries, and keeps a client-side guard on candidates.
+  Family aliases (`cwts`, `jufo`, `norway`, `ki-jl`, `jpps`, `abdc`) expand
+  to every level. Default off; membership is the maintainer’s list, not a
+  quality score. See
+  [OpenAlex blog](https://blog.openalex.org/trusted-journal-lists-come-to-openalex/)
+  and [snowball stop rules](docs/snowball.md#stop-rules).
 - **`paperful stuff`.** Extra citations from the local RAG index per
   manuscript sentence (`--lane manuscript`) or outline section
   (`--lane outline`). `--item` / `--file`, `--k` capped by `[rag].top_k`.

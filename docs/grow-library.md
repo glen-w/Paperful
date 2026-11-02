@@ -30,7 +30,8 @@ The screenshots are the Discover page on a live `ocean/BBNJ` chip.
 ### Topic
 
 1. Open **Discover**. **Topic** is a keyword search (`snowball search`,
-   dry-run queue).
+   dry-run queue). Advanced can filter by OpenAlex study designs or trusted
+   journal lists (`listed_in`: DOAJ, MEDLINE, …).
 
 2. Type a query (for example `area based management`) and **Search**.
    Per-row Keep / Skip marks the queue. Nothing is written to Zotero yet.

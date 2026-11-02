@@ -11,7 +11,7 @@ are implemented, plus a frontier `digest` on a saved queue or watch.
 Optional [stopping rules](#stopping-rules) are off until you set them: one hop,
 then Keep/Skip, then `snowball continue`.
 Config honors `dedupe_scope`, `tag_prefix`, `default_tags`,
-`types`, `oa_only`, venues, `languages`, `min_seed_citations`,
+`types`, `oa_only`, venues, `listed_in`, `languages`, `min_seed_citations`,
 `note_provenance`, and `backends`. `--refine` writes query suggestions when
 `[llm]` is on and does not create items. `expand = cited_authors` stays off.
 Phases live in [ROADMAP](ROADMAP.md#snowball).
@@ -24,6 +24,7 @@ keys just created. How far one command reaches is [drawn below](#how-a-hop-is-cu
 
 ```text
 paperful snowball search "area based management tools" --year-from 2018
+paperful snowball search "marine spatial planning" --listed-in doaj,medline
 paperful snowball search "marine spatial planning" "offshore renewable energy"
 paperful snowball search msp ore --or
 paperful snowball doi 10.1038/s41586-021-03819-2 --depth 2 --direction both
@@ -415,6 +416,7 @@ The picture is [How a hop is cut](#how-a-hop-is-cut).
 | `cites_query` | unset | OpenAlex search on every reference batch and every cited-by request (title, abstract, or full text). Needs refs or cites in the direction, and depth of at least 1 |
 | `year_from` / `year_to` | unset | Drop candidates outside the window |
 | `study_designs` | unset | OpenAlex study design filter (`filter=study_designs.id:…`). OR several with `|` / repeated `--study-design`. Ids: `randomized-controlled-trial`, `clinical-trial`, `observational-study`, `case-report`, `systematic-review`, `meta-analysis`, `study-protocol`. Aliases: `rct`, `meta`, `sr`, `observational`, `protocol`, `case`, `trial`. Parents are included (every RCT is also a clinical trial). Untagged works (no abstract) never match. Also applied client-side after id hops. See [OpenAlex study designs](https://blog.openalex.org/filter-openalex-for-rcts-meta-analyses-and-systematic-reviews/) |
+| `listed_in` | unset | OpenAlex trusted journal lists (`filter=primary_location.source.listed_in:…`). OR several with `,` / `|` / repeated `--listed-in`. Ids are OpenAlex source-list slugs (`doaj`, `medline`, `jufo-3`, `latindex`, `scielo`, …). Family aliases expand to every level: `cwts` → `cwts-core`, `jufo`, `norway`, `ki-jl`, `jpps`, `abdc`. Membership is the maintainer’s list, not Paperful calling a journal good. Preprints, repositories, books, and backends without OpenAlex source metadata never match. Also applied client-side after id hops. Snapshot citing skips the parquet store when this filter is set. See [trusted journal lists](https://blog.openalex.org/trusted-journal-lists-come-to-openalex/) and [source-lists](https://help.openalex.org/data/source-lists/). Full catalog: [openalex.org/source-lists](https://openalex.org/source-lists) |
 | `types` | journal-article-shaped | OpenAlex / Zotero types |
 | `oa_only` | false | Metadata filter only. It does not change the PDF chain |
 | `min_seed_citations` | 0 | Skip cited-by expansion when the seed is below this count |
@@ -491,7 +493,7 @@ Schema `paperful.snowball.candidate.v1`:
 | `hop` | Integer. Search hits are 0. References of a seed are 1 |
 | `direction` | `search`, `refs`, `cites`, `keywords`, or `orcid` (the person’s own works) |
 | `ids` | Normalized doi, openalex, s2, pmid, orcid, when known |
-| `biblio` | Title, year, authors, venue, type, optional OA url, optional `study_designs` (OpenAlex slugs) |
+| `biblio` | Title, year, authors, venue, type, optional OA url, optional `study_designs` (OpenAlex slugs), optional `listed_in` (OpenAlex source-list ids) |
 | `why` | Short reason, for example `ref of 10.xxxx/yyyy` |
 | `status` | `new`, `exists`, `filtered`, or `error` |
 | `exists_match` | When `exists`: `item_key` and `doi` or `title_year` |
@@ -781,8 +783,10 @@ the daily budget is spent. Store cites-query matching is title-only (boolean
 `OR` / `AND` / `NOT` stay on the API). Fallback lookups that miss `timeout_s`
 (default 120s) count as failures; after `fail_limit` (default 3) the run skips
 further snapshot calls. Keywords / ORCID / full-text search still hit the live
-API. When the API daily budget is spent, DOI/id and citing keep using the
-snapshot; the rest pause for `resume`.
+API. Citing with `study_designs` or `listed_in` also stays on the live API
+(older dumps may lack those fields). When the API daily budget is spent,
+DOI/id and citing keep using the snapshot unless those filters are set; the
+rest pause for `resume`.
 
 Setup and TOML: [config Advanced](config.md#openalex-api-limits-and-snapshot-store).
 Roadmap for full search parity and campus HTTP hosting:

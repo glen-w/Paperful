@@ -514,6 +514,16 @@ StudyDesignOpt = typer.Option(
         "Aliases: rct, meta, sr, observational, protocol, case, trial."
     ),
 )
+ListedInOpt = typer.Option(
+    [],
+    "--listed-in",
+    help=(
+        "OpenAlex trusted journal list filter (repeatable or comma-separated). "
+        "Ids: doaj, medline, jufo-3, latindex, scielo, … "
+        "Family aliases: cwts, jufo, norway, ki-jl, jpps, abdc. "
+        "Membership is the maintainer’s list, not a quality score."
+    ),
+)
 CreateTagOpt = typer.Option(
     [],
     "--tag",
@@ -4103,6 +4113,7 @@ def snowball_search(
     search_keywords: bool | None = SearchKeywordsOpt,
     cites_query: str | None = CitesQueryOpt,
     study_design: list[str] = StudyDesignOpt,
+    listed_in: list[str] = ListedInOpt,
     or_mode: bool = typer.Option(
         False, "--or", help="Match any keyword (default: all)."
     ),
@@ -4159,6 +4170,7 @@ def snowball_search(
         search_keywords=search_keywords,
         cites_query=cites_query,
         study_design=study_design,
+        listed_in=listed_in,
         or_mode=or_mode,
         gate=gate,
         collection=collection,
@@ -4202,6 +4214,7 @@ def snowball_hybrid(
     search_keywords: bool | None = SearchKeywordsOpt,
     cites_query: str | None = CitesQueryOpt,
     study_design: list[str] = StudyDesignOpt,
+    listed_in: list[str] = ListedInOpt,
     or_mode: bool = typer.Option(
         False, "--or", help="Match any keyword (default: all)."
     ),
@@ -4246,6 +4259,7 @@ def snowball_hybrid(
         search_keywords=search_keywords,
         cites_query=cites_query,
         study_design=study_design,
+        listed_in=listed_in,
         or_mode=or_mode,
         gate=gate,
         collection=collection,
@@ -4286,6 +4300,7 @@ def snowball_doi(
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
     study_design: list[str] = StudyDesignOpt,
+    listed_in: list[str] = ListedInOpt,
     gate: str | None = typer.Option(
         None,
         "--gate",
@@ -4326,6 +4341,7 @@ def snowball_doi(
         keyword_min_score=keyword_min_score,
         cites_query=cites_query,
         study_design=study_design,
+        listed_in=listed_in,
         gate=gate,
         collection=collection,
         fetch_pdfs=fetch_pdfs,
@@ -4363,6 +4379,7 @@ def snowball_orcid(
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
     study_design: list[str] = StudyDesignOpt,
+    listed_in: list[str] = ListedInOpt,
     gate: str | None = typer.Option(
         None,
         "--gate",
@@ -4403,6 +4420,7 @@ def snowball_orcid(
         keyword_min_score=keyword_min_score,
         cites_query=cites_query,
         study_design=study_design,
+        listed_in=listed_in,
         gate=gate,
         collection=collection,
         fetch_pdfs=fetch_pdfs,
@@ -4440,6 +4458,7 @@ def snowball_collection(
     keyword_min_score: float | None = KeywordMinScoreOpt,
     cites_query: str | None = CitesQueryOpt,
     study_design: list[str] = StudyDesignOpt,
+    listed_in: list[str] = ListedInOpt,
     gate: str | None = typer.Option(
         None,
         "--gate",
@@ -4482,6 +4501,7 @@ def snowball_collection(
         keyword_min_score=keyword_min_score,
         cites_query=cites_query,
         study_design=study_design,
+        listed_in=listed_in,
         gate=gate,
         collection=collection,
         fetch_pdfs=fetch_pdfs,
@@ -4776,6 +4796,7 @@ def snowball_profile_save(
     search_keywords: bool | None = SearchKeywordsOpt,
     cites_query: str | None = CitesQueryOpt,
     study_design: list[str] = StudyDesignOpt,
+    listed_in: list[str] = ListedInOpt,
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     dedupe_scope: str = typer.Option("", "--dedupe-scope"),
@@ -4835,6 +4856,7 @@ def snowball_profile_save(
         search_keywords=search_keywords,
         cites_query=cites_query,
         study_design=study_design,
+        listed_in=listed_in,
         year_from=year_from,
         year_to=year_to,
         dedupe_scope=dedupe_scope,

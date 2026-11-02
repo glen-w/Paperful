@@ -147,6 +147,7 @@ class SnowballRequest:
     from_created_date: str | None = None
     cites_query: str = ""
     study_designs: tuple[str, ...] | None = None
+    listed_in: tuple[str, ...] | None = None
     map_categories: tuple[str, ...] | None = None
     map_category_defs: tuple[dict[str, Any], ...] | None = None
     dedupe_after: str | None = None
@@ -551,6 +552,11 @@ def _open_stop(
         if request.study_designs is None
         else request.study_designs
     )
+    lists = (
+        cfg.snowball_listed_in
+        if request.listed_in is None
+        else request.listed_in
+    )
     state = {
         "schema": SCHEMA,
         "rule": params.rule,
@@ -584,6 +590,7 @@ def _open_stop(
             "seed": seed,
             "types": list(types or ()),
             "study_designs": list(study or ()),
+            "listed_in": list(lists or ()),
             "oa_only": cfg.snowball_oa_only
             if request.oa_only is None
             else request.oa_only,
@@ -810,6 +817,7 @@ def run_continue(
         venue_exclude=tuple(crawl.get("venue_exclude") or ()),
         languages=tuple(crawl.get("languages") or ()),
         study_designs=tuple(crawl.get("study_designs") or ()),
+        listed_in=tuple(crawl.get("listed_in") or ()),
     )
     if lookup is not None:
         _mark_exists(new_rows, lookup)
@@ -1480,6 +1488,9 @@ def _snowball_prepare_queue(
         if request.study_designs is None
         else request.study_designs
     )
+    listed_in = (
+        cfg.snowball_listed_in if request.listed_in is None else request.listed_in
+    )
     try:
         direction = normalize_direction(request.direction)
     except ValueError:
@@ -1527,6 +1538,7 @@ def _snowball_prepare_queue(
         venue_exclude=venue_exclude,
         languages=languages,
         study_designs=tuple(study_designs or ()),
+        listed_in=tuple(listed_in or ()),
     )
     rows = truncate(rows, caps[0])
     if gate == "approve-batch" and not request.iterative:
@@ -1787,6 +1799,10 @@ def _execute(
         else request.study_designs
     )
     oa.study_designs = tuple(designs or ())
+    lists = (
+        cfg.snowball_listed_in if request.listed_in is None else request.listed_in
+    )
+    oa.listed_in = tuple(lists or ())
     if oa.progress is None:
         oa.progress = lambda message: console.print(paint(message))
     backends_early = _backends(cfg, request)
@@ -2320,6 +2336,11 @@ def _summary_meta(
     )
     if designs:
         meta["study_designs"] = list(designs)
+    lists = (
+        cfg.snowball_listed_in if request.listed_in is None else request.listed_in
+    )
+    if lists:
+        meta["listed_in"] = list(lists)
     map_cats = (
         cfg.snowball_map_categories
         if request.map_categories is None

@@ -481,6 +481,7 @@ concurrency = 2
 # default_tags = []
 # types = ["article", "review"]  # empty = journal-article-shaped
 # study_designs = []  # OpenAlex: rct, meta-analysis, systematic-review, …
+# listed_in = []  # OpenAlex source lists: doaj, medline, jufo-3, latindex, scielo. Family aliases: cwts, jufo, norway, ki-jl, jpps, abdc. See https://openalex.org/source-lists. Membership is not a quality score.
 # map_categories = ["evidence-synthesis", "trials", "clinical-trials", "observational", "case-reports", "protocols", "narrative-reviews", "preprints", "books", "commentary"]
 # map_category_defs = [
 #   { id = "preprints", label = "Preprints", any_types = ["preprint", "posted-content"] },

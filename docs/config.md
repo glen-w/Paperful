@@ -346,6 +346,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[stuff].lane` | `manuscript` | `manuscript` (sentences) or `outline` (sections). CLI `--lane` overrides |
 | `[snowball].default_tags` | `()` | Extra tags on snowball `--gate auto` / `apply` creates, with `--tag` and `from-<seed-slug>` |
 | `[snowball].study_designs` | `()` | OpenAlex study design filter (`rct`, `meta-analysis`, …). CLI `--study-design`. See [snowball stop rules](snowball.md#stop-rules) |
+| `[snowball].listed_in` | `()` | OpenAlex trusted journal lists (`doaj`, `medline`, `jufo-3`, …). CLI `--listed-in`. Family aliases `cwts`, `jufo`, `norway`, `ki-jl`, `jpps`, `abdc`. Membership is not a quality score. See [snowball stop rules](snowball.md#stop-rules) |
 | `[snowball].map_categories` | ten built-ins | Which literature-category ids appear on the citation map (badges/filters). Defaults include study-design ids (`evidence-synthesis`, `trials`, `clinical-trials`, …) and type ids (`preprints`, `books`, `narrative-reviews`, `commentary`). See [Citation map](snowball.md#citation-map) |
 | `[snowball].map_category_defs` | `()` | Extra category tables: `{ id, label, any_study_designs?, any_types?, color? }`. Ids listed here are appended to `map_categories` when that key is unset |
 | `[snowball].stop_rule` | `off` | `off`, `marginal_yield`, `asymptotic_coverage`, `budget`, or `any`. Off is one shot. A rule pauses for Keep/Skip between hops. CLI `--stop-rule`. See [snowball stopping rules](snowball.md#stopping-rules) |
@@ -541,7 +542,8 @@ finished slices). Store-side cites-query / `search=` filtering is
 Boolean `OR` / `AND` / `NOT` queries stay on the API. A fallback lookup that
 misses `timeout_s` (default 120) counts as a failure; after `fail_limit`
 (default 3) in one run, Paperful skips further snapshot calls. Keywords and
-ORCID stay API-only.
+ORCID stay API-only. Citing with `study_designs` or `listed_in` also stays
+API-only (older parquet may lack those fields).
 
 When the live API daily budget is spent, DOI/id and citing (with index) keep
 using the store; keyword / ORCID / full-text search still pause for

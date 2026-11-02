@@ -89,6 +89,9 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         study_designs=_profile_study_designs(raw.get("study_designs"))
         if "study_designs" in raw
         else None,
+        listed_in=_profile_listed_in(raw.get("listed_in"))
+        if "listed_in" in raw
+        else None,
         map_categories=_profile_map_categories(raw.get("map_categories"))
         if "map_categories" in raw
         else None,
@@ -139,6 +142,15 @@ def _profile_study_designs(raw: Any) -> tuple[str, ...]:
     from .expand import parse_study_designs
 
     return parse_study_designs(raw)
+
+
+def _profile_listed_in(raw: Any) -> tuple[str, ...]:
+    from .expand import parse_listed_in
+
+    try:
+        return parse_listed_in(raw)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
 
 
 def _profile_map_categories(raw: Any) -> tuple[str, ...]:

@@ -30,6 +30,7 @@ from paperful.snowball.expand import (
     cap_ids,
     clamp_depth,
     keyword_depth,
+    parse_listed_in,
     parse_study_designs,
     truncate,
 )
@@ -192,6 +193,78 @@ def test_parse_study_designs_aliases_and_reject_unknown():
     )
     with pytest.raises(ValueError, match="unknown study design"):
         parse_study_designs(["not-a-design"])
+
+
+def test_parse_listed_in_aliases_and_reject_garbage():
+    assert parse_listed_in(["doaj", "medline"]) == ("doaj", "medline")
+    assert parse_listed_in("cwts") == ("cwts-core",)
+    assert parse_listed_in("jufo") == ("jufo-1", "jufo-2", "jufo-3")
+    assert parse_listed_in("norway,ki-jl") == (
+        "norway-1",
+        "norway-2",
+        "ki-jl-1",
+        "ki-jl-2",
+        "ki-jl-3",
+    )
+    assert parse_listed_in("jpps|abdc-a-star") == (
+        "jpps-1",
+        "jpps-2",
+        "jpps-3",
+        "abdc-a-star",
+    )
+    assert parse_listed_in("abdc") == (
+        "abdc-a-star",
+        "abdc-a",
+        "abdc-b",
+        "abdc-c",
+    )
+    assert parse_listed_in("https://openalex.org/source-lists/doyens") == ("doyens",)
+    assert parse_listed_in("future-list-99") == ("future-list-99",)
+    assert parse_listed_in("core") == ("core",)
+    assert parse_listed_in("   ") == ()
+    with pytest.raises(ValueError, match="unknown listed_in"):
+        parse_listed_in(["DOAJ!!!"])
+
+
+def test_apply_filters_listed_in():
+    keep = _apply_filter_row(listed_in=["doaj", "medline"])
+    drop = _apply_filter_row(listed_in=["scielo"])
+    bare = _apply_filter_row()
+    out = apply_filters(
+        [keep, drop, bare],
+        year_from=None,
+        year_to=None,
+        types=(),
+        oa_only=False,
+        venue_include=(),
+        venue_exclude=(),
+        listed_in=("doaj", "jufo-3"),
+    )
+    assert out[0].status == "new"
+    assert out[1].status == "filtered"
+    assert "listed_in" in out[1].why
+    assert out[2].status == "filtered"
+
+
+def test_apply_filters_listed_in_keeps_error_and_exists():
+    keep = _apply_filter_row(listed_in=["doaj"])
+    error = _apply_filter_row()
+    error.status = "error"
+    exists = _apply_filter_row()
+    exists.status = "exists"
+    out = apply_filters(
+        [keep, error, exists],
+        year_from=None,
+        year_to=None,
+        types=(),
+        oa_only=False,
+        venue_include=(),
+        venue_exclude=(),
+        listed_in=("medline",),
+    )
+    assert out[0].status == "filtered"
+    assert out[1].status == "error"
+    assert out[2].status == "exists"
 
 
 def test_apply_filters_study_designs():
@@ -4039,6 +4112,53 @@ def test_openalex_search_uses_cursor_past_the_page_cap():
     assert pages == ["1"]
 
 
+def test_openalex_search_emits_listed_in_filter():
+    seen: dict[str, dict] = {}
+
+    def getter(path: str, params: dict) -> dict:
+        seen["path"] = path
+        seen["params"] = dict(params)
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    client.listed_in = ("doaj", "medline")
+    client.search("semaglutide", limit=10, year_from=2020, year_to=None)
+    filt = str(seen["params"].get("filter") or "")
+    assert "from_publication_date:2020-01-01" in filt
+    assert "primary_location.source.listed_in:doaj|medline" in filt
+
+
+def test_openalex_works_by_keywords_and_citing_honor_listed_in():
+    seen: list[str] = []
+
+    def getter(path: str, params: dict) -> dict:
+        seen.append(str(params.get("filter") or ""))
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    client.listed_in = ("jufo-3",)
+    client.works_by_keywords(["machine-learning"], limit=5)
+    client.works_citing("W1", limit=5)
+    client.works_by_author(orcid="0000-0002-1825-0097", limit=5)
+    assert all("primary_location.source.listed_in:jufo-3" in filt for filt in seen)
+    assert any("author.orcid:" in filt for filt in seen)
+
+
+def test_openalex_counts_by_year_emits_listed_in_filter():
+    seen: dict[str, dict] = {}
+
+    def getter(path: str, params: dict) -> dict:
+        seen["params"] = dict(params)
+        return {"group_by": [{"key": 2024, "count": 3}]}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    client.listed_in = ("doaj",)
+    rows = client.counts_by_year("ocean treaty")
+    filt = str(seen["params"].get("filter") or "")
+    assert "primary_location.source.listed_in:doaj" in filt
+    assert rows == [(2024, 3)]
+
+
 def test_openalex_search_emits_study_designs_filter():
     seen: dict[str, dict] = {}
 
@@ -4070,6 +4190,86 @@ def test_openalex_works_by_keywords_and_citing_honor_study_designs():
     client.works_by_author(orcid="0000-0002-1825-0097", limit=5)
     assert all("study_designs.id:systematic-review" in filt for filt in seen)
     assert any("author.orcid:" in filt for filt in seen)
+
+
+def test_config_and_profile_load_listed_in(tmp_path: Path):
+    from paperful.config import load_config
+    from paperful.snowball.profile import request_from_profile
+
+    path = tmp_path / "config.toml"
+    path.write_text(
+        'email = "t@example.org"\n'
+        f'out_dir = "{tmp_path / "out"}"\n'
+        f'state_dir = "{tmp_path / "state"}"\n'
+        "[snowball]\n"
+        "enabled = true\n"
+        'listed_in = ["doaj", "jufo"]\n',
+        encoding="utf-8",
+    )
+    cfg = load_config(path)
+    assert cfg.snowball_listed_in == ("doaj", "jufo-1", "jufo-2", "jufo-3")
+    req = request_from_profile(
+        {
+            "mode": "search",
+            "query": "semaglutide",
+            "listed_in": ["medline", "cwts"],
+        },
+        cfg,
+    )
+    assert req.listed_in == ("medline", "cwts-core")
+
+
+def test_config_rejects_garbage_listed_in(tmp_path: Path):
+    from paperful.config import load_config
+
+    path = tmp_path / "config.toml"
+    path.write_text(
+        'email = "t@example.org"\n'
+        f'out_dir = "{tmp_path / "out"}"\n'
+        f'state_dir = "{tmp_path / "state"}"\n'
+        "[snowball]\n"
+        "enabled = true\n"
+        'listed_in = ["DOAJ!!!"]\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="unknown listed_in"):
+        load_config(path)
+
+
+def test_cli_listed_in_flag_reaches_request(tmp_path: Path, monkeypatch):
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nstate_dir = "{tmp_path / "state"}"\n[snowball]\nenabled = true\n'
+    )
+    seen: list[object] = []
+
+    def fake_run_search(cfg, query, request, **kwargs):
+        seen.append(request)
+
+        class _Ok:
+            exit_code = 0
+
+        return _Ok()
+
+    monkeypatch.setattr("paperful.snowball.command.run_search", fake_run_search)
+    result = runner.invoke(
+        cli.app,
+        [
+            "snowball",
+            "search",
+            "msp",
+            "--listed-in",
+            "doaj",
+            "--listed-in",
+            "jufo",
+            "-c",
+            str(cfg_path),
+        ],
+    )
+    assert result.exit_code == 0, result.stdout + result.stderr
+    assert seen[0].listed_in == ("doaj", "jufo-1", "jufo-2", "jufo-3")
+    help_text = runner.invoke(cli.app, ["snowball", "search", "--help"])
+    assert "--listed-in" in plain_text(help_text.stdout)
 
 
 def test_config_and_profile_load_study_designs(tmp_path: Path):
@@ -4104,6 +4304,61 @@ def test_config_and_profile_load_study_designs(tmp_path: Path):
     )
     assert req.study_designs == ("systematic-review",)
     assert req.map_categories == ("protocols",)
+
+
+def test_work_to_candidate_maps_listed_in():
+    from paperful.snowball.openalex import work_to_candidate
+
+    row = work_to_candidate(
+        {
+            "id": "https://openalex.org/W9",
+            "doi": "https://doi.org/10.1000/doaj",
+            "display_name": "An OA paper",
+            "publication_year": 2024,
+            "type": "article",
+            "cited_by_count": 3,
+            "authorships": [],
+            "primary_location": {
+                "source": {
+                    "display_name": "PLOS ONE",
+                    "listed_in": [
+                        "doaj",
+                        "https://openalex.org/source-lists/medline",
+                    ],
+                }
+            },
+            "open_access": {},
+        },
+        run_id="r",
+        seed={"type": "keyword", "value": "x"},
+        hop=0,
+        direction="search",
+        why="hit",
+        gate="dry-run",
+    )
+    assert row.biblio["listed_in"] == ["doaj", "medline"]
+    assert row.biblio["venue"] == "PLOS ONE"
+
+    bare = work_to_candidate(
+        {
+            "id": "https://openalex.org/W10",
+            "doi": "https://doi.org/10.1000/preprint",
+            "display_name": "A preprint",
+            "publication_year": 2024,
+            "type": "preprint",
+            "cited_by_count": 0,
+            "authorships": [],
+            "primary_location": {},
+            "open_access": {},
+        },
+        run_id="r",
+        seed={"type": "keyword", "value": "x"},
+        hop=0,
+        direction="search",
+        why="hit",
+        gate="dry-run",
+    )
+    assert bare.biblio["listed_in"] == []
 
 
 def test_work_to_candidate_maps_study_designs():

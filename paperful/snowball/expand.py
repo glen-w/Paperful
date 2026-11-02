@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+import re
 from typing import Any, Callable
 
 from .candidate import Candidate
@@ -237,6 +238,70 @@ def normalize_study_design(raw: str) -> str:
     return text
 
 
+# OpenAlex source-list ids (https://help.openalex.org/data/source-lists/).
+# The catalog grows; unknown well-formed slugs pass through.
+LISTED_IN_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+LISTED_IN_ALIASES: dict[str, tuple[str, ...]] = {
+    "cwts": ("cwts-core",),
+    "jufo": ("jufo-1", "jufo-2", "jufo-3"),
+    "norway": ("norway-1", "norway-2"),
+    "ki-jl": ("ki-jl-1", "ki-jl-2", "ki-jl-3"),
+    "jpps": ("jpps-1", "jpps-2", "jpps-3"),
+    "abdc": ("abdc-a-star", "abdc-a", "abdc-b", "abdc-c"),
+}
+
+
+def listed_in_slug(raw: str) -> str:
+    """OpenAlex source-list id as a slug (``doaj``, ``jufo-3``)."""
+    text = str(raw or "").strip().lower().replace("_", "-").replace(" ", "-")
+    if "/source-lists/" in text:
+        text = text.rsplit("/source-lists/", 1)[-1]
+    return text.strip().strip("/")
+
+
+def normalize_listed_in(raw: str) -> tuple[str, ...]:
+    """Canonical OpenAlex ``listed_in`` slug(s), or raise ValueError."""
+    text = listed_in_slug(raw)
+    if not text:
+        raise ValueError("empty listed_in id")
+    expanded = LISTED_IN_ALIASES.get(text)
+    if expanded:
+        return expanded
+    if not LISTED_IN_SLUG.fullmatch(text):
+        raise ValueError(
+            f"unknown listed_in {raw!r}; use an OpenAlex source-list id "
+            "(doaj, medline, jufo-3, …) or a family alias "
+            "(cwts, jufo, norway, ki-jl, jpps, abdc)"
+        )
+    return (text,)
+
+
+def parse_listed_in(value: Any) -> tuple[str, ...]:
+    """Parse CLI/config source lists. Repeatable values, commas, and ``|`` are OR'd."""
+    if value is None:
+        return ()
+    parts: list[str] = []
+    if isinstance(value, str):
+        chunks = [value]
+    elif isinstance(value, (list, tuple)):
+        chunks = [str(item) for item in value if item is not None]
+    else:
+        chunks = [str(value)]
+    for chunk in chunks:
+        for token in re.split(r"[,|]", chunk):
+            text = token.strip()
+            if text:
+                parts.append(text)
+    out: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        for slug in normalize_listed_in(part):
+            if slug not in seen:
+                seen.add(slug)
+                out.append(slug)
+    return tuple(out)
+
+
 def parse_study_designs(value: Any) -> tuple[str, ...]:
     """Parse CLI/config study designs. Repeatable values and commas are OR'd."""
     if value is None:
@@ -279,6 +344,7 @@ def apply_filters(
     venue_exclude: tuple[str, ...],
     languages: tuple[str, ...] = (),
     study_designs: tuple[str, ...] = (),
+    listed_in: tuple[str, ...] = (),
 ) -> list[Candidate]:
     """Mark rejects ``filtered``. Drop rows with no DOI and no OpenAlex id."""
     allowed = {item.lower() for item in types} if types else set(JOURNAL_SHAPED)
@@ -286,6 +352,7 @@ def apply_filters(
     exclude = {item.lower() for item in venue_exclude}
     langs = {item.lower() for item in languages}
     wanted_designs = {item.lower() for item in study_designs if item}
+    wanted_lists = {item.lower() for item in listed_in if item}
     out: list[Candidate] = []
     for row in rows:
         if row.status == "error":
@@ -324,6 +391,14 @@ def apply_filters(
             }
             if not (carried & wanted_designs):
                 reasons.append("study_design")
+        if wanted_lists:
+            carried_lists = {
+                str(item).strip().lower()
+                for item in (row.biblio.get("listed_in") or [])
+                if str(item).strip()
+            }
+            if not (carried_lists & wanted_lists):
+                reasons.append("listed_in")
         if reasons:
             row.status = "filtered"
             note = ",".join(reasons)

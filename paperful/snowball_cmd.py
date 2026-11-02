@@ -39,6 +39,7 @@ def _snowball_request(
     cites_query: str | None = None,
     languages: str | None = None,
     study_designs: list[str] | str | None = None,
+    listed_in: list[str] | str | None = None,
     min_seed_citations: int | None = None,
     note_provenance: bool | None = None,
     backends: str | None = None,
@@ -55,7 +56,7 @@ def _snowball_request(
     stop_max_screened: int | None = None,
 ) -> Any:
     from .snowball.command import SnowballRequest
-    from .snowball.expand import parse_study_designs
+    from .snowball.expand import parse_listed_in, parse_study_designs
 
     if twenty_writeback is not None:
         cfg.twenty_writeback_listings = twenty_writeback
@@ -63,6 +64,13 @@ def _snowball_request(
     if study_designs:
         try:
             designs = parse_study_designs(study_designs)
+        except ValueError as exc:
+            cli_mod.console.print(f"[red]{exc}[/]")
+            raise typer.Exit(2) from exc
+    lists = None
+    if listed_in:
+        try:
+            lists = parse_listed_in(listed_in)
         except ValueError as exc:
             cli_mod.console.print(f"[red]{exc}[/]")
             raise typer.Exit(2) from exc
@@ -84,6 +92,7 @@ def _snowball_request(
         cites_query=(cites_query or "").strip(),
         languages=_csv(languages) if languages else None,
         study_designs=designs,
+        listed_in=lists,
         min_seed_citations=min_seed_citations,
         note_provenance=note_provenance,
         backends=_csv(backends) if backends else None,
@@ -239,6 +248,7 @@ def run_snowball_search(
     search_keywords: Any,
     cites_query: Any,
     study_design: Any,
+    listed_in: Any,
     or_mode: Any,
     gate: Any,
     collection: Any,
@@ -285,6 +295,7 @@ def run_snowball_search(
         cites_query=(cites_query or "").strip(),
         languages=languages,
         study_designs=study_design,
+        listed_in=listed_in,
         min_seed_citations=min_seed_citations,
         note_provenance=note_provenance,
         backends=backends,
@@ -329,6 +340,7 @@ def run_snowball_hybrid(
     search_keywords: Any,
     cites_query: Any,
     study_design: Any,
+    listed_in: Any,
     or_mode: Any,
     gate: Any,
     collection: Any,
@@ -373,6 +385,7 @@ def run_snowball_hybrid(
         cites_query=(cites_query or "").strip(),
         languages=languages,
         study_designs=study_design,
+        listed_in=listed_in,
         min_seed_citations=min_seed_citations,
         hybrid_seeds=hybrid_seeds,
         refine=refine,
@@ -415,6 +428,7 @@ def run_snowball_doi(
     keyword_min_score: Any,
     cites_query: Any,
     study_design: Any,
+    listed_in: Any,
     gate: Any,
     collection: Any,
     fetch_pdfs: Any,
@@ -454,6 +468,7 @@ def run_snowball_doi(
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
         study_designs=study_design,
+        listed_in=listed_in,
         tags=tag,
         dedupe_scope=dedupe_scope,
         dedupe_after=dedupe_after,
@@ -493,6 +508,7 @@ def run_snowball_orcid(
     keyword_min_score: Any,
     cites_query: Any,
     study_design: Any,
+    listed_in: Any,
     gate: Any,
     collection: Any,
     fetch_pdfs: Any,
@@ -532,6 +548,7 @@ def run_snowball_orcid(
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
         study_designs=study_design,
+        listed_in=listed_in,
         tags=tag,
         dedupe_scope=dedupe_scope,
         dedupe_after=dedupe_after,
@@ -568,6 +585,7 @@ def run_snowball_collection(
     keyword_min_score: Any,
     cites_query: Any,
     study_design: Any,
+    listed_in: Any,
     gate: Any,
     collection: Any,
     fetch_pdfs: Any,
@@ -607,6 +625,7 @@ def run_snowball_collection(
         keyword_min_score=keyword_min_score,
         cites_query=(cites_query or "").strip(),
         study_designs=study_design,
+        listed_in=listed_in,
         tags=tag,
         dedupe_scope=dedupe_scope,
         dedupe_after=dedupe_after,
@@ -931,6 +950,7 @@ def run_snowball_profile_save(
     search_keywords: Any,
     cites_query: Any,
     study_design: Any,
+    listed_in: Any,
     year_from: Any,
     year_to: Any,
     dedupe_scope: Any,
@@ -1066,6 +1086,13 @@ def run_snowball_profile_save(
 
         try:
             body["study_designs"] = list(parse_study_designs(study_design))
+        except ValueError as exc:
+            raise SnowballError(str(exc)) from exc
+    if listed_in:
+        from .snowball.expand import parse_listed_in
+
+        try:
+            body["listed_in"] = list(parse_listed_in(listed_in))
         except ValueError as exc:
             raise SnowballError(str(exc)) from exc
     if year_from is not None:

@@ -15,7 +15,7 @@ import httpx
 
 from ..resolve import normalize_doi
 from .candidate import Candidate
-from .expand import cap_ids
+from .expand import cap_ids, listed_in_slug
 from .local_openalex import store_can_apply_search, title_matches
 
 API = "https://api.openalex.org"
@@ -81,6 +81,7 @@ class OpenAlexClient:
         self.emit: Callable[[list[Any]], None] | None = None
         self.from_created_date: str | None = None
         self.study_designs: tuple[str, ...] = ()
+        self.listed_in: tuple[str, ...] = ()
         self._getter = getter
         self.store = store
         self.store_fail_limit = max(1, int(store_fail_limit))
@@ -109,6 +110,16 @@ class OpenAlexClient:
         if not cleaned:
             return None
         return "study_designs.id:" + "|".join(cleaned)
+
+    def _listed_in_filter(
+        self, listed_in: list[str] | tuple[str, ...] | None = None
+    ) -> str | None:
+        """OpenAlex ``primary_location.source.listed_in:a|b``. Client default, or an override."""
+        ids = listed_in if listed_in is not None else self.listed_in
+        cleaned = [str(item).strip() for item in (ids or ()) if str(item).strip()]
+        if not cleaned:
+            return None
+        return "primary_location.source.listed_in:" + "|".join(cleaned)
 
     def get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         if self._budget is not None:
@@ -316,6 +327,7 @@ class OpenAlexClient:
         year_to: int | None,
         from_created_date: str | None = None,
         study_designs: list[str] | tuple[str, ...] | None = None,
+        listed_in: list[str] | tuple[str, ...] | None = None,
     ) -> list[dict[str, Any]]:
         filters: list[str] = []
         if year_from is not None:
@@ -328,6 +340,9 @@ class OpenAlexClient:
         design = self._study_design_filter(study_designs)
         if design:
             filters.append(design)
+        lists = self._listed_in_filter(listed_in)
+        if lists:
+            filters.append(lists)
         params: dict[str, Any] = {"search": query, "select": SELECT}
         if filters:
             params["filter"] = ",".join(filters)
@@ -342,6 +357,7 @@ class OpenAlexClient:
         year_to: int | None = None,
         from_created_date: str | None = None,
         study_designs: list[str] | tuple[str, ...] | None = None,
+        listed_in: list[str] | tuple[str, ...] | None = None,
     ) -> list[tuple[int, int]]:
         """Publication-year histogram via OpenAlex ``group_by=publication_year``."""
         filters: list[str] = []
@@ -355,6 +371,9 @@ class OpenAlexClient:
         design = self._study_design_filter(study_designs)
         if design:
             filters.append(design)
+        lists = self._listed_in_filter(listed_in)
+        if lists:
+            filters.append(lists)
         params: dict[str, Any] = {
             "search": query,
             "group_by": "publication_year",
@@ -667,19 +686,27 @@ class OpenAlexClient:
         from_created_date: str | None = None,
         search: str | None = None,
         study_designs: list[str] | tuple[str, ...] | None = None,
+        listed_in: list[str] | tuple[str, ...] | None = None,
     ) -> list[dict[str, Any]]:
         """Works that cite ``openalex_id`` (OpenAlex ``filter=cites:``).
 
         On the live API, ``search`` is title/abstract/full text. From the
         snapshot cites index, ``search`` is title-only (``display_name``).
-        ``from_created_date`` and ``study_designs`` stay API-only.
+        ``from_created_date``, ``study_designs``, and ``listed_in`` stay API-only.
         """
         oa = short_id(openalex_id)
         if not oa:
             return []
-        # Store cannot apply created-date or study_design filters; skip when set
-        # unless the API is blocked (then title/year citing is better than nothing).
-        store_ok = not (from_created_date or study_designs) or self._api_blocked()
+        # Store cannot apply created-date or study_design filters; skip when
+        # set unless the API is blocked (then title/year citing is better than
+        # nothing). listed_in never uses the snapshot: old parquet lacks
+        # membership, and unfiltered citing would silently ignore the allow
+        # list.
+        designs = study_designs if study_designs is not None else self.study_designs
+        lists = listed_in if listed_in is not None else self.listed_in
+        store_ok = not (from_created_date or designs) or self._api_blocked()
+        if lists:
+            store_ok = False
         if not self._api_blocked():
             try:
                 return self._works_citing_api(
@@ -691,6 +718,7 @@ class OpenAlexClient:
                     from_created_date=from_created_date,
                     search=search,
                     study_designs=study_designs,
+                    listed_in=listed_in,
                 )
             except OpenAlexBudgetExceeded:
                 if not store_ok or not self._store_ready():
@@ -728,6 +756,7 @@ class OpenAlexClient:
         from_created_date: str | None = None,
         search: str | None = None,
         study_designs: list[str] | tuple[str, ...] | None = None,
+        listed_in: list[str] | tuple[str, ...] | None = None,
     ) -> list[dict[str, Any]]:
         filters = [f"cites:{oa}"]
         if year_from is not None:
@@ -740,6 +769,9 @@ class OpenAlexClient:
         design = self._study_design_filter(study_designs)
         if design:
             filters.append(design)
+        lists = self._listed_in_filter(listed_in)
+        if lists:
+            filters.append(lists)
         params: dict[str, Any] = {"filter": ",".join(filters), "select": SELECT}
         text = (search or "").strip()
         if text:
@@ -758,6 +790,7 @@ class OpenAlexClient:
         sort: str | None = None,
         from_created_date: str | None = None,
         study_designs: list[str] | tuple[str, ...] | None = None,
+        listed_in: list[str] | tuple[str, ...] | None = None,
     ) -> list[dict[str, Any]]:
         """Works carrying any of ``slugs``. ``limit`` must be a positive integer."""
         if limit <= 0:
@@ -779,6 +812,9 @@ class OpenAlexClient:
         design = self._study_design_filter(study_designs)
         if design:
             filters.append(design)
+        lists = self._listed_in_filter(listed_in)
+        if lists:
+            filters.append(lists)
         params: dict[str, Any] = {"filter": ",".join(filters), "select": SELECT}
         if sort:
             params["sort"] = sort
@@ -859,6 +895,7 @@ class OpenAlexClient:
         from_created_date: str | None = None,
         from_publication_date: str | None = None,
         study_designs: list[str] | tuple[str, ...] | None = None,
+        listed_in: list[str] | tuple[str, ...] | None = None,
         select: str | None = None,
     ) -> list[dict[str, Any]]:
         """Works for an ORCID or OpenAlex author id. Name-only is refused by callers."""
@@ -885,6 +922,9 @@ class OpenAlexClient:
         design = self._study_design_filter(study_designs)
         if design:
             filters.append(design)
+        lists = self._listed_in_filter(listed_in)
+        if lists:
+            filters.append(lists)
         self.stage = self.stage or f"OpenAlex author {label}"
         return self._collect(
             "/works",
@@ -1018,8 +1058,10 @@ def work_to_candidate(
     work_type = str(work.get("type") or "")
     loc = work.get("primary_location") or {}
     source = loc.get("source") or {}
+    listed_in: list[str] = []
     if isinstance(source, dict):
         venue = str(source.get("display_name") or "")
+        listed_in = listed_in_slugs(source)
     if work_type == "book-chapter" and venue:
         # OpenAlex source is usually the series; keep it off venue so Crossref
         # fill can set the book title, and stash series for ingest.
@@ -1049,6 +1091,7 @@ def work_to_candidate(
             "language": str(work.get("language") or ""),
             "cited_by_count": int(work.get("cited_by_count") or 0),
             "study_designs": study_design_slugs(work),
+            "listed_in": listed_in,
         },
         why=why,
         status="new",
@@ -1072,6 +1115,22 @@ def study_design_slug(raw: str) -> str:
     if "/study-designs/" in text:
         text = text.rsplit("/study-designs/", 1)[-1]
     return text.strip().strip("/").lower().replace(" ", "-").replace("_", "-")
+
+
+def listed_in_slugs(source: dict[str, Any]) -> list[str]:
+    """OpenAlex source-list ids on a dehydrated source (``doaj``, ``jufo-3``)."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in source.get("listed_in") or []:
+        if isinstance(item, dict):
+            raw = str(item.get("id") or item.get("display_name") or "")
+        else:
+            raw = str(item or "")
+        slug = listed_in_slug(raw)
+        if slug and slug not in seen:
+            seen.add(slug)
+            out.append(slug)
+    return out
 
 
 def study_design_slugs(work: dict[str, Any]) -> list[str]:

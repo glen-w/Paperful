@@ -333,6 +333,7 @@ class Config:
     snowball_default_tags: tuple[str, ...] = ()
     snowball_types: tuple[str, ...] = ()
     snowball_study_designs: tuple[str, ...] = ()
+    snowball_listed_in: tuple[str, ...] = ()
     # Citation-map literature categories (OpenAlex study designs + user rules).
     snowball_map_categories: tuple[str, ...] = (
         "evidence-synthesis",
@@ -850,6 +851,10 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         from .snowball.expand import parse_study_designs
 
         cfg.snowball_study_designs = parse_study_designs(raw["study_designs"])
+    if "listed_in" in raw:
+        from .snowball.expand import parse_listed_in
+
+        cfg.snowball_listed_in = parse_listed_in(raw["listed_in"])
     if "map_categories" in raw:
         from .snowball.map_categories import parse_map_categories
 

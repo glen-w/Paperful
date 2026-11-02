@@ -39,17 +39,29 @@ def test_advanced_parses_crawl_knobs():
     assert payload.languages == ("en", "fr")
 
 
+def test_advanced_rejects_garbage_listed_in():
+    import pytest
+
+    with pytest.raises(ValueError, match="unknown listed_in"):
+        parse_discover_topic(
+            {"kind": "search", "query": "BBNJ", "listed_in": "DOAJ!!!"},
+            advanced=True,
+        )
+
+
 def test_advanced_parses_map_categories_and_study_designs():
     payload = parse_discover_topic(
         {
             "kind": "search",
             "query": "GLP-1",
             "study_designs": "rct, meta-analysis",
+            "listed_in": "doaj, jufo",
             "map_categories": "trials, evidence-synthesis",
         },
         advanced=True,
     )
     assert payload.study_designs == ("randomized-controlled-trial", "meta-analysis")
+    assert payload.listed_in == ("doaj", "jufo-1", "jufo-2", "jufo-3")
     assert payload.map_categories == ("trials", "evidence-synthesis")
 
 
@@ -108,6 +120,7 @@ def test_compose_query_and_lists(cfg):
             "stop_max_screened": "10",
             "languages": "en",
             "study_designs": "rct",
+            "listed_in": "medline",
             "map_categories": "trials",
         },
         advanced=True,
@@ -117,6 +130,7 @@ def test_compose_query_and_lists(cfg):
     assert body["or"] is True
     assert body["refine"] is True
     assert body["tag"] == ["grey", "oa"]
+    assert body["listed_in"] == ["medline"]
 
     coll = parse_discover_topic({"kind": "collection", "seeds": "Other"}, advanced=True)
     body2 = profile_body_from_payload(coll, collection="")
