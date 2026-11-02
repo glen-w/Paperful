@@ -482,7 +482,8 @@ run misbehaves or you host infrastructure yourself.
 | `[summarize].prompt_template` | `default` | Or path to a custom prompt file (relative to the config file); its SHA is stamped in the note footer |
 | `[summarize].max_context_chars` | `24000` | Budget for PDF text sent to the model (head + headings + tail) |
 | `[summarize].tag` | `paperful-summary` | Zotero child-note tag; re-runs update the note carrying it |
-| `[synthesize].prompt_template` | `default` | Report prompt, or a path relative to the config file |
+| `[synthesize].prompt_template` | `default` | Report prompt, or a path relative to the config file. Wins over `layout` |
+| `[synthesize].layout` | `default` | Bundled report shape: `default` (Corpus/Themes/…), `conflict` (camps and methods), `review` (question → methods → findings → limits). Distinct from Ask `--focus`. CLI `--layout` wins for one run |
 | `[synthesize].max_context_chars` | `24000` | Budget for summary text in one model call (room left for the prompt) |
 | `[synthesize].tag` | `paperful-report` | Base tag on the collection note. A second tag `tag:<slug>` makes re-runs update |
 | `[synthesize].timeout_s` | `max([llm].timeout_s, 300)` | Per-completion timeout for the report |

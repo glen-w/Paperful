@@ -37,6 +37,7 @@ from .pages import (
     dest_options,
     ask_mode_options,
     focus_options,
+    layout_options,
     following_lists,
     last_ask_result,
     last_job_result,
@@ -292,6 +293,8 @@ def handle_page_index(
             synth_dest=dest_for_form(
                 ui.cfg.synthesize_dest, prefs_from_request(request).collection
             ),
+            layout_options=layout_options(),
+            synth_layout=ui.cfg.synthesize_layout,
         ),
     )
 
@@ -325,6 +328,16 @@ async def handle_index_synthesize(ui: UiContext, request: Request) -> RedirectRe
             url=ui.page_url("/index", error="collection"), status_code=303
         )
     force = form.get("force") == "1"
+    from ..synthesis_layouts import canonical_layout
+
+    try:
+        layout = canonical_layout(
+            str(form.get("layout") or "").strip() or ui.cfg.synthesize_layout
+        )
+    except ValueError:
+        return RedirectResponse(
+            url=ui.page_url("/index", error="layout"), status_code=303
+        )
 
     def work(cmd_id: str) -> None:
         jobs.synthesize(
@@ -337,6 +350,7 @@ async def handle_index_synthesize(ui: UiContext, request: Request) -> RedirectRe
             dest=dest,
             dry_run=dry_run,
             force=force,
+            layout=layout,
         )
 
     cmd_id = commands.enqueue(
@@ -350,6 +364,7 @@ async def handle_index_synthesize(ui: UiContext, request: Request) -> RedirectRe
             "year_to": year_to,
             "force": force,
             "dry_run": dry_run,
+            "layout": layout,
         },
     )
     return RedirectResponse(url=ui.page_url("/index", run=cmd_id), status_code=303)

@@ -186,6 +186,8 @@ the scope. **Synthesize** on Index when `[llm]` is on. **Extract sections**
 ![Ask: a cited answer from PDFs already on disk in ocean/BBNJ](_static/workflows/index-ask.png)
 
 **Briefs**: collection **summarize** / **synthesize** when `[llm]` is on.
+Synthesize has a **Layout** control (`default`, `conflict`, `review`; CLI
+`--layout`). Ask `--focus` stays on `/ask`.
 Per-item **summarize** in Wanted/Library drawers (Advanced). **Settings** writes
 `config.toml`; it does not enable `[rag]` or `[llm]`.
 **Critique** (Advanced): pick a collection item **or** drop a draft

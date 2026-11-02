@@ -605,6 +605,7 @@ def synthesize(
     dest: str,
     dry_run: bool,
     force: bool,
+    layout: str | None = None,
 ) -> None:
     if jobs.synthesize_fn is not None:
         result = jobs.synthesize_fn(
@@ -617,6 +618,7 @@ def synthesize(
             dest=dest,
             dry_run=dry_run,
             force=force,
+            layout=layout,
         )
         _attach_result(cfg, cmd_id, result)
         return
@@ -625,6 +627,7 @@ def synthesize(
     from ..llm import get_client
     from ..llm.preflight import validate_llm_for_verb
     from ..scope import load_scope
+    from ..synthesis_layouts import load_layout_prompt, resolve_layout
     from ..synthesize import (
         prepare_synthesis,
         report_is_current,
@@ -632,6 +635,8 @@ def synthesize(
     )
 
     validate_llm_for_verb(cfg)
+    if layout is not None and str(layout).strip():
+        cfg.synthesize_layout = resolve_layout(cfg, layout)
     if wants_zotero(dest) and not collection.strip() and not dry_run:
         raise ValueError("Pass a collection to file the Zotero note, or dest=disk.")
     backend = open_library(cfg)
@@ -658,6 +663,9 @@ def synthesize(
         slug_parts.append(collection)
     if year_from is not None or year_to is not None:
         slug_parts.append(f"{year_from or ''}-{year_to or ''}")
+    _text, layout_id, _label = load_layout_prompt(cfg)
+    if layout_id != "default":
+        slug_parts.append(layout_id)
     prepared = prepare_synthesis(cfg, items, backend, slug_parts)
     on_disk = sum(1 for src in prepared.sources if src.origin == "disk")
     from_note = sum(1 for src in prepared.sources if src.origin == "note")

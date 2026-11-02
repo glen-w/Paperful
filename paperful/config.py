@@ -282,6 +282,7 @@ class Config:
     ste_violation_policy: str = "warn"  # warn | fail
     ste_word_list_path: Path | None = None
     synthesize_prompt_template: str = "default"
+    synthesize_layout: str = "default"  # default | conflict | review
     synthesize_max_context_chars: int = 24_000
     synthesize_tag: str = "paperful-report"
     synthesize_dest: str = "both"  # disk | zotero | both
@@ -1093,6 +1094,7 @@ def parse_rag_embed_provider(value: str) -> str:
 
 _SUMMARIZE_ORDERS = frozenset({"library", "newest", "oldest"})
 _SUMMARIZE_STYLES = frozenset({"plain", "ste"})
+_SYNTHESIZE_LAYOUTS = frozenset({"default", "conflict", "review"})
 _STE_VIOLATION_POLICIES = frozenset({"warn", "fail"})
 _VALE_MIN_ALERT_LEVELS = frozenset({"suggestion", "warning", "error"})
 
@@ -1105,6 +1107,18 @@ def parse_summarize_order(value: str, *, key: str = "order") -> str:
     if order not in _SUMMARIZE_ORDERS:
         raise ValueError(f"config {key} {value!r} must be newest, oldest, or library")
     return order
+
+
+def parse_synthesize_layout(value: str, *, key: str = "layout") -> str:
+    """Normalise synthesize layout. Blank means default."""
+    layout = str(value).strip().lower()
+    if not layout:
+        return "default"
+    if layout not in _SYNTHESIZE_LAYOUTS:
+        raise ValueError(
+            f"config {key} {value!r} must be default, conflict, or review"
+        )
+    return layout
 
 
 def parse_summarize_style(value: str, *, key: str = "style") -> str:

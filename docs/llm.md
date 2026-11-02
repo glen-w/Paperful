@@ -384,16 +384,23 @@ uv run paperful synthesize -C BBNJ --force            # ignore the up-to-date si
   three (or fewer), forecasts whether three reduce passes can fit the budget,
   and may run one extra reduce on that sample. If the forecast still leaves
   more than one chunk, it exits 1 before the rest of the chunks run.
-- The builtin prompt asks for Corpus / Themes / Points of agreement /
-  Disagreements and tensions / Gaps and open questions / Suggested reading
-  order, citing only `[Surname Year]`. `--prompt FILE` overrides it; its SHA
-  is stamped in the footer.
+- Bundled `--layout` (or `[synthesize].layout`) chooses the HTML shape,
+  citing only `[Surname Year]`:
+  - `default` — Corpus / Themes / Points of agreement / Disagreements and
+    tensions / Gaps and open questions / Suggested reading order
+  - `conflict` — camps, methods behind each camp, what agrees / disagrees /
+    is undecided (no smoothed narrative)
+  - `review` — Abstract / Research question / Methods in this set / Findings /
+    Limits / Conclusions
+  `--prompt FILE` overrides the bundled layout; its SHA is stamped in the
+  footer. Distinct from Ask `--focus conflict` (RAG excerpts, not summaries).
 - After the model text, Paperful appends a **Sources** list (key, DOI, and
   the source note’s model and date), the **Not included** list, and any
   `[Surname Year]` token that matches no source.
 - Disk output is `state/reports/<slug>.html` plus a `<slug>.json` sidecar
   (`paperful.synthesis.v1`) of source hashes. A later run with the same
-  hashes and the same destination skips the model; `--force` regenerates.
+  hashes, layout, prompt SHA, and destination skips the model; `--force`
+  regenerates. Non-default layouts append the layout id to the slug.
 - Zotero output is one standalone note in each collection you named with
   `-C` (or in `--report-collection`), tagged `paperful-report` and
   `paperful-report:<slug>`. Re-runs update that note. `--library` or

@@ -17,21 +17,10 @@ from .dedupe import scope_slug
 from .library import LibraryBackend
 from .llm import CompletionRequest, ctx_tokens_for, llm_egress_is_remote
 from .summarize import to_note_html
+from .synthesis_layouts import load_layout_prompt
 from .zot import Item
 
 SCHEMA = "paperful.synthesis.v1"
-
-_DEFAULT_REPORT_PROMPT = """You are writing a literature review for a personal research library.
-Use ONLY the summaries below. Cite only as [Surname Year] from those blocks.
-If something is not covered, say "not covered". Do not invent papers or findings.
-Structure the review in simple HTML (no outer html/body tags, no Markdown, no code fences):
-<h2>Corpus</h2>
-<h2>Themes</h2>
-<h2>Points of agreement</h2>
-<h2>Disagreements and tensions</h2>
-<h2>Gaps and open questions</h2>
-<h2>Suggested reading order</h2>
-Use <p> and <ul><li>. Keep under 1200 words."""
 
 _CHUNK_PROMPT = """You are synthesising a batch of paper summaries for a later literature review.
 Use ONLY the summaries below. Keep citations exactly as [Surname Year].
@@ -100,11 +89,9 @@ def split_footer(raw_html: str) -> tuple[str, str]:
     return stripped[: match.start()].strip(), match.group("body").strip()
 
 
-def load_report_prompt(cfg: Config) -> tuple[str, str]:
-    if cfg.synthesize_prompt_template == "default":
-        return _DEFAULT_REPORT_PROMPT, "default"
-    path = Path(cfg.synthesize_prompt_template)
-    return path.read_text(encoding="utf-8"), str(path)
+def load_report_prompt(cfg: Config) -> tuple[str, str, str]:
+    """Return ``(text, layout_id, label)``. ``--prompt`` / a path wins."""
+    return load_layout_prompt(cfg)
 
 
 def cite_token(author: str, year: int | None) -> str:
@@ -195,7 +182,7 @@ def load_sources(
 
 def chunk_plan(cfg: Config, sources: list[SourceNote]) -> list[int]:
     """Character length of each first-level chunk. No model call."""
-    template, _ = load_report_prompt(cfg)
+    template, _layout, _label = load_report_prompt(cfg)
     chunks = pack_chunks(
         [source_block(src) for src in sources], body_budget(cfg, template)
     )
@@ -474,7 +461,7 @@ def render_synthesis(
     log=None,
 ) -> tuple[str, int, str]:
     """Return (full html, first-level chunk count, prompt sha)."""
-    template, _template_id = load_report_prompt(cfg)
+    template, _layout, _label = load_report_prompt(cfg)
     sha = hashlib.sha256(template.encode()).hexdigest()[:8]
     body, n_chunks = map_reduce(
         cfg,
@@ -525,6 +512,14 @@ def report_is_current(
     except (OSError, json.JSONDecodeError):
         return False
     if dest is not None and data.get("destinations") != destination_names(dest):
+        return False
+    _text, layout_id, _label = load_layout_prompt(cfg)
+    previous_layout = str(data.get("layout") or "default")
+    if previous_layout != layout_id:
+        return False
+    previous_sha = str(data.get("prompt_sha") or "")
+    current_sha = hashlib.sha256(_text.encode()).hexdigest()[:8]
+    if previous_sha and previous_sha != current_sha:
         return False
     previous = data.get("sources") or []
 
@@ -599,6 +594,7 @@ def build_sidecar(
     dest: str,
     note_keys: dict[str, str],
 ) -> dict:
+    _text, layout_id, label = load_layout_prompt(cfg)
     return {
         "schema": SCHEMA,
         "scope": scope,
@@ -606,6 +602,8 @@ def build_sidecar(
         "created_at": datetime.now(tz=timezone.utc).isoformat(),
         "model": cfg.llm_model,
         "prompt_sha": prompt_sha,
+        "layout": layout_id,
+        "prompt_label": label,
         "chunks": n_chunks,
         "sources": fingerprint(sources),
         "missing": [it.key for it in missing],

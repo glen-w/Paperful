@@ -35,6 +35,7 @@ from .pages import (
     dest_for_form,
     dest_options,
     focus_options,
+    layout_options,
     following_lists,
     last_ask_result,
     last_job_result,
@@ -347,11 +348,13 @@ def handle_page_briefs(
             reports=list_html_stems(ui.cfg.reports_dir),
             summarize_result=last_job_result(ui.cfg, "summarize", run),
             synthesize_result=synthesize_result,
+            layout_options=layout_options(),
             synth_form=briefs_synth_form(
                 request,
                 dest_default=ui.cfg.synthesize_dest,
                 collection=prefs.collection,
                 last=synthesize_result,
+                layout_default=ui.cfg.synthesize_layout,
             ),
             synth_via=str(request.query_params.get("via") or "").strip()
             == "synthesize",
@@ -420,6 +423,7 @@ async def handle_briefs_synthesize(ui: UiContext, request: Request) -> RedirectR
     raw_limit = str(form.get("limit") or "").strip()
     raw_year_from = str(form.get("year_from") or "").strip()
     raw_year_to = str(form.get("year_to") or "").strip()
+    raw_layout = str(form.get("layout") or "").strip()
     force = form.get("force") == "1"
 
     def bounce(error: str) -> RedirectResponse:
@@ -433,6 +437,7 @@ async def handle_briefs_synthesize(ui: UiContext, request: Request) -> RedirectR
                 synth_year_from=raw_year_from,
                 synth_year_to=raw_year_to,
                 synth_force="1" if force else "",
+                synth_layout=raw_layout,
             ),
             status_code=303,
         )
@@ -459,6 +464,12 @@ async def handle_briefs_synthesize(ui: UiContext, request: Request) -> RedirectR
 
     if wants_zotero(dest) and not prefs.collection and not dry_run:
         return bounce("collection")
+    from ..synthesis_layouts import canonical_layout
+
+    try:
+        layout = canonical_layout(raw_layout or ui.cfg.synthesize_layout)
+    except ValueError:
+        return bounce("layout")
 
     def work(cmd_id: str) -> None:
         jobs.synthesize(
@@ -471,6 +482,7 @@ async def handle_briefs_synthesize(ui: UiContext, request: Request) -> RedirectR
             dest=dest,
             dry_run=dry_run,
             force=force,
+            layout=layout,
         )
 
     cmd_id = commands.enqueue(
@@ -483,6 +495,7 @@ async def handle_briefs_synthesize(ui: UiContext, request: Request) -> RedirectR
             "year_from": year_from,
             "year_to": year_to,
             "force": force,
+            "layout": layout,
             "dry_run": dry_run,
         },
     )

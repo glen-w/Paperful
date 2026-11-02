@@ -94,6 +94,13 @@
     <label>Limit {{ info("Max summary notes to include. Leave blank for the whole scope.") }} <input type="number" name="limit" min="1" value="{{ synth_form.limit }}"></label>
     <label>Year from {{ info("Only summaries dated this year or later.") }} <input type="number" name="year_from" value="{{ synth_form.year_from }}"></label>
     <label>Year to {{ info("Only summaries dated this year or earlier.") }} <input type="number" name="year_to" value="{{ synth_form.year_to }}"></label>
+    <label>Layout {{ info("default: current review sections. conflict: camps and methods, no smoothed narrative. review: question → methods → findings → limits. Distinct from Ask --focus. --layout on the CLI.") }}
+      <select name="layout">
+        {% for layout in layout_options %}
+        <option value="{{ layout }}" {% if layout == synth_form.layout %}selected{% endif %}>{{ layout }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <label><input type="checkbox" name="force" value="1" {% if synth_form.force %}checked{% endif %}> Force {{ info("Regenerate even when a saved report used the same summary notes.") }}</label>
     {% if not prefs.collection %}
     <p class="counts">No collection in the chip — destination defaults to disk. Zotero or both needs a collection.</p>

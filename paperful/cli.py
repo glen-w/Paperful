@@ -3644,6 +3644,11 @@ def synthesize(
     prompt: Path | None = typer.Option(
         None, "--prompt", help="Override the report prompt file for this run."
     ),
+    layout: str | None = typer.Option(
+        None,
+        "--layout",
+        help="Report shape: default, conflict, or review. Default \\[synthesize].layout. Ignored when --prompt is set.",
+    ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show source counts and the chunk plan. No model call."
     ),
@@ -3672,6 +3677,7 @@ def synthesize(
         to_dest=_typer_enum_value(to),
         report_collection=report_collection,
         prompt=prompt,
+        layout=layout,
         dry_run=dry_run,
         force=force,
         year_from=year_from,

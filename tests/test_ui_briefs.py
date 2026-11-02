@@ -268,6 +268,60 @@ def test_briefs_synthesize_dry_run(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_briefs_synthesize_layout_conflict(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    import paperful.ui.app as ui_app
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    cfg.llm_enabled = True
+    monkeypatch.setattr(ops, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(ui_app, "doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(
+        ops, "collections_tree", lambda _c: {"ok": True, "collections": []}
+    )
+    seen: list[str] = []
+
+    def fake(cfg, cmd_id, **kw):
+        seen.append(str(kw.get("layout") or ""))
+        return {"dry_run": True, "slug": "ocean-bbnj-conflict", "chunks": 1}
+
+    jobs.synthesize_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        page = client.get("/briefs")
+        assert 'name="layout"' in page.text
+        assert "conflict" in page.text
+        res = client.post(
+            "/briefs/synthesize",
+            data={"dry_run": "1", "dest": "disk", "layout": "conflict"},
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        cmd_id = (res.headers.get("location") or "").split("run=")[1].split("&")[0]
+        deadline = time.time() + 3
+        rec = {}
+        while time.time() < deadline:
+            rec = client.get(f"/v1/runs/{cmd_id}").json()
+            if rec.get("status") in {"done", "failed"}:
+                break
+            time.sleep(0.02)
+        assert rec.get("status") == "done", rec
+        assert seen == ["conflict"]
+        bad = client.post(
+            "/briefs/synthesize",
+            data={"dry_run": "1", "dest": "disk", "layout": "novelty"},
+            follow_redirects=False,
+        )
+        assert bad.status_code == 303
+        assert "error=layout" in (bad.headers.get("location") or "")
+    finally:
+        jobs.synthesize_fn = None
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_briefs_write_report_defaults_to_disk_without_collection(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 

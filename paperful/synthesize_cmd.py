@@ -25,6 +25,7 @@ def run_synthesize(
     to_dest: str | None,
     report_collection: str | None,
     prompt: Path | None,
+    layout: str | None,
     dry_run: bool,
     force: bool,
     year_from: int | None,
@@ -88,6 +89,14 @@ def run_synthesize(
         )
     if prompt is not None:
         cfg.synthesize_prompt_template = str(prompt.expanduser().resolve())
+    if layout is not None and str(layout).strip():
+        from .synthesis_layouts import canonical_layout
+
+        try:
+            cfg.synthesize_layout = canonical_layout(layout)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/]")
+            raise typer.Exit(1) from exc
     backend = cli_mod._connect(cfg, quiet=json_out)
     loaded = cli_mod._load_scope(
         backend,
@@ -139,6 +148,11 @@ def run_synthesize(
     types = cli_mod._resolve_types(item_type)
     if types:
         slug_parts.extend(sorted(types))
+    from .synthesis_layouts import load_layout_prompt
+
+    _text, layout_id, _label = load_layout_prompt(cfg)
+    if layout_id != "default":
+        slug_parts.append(layout_id)
     with cli_mod._item_progress(json_out=json_out) as progress:
         prepared = prepare_synthesis(
             cfg,
@@ -242,6 +256,7 @@ def run_synthesize(
             "included": len(sources),
             "missing": len(missing),
             "slug": slug,
+            "layout": layout_id,
         },
     )
     report["summary"]["included"] = len(sources)
@@ -258,7 +273,7 @@ def run_synthesize(
             "chunks": n_chunks,
         },
         paths={"report": str(path) if path else ""},
-        flags={"to": dest, "slug": slug},
+        flags={"to": dest, "slug": slug, "layout": layout_id},
     )
     cli_mod._emit_agent(
         payload,

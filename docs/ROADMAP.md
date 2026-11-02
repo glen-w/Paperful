@@ -349,7 +349,8 @@ Ask stays optional; whether it stays third on the default nav is open.
   - A **conflicting-evidence** `synthesize` layout (already adjacent to
     `gaps` and “what is contested”) that names the camps, the methods that
     disagree, and the passages — not a single smoothed narrative. Ask
-    `--focus conflict` is **shipped**; the synthesize layout is still later.
+    `--focus conflict` is **shipped**; synthesize `--layout conflict` /
+    `review` is **shipped** (Ask RAG vs summary-note briefs stay separate).
   - A **review-shaped** synthesize layout (question → methods in the set →
     findings → limits), closer to Edison’s “report with abstract and
     conclusions” than a chat dump. Same note provenance as today.
@@ -567,7 +568,7 @@ until Wanted is honest. Do not grow 1.x into a second product.
 | Refuse the sentence if you cannot click the passage (`has_successful_answer`) | Synthesize / critique | Copy test, not a world-model store | Edison borrow #4 above |
 | Split **novelty pack** from **synthesis** before any outline | Novelty vs synthesize | Stamp `held` vs `public-metadata-only`; never “nobody has done this” | Wave 4 (shipped: `paperful precedent`) |
 | Continuation / cheap vs high-effort as a **user-visible** Ask control | Synthesize | Local model; do not claim LABBench wins | [Ask](#after-110-briefs-ask) |
-| Conflicting-evidence `synthesize` (question → methods → findings → limits) over **your** PDFs | Synthesize | Held full text only | [Briefs](#after-110-briefs-ask) |
+| Conflicting-evidence `synthesize` (question → methods → findings → limits) over **your** PDFs. **Shipped** as `--layout conflict` / `review` | Synthesize | Held full text only | [Briefs](#after-110-briefs-ask) |
 | Figure/table **pullouts** (caption + page + stem), not generated artwork | Extract | Publisher bans on genAI primary images | [Briefs](#after-110-briefs-ask) |
 | `stuff`: sentence or outline section → `rag search`; extra cites enter **Zotero before** `\cite`; no invented BibTeX. **CLI shipped**; `--apply` later | Write | Fail closed if index empty | [`stuff`](#stuff-later-extra-citations-from-the-library) |
 | PRISMA **counts** in the run report; watch **drift** hash; export Discover / import `included.csv` | Screen / keep current | Counts only; no fake recall % | [Snowballing](#after-110-snowball-review) |

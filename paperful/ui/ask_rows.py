@@ -27,6 +27,7 @@ ASK_ERROR_MESSAGES = {
     "scope": "Pick a collection, item keys, or whole library.",
     "upload": "Upload is empty or too large.",
     "type": "Item type filter is invalid.",
+    "layout": "Layout must be default, conflict, or review.",
 }
 
 SUMMARIZE_ORDERS = ("library", "newest", "oldest")
@@ -358,6 +359,7 @@ def briefs_synth_form(
     dest_default: str,
     collection: str,
     last: dict[str, Any],
+    layout_default: str = "default",
 ) -> dict[str, Any]:
     """Filters for the Briefs synthesize form (query string, then last job, then dest default)."""
     qp = getattr(request, "query_params", {}) or {}
@@ -383,12 +385,23 @@ def briefs_synth_form(
             arg_dest if arg_dest in DEST_OPTIONS else dest_default,
             collection,
         )
+    q_layout = str(qp.get("synth_layout") or "").strip().lower()
+    if q_layout in {"default", "conflict", "review"}:
+        layout = q_layout
+    else:
+        arg_layout = str(args.get("layout") or "").strip().lower()
+        layout = (
+            arg_layout
+            if arg_layout in {"default", "conflict", "review"}
+            else str(layout_default or "default")
+        )
     return {
         "dest": dest,
         "limit": pick("limit"),
         "year_from": pick("year_from"),
         "year_to": pick("year_to"),
         "force": pick("force") in {"1", "true", "True"},
+        "layout": layout,
     }
 
 
@@ -403,6 +416,12 @@ def briefs_page_flags(cfg: Config) -> dict[str, Any]:
         "synthesize_dest": cfg.synthesize_dest,
         "summarize_order": cfg.summarize_order,
     }
+
+
+def layout_options() -> list[str]:
+    from ..synthesis_layouts import KNOWN_LAYOUTS
+
+    return list(KNOWN_LAYOUTS)
 
 
 def focus_options() -> list[str]:

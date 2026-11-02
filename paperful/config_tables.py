@@ -407,6 +407,11 @@ def apply_synthesize(raw: dict[str, Any], cfg: "Config") -> None:
                 lambda v: str(v).strip(),
             ),
             (
+                "layout",
+                "synthesize_layout",
+                lambda v: C.parse_synthesize_layout(v, key="[synthesize].layout"),
+            ),
+            (
                 "max_context_chars",
                 "synthesize_max_context_chars",
                 lambda v: max(1000, int(v)),

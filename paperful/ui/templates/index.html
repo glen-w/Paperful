@@ -145,6 +145,13 @@
     <label>Year from {{ info("Only summaries dated this year or later.") }} <input type="number" name="year_from"></label>
     <label>Year to {{ info("Only summaries dated this year or earlier.") }} <input type="number" name="year_to"></label>
     <label>Limit {{ info("Max summary notes to include. Leave blank for the whole scope.") }} <input type="number" name="limit" min="1"></label>
+    <label>Layout {{ info("default, conflict, or review. Distinct from Ask --focus.") }}
+      <select name="layout">
+        {% for layout in layout_options %}
+        <option value="{{ layout }}" {% if layout == synth_layout %}selected{% endif %}>{{ layout }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <label><input type="checkbox" name="force" value="1"> Force {{ info("Regenerate even when a saved report used the same summary notes.") }}</label>
     <button type="submit" name="dry_run" value="1"{% if synthesize_result.status == 'queued' or synthesize_result.status == 'running' %}{% if synthesize_result.args.dry_run %} data-poll-button{% endif %}{% endif %}>Preview</button>
     {{ info("Show source counts and the chunk plan. No model call.") }}
