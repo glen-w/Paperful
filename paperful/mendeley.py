@@ -75,7 +75,11 @@ class MendeleyClient:
 
     def __init__(self, cfg: Config, http: httpx.Client | None = None):
         self.cfg = cfg
-        self.http = http or httpx.Client(timeout=60.0, follow_redirects=True)
+        from .http import client as http_client
+
+        self.http = http or http_client(
+            timeout=60.0, follow_redirects=True, retries=0, guard=True
+        )
         self._own_http = http is None
         self._tokens: dict[str, Any] | None = None
         self._lock = threading.Lock()

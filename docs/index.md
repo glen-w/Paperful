@@ -56,6 +56,7 @@ endnote
 adapters
 sources
 screen
+sr-mode
 critique
 rewrite
 stuff

@@ -48,6 +48,7 @@ def search_query(
     getter: Any = None,
     cache_dir: Path | None = None,
     pages: int | None = None,
+    errors: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Generic SearXNG JSON search. Empty when ``[searxng].base_url`` is unset.
 
@@ -71,6 +72,12 @@ def search_query(
         payload = _cached_search(
             base, q, getter=getter, cache_dir=folder, pageno=pageno
         )
+        if (
+            errors is not None
+            and isinstance(payload, dict)
+            and payload.get("paperful_engine") == "suspended"
+        ):
+            errors.append(payload)
         results = payload.get("results") if isinstance(payload, dict) else []
         got = 0
         for row in results or []:
@@ -163,15 +170,23 @@ def _http_search(base: str, query: str, *, pageno: int = 1) -> dict[str, Any]:
     params = {"q": query, "format": "json", "pageno": max(1, int(pageno or 1))}
     for attempt in range(3):
         try:
-            with httpx.Client(timeout=20.0, follow_redirects=True) as client:
+            from ..http import client as http_client
+
+            with http_client(
+                timeout=20.0, follow_redirects=True, retries=0, guard=False
+            ) as client:
                 resp = client.get(url, params=params)
-            if resp.status_code >= 500:
+            if resp.status_code >= 500 or resp.status_code == 429:
                 time.sleep(0.5 * (2**attempt))
                 continue
             if resp.status_code >= 400:
-                return {}
+                return {
+                    "results": [],
+                    "paperful_engine": "suspended",
+                    "status": resp.status_code,
+                }
             data = resp.json()
             return data if isinstance(data, dict) else {}
         except (httpx.HTTPError, json.JSONDecodeError, ValueError):
             time.sleep(0.5 * (2**attempt))
-    return {}
+    return {"results": [], "paperful_engine": "suspended", "status": 0}

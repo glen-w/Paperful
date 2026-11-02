@@ -136,11 +136,21 @@ def _attach_operator_line(code: str) -> str:
     return ""
 
 
+def _miss_reason(attempts: list[str]) -> str:
+    from .miss_reasons import reason_from_attempts
+
+    return reason_from_attempts(attempts)
+
+
 def make_client(cfg: Config) -> httpx.Client:
-    client = httpx.Client(
+    from .http import client as http_client
+
+    client = http_client(
         headers={"User-Agent": cfg.user_agent, "Accept-Language": "en-US,en;q=0.9"},
         follow_redirects=True,
         timeout=30,
+        retries=0,
+        guard=True,
         limits=httpx.Limits(max_connections=cfg.concurrency_oa + 2),
     )
     apply_netscape_cookies(client, vault_cookies_path(cfg))
@@ -462,8 +472,12 @@ class Pipeline:
         self.release_browser()
         try:
             self.client.close()
-        except Exception:  # noqa: S110 -- best-effort cleanup; intentionally ignored
-            pass
+        except Exception:
+            from .log import get_logger
+
+            get_logger("paperful.pipeline").debug(
+                "HTTP client close failed", exc_info=True
+            )
         self.client = make_client(self.cfg)
         self.ctx = Context(config=self.cfg, client=self.client, browser=self.browser)
         self._ezproxy_down = False
@@ -1115,13 +1129,20 @@ class Pipeline:
                 for a in attempts
             )
             if not recover_done:
-                self._record(item, STATUS_RETRYABLE, attempts, reason="soft block")
+                reason = (
+                    "html_not_pdf"
+                    if _miss_reason(attempts) == "html_not_pdf"
+                    else "soft block"
+                )
+                self._record(item, STATUS_RETRYABLE, attempts, reason=reason)
             elif any(":captcha" in a for a in attempts):
                 self._record(item, STATUS_CAPTCHA, attempts, reason="bot wall")
             else:
                 self._record(item, STATUS_NOT_FOUND, attempts, reason=REASON_CLOSED)
         elif any(":license_blocked" in a for a in attempts):
             self._record(item, STATUS_NOT_FOUND, attempts, reason="license_blocked")
+        elif (miss := _miss_reason(attempts)) in {"host_blocked", "html_not_pdf"}:
+            self._record(item, STATUS_NOT_FOUND, attempts, reason=miss)
         elif any(":captcha" in a for a in attempts):
             self._record(item, STATUS_CAPTCHA, attempts, reason="bot wall")
         elif any(

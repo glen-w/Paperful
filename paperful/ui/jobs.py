@@ -598,6 +598,11 @@ def critique(
                     if not scope_items:
                         scope_items = items
                 except Exception:
+                    from ..log import get_logger
+
+                    get_logger("paperful.ui.jobs").warning(
+                        "scope load failed", exc_info=True
+                    )
                     target = None
         if backend is None and (apply or key):
             try:
@@ -605,6 +610,11 @@ def critique(
 
                 backend = open_library(cfg)
             except Exception:
+                from ..log import get_logger
+
+                get_logger("paperful.ui.jobs").warning(
+                    "library open failed", exc_info=True
+                )
                 backend = None
     if key and target is None:
         rec = commands.read_command(cfg, cmd_id) or {}
@@ -894,6 +904,11 @@ def stuff(
                 items = loaded.items
                 target = items[0] if items else None
             except Exception:
+                from ..log import get_logger
+
+                get_logger("paperful.ui.jobs").warning(
+                    "scope load failed", exc_info=True
+                )
                 target = None
         if target is None:
             fail("item not in the mirror / scope")

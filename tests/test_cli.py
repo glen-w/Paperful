@@ -157,7 +157,7 @@ def test_run_uses_mirror_when_manager_is_down(cfg_file, tmp_path, monkeypatch):
     res = runner.invoke(
         cli.app,
         ["run", "-c", str(cfg_file), "--library", "--dry-run"],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert res.exit_code == 0, res.stdout
     assert "not reachable" in res.stdout
@@ -211,7 +211,7 @@ def test_run_dry_run_lists_items_and_writes_nothing(cfg_file, stub_zotero, tmp_p
     res = runner.invoke(
         cli.app,
         ["run", "-c", str(cfg_file), "--collection", "BBNJ/EIA / SEA", "--dry-run"],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert res.exit_code == 0, res.stdout
     assert (
@@ -247,7 +247,7 @@ def test_run_year_range_filters_items(cfg_file, stub_zotero):
             "2026",
             "--dry-run",
         ],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert res.exit_code == 0, res.stdout
     assert "years 2023–2026" in res.stdout
@@ -279,7 +279,7 @@ def test_run_type_filter(cfg_file, stub_zotero):
             "Journal Article",
             "--dry-run",
         ],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert res.exit_code == 0, res.stdout
     assert "types journalArticle" in res.stdout
@@ -322,7 +322,7 @@ def test_run_scihub_opt_in_appends_and_prints_disclaimer(cfg_file, stub_zotero):
     res = runner.invoke(
         cli.app,
         ["run", "-c", str(cfg_file), "--library", "--dry-run", "--scihub"],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert res.exit_code == 0, res.stdout
     sources_line = res.stdout.split("Sources:")[-1].split("\n")[0]
@@ -348,7 +348,7 @@ def test_run_drops_scihub_when_year_from_past_coverage(cfg_file, stub_zotero):
             "--year-to",
             "2026",
         ],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert res.exit_code == 0, res.stdout
     sources_line = res.stdout.split("Sources:")[-1].split("\n")[0]
@@ -370,7 +370,7 @@ def test_run_scihub_via_sources_override_prints_disclaimer(cfg_file, stub_zotero
             "--sources",
             "unpaywall,scihub",
         ],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert res.exit_code == 0, res.stdout
     assert SCIHUB_DISCLAIMER in res.stdout
@@ -845,13 +845,13 @@ def test_run_skips_already_handled_items(cfg_file, stub_zotero, tmp_path):
     res = runner.invoke(
         cli.app,
         ["run", "-c", str(cfg_file), "--library", "--dry-run"],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert "2 already handled" in res.stdout and "0 to process" in res.stdout
     res2 = runner.invoke(
         cli.app,
         ["run", "-c", str(cfg_file), "--library", "--dry-run", "--retry-failed"],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert "1 to process" in res2.stdout
 
@@ -895,7 +895,7 @@ def test_report_empty_and_populated(cfg_file, tmp_path):
         )
     )
     res = runner.invoke(
-        cli.app, ["report", "-c", str(cfg_file), "--not-found"], env={"COLUMNS": "200"}
+        cli.app, ["report", "-c", str(cfg_file), "--not-found"], env={"COLUMNS": "320"}
     )
     assert res.exit_code == 0
     assert (
@@ -1731,7 +1731,7 @@ def test_run_dry_run_appends_recover_lane(tmp_path, stub_zotero, monkeypatch):
     res = runner.invoke(
         cli.app,
         ["run", "-c", str(cfg_file), "--library", "--dry-run"],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert res.exit_code == 0, res.stdout
     sources_line = res.stdout.split("Sources:")[-1].split("\n")[0]
@@ -1751,7 +1751,7 @@ def test_run_dry_run_skips_recover_lane_when_during_run_off(
     res = runner.invoke(
         cli.app,
         ["run", "-c", str(cfg_file), "--library", "--dry-run"],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert res.exit_code == 0, res.stdout
     sources_line = res.stdout.split("Sources:")[-1].split("\n")[0]
@@ -1769,7 +1769,7 @@ def test_run_dry_run_skips_recover_lane_with_cli_flag(
     res = runner.invoke(
         cli.app,
         ["run", "-c", str(cfg_file), "--library", "--dry-run", "--no-browser-agent"],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert res.exit_code == 0, res.stdout
     sources_line = res.stdout.split("Sources:")[-1].split("\n")[0]
@@ -1787,7 +1787,7 @@ def test_run_dry_run_forces_recover_lane_with_cli_flag_when_config_off(
     res = runner.invoke(
         cli.app,
         ["run", "-c", str(cfg_file), "--library", "--dry-run", "--browser-agent"],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert res.exit_code == 0, res.stdout
     sources_line = res.stdout.split("Sources:")[-1].split("\n")[0]

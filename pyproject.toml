@@ -1,6 +1,6 @@
 [project]
 name = "paperful"
-version = "1.7.0"
+version = "1.8.0"
 description = "Find missing PDFs for a Zotero library: clean records, summarise papers, keep a platform-agnostic mirror."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -289,6 +289,9 @@ ignore_missing_imports = true
 warn_unused_ignores = true
 files = [
     "paperful/fsio.py",
+    "paperful/http.py",
+    "paperful/log.py",
+    "paperful/miss_reasons.py",
     "paperful/config_check.py",
     "paperful/update_check.py",
     "paperful/sr_cmd.py",

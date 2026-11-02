@@ -6,6 +6,18 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.8.0 — 2026-11-02
+
+Decision log: `docs/plans/1.8-wave.md`.
+
+- **Crash-safe append.** Manifest, screening, RAG ingest, the mirror index, and search-watch inbox lines go through `fsio.append_jsonl` (fsync). A torn last line is skipped. Checkpoints still use atomic replace.
+- **HTTP client.** `paperful.http` checks fetchable URLs before send and does not retry 401 or 403. `run` uses it with the existing PDF retry loop. SearXNG stays unguarded so a local engine still works.
+- **Logging.** `paperful.log` redacts bearer tokens. `-v` / `--verbose` turns on debug logs. Job and pipeline failures that used to be swallowed are logged.
+- **CLI split.** Typer signatures live in `paperful/cli_bind.py`. `paperful/cli.py` keeps the app tree.
+- **Systematic review.** `sr init --reason` sets the exclude list. An exclude reason off that list exits 1. `sr status` prints a reason histogram and writes `prisma.json` / `prisma.svg` from exact counts. `sr export` / `sr import` speak CSV and RIS (Covidence, Rayyan, and ASReview column names on the CSV). Import is a dry-run until `--apply`. `--collection` with `--apply` can create included parents. Advanced `/review` is not on the nav.
+- **Grey misses.** A fetch that dies on HTTP 401/403 is `host_blocked`. An HTML body after a found URL is `html_not_pdf` and stays retryable. A SearXNG run that comes back suspended is `engine_suspended`, not an empty literature. `search watch due` prints watches whose interval has elapsed. `doctor` names hosts that were blocked and match no playbook.
+- **Not in this cut.** Coverage stays at 82. Export writers may still use `write_text` (the allowlist test freezes that set). Performance numbers are measured by `scripts/bench_synthetic.py`; the 10k budget is not a PR gate.
+
 ### Workbench hardening wave (GUI)
 
 Assessment and plan: `assessments/2026-11-02-gui-ux-assessment-and-hardening-wave.md`.

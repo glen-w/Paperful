@@ -341,6 +341,22 @@ def test_sr_protocol_v1_keys_match_golden(tmp_path: Path):
     assert set(live) == PROTOCOL_KEYS
 
 
+def test_sr_prisma_v1_counts_are_exact():
+    from paperful.sr.prisma import SCHEMA as PRISMA_SCHEMA, counts_hold, prisma_counts
+
+    counts = prisma_counts(4, included=1, excluded=1, maybe=0)
+    assert PRISMA_SCHEMA == "paperful.sr.prisma.v1"
+    assert counts_hold(counts)
+    assert set(counts) == {
+        "identified",
+        "screened",
+        "included",
+        "excluded",
+        "maybe",
+        "pending",
+    }
+
+
 def test_sr_screen_v1_keys_match_golden(tmp_path: Path):
     keys = json.loads((FIX / "sr_screen_v1" / "keys.json").read_text(encoding="utf-8"))
     assert keys == sorted(SCREEN_KEYS)

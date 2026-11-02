@@ -1,8 +1,8 @@
 """Thin MCP stdio server over the same JSON channel as ``--format json``.
 
 Read-only tools: ``refs_gap``, ``gaps``, ``snowball_search``, ``snowball_trends``,
-``export``, ``proposal_export``, ``ask``, ``precedent``, and ``stuff``. ``collections add`` is
-CLI-only. Prefer CLI ``--format json``.
+``export``, ``proposal_export``, ``ask``, ``precedent``, ``stuff``, ``sr_status``,
+and ``sr_prisma``. ``collections add`` is CLI-only. Prefer CLI ``--format json``.
 """
 
 from __future__ import annotations
@@ -221,6 +221,29 @@ TOOLS = [
             },
         },
     },
+    {
+        "name": "sr_status",
+        "description": (
+            "Systematic-review counts for one local protocol. Read-only. "
+            "No recall percentage and no library write."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"slug": {"type": "string"}},
+            "required": ["slug"],
+        },
+    },
+    {
+        "name": "sr_prisma",
+        "description": (
+            "PRISMA 2020 counts and SVG for one local review. Exact counts only."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"slug": {"type": "string"}},
+            "required": ["slug"],
+        },
+    },
 ]
 
 
@@ -360,6 +383,26 @@ def call_snowball_trends(cfg: Config, args: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def call_sr_status(cfg: Config, slug: str) -> dict[str, Any]:
+    from .sr_cmd import review_counts
+
+    return {"slug": slug, "counts": review_counts(cfg, slug)}
+
+
+def call_sr_prisma(cfg: Config, slug: str) -> dict[str, Any]:
+    from .sr.prisma import prisma_svg
+    from .sr.protocol import load_protocol
+    from .sr_cmd import review_counts
+
+    counts = review_counts(cfg, slug)
+    protocol = load_protocol(cfg.state_dir, slug)
+    return {
+        "slug": slug,
+        "counts": counts,
+        "svg": prisma_svg(counts, title=str(protocol.get("title") or slug)),
+    }
+
+
 def call_export(cfg: Config, args: dict[str, Any]) -> dict[str, Any]:
     return run_export(
         cfg,
@@ -413,6 +456,10 @@ def handle_tools_call(
         body = call_precedent(cfg, args)
     elif name == "stuff":
         body = call_stuff(cfg, args)
+    elif name == "sr_status":
+        body = call_sr_status(cfg, str(args.get("slug") or ""))
+    elif name == "sr_prisma":
+        body = call_sr_prisma(cfg, str(args.get("slug") or ""))
     else:
         return _error(req_id, -32601, f"unknown tool {name}")
     return _result(req_id, _text(body))

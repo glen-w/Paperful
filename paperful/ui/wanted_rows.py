@@ -93,6 +93,11 @@ def wanted_rows(
                 miss_surface_plain(code) if code else miss_surface_plain("not_fetched")
             )
             code = code or "not_fetched"
+        reason = str(getattr(rec, "reason", "") or "") if rec else ""
+        if reason == "host_blocked":
+            plain = "Host refused the download (401/403)"
+        elif reason == "html_not_pdf":
+            plain = "Page was HTML, not a PDF"
         if not plain:
             continue
         missing.append(

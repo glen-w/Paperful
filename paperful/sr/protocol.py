@@ -8,7 +8,17 @@ from typing import Any
 from ..fsio import atomic_write_json
 
 SCHEMA = "paperful.sr.protocol.v1"
-PROTOCOL_KEYS = frozenset({"schema", "slug", "title", "question", "exclude_reasons"})
+PROTOCOL_KEYS = frozenset(
+    {
+        "schema",
+        "slug",
+        "title",
+        "question",
+        "exclude_reasons",
+        "snowball_run",
+        "search_run",
+    }
+)
 
 
 def review_dir(state_dir: Path, slug: str) -> Path:
@@ -41,6 +51,8 @@ def save_protocol(state_dir: Path, slug: str, body: dict[str, Any]) -> Path:
         "title": str(body.get("title") or ""),
         "question": str(body.get("question") or ""),
         "exclude_reasons": list(body.get("exclude_reasons") or []),
+        "snowball_run": str(body.get("snowball_run") or ""),
+        "search_run": str(body.get("search_run") or ""),
     }
     atomic_write_json(path, payload)
     return path

@@ -5,7 +5,6 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-import httpx
 from rich.console import Console
 from rich.table import Table
 
@@ -40,7 +39,11 @@ def run_urls(
     findings = []
     applied = 0
     refused = 0
-    with httpx.Client(follow_redirects=True, timeout=8.0) as client:
+    from .http import client as http_client
+
+    with http_client(
+        follow_redirects=True, timeout=8.0, retries=0, guard=True
+    ) as client:
         for item in items:
             children = []
             if hasattr(backend, "children"):

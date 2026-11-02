@@ -835,9 +835,10 @@ def _create_inbox_parent(
 
 
 def _default_resolve(cfg: Config) -> Callable[[str], WorkMeta | None]:
-    import httpx
 
-    client = httpx.Client(follow_redirects=True, timeout=30)
+    from .http import client as http_client
+
+    client = http_client(follow_redirects=True, timeout=30, retries=0, guard=True)
 
     def resolve(doi: str) -> WorkMeta | None:
         return work_by_doi(client, doi, cfg.email)

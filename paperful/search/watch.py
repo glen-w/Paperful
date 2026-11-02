@@ -229,12 +229,22 @@ def load_inbox(cfg: Config, name: str) -> list[dict[str, Any]]:
 
 
 def append_inbox(cfg: Config, name: str, rows: list[dict[str, Any]]) -> None:
+    from ..fsio import append_jsonl
+
     dest = watch_dir(cfg, name)
-    dest.mkdir(parents=True, exist_ok=True)
     path = dest / "inbox.jsonl"
-    with path.open("a", encoding="utf-8") as handle:
-        for row in rows:
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    append_jsonl(
+        path,
+        [json.dumps(row, ensure_ascii=False) for row in rows],
+        lock=(cfg.state_dir, f"search-watch-{name}"),
+    )
+
+
+def due_watches(cfg: Config) -> list[dict[str, Any]]:
+    """Watches whose interval has elapsed. Empty when nothing is due."""
+    return [
+        row for row in list_watches(cfg) if int(row.get("days_until_due") or 0) <= 0
+    ]
 
 
 def inbox_count(cfg: Config, name: str) -> int:

@@ -165,7 +165,9 @@ class OllamaEmbedder(_BatchingEmbedder):
     def check_config(self) -> tuple[bool, str]:
         validate_ollama_url(self._api_root(), self.allow_remote)
         try:
-            with httpx.Client(timeout=10.0) as client:
+            from ..http import client as http_client
+
+            with http_client(timeout=10.0, retries=0, guard=False) as client:
                 resp = client.get(f"{self._api_root()}/api/tags")
                 resp.raise_for_status()
                 data = resp.json()
@@ -186,7 +188,11 @@ class OllamaEmbedder(_BatchingEmbedder):
 
         def call() -> list[list[float]]:
             try:
-                with httpx.Client(timeout=self.timeout_s) as client:
+                from ..http import client as http_client
+
+                with http_client(
+                    timeout=self.timeout_s, retries=0, guard=False
+                ) as client:
                     resp = client.post(url, json=payload)
             except httpx.TimeoutException as exc:
                 raise EmbedError(

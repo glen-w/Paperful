@@ -248,9 +248,9 @@ def write_summary(state_dir: Path, collection: str, batch: IngestBatch) -> Path:
 
 
 def default_resolver(email: str) -> ResolveFn:
-    import httpx
+    from .http import client as http_client
 
-    client = httpx.Client(follow_redirects=True, timeout=30)
+    client = http_client(follow_redirects=True, timeout=30, retries=0, guard=True)
 
     def resolve(doi: str) -> WorkMeta | None:
         return work_by_doi(client, doi, email)

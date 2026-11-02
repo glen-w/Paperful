@@ -539,9 +539,9 @@ def read_index(out_dir: Path) -> dict[str, dict[str, Any]]:
 
 def append_index(out_dir: Path, row: dict[str, Any]) -> None:
     """Add one row without rewriting the file. The next ``merge_index`` compacts it."""
-    out_dir.mkdir(parents=True, exist_ok=True)
-    with (out_dir / "_index.jsonl").open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    from .fsio import append_jsonl
+
+    append_jsonl(out_dir / "_index.jsonl", json.dumps(row, ensure_ascii=False))
 
 
 def merge_index(out_dir: Path, rows: list[dict[str, Any]]) -> None:
@@ -549,8 +549,10 @@ def merge_index(out_dir: Path, rows: list[dict[str, Any]]) -> None:
     by_key = read_index(out_dir)
     for row in rows:
         _index_put(by_key, row)
+    from .fsio import atomic_write_text
+
     lines = [json.dumps(by_key[k], ensure_ascii=False) for k in sorted(by_key)]
-    path.write_text(("\n".join(lines) + ("\n" if lines else "")), encoding="utf-8")
+    atomic_write_text(path, "\n".join(lines) + ("\n" if lines else ""))
 
 
 def json_loads(line: str) -> Any:

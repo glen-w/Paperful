@@ -108,9 +108,13 @@ class Ledger:
         del self._rows[key]
 
     def _append(self, row: LedgerRow) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(asdict(row), ensure_ascii=False) + "\n")
+        from ..fsio import append_jsonl
+
+        append_jsonl(
+            self.path,
+            json.dumps(asdict(row), ensure_ascii=False),
+            lock=(self.path.parent, "rag-ledger"),
+        )
 
 
 def pick_pdf(entry: MirrorEntry) -> PdfStat | None:

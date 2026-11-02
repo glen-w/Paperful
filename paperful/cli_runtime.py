@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import typer
-from rich.console import Console
+from rich.console import Console, ConsoleDimensions
 from rich.table import Table
 
 from .progress import Track, item_progress, tracker
@@ -48,7 +48,24 @@ from .scope import ScopeError, filter_scope_items, load_scope, resolve_keys
 from .store import Manifest
 from .zot import ZoteroLocal, resolve_item_types
 
-console = Console(highlight=False)
+class _ColumnsConsole(Console):
+    """Use ``COLUMNS`` even when ``TERM`` is dumb.
+
+    Rich otherwise forces 80 columns and ignores ``COLUMNS``, which wraps
+    dry-run tables and disclaimers the tests pin to a wide line.
+    """
+
+    @property
+    def size(self) -> ConsoleDimensions:  # type: ignore[override]
+        columns = os.environ.get("COLUMNS")
+        if columns and columns.isdigit():
+            lines = os.environ.get("LINES")
+            height = int(lines) if lines and lines.isdigit() else 24
+            return ConsoleDimensions(int(columns), height)
+        return super().size
+
+
+console = _ColumnsConsole(highlight=False)
 
 
 def _stdin_is_tty() -> bool:

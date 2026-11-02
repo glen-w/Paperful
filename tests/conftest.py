@@ -22,6 +22,16 @@ def pytest_collection_modifyitems(items):
 
 
 @pytest.fixture(autouse=True)
+def _wide_columns(monkeypatch):
+    """Rich forces 80 columns when TERM=dumb and ignores a later COLUMNS.
+
+    CLI tests pin full lines (disclaimers, source lists). A wide default
+    keeps those lines intact; a test may still pass a narrower env.
+    """
+    monkeypatch.setenv("COLUMNS", "320")
+
+
+@pytest.fixture(autouse=True)
 def _no_real_zotero(monkeypatch):
     """Tests never talk to a Zotero that happens to be running on this machine.
 

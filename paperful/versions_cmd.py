@@ -62,7 +62,9 @@ def run_versions(
         scoped, quiet=as_json, json_out=as_json, require_manager=True
     )
     scope = loaded.label
-    client = httpx.Client(follow_redirects=True, timeout=30)
+    from .http import client as http_client
+
+    client = http_client(follow_redirects=True, timeout=30, retries=0, guard=True)
     errors: list[str] = []
     try:
         try:

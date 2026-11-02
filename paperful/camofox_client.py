@@ -56,10 +56,14 @@ class CamofoxClient:
         key = access_key if access_key is not None else camofox_access_key()
         if key:
             headers["Authorization"] = f"Bearer {key}"
-        self._client = client or httpx.Client(
+        from .http import client as http_client
+
+        self._client = client or http_client(
             timeout=httpx.Timeout(timeout),
             headers=headers,
             follow_redirects=True,
+            retries=0,
+            guard=False,
         )
 
     def close(self) -> None:

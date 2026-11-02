@@ -61,10 +61,14 @@ def run_playbooks_probe(
     cfg = cli_mod._cfg(config)
     books = playbooks_for_probe(cfg.grey_playbooks, examples=examples)
     timeout = httpx.Timeout(20.0, connect=15.0)
-    with httpx.Client(
+    from .http import client as http_client
+
+    with http_client(
         headers={"User-Agent": cfg.user_agent, "Accept-Language": "en-US,en;q=0.9"},
         follow_redirects=True,
         timeout=timeout,
+        retries=0,
+        guard=True,
     ) as client:
         rows = probe_corpus(
             targets,

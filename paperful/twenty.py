@@ -102,7 +102,9 @@ def _headers() -> dict[str, str]:
 
 
 def _default_get(url: str, headers: dict[str, str], params: dict[str, str]) -> Any:
-    with httpx.Client(timeout=20) as client:
+    from .http import client as http_client
+
+    with http_client(timeout=20, retries=0, guard=False) as client:
         resp = client.get(url, headers=headers, params=params)
         resp.raise_for_status()
         return resp.json()
@@ -267,7 +269,9 @@ def _default_send(
     params: dict[str, str],
     body: dict[str, Any] | None,
 ) -> Any:
-    with httpx.Client(timeout=30) as client:
+    from .http import client as http_client
+
+    with http_client(timeout=30, retries=0, guard=False) as client:
         resp = client.request(
             method, url, headers=headers, params=params or None, json=body
         )

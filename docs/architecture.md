@@ -280,9 +280,11 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
 - `paperful config check` — static pass over `config.toml`: unknown keys and
   sections, secrets that belong in the environment. Exit 1 when anything is
   flagged. Run it before `doctor` when a setting seems ignored.
-- `paperful sr init` / `screen` / `status` — systematic-review scaffold under
-  `state/sr/<slug>/` (protocol + append-only screening ledger). No scheduler;
-  no workbench page yet.
+- `paperful sr init` / `screen` / `status` / `export` / `import` — systematic
+  review under `state/sr/<slug>/` (protocol, append-only screening ledger,
+  PRISMA counts and SVG). Exclude reasons come from the protocol list.
+  Advanced `/review` records decisions. No scheduler and no recall percentage.
+  See [sr-mode](sr-mode.md).
 - `paperful doctor` — preflight. Colours: **green** = ready; **amber** = usable with
   a degraded path (empty email, missing session, expired session when `--probe`,
   no `pdftotext`, missing `vale` (optional critique house style), rewrite areas

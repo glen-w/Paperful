@@ -2,6 +2,8 @@
   "exclude_reasons",
   "question",
   "schema",
+  "search_run",
   "slug",
+  "snowball_run",
   "title"
 ]

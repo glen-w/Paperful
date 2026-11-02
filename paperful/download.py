@@ -251,6 +251,9 @@ def fetch_pdf(
             if status_fails >= retries:
                 break
             time.sleep(1.5 * (attempt + 1))
+    from .log import get_logger
+
+    get_logger("paperful.download").debug("fetch failed: %s", last)
     raise DownloadError(last)
 
 

@@ -223,6 +223,42 @@ def test_miss_classification(pipe_factory):
     assert manifest2.get("NF").reason == "closed"
 
 
+def test_http_403_is_host_blocked(pipe_factory):
+    def handler(_req):
+        return httpx.Response(403)
+
+    src = StubSource(
+        "oa",
+        {"A": Candidate(url="https://blocked.test/a.pdf", source="oa")},
+    )
+    pipe, manifest = pipe_factory({"oa": src}, ["oa"], handler=handler)
+    pipe.run([make_item(key="A")])
+    rec = manifest.get("A")
+    assert rec is not None
+    assert rec.status == STATUS_NOT_FOUND
+    assert rec.reason == "host_blocked"
+
+
+def test_html_body_is_not_a_pdf_miss(pipe_factory):
+    def handler(_req):
+        return httpx.Response(
+            200,
+            content=b"<html><body>tribute</body></html>",
+            headers={"content-type": "text/html"},
+        )
+
+    src = StubSource(
+        "oa",
+        {"A": Candidate(url="https://example.test/page", source="oa")},
+    )
+    pipe, manifest = pipe_factory({"oa": src}, ["oa"], handler=handler)
+    pipe.run([make_item(key="A")])
+    rec = manifest.get("A")
+    assert rec is not None
+    assert rec.status == STATUS_RETRYABLE
+    assert rec.reason == "html_not_pdf"
+
+
 def test_circuit_breaker_skips_source_after_repeated_blocks(pipe_factory, cfg):
     blocked = StubSource("blocked", default=Outcome.CAPTCHA)
     oa = StubSource("oa", default=Outcome.NOT_FOUND)

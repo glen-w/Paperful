@@ -61,7 +61,11 @@ def _http_json(orcid: str, suffix: str) -> dict[str, Any]:
     last: Exception | None = None
     for attempt in range(_HTTP_ATTEMPTS):
         try:
-            with httpx.Client(timeout=60.0, follow_redirects=True) as client:
+            from ..http import client as http_client
+
+            with http_client(
+                timeout=60.0, follow_redirects=True, retries=0, guard=True
+            ) as client:
                 resp = client.get(url, headers=headers)
         except (httpx.TransportError, httpx.TimeoutException) as exc:
             last = exc

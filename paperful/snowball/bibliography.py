@@ -563,7 +563,11 @@ def pdf_payload(doi: str, *, cache_dir: Path | None = None) -> dict[str, Any] | 
 
 def _download_html(url: str) -> str:
     try:
-        with httpx.Client(follow_redirects=True, timeout=30.0) as client:
+        from ..http import client as http_client
+
+        with http_client(
+            follow_redirects=True, timeout=30.0, retries=0, guard=True
+        ) as client:
             resp = client.get(
                 url,
                 headers={
@@ -582,7 +586,11 @@ def _download_html(url: str) -> str:
 
 def _download_pdf_text(url: str) -> tuple[str, str]:
     try:
-        with httpx.Client(follow_redirects=True, timeout=60.0) as client:
+        from ..http import client as http_client
+
+        with http_client(
+            follow_redirects=True, timeout=60.0, retries=0, guard=True
+        ) as client:
             resp = client.get(url, headers={"User-Agent": "paperful-snowball/0.1"})
             resp.raise_for_status()
             data = resp.content

@@ -68,8 +68,10 @@ def write_queue(
 
 
 def write_report(dest: Path, report: dict[str, Any]) -> None:
-    (dest / "write_report.json").write_text(
-        json.dumps(report, indent=2) + "\n", encoding="utf-8"
+    from ..fsio import atomic_write_text
+
+    atomic_write_text(
+        dest / "write_report.json", json.dumps(report, indent=2) + "\n"
     )
 
 

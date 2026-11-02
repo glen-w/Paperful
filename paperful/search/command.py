@@ -332,6 +332,25 @@ def run_search_watch_show(
     _call(lambda: show_watch(cfg, name, console=console))
 
 
+def run_search_watch_due(
+    console: Console,
+    *,
+    fmt: str = "text",
+    config: Any = None,
+) -> None:
+    """Print watches whose interval has elapsed. Exit 0. Paperful does not wait."""
+    from .. import cli_runtime as cli_mod
+    from .watch import due_watches
+
+    cfg = cli_mod._cfg(config)
+    rows = due_watches(cfg)
+    if fmt == "json":
+        print(json.dumps({"due": rows}, ensure_ascii=False))
+        return
+    for row in rows:
+        console.print(str(row.get("name") or ""))
+
+
 def run_search_watch_list(
     console: Console,
     *,
@@ -398,6 +417,9 @@ def _emit(console: Console, bundle: dict[str, Any], *, fmt: str, command: str) -
                         "exists": summary.get("exists"),
                         "blocked": summary.get("blocked"),
                         "partial": bool(bundle.get("partial")),
+                        "engine_suspended": bool(summary.get("engine_suspended")),
+                        "playbook_gaps": list(summary.get("playbook_gaps") or []),
+                        "reason": summary.get("reason") or "",
                     },
                     items=candidates,
                     paths={"run": bundle.get("path")},
@@ -428,5 +450,17 @@ def _emit(console: Console, bundle: dict[str, Any], *, fmt: str, command: str) -
     path = bundle.get("path") or ""
     if path:
         console.print(f"Wrote [bold]{path}[/]")
+    if summary.get("engine_suspended"):
+        console.print(
+            "Search engines were suspended (429, captcha, or transport). "
+            "This is not an empty literature."
+        )
+    gaps = summary.get("playbook_gaps") or []
+    if gaps:
+        console.print(
+            "Hosts blocked with no grey playbook: "
+            + ", ".join(str(host) for host in gaps)
+            + ". Add one under grey_playbooks_dir."
+        )
     if bundle.get("partial"):
         console.print("[yellow]SearXNG returned no hits (partial).[/]")

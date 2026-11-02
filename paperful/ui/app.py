@@ -172,6 +172,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     from .critique_routes import register_critique
     from .rewrite_routes import register_rewrite
     from .stuff_routes import register_stuff
+    from .review_routes import register_review
 
     commands.reconcile_orphans(cfg)
     templates = Jinja2Templates(directory=str(_ui_dir() / "templates"))
@@ -194,3 +195,4 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     register_critique(ui)
     register_rewrite(ui)
     register_stuff(ui)
+    register_review(ui)

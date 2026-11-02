@@ -81,6 +81,8 @@ def test_initialize_and_tools_list(cfg):
         "ask",
         "precedent",
         "stuff",
+        "sr_status",
+        "sr_prisma",
     } <= names
     for tool in listed:
         assert tool["inputSchema"]["type"] == "object"
@@ -230,6 +232,8 @@ def test_mcp_surface_is_the_documented_read_only_set():
         "ask",
         "precedent",
         "stuff",
+        "sr_status",
+        "sr_prisma",
     }
     verbs = (
         "apply",

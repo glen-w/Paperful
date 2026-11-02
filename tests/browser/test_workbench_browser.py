@@ -31,6 +31,7 @@ PAGES = [
     "/critique",
     "/rewrite",
     "/stuff",
+    "/review",
     "/settings",
 ]
 

@@ -452,7 +452,6 @@ def _dedupe(
 
 
 def _versions(cfg: Config, collection: str, *, apply: bool) -> dict[str, Any]:
-    import httpx
 
     from ..versions import (
         apply_versions,
@@ -464,7 +463,9 @@ def _versions(cfg: Config, collection: str, *, apply: bool) -> dict[str, Any]:
     )
 
     backend, items, scope = _open_scope(cfg, collection)
-    client = httpx.Client(follow_redirects=True, timeout=30)
+    from ..http import client as http_client
+
+    client = http_client(follow_redirects=True, timeout=30, retries=0, guard=True)
     applied = 0
     errors: list[str] = []
     try:

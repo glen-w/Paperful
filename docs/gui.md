@@ -280,6 +280,8 @@ sidecar, tracked-changes Word / OpenDocument / PDF). Never overwrites the source
 
 ![Suggest edits: pick a critique pack, choose areas and outputs, optional comments](_static/workflows/rewrite.png)
 
+**Review** (Advanced route `/review`, not in the nav; CLI `paperful sr`) records include / exclude / maybe against a protocol. Apply stays disabled until Preview. See [sr-mode](sr-mode.md).
+
 **Stuff** (Advanced; `/stuff`, CLI `paperful stuff`): pick a collection item
 **or** drop a draft. Extra library cites per sentence (`manuscript`) or
 outline section. Writes `state/stuff/` (`pack.md` / `pack.json`). Needs

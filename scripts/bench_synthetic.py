@@ -41,6 +41,18 @@ def build_mirror(root: Path, count: int) -> Path:
     return out
 
 
+def count_records(out: Path) -> int:
+    """Gaps-shaped walk: how many item records the mirror holds."""
+    return sum(1 for _ in out.rglob("record.json"))
+
+
+def over_budget(current: float, baseline: float, *, limit: float = 0.10) -> bool:
+    """True when ``current`` is more than ``limit`` above ``baseline``."""
+    if baseline <= 0:
+        return False
+    return current > baseline * (1.0 + limit)
+
+
 def timeit(label: str, fn) -> dict:
     start = time.perf_counter()
     result = fn()
@@ -60,10 +72,17 @@ def main() -> int:
     for size in [int(s) for s in args.sizes.split(",") if s.strip()]:
         root = args.root / str(size)
         build_mirror(root, size)
+        out = root / "out"
         rows.append(
             timeit(
                 f"MirrorIndex.scan[{size}]",
-                lambda root=root: len(MirrorIndex.scan(root / "out").keys()),
+                lambda out=out: len(MirrorIndex.scan(out).keys()),
+            )
+        )
+        rows.append(
+            timeit(
+                f"gaps.count[{size}]",
+                lambda out=out: count_records(out),
             )
         )
     print(json.dumps(rows, indent=2))

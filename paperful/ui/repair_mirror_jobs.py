@@ -225,7 +225,11 @@ def run_repair_preview(
 
         from ..versions import classify_versions, pack_counts, resolver_for, write_pack
 
-        client = httpx.Client(follow_redirects=True, timeout=30)
+        from ..http import client as http_client
+
+        client = http_client(
+            follow_redirects=True, timeout=30, retries=0, guard=True
+        )
         try:
             proposals = classify_versions(items, resolver_for(client, cfg.email))
         finally:
@@ -457,7 +461,11 @@ def run_repair_apply(
         proposals = [VersionProposal(**row) for row in payload.get("proposals") or []]
         if not backend.supports_write():
             return False, "write API not available", {}
-        client = httpx.Client(follow_redirects=True, timeout=30)
+        from ..http import client as http_client
+
+        client = http_client(
+            follow_redirects=True, timeout=30, retries=0, guard=True
+        )
         try:
             applied, errors = apply_versions(
                 backend,

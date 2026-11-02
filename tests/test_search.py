@@ -347,6 +347,20 @@ def test_unset_searxng_raises_code_2(tmp_path: Path, monkeypatch):
         assert exc.code == 2
 
 
+def test_suspended_engine_is_not_an_empty_literature(tmp_path: Path):
+    cfg = _cfg(tmp_path)
+    bundle = run_search(
+        cfg,
+        ["Gjerde"],
+        run_id="suspended-web",
+        probe=False,
+        getter=lambda _q: {"results": [], "paperful_engine": "suspended"},
+    )
+    assert bundle["summary"]["kept"] == 0
+    assert bundle["summary"]["engine_suspended"] is True
+    assert bundle["summary"]["reason"] == "engine_suspended"
+
+
 def test_empty_searxng_is_partial(tmp_path: Path):
     cfg = _cfg(tmp_path)
     bundle = run_search(

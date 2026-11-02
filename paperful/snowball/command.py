@@ -971,11 +971,12 @@ def _mark_exists(
 def _version_of(cfg: Config, request: SnowballRequest) -> Callable[[str], Any] | None:
     if not request.link_versions:
         return None
-    import httpx
-
+    from ..http import client as http_client
     from ..versions import resolver_for
 
-    client = httpx.Client(follow_redirects=True, timeout=30)
+    client = http_client(
+        follow_redirects=True, timeout=30, retries=0, guard=True
+    )
     return resolver_for(client, cfg.email)
 
 

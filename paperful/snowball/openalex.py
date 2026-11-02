@@ -260,7 +260,11 @@ class OpenAlexClient:
 
     def _client(self) -> httpx.Client:
         if self._http_client is None:
-            self._http_client = httpx.Client(timeout=60.0, follow_redirects=True)
+            from ..http import client as http_client
+
+            self._http_client = http_client(
+                timeout=60.0, follow_redirects=True, retries=0, guard=True
+            )
         return self._http_client
 
     def _collect(

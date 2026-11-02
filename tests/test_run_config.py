@@ -266,7 +266,7 @@ def test_profile_cli_fills_collection(stubbed):
     res = runner.invoke(
         cli.app,
         ["run", "-c", str(stubbed), "--profile", "bbnj", "--dry-run"],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert res.exit_code == 0, res.stdout
     assert "BBNJ" in res.stdout
@@ -329,7 +329,7 @@ def test_all_dry_run_skips_summarize_and_closes_pack(stubbed, tmp_path):
     res = runner.invoke(
         cli.app,
         ["all", "-c", str(stubbed), "-C", "BBNJ", "--dry-run"],
-        env={"COLUMNS": "200"},
+        env={"COLUMNS": "320"},
     )
     assert res.exit_code == 0, res.stdout
     assert "Skipping summarize" in res.stdout

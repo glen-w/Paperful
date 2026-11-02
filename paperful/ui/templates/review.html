@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Review — Paperful{% endblock %}
+{% block content %}
+<h1>Review</h1>
+<p class="page-lede">Screen a saved snowball or search run. Counts only. Nothing is created in the library until Apply, and Apply stays off until Preview.</p>
+{% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
+
+<section class="panel">
+  <h2>Protocol</h2>
+  <form method="get" action="/review" class="toolbar">
+    <label>Slug <input name="slug" value="{{ slug }}" required></label>
+    <button type="submit">Open</button>
+  </form>
+  <p>{{ protocol.title or "(no title)" }}</p>
+  {% if counts %}
+  <p>Identified {{ counts.identified }} · screened {{ counts.screened }} · included {{ counts.included }} · excluded {{ counts.excluded }} · maybe {{ counts.maybe }} · pending {{ counts.pending }}</p>
+  <p><a href="/review/prisma.svg?slug={{ slug }}">PRISMA flow</a></p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Decision</h2>
+  <form method="post" action="/review/screen" class="toolbar">
+    <input type="hidden" name="slug" value="{{ slug }}">
+    <label>Identity <input name="identity" required></label>
+    <label>Decision
+      <select name="decision">
+        <option value="include">include</option>
+        <option value="exclude">exclude</option>
+        <option value="maybe">maybe</option>
+      </select>
+    </label>
+    <label>Reason <input name="reason"></label>
+    <button type="submit">Record</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Pending</h2>
+  <table class="wb-table">
+    <caption class="sr-only">Identities with no decision</caption>
+    <thead><tr><th scope="col">Identity</th></tr></thead>
+    <tbody>
+    {% for ident in pending %}
+      <tr><td>{{ ident }}</td></tr>
+    {% else %}
+      <tr><td>Nothing undecided in the linked runs.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="panel">
+  <h2>Add included parents</h2>
+  <form method="post" action="/review/preview" class="toolbar">
+    <input type="hidden" name="slug" value="{{ slug }}">
+    <label>Collection <input name="collection" value="{{ prefs.collection }}"></label>
+    <label>Import file <input name="path" placeholder="optional csv path"></label>
+    <button type="submit">Preview</button>
+  </form>
+  <form method="post" action="/review/apply" class="toolbar">
+    <input type="hidden" name="slug" value="{{ slug }}">
+    <input type="hidden" name="review_token" value="{{ review_token }}">
+    <button type="submit" {% if not review_token %}disabled{% endif %}>Apply</button>
+  </form>
+</section>
+{% endblock %}

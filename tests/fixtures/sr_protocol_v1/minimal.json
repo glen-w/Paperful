@@ -3,5 +3,7 @@
   "slug": "demo",
   "title": "T",
   "question": "Q?",
-  "exclude_reasons": []
+  "exclude_reasons": [],
+  "snowball_run": "",
+  "search_run": ""
 }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -824,12 +825,55 @@ def _tool_path_checks() -> list[Check]:
     return checks
 
 
+def _playbook_gap_check(cfg: Config) -> Check | None:
+    """Amber when the newest search run recorded a 403 host with no playbook."""
+    root = cfg.state_dir / "search"
+    if not root.is_dir():
+        return None
+    newest: Path | None = None
+    newest_mtime = -1.0
+    for path in root.glob("*/summary.json"):
+        if path.parent.name == "watches":
+            continue
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+        if mtime >= newest_mtime:
+            newest_mtime = mtime
+            newest = path
+    if newest is None:
+        return None
+    try:
+        data = json.loads(newest.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    gaps = [
+        str(host) for host in (data.get("playbook_gaps") or []) if str(host).strip()
+    ]
+    if not gaps:
+        return None
+    shown = ", ".join(gaps[:8])
+    return Check(
+        "Grey playbook gaps",
+        "amber",
+        f"{shown} returned host_blocked with no playbook. "
+        "Add a file under grey_playbooks_dir.",
+        code="playbook_gap",
+    )
+
+
 def _corpus_checks(
     cfg: Config,
     zl: ZoteroLocal | None,
     info: dict | None,
 ) -> list[Check]:
     checks: list[Check] = [_grey_playbooks_check(cfg)]
+    gap = _playbook_gap_check(cfg)
+    if gap is not None:
+        checks.append(gap)
     exclude_cols = None
     if zl is not None and info is not None:
         try:

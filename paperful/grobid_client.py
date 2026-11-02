@@ -128,9 +128,13 @@ class GrobidClient:
         self.consolidate_header = int(consolidate_header)
         self.consolidate_citations = int(consolidate_citations)
         wall = max(5.0, float(timeout))
-        self._client = client or httpx.Client(
+        from .http import client as http_client
+
+        self._client = client or http_client(
             timeout=httpx.Timeout(wall, connect=15.0),
             follow_redirects=True,
+            retries=0,
+            guard=False,
         )
 
     def close(self) -> None:

@@ -26,8 +26,9 @@ def file_fingerprint(path: Path) -> str:
 
 
 def write_preview(path: Path, body: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
+    from ..fsio import atomic_write_text
+
+    atomic_write_text(path, json.dumps(body, indent=2) + "\n")
 
 
 def read_preview(path: Path) -> dict[str, Any] | None:

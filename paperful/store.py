@@ -138,11 +138,15 @@ class Manifest:
         return self.records.get(key)
 
     def write(self, rec: Record) -> None:
+        from .fsio import append_jsonl
+
         rec.ts = time.time()
         with self._lock:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("a", encoding="utf-8") as fh:
-                fh.write(rec.to_json() + "\n")
+            append_jsonl(
+                self.path,
+                rec.to_json(),
+                lock=(self.path.parent, "manifest"),
+            )
             self.records[rec.itemKey] = rec
 
     def should_process(self, key: str, retry_failed: bool) -> bool:

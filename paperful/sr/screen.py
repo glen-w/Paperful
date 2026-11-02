@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..fsio import atomic_write_text, file_lock
+from ..fsio import append_jsonl
 
 SCHEMA = "paperful.sr.screen.v1"
 SCREEN_KEYS = frozenset({"schema", "identity", "decision", "reason", "reviewer", "at"})
@@ -37,6 +37,16 @@ def load_screen_ledger(state_dir: Path, slug: str) -> list[dict[str, Any]]:
     return rows
 
 
+def latest_decisions(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Latest ledger line per identity. Earlier lines stay on disk."""
+    out: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        ident = str(row.get("identity") or "").strip()
+        if ident:
+            out[ident] = row
+    return out
+
+
 def append_screen_decision(
     state_dir: Path,
     slug: str,
@@ -48,6 +58,18 @@ def append_screen_decision(
 ) -> None:
     if decision not in {"include", "exclude", "maybe"}:
         raise ValueError(f"invalid decision {decision!r}")
+    if decision == "exclude":
+        from .protocol import load_protocol
+
+        allowed = [
+            str(item).strip()
+            for item in (load_protocol(state_dir, slug).get("exclude_reasons") or [])
+            if str(item).strip()
+        ]
+        if reason.strip() not in allowed:
+            raise ValueError(
+                f"exclude reason {reason!r} is not on the protocol list"
+            )
     row = {
         "schema": SCHEMA,
         "identity": identity,
@@ -57,8 +79,5 @@ def append_screen_decision(
         "at": datetime.now(tz=timezone.utc).isoformat(),
     }
     path = ledger_path(state_dir, slug)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    line = json.dumps(row, ensure_ascii=False) + "\n"
-    with file_lock(state_dir, f"sr-{slug}-screen"):
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(line)
+    line = json.dumps(row, ensure_ascii=False)
+    append_jsonl(path, line, lock=(state_dir, f"sr-{slug}-screen"))

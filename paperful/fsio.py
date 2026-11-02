@@ -47,6 +47,42 @@ def atomic_write_json(path: Path, payload: Any, *, indent: int = 2) -> None:
     atomic_write_text(path, text)
 
 
+def append_jsonl(
+    path: Path,
+    lines: str | list[str],
+    *,
+    lock: tuple[Path, str] | None = None,
+) -> None:
+    """Append JSONL and fsync. A crash can tear only the last line.
+
+    ``lock`` is ``(state_dir, name)`` for the cross-process lock. Readers
+    must skip a final line that is not valid JSON.
+    """
+    if isinstance(lines, str):
+        chunk = lines if lines.endswith("\n") else lines + "\n"
+    else:
+        parts: list[str] = []
+        for line in lines:
+            parts.append(line if line.endswith("\n") else line + "\n")
+        chunk = "".join(parts)
+        if not chunk:
+            return
+
+    def _write() -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(chunk)
+            fh.flush()
+            os.fsync(fh.fileno())
+
+    if lock is None:
+        _write()
+        return
+    state_dir, name = lock
+    with file_lock(state_dir, name):
+        _write()
+
+
 def lock_path(state_dir: Path, name: str) -> Path:
     d = state_dir / ".locks"
     d.mkdir(parents=True, exist_ok=True)

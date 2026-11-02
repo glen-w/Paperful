@@ -488,6 +488,14 @@ def run_sync(
         _write_state(
             cfg, changes, state, stats, pdfs_complete=pdfs_complete and mode == "all"
         )
+    else:
+        from .log import get_logger
+
+        get_logger("paperful.sync").warning(
+            "sync version not advanced unread=%s unwritten=%s",
+            stats.unread,
+            len(stats.unwritten),
+        )
 
     if mode == "all" and (backfill or not changes.full):
         # A command's own refresh never starts the whole-library copy, even

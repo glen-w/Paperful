@@ -63,11 +63,9 @@ def _reviews_dir(cfg: Config) -> Path:
 
 
 def _atomic_write(path: Path, data: dict[str, Any]) -> None:
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    tmp.replace(path)
+    from ..fsio import atomic_write_text
+
+    atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
 
 
 def write_command(cfg: Config, record: dict[str, Any]) -> None:

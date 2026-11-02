@@ -55,7 +55,9 @@ def probe_url(url: str, *, getter: Any = None) -> dict[str, Any]:
             return data
         return {"kind": "unknown"}
     try:
-        with httpx.Client(timeout=12.0, follow_redirects=True) as client:
+        from ..http import client as http_client
+
+        with http_client(timeout=12.0, follow_redirects=True, guard=True) as client:
             head = client.head(url)
             ctype = str(head.headers.get("content-type") or "").lower()
             if "pdf" in ctype or looks_like_pdf_url(str(head.url)):
@@ -117,6 +119,7 @@ def run_search(
     page_cap = min(8, max(4, (per_query + 19) // 20))
     raw: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
+    engine_errors: list[dict[str, Any]] = []
     for q in queries:
         if len(raw) >= fetch_limit:
             break
@@ -127,6 +130,7 @@ def run_search(
             getter=getter,
             cache_dir=cache_dir(cfg),
             pages=page_cap,
+            errors=engine_errors,
         )
         for row in page:
             url = str(row.get("url") or "").strip()
@@ -187,6 +191,7 @@ def run_search(
     )
 
     candidates: list[dict[str, Any]] = []
+    gap_hosts: set[str] = set()
     for row in hits:
         if row.get("status") == "blocked":
             continue
@@ -194,10 +199,16 @@ def run_search(
         if do_probe:
             info = probe_url(str(probed.get("url") or ""), getter=probe_getter)
             kind = str(info.get("kind") or "")
-            if kind == "pdf":
+            status = int(info.get("status") or 0)
+            if status in {401, 403}:
+                probed["reason"] = "host_blocked"
+                if not probed.get("playbook") and probed.get("host"):
+                    gap_hosts.add(str(probed["host"]))
+            elif kind == "pdf":
                 probed["kind"] = "pdf"
             elif kind == "landing":
                 probed["kind"] = "landing"
+                probed["reason"] = "html_not_pdf"
             if (
                 probed.get("kind") == "landing"
                 and not probed.get("playbook")
@@ -238,6 +249,8 @@ def run_search(
         "probe": bool(do_probe),
         "partial": not raw,
     }
+    engine_suspended = bool(engine_errors) and not raw
+    gaps = sorted(gap_hosts)
     summary = {
         "hits": len(hits),
         "kept": len(candidates),
@@ -245,7 +258,11 @@ def run_search(
         "blocked": blocked,
         "new": sum(1 for row in candidates if row.get("status") == "new"),
         "dropped": dropped,
+        "engine_suspended": engine_suspended,
+        "playbook_gaps": gaps,
     }
+    if engine_suspended:
+        summary["reason"] = "engine_suspended"
     write_run(out, meta=meta, hits=hits, candidates=candidates, summary=summary)
     return {
         "schema": SCHEMA,

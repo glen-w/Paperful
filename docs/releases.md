@@ -1,6 +1,6 @@
 # Releases and stability
 
-**1.7.0** is the current release (`pipx install paperful` / `uv tool install paperful`
+**1.8.0** is the current release (`pipx install paperful` / `uv tool install paperful`
 after this tag is published; `pip install paperful` still works). Optional extras:
 `[browser]`, `[llm]`, `[rag]`, `[rag-docling]`, `[serve]`, `[browser-agent]`, `[openxml]`, `[network]`. **1.1.0** introduced PyPI and
 trusted publishing. For campus login and HTML PDF paths, install
@@ -33,7 +33,9 @@ be added. Required `paperful.run_report.v1` keys and imported-file attach
 (typed `attach_failed`, provenance note) are the contract. **1.1.1** shipped
 Wanted stop-ship hygiene (Grab scope, Attach at zero, copy). Everything after
 that is a buffet by area (Wanted excellence foundation shipped; residual polish).
-**1.7.0** is the hardening + platform wave (workbench token auth, required
+**1.8.0** adds crash-safe ledger appends, one HTTP client, systematic-review
+export/import and PRISMA counts, and grey miss labels (`host_blocked`,
+`html_not_pdf`, `engine_suspended`). **1.7.0** is the hardening + platform wave (workbench token auth, required
 pip-audit/socket/fresh-install CI gates, Playwright as the `[browser]`
 extra, atomic ledger writes, defusedxml, backend conformance kit — details
 in the changelog). **1.6.5** adds the Stuff workbench, synthesize `--layout conflict`/`review`,
