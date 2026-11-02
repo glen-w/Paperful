@@ -59,7 +59,7 @@ mounts (`PAPERFUL_DATA`).
 ## Quick start
 
 ```sh
-git clone --branch v1.6.4 https://github.com/glen-w/Paperful.git
+git clone --branch v1.6.5 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
 ```

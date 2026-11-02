@@ -6,6 +6,8 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.6.5 — 2026-11-02
+
 ### Added
 
 - **Stuff workbench.** Advanced `/stuff` (item or upload, background job,
