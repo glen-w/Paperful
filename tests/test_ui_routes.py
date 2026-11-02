@@ -38,6 +38,24 @@ def test_discover_handlers_are_module_level():
     src = inspect.getsource(discover_routes.register_discover)
     assert "handle_page_discover(" in src
     assert "def _discover_page(" not in src
+    from paperful.ui import (
+        discover_graph_routes,
+        discover_people_routes,
+        discover_search_routes,
+    )
+
+    assert (
+        discover_routes.handle_discover_graph
+        is discover_graph_routes.handle_discover_graph
+    )
+    assert (
+        discover_routes.handle_discover_search
+        is discover_search_routes.handle_discover_search
+    )
+    assert (
+        discover_routes.handle_discover_authors
+        is discover_people_routes.handle_discover_authors
+    )
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
