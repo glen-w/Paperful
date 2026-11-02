@@ -25,6 +25,9 @@ may still be added). See [releases](docs/releases.md).
   `show` / `list`). Remembers seen **URLs**, not DOIs. `--interval-days`
   (default 7) is a due-date hint; cron `search watch run`. Discover → Web
   can save and run a watch. Apply creates metadata parents only.
+- **Share card `og-v2.png`.** Homepage Open Graph / Twitter image is a
+  1200×630 crop of Wanted (heading + Have/Held/Missing counts), not the
+  logo-only `og.png`.
 
 ## 1.6.4 — 2026-11-02
 

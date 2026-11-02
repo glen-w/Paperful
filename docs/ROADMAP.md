@@ -640,7 +640,7 @@ Launch gates, in order:
 
 1. The paperful.io collision strip, then a link-preview paste test.
 2. Re-crop the share image as `og-v2.png` so the Wanted heading and count
-   show.
+   show. **Shipped** (`website/images/og-v2.png`, homepage `og:image`).
 3. A `robots.txt` with the sitemap line.
 4. A ~60-character title.
 5. A homepage link and topics on GitHub About.
@@ -713,8 +713,8 @@ prerequisite for picking from the buffet.
 
 1. **1.1.1** — P0 scoping and ticks, Attach-at-zero, review-token test,
    version single-source, first-hour copy.
-2. **Launch gates** — paperful.io strip, share image, robots, title,
-   GitHub About.
+2. **Launch gates** — paperful.io strip, share image (`og-v2.png` **shipped**),
+   robots, title; GitHub About remains an operator step.
 3. **Wanted excellence** — **shipped** (stamps, reasons, hand-ticks,
    Waiting→add); keep honesty polish here.
 4. **Cheap OpenAlex housekeeping** alongside 1.1.x (date stamp, stale
