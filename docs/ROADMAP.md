@@ -96,7 +96,7 @@ under it is still the encyclopaedia of jobs; it is not the order.
 ### What 1.7 already settled
 
 Sources: [1.7 decision log](plans/1.7-wave.md), [legal-privacy](legal-privacy.md),
-changelog **1.7.0**. An unreleased workbench hardening wave sits on top of
+changelog **1.7.0**. The 1.8.0 workbench hardening wave sits on top of
 that tag (content-security policy, orphaned jobs, cached counts, Wanted and
 Discover layout). It is in tree; it is not a reason to reopen 1.7’s
 product decisions.
@@ -615,7 +615,7 @@ matrix in one change.
 (after-17-workbench)=
 ### Workbench and docs residuals
 
-The unreleased hardening wave covers security headers, orphaned jobs,
+The 1.8.0 hardening wave covers security headers, orphaned jobs,
 cached counts, layout, Wanted and Discover structure, Preview-gated
 Apply, and an opt-in browser test lane. Leave that wave’s bugs in its
 own fixes.
@@ -696,7 +696,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.8.5).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.0).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -704,7 +704,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.8.5` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.9.0` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=

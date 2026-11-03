@@ -86,7 +86,7 @@ No campus access: choose **Open access**. Campus library login: choose
 [Configuration](docs/config.md).
 
 ```sh
-git clone --branch v1.8.5 https://github.com/glen-w/Paperful.git
+git clone --branch v1.9.0 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env          # PAPERFUL_DATA=. PAPERFUL_OUT=./out keeps data here
                               # .env.example sets PAPERFUL_IMAGE_MODE=heavy

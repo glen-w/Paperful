@@ -6,6 +6,8 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.9.0 — 2026-11-03
+
 - **CI.** GitHub Actions runs one Ubuntu smoke job (`pytest -m smoke`). The OS and Python matrix, lint, audit, socket, fresh-install, browser, and docker jobs are off the gate until each is green on its own. The order is in the roadmap.
 
 ## 1.8.5 — 2026-11-02
