@@ -271,18 +271,20 @@
           <pre class="code"><code>git clone --branch v1.9.0 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
-mkdir -p ../paperful-data
+mkdir -p ../paperful-data ../paperful-out
 cp config.minimal.toml ../paperful-data/config.toml   # set email
 docker compose build
 docker compose run --rm paperful doctor
 docker compose up</code></pre>
           <p>
             Compose reads <code>config.toml</code> from
-            <code>PAPERFUL_DATA</code> (the <code>.env</code> default is
-            <code>../paperful-data</code>), not from the git root. Set a real
-            <code>email</code> in that file (Unpaywall). To keep data in the
-            checkout, set <code>PAPERFUL_DATA=.</code> and copy
-            <code>config.toml</code> next to <code>compose.yaml</code>.
+            <code>PAPERFUL_DATA</code> and the PDF mirror from
+            <code>PAPERFUL_OUT</code> (the <code>.env</code> defaults are
+            <code>../paperful-data</code> and <code>../paperful-out</code>),
+            not from the git root. Set a real <code>email</code> in that file
+            (Unpaywall). To keep data in the checkout, set
+            <code>PAPERFUL_DATA=.</code> and <code>PAPERFUL_OUT=./out</code>,
+            then copy <code>config.toml</code> next to <code>compose.yaml</code>.
           </p>
           <p class="fine">
             Omit <code>--branch v1.9.0</code> to track latest <code>main</code>.

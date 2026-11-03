@@ -9,9 +9,11 @@ voice here; operator depth lives in `./guide/`.
 - Logos live in [images/](images/) (copied from `docs/`): `logo.png` (ink wordmark for light backgrounds) and `logo-dark.png` (cream wordmark for dark backgrounds). The README picks via `prefers-color-scheme`.
 - Footer version should match [pyproject.toml](../pyproject.toml) `version` (currently **1.9.0**).
 - Stability story is [docs/releases.md](../docs/releases.md).
-- Install snippet matches README: `docker compose build`, then `doctor`, then
-  `docker compose up` (workbench at http://127.0.0.1:8765). CLI one-shots stay
-  `docker compose run --rm paperful …`.
+- Install snippet matches the sibling-mount path in `docs/docker.md` and
+  `.env.example` defaults (`../paperful-data` + `../paperful-out`):
+  `docker compose build`, then `doctor`, then `docker compose up` (workbench at
+  http://127.0.0.1:8765). README keeps the optional repo-local
+  `PAPERFUL_DATA=.` variant. CLI one-shots stay `docker compose run --rm paperful …`.
   Build the image on your computer with `docker compose build`. `.env.example` sets
   `PAPERFUL_IMAGE_MODE=heavy`; CI builds **light**. `uv` is the contributor path.
   Guide: `./guide/docker.html` (light vs heavy packs).

@@ -42,8 +42,9 @@ exclude_patterns = [
     "_build",
     "Thumbs.db",
     ".DS_Store",
-    # Maintainer planning notes (not part of the published guide).
+    # Maintainer planning notes / maturity surveys (not part of the published guide).
     "plans/**",
+    "assessments/**",
 ]
 
 source_suffix = {

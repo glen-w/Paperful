@@ -79,13 +79,14 @@ docker compose up
 docker compose run --rm paperful run --collection interesting --dry-run
 ```
 
-**Or migrate into sibling mounts** (recommended if you use Compose long-term):
+**Or migrate into sibling mounts** (recommended if you use Compose long-term;
+same layout as [paperful.app](https://paperful.app/#install)):
 
 ```sh
 cp .env.example .env   # PAPERFUL_DATA=../paperful-data PAPERFUL_OUT=../paperful-out
 mkdir -p ../paperful-data/packs ../paperful-data/profiles ../paperful-data/state
 mkdir -p ../paperful-out
-cp config.example.toml ../paperful-data/config.toml
+cp config.minimal.toml ../paperful-data/config.toml   # or config.example.toml for the full file
 # edit email / ezproxy_base / grey_playbooks_dir = "packs" as needed
 # optional: move existing state/ into ../paperful-data/ and out/ into ../paperful-out/
 docker compose build

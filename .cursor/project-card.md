@@ -27,6 +27,14 @@ architecture_rules:
   - default tests stay offline (fixture HTML / mocks — no live Zotero or network)
   - Docker Compose build on this machine is the operator path; PAPERFUL_IMAGE_MODE light (CI) vs heavy (llm/rag/browser-agent); uv is the contributor path; host Zotero + headed session login stay outside; durable data via PAPERFUL_DATA + PAPERFUL_OUT when using Compose
 release_governance: none
+roadmap_doc: docs/ROADMAP.md
+doc_assessments: docs/assessments
+maturity_bars:
+  - trust checklist shipped
+  - GitHub Latest matches PyPI
+  - stop bumping for freeze
+  - workbench stays the 1.x surface
+public_url: https://glenwright.earth/Paperful/
 backup_hub: "$HOME/Documents/code backups"
 backup_excludes:
   - out
