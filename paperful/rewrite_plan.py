@@ -18,6 +18,8 @@ SKIP_REASONS = (
     "leakage",
     "cap",
     "drift",
+    "docx_miss",
+    "office_miss",
 )
 
 

@@ -225,29 +225,51 @@ def _paragraphs(doc: Any, text: str) -> list[str]:
     return [p for p in text.split("\n\n") if p.strip()]
 
 
+def _as_office_skips(
+    raw: list[Any], *, reason: str
+) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for item in raw:
+        if isinstance(item, dict):
+            row = {
+                "finding_id": str(item.get("finding_id") or ""),
+                "reason": str(item.get("reason") or reason),
+            }
+            if item.get("detail"):
+                row["detail"] = str(item["detail"])[:80]
+            rows.append(row)
+            continue
+        rows.append({"finding_id": "", "reason": reason, "detail": str(item)[:80]})
+    return rows
+
+
 def _write_tracked(
     folder: Path,
     manuscript: Path,
     paragraphs: list[str],
     edits: list[RewriteEdit],
-) -> tuple[Path, Path | None]:
+) -> tuple[Path, Path | None, list[dict[str, str]]]:
     """Native tracked file when the source is Office; Word spine otherwise."""
     suffix = manuscript.suffix.lower()
     if suffix == ".docx":
         dest = folder / "tracked.docx"
-        apply_tracked_docx(manuscript, dest, edits)
-        return dest, manuscript
+        skips = _as_office_skips(
+            apply_tracked_docx(manuscript, dest, edits), reason="docx_miss"
+        )
+        return dest, manuscript, skips
     if suffix == ".pptx":
         dest = folder / "tracked.pptx"
-        apply_pptx(manuscript, dest, edits)
-        return dest, manuscript
+        skips = _as_office_skips(apply_pptx(manuscript, dest, edits), reason="office_miss")
+        return dest, manuscript, skips
     if suffix == ".odt":
         dest = folder / "tracked.odt"
-        apply_odt(manuscript, dest, edits)
-        return dest, manuscript
+        skips = _as_office_skips(apply_odt(manuscript, dest, edits), reason="office_miss")
+        return dest, manuscript, skips
     dest = folder / "tracked.docx"
-    build_docx_from_paragraphs(dest, paragraphs, edits)
-    return dest, None
+    skips = _as_office_skips(
+        build_docx_from_paragraphs(dest, paragraphs, edits), reason="docx_miss"
+    )
+    return dest, None, skips
 
 
 def _write_odt(
@@ -255,13 +277,15 @@ def _write_odt(
     manuscript: Path,
     paragraphs: list[str],
     edits: list[RewriteEdit],
-) -> tuple[Path, Path | None]:
+) -> tuple[Path, Path | None, list[dict[str, str]]]:
     dest = folder / "tracked.odt"
     if manuscript.suffix.lower() == ".odt":
-        apply_odt(manuscript, dest, edits)
-        return dest, manuscript
-    build_odt_from_paragraphs(dest, paragraphs, edits)
-    return dest, None
+        skips = _as_office_skips(apply_odt(manuscript, dest, edits), reason="office_miss")
+        return dest, manuscript, skips
+    skips = _as_office_skips(
+        build_odt_from_paragraphs(dest, paragraphs, edits), reason="office_miss"
+    )
+    return dest, None, skips
 
 
 def build_rewrite(
@@ -458,17 +482,33 @@ def build_rewrite(
             (folder / f"sidecar{suffix}").write_text(sidecar, encoding="utf-8")
         paras = _paragraphs(doc, text)
         office: dict[str, tuple[Path, Path | None]] = {}
+        office_skips: list[dict[str, str]] = []
         if "tracked" in output_ids:
-            dest, source = _write_tracked(folder, manuscript, paras, plan.edits)
+            dest, source, extra = _write_tracked(
+                folder, manuscript, paras, plan.edits
+            )
             office[dest.name] = (dest, source)
+            office_skips.extend(extra)
             payload["tracked"] = dest.name
+            if source is None:
+                payload["input"]["tracked_spine"] = True
         if "odt" in output_ids:
             if "tracked.odt" in office:
                 dest, source = office["tracked.odt"]
             else:
-                dest, source = _write_odt(folder, manuscript, paras, plan.edits)
+                dest, source, extra = _write_odt(
+                    folder, manuscript, paras, plan.edits
+                )
                 office[dest.name] = (dest, source)
+                office_skips.extend(extra)
             payload["odt"] = dest.name
+            if source is None:
+                payload["input"]["tracked_spine"] = True
+        if office_skips:
+            plan.skips.extend(office_skips)
+            payload["counts"]["skips"] = len(plan.skips)
+            payload["plan"] = plan.to_dict()
+            write_json(folder / "plan.json", plan.to_dict())
         if "pdf" in output_ids:
             pdf_dest = folder / "tracked.pdf"
             pdf_skips = build_pdf_from_paragraphs(pdf_dest, paras, plan.edits)

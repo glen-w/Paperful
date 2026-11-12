@@ -108,8 +108,10 @@ drafts should not assume them. See [llm.md](llm.md).
 - Body edits must not mention Paperful, the critique pack, or “the reviewer”.
 - Weak alignment → skip or a Word comment, not a guessed rewrite.
 - Tracked-changes v1 uses stdlib OOXML for `.docx`. Unique paragraph match
-  only; miss → skip. Complex Word (fields, existing revisions, text boxes) is
-  not round-tripped. `.pptx` / `.odt` get a copy with unique-span
+  only; miss → skip. If a paragraph has run properties, fields, existing
+  revisions, or a text box, rewrite leaves the runs and writes a Word
+  comment instead of flattening. Apply-time misses are recorded on the plan
+  (`docx_miss` / `office_miss`). Complex Word is not round-tripped. `.pptx` / `.odt` get a copy with unique-span
   replacements (not Word revision markup; comments stay in the edit plan).
   `--output odt` on a non-ODT source builds a paragraph OpenDocument spine
   the same way. `--output pdf` prints the applied text with numbered comment

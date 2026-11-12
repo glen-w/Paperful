@@ -485,6 +485,114 @@ def test_tracked_docx_insert_delete(tmp_path: Path):
     assert docx_structural_issues(dest) == []
 
 
+def test_tracked_docx_mixed_runs_become_comment(tmp_path: Path):
+    src = tmp_path / "src.docx"
+    body = (
+        '<?xml version="1.0"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:p>"
+        "<w:r><w:t>The </w:t></w:r>"
+        "<w:r><w:rPr><w:b/></w:rPr><w:t>Maritime Area beyond national jurisdictions</w:t></w:r>"
+        "<w:r><w:t> apply.</w:t></w:r>"
+        "</w:p>"
+        "</w:document>"
+    )
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("word/document.xml", body)
+        zf.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>',
+        )
+    dest = tmp_path / "out.docx"
+    edit = RewriteEdit(
+        kind="replace",
+        finding_ids=["a"],
+        area="style",
+        quote="Maritime Area beyond national jurisdictions",
+        replacement="Areas Beyond National Jurisdiction",
+    )
+    skips = apply_tracked_docx(src, dest, [edit])
+    assert skips == []
+    with zipfile.ZipFile(dest) as zf:
+        xml = zf.read("word/document.xml").decode("utf-8")
+        comments = zf.read("word/comments.xml").decode("utf-8")
+    assert "w:b" in xml
+    assert "w:ins" not in xml
+    assert "Maritime Area beyond national jurisdictions" in xml
+    assert "complex formatting" in comments.lower() or "Tracked change skipped" in comments
+
+
+def test_second_body_edit_on_paragraph_is_docx_miss(tmp_path: Path):
+    src = tmp_path / "src.docx"
+    body = (
+        '<?xml version="1.0"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:p><w:r><w:t>Maritime Area beyond national jurisdictions apply here.</w:t></w:r></w:p>"
+        "</w:document>"
+    )
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("word/document.xml", body)
+        zf.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>',
+        )
+    dest = tmp_path / "out.docx"
+    edits = [
+        RewriteEdit(
+            kind="replace",
+            finding_ids=["a"],
+            area="style",
+            quote="Maritime Area beyond national jurisdictions",
+            replacement="Areas Beyond National Jurisdiction",
+        ),
+        RewriteEdit(
+            kind="replace",
+            finding_ids=["b"],
+            area="style",
+            quote="apply here",
+            replacement="apply in this Part",
+        ),
+    ]
+    skips = apply_tracked_docx(src, dest, edits)
+    assert any(s.get("reason") == "docx_miss" for s in skips)
+    assert any(s.get("finding_id") == "b" for s in skips)
+
+
+def test_build_rewrite_records_docx_miss_on_plan(cfg, tmp_path: Path):
+    src = tmp_path / "draft.docx"
+    body = (
+        '<?xml version="1.0"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:p><w:r><w:t>Maritime Area beyond national jurisdictions apply here.</w:t></w:r></w:p>"
+        "</w:document>"
+    )
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("word/document.xml", body)
+        zf.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>',
+        )
+    finding_a = _finding()
+    finding_b = _finding(
+        quote="apply here",
+        extra={"suggested": "apply in this Part"},
+        loc="paragraph 1",
+    )
+    finding_b["id"] = "f-b"
+    pack = _pack([finding_a, finding_b], path=str(src))
+    result = build_rewrite(
+        cfg,
+        pack=pack,
+        manuscript=src,
+        areas=("style",),
+        outputs=("edits", "tracked"),
+        dry_run=False,
+        llm_client=None,
+    )
+    reasons = {s.get("reason") for s in (result.get("plan") or {}).get("skips") or []}
+    assert "docx_miss" in reasons
+
+
 def _docx_with_comment(path: Path, *, para: str, comment_id: str, body: str) -> None:
     document = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
