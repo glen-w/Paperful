@@ -13,6 +13,7 @@ from .critique import critique_id, latest_pack_dir, load_pack
 from .critique_extract import extract_path
 from .fsio import file_sha256
 from .rewrite_align import Alignment, align_finding, unique_span
+from .rewrite_check import filter_broken_edits
 from .rewrite_areas import (
     COMMENT_ONLY_CODES,
     STYLE_COMMENT_CODES,
@@ -433,6 +434,8 @@ def build_rewrite(
             calls.append({"area": spec.id, **meta})
         proposed.extend(edits)
         skips.extend(extra_skips)
+
+    proposed = filter_broken_edits(cfg, proposed, skips, full_text=text)
 
     plan = merge_edits(
         proposed, max_edits=int(cfg.rewrite_max_edits or 80), existing_skips=skips
