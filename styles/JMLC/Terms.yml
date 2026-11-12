@@ -1,0 +1,30 @@
+extends: substitution
+message: 'Use "%s" instead of "%s" (JMLC/Emerald AML usage).'
+level: warning
+ignorecase: true
+swap:
+  antimoney laundering: anti-money laundering
+  anti money laundering: anti-money laundering
+  anti-money-laundering: anti-money laundering
+  counterterror: counter-terror
+  counter terrorism financing: countering the financing of terrorism
+  counter-terrorism financing: countering the financing of terrorism
+  wash money: launder money
+  wash funds: launder funds
+
+---
+extends: existence
+message: 'Spell out "Financial Action Task Force (FATF)" on first substantive mention, then use FATF.'
+level: suggestion
+scope: text
+tokens:
+  - '\bFinancial Action Task Force \(FATF\)'
+
+---
+extends: existence
+message: 'Consider defining "anti-money laundering (AML)" on first use; JMLC readers span law, compliance, and policy.'
+level: suggestion
+scope: text
+tokens:
+  - '\banti-money laundering \(AML\)'
+  - '\bAnti-money laundering \(AML\)'

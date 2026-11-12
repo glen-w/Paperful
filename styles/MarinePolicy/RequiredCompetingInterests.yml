@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Declare competing interests (or that there is nothing to declare)."
+link: https://www.sciencedirect.com/journal/marine-policy/publish/guide-for-authors
+level: warning
+scope: raw
+ignorecase: true
+min: 1
+token: 'competing interests|conflict of interest|conflicts of interest|nothing to declare'

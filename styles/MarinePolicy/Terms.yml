@@ -1,0 +1,17 @@
+extends: substitution
+message: "Use '%s' (Marine Policy / UNCLOS usage) instead of '%s'."
+link: https://www.sciencedirect.com/journal/marine-policy/publish/guide-for-authors
+level: suggestion
+ignorecase: true
+swap:
+  unclos: UNCLOS
+  eez: EEZ
+  "high seas treaty": BBNJ Agreement
+  "biodiversity beyond national jurisdiction treaty": BBNJ Agreement
+  abmt: ABMT
+  abmts: ABMTs
+  "iuu fishing": IUU fishing
+  "illegal unreported and unregulated fishing": illegal, unreported and unregulated (IUU) fishing
+  "flagstate": flag State
+  "flag-state": flag State
+  "coastal-state": coastal State

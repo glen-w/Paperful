@@ -1,0 +1,9 @@
+extends: substitution
+message: "Consider '%s' instead of '%s'."
+link: https://www.sciencedirect.com/journal/marine-policy/publish/guide-for-authors
+level: suggestion
+ignorecase: true
+swap:
+  "due to the fact that": because
+  "in spite of the fact that": although
+  "on a regular basis": regularly

@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Journal of Cleaner Production asks for practical cleaner production contributions. Name implications for practice, policy, production, or resource use."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/publish/guide-for-authors
+level: warning
+scope: raw
+ignorecase: true
+min: 1
+token: 'practical implication|implications for (practice|policy|policymakers|managers|industry|production)|policy implication|cleaner production practice|managerial implication'

@@ -6,6 +6,9 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+- **Example Vale styles.** The repo ships `styles/JMLC`, `styles/JCP`, and `styles/MarinePolicy` for `critique --vale`. Other packs under `styles/` stay local and gitignored.
+- **Critique JSON turns.** Review lanes send Ollama `format=json` and `think=false`, parse replies that wrap think-tags or trailing commas, and retry once when the first object is unusable. MARG aspect groups that never `action=final` get one forced final turn before `empty_reply`.
+
 ## 1.9.0 — 2026-11-03
 
 - **CI.** GitHub Actions runs one Ubuntu smoke job (`pytest -m smoke`). The OS and Python matrix, lint, audit, socket, fresh-install, browser, and docker jobs are off the gate until each is green on its own. The order is in the roadmap.

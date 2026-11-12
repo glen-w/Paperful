@@ -1,0 +1,20 @@
+extends: consistency
+message: "Mix of American and British English ('%s'). Journal of Cleaner Production accepts either, not both."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/publish/guide-for-authors
+level: warning
+ignorecase: true
+either:
+  behaviour: behavior
+  favour: favor
+  organise: organize
+  organisation: organization
+  analyse: analyze
+  centre: center
+  defence: defense
+  labour: labor
+  licence: license
+  towards: toward
+  whilst: while
+  amongst: among
+  modelling: modeling
+  ageing: aging

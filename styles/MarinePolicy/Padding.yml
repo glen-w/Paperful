@@ -1,0 +1,8 @@
+extends: existence
+message: "Consider cutting '%s'."
+link: https://www.sciencedirect.com/journal/marine-policy/publish/guide-for-authors
+level: suggestion
+ignorecase: true
+tokens:
+  - it is important to note that
+  - it should be noted that

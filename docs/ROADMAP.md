@@ -561,7 +561,7 @@ install.
 | --- | --- | --- |
 | Ocean / BBNJ | [bbnj-author-lanes](bbnj-author-lanes.md), grey packs, `author_site`, `authorwatch` | `since` and the topic gap map on `ocean/BBNJ` |
 | Policy grey | `search` / `search watch`, RFMO and UN-doc playbooks | Playbook health on learned rows, or `siblings` if the holdings actually link out |
-| Journal desk | `styles/JMLC` and the other house styles; `critique` | Claim-check on one manuscript extract. Not a new style product |
+| Journal desk | Shipped example packs `styles/JMLC`, `styles/JCP`, `styles/MarinePolicy`; `critique` | Claim-check on one manuscript extract. Not a new style product |
 
 Do not open a fourth desk to justify a feature.
 
@@ -1445,7 +1445,10 @@ for real-library runs; keep filled reports under gitignored `assessments/`.
   browser (SSO / PDF link / download control), then optional opt-in `camofox`
   (external camofox-browser REST; scripted grab; [camofox.md](camofox.md)) and
   optional `browser_agent`; items stay `retryable` / `soft block` rather than
-  hard `not_found`. Dead vault landings (`login` / `captcha` / `no download
+  hard `not_found`. **Later (fetch, not a bypass product):** if vault retry
+  of those 403 / empty httpx bodies is the bottleneck, an opt-in TLS
+  impersonator on scripted HTTP only — [CAPTCHA open question 4](#optional-llm-assist-local-litellm).
+  Dead vault landings (`login` / `captcha` / `no download
   control`) silence that final host for the rest of the run; transport timeouts
   use a short connect budget and do not permanently block a publisher on a
   single blip. Manual handoff: `run` / `gaps --handoff list|tabs|walk|watch` and
@@ -1913,6 +1916,16 @@ Open questions before wiring anything else:
    only on scripted httpx while leaving vault UA alone. Measure against host
    silence, 403/soft-block rates, and campus/Google posture; opt-in config only,
    not a default anti-bot product.
+4. **Small HTTP impersonator (later, not a scrape framework).** Some
+   publisher `downloadpdf` links 403 on stock httpx TLS while the same URL
+   works in the vault browser. **Later, if that retry is the bottleneck:**
+   an opt-in extra that impersonates a browser TLS fingerprint on *scripted
+   HTTP only* (typical engine: `curl_cffi` or httpx impersonate), still
+   behind `is_fetchable_url`, pacing, circuit breaker, and email identity.
+   Never a default. Never Cloudflare / Turnstile / CAPTCHA solving. Do
+   **not** take on a crawl kit (Scrapling, Scrapy, Camoufox-in-process) for
+   this — Camofox and `browser_agent` already cover recover. Measure 403 /
+   empty-body rates against vault retry before wiring. Sibling of question 3.
 
 **MVP:** when a title looks wonky (ALL CAPS, truncated, HTML junk, filename-as-title,
 mojibake), propose a cleaned title using **abstract and/or first-page PDF text**
@@ -2807,7 +2820,9 @@ Larger product bets. Park until the ledger and core loop justify them.
    report (which hosts / win kinds paid off); **allowlisted extensions** on the
    vault profile for agent ergonomics (see Optional LLM — extensions bullet);
    **user-agent switcher** spike (CAPTCHA open question #3 under Optional LLM)
-   for between-item or mid-run rotation vs stable profile UA. **Shipped:** `--format json`
+   for between-item or mid-run rotation vs stable profile UA; **later** a
+   small opt-in HTTP TLS impersonator on scripted fetch only (question #4;
+   not Scrapling, not a CAPTCHA product). **Shipped:** `--format json`
    (`paperful.agent.json.v1`) on batch verbs (`run`, `refs gap`, `coverage`,
    `ingest-dois`, `inbox drain`, `ask`, snowball crawl/apply, …); documented exit-code
    table (`0` ok, `1` user, `2` manager down, `3` partial write batch). **MCP** is a thin

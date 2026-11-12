@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Journal of Cleaner Production encourages a graphical abstract (separate file, at least 1328 px wide)."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/publish/guide-for-authors
+level: suggestion
+scope: raw
+ignorecase: true
+min: 1
+token: 'graphical abstract'

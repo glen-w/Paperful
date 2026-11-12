@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Journal of Cleaner Production desk-rejects for scope. Name the cleaner production, sustainability, or environmental contribution in the extract."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/about/news/policy-statement-for-rejecting-articles-before-peer-review
+level: warning
+scope: raw
+ignorecase: true
+min: 1
+token: 'cleaner production|sustainability|sustainable (development|consumption|transition|product)|environmental (assessment|sustainability|impact)|circular economy|eco-efficiency'

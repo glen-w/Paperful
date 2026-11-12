@@ -1,0 +1,14 @@
+; Marine Policy — Vale config for Paperful critique
+; Copy to your project root as .vale.ini (or set [critique].vale_config).
+;
+;   cp styles/MarinePolicy/vale.ini.example .vale.ini
+;   vale --config=.vale.ini path/to/manuscript.txt
+;   uv run paperful critique --file manuscript.docx --vale
+;
+; Do not mix with JCP (citation styles conflict).
+
+StylesPath = styles
+MinAlertLevel = suggestion
+
+[*]
+BasedOnStyles = MarinePolicy

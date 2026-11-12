@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Marine Policy full-length articles should include a discussion of policy impact."
+link: https://www.sciencedirect.com/journal/marine-policy/publish/guide-for-authors
+level: warning
+scope: raw
+ignorecase: true
+min: 1
+token: 'policy (impact|implication|relevance|recommendation)s?|implications for (policy|management|governance)|policy[- ]makers'

@@ -1,0 +1,43 @@
+extends: existence
+message: 'Emerald Harvard in-text citations use "and", not "&", between two author surnames.'
+level: warning
+scope: text
+nonword: true
+tokens:
+  - '\([A-Za-z][A-Za-z\-''’]+ & [A-Za-z]'
+
+---
+extends: existence
+message: 'Use "et al." (with a full stop) for three or more authors in Harvard citations.'
+level: suggestion
+scope: text
+nonword: true
+tokens:
+  - '\bet al[^.]'
+
+---
+extends: existence
+message: 'Emerald Harvard uses "pp." for page ranges in references (e.g. pp.175-179).'
+level: suggestion
+scope: text
+tokens:
+  - '\bpp\.[0-9]+-[0-9]+\b'
+  - '\bpp\.[0-9]+–[0-9]+\b'
+
+---
+extends: existence
+message: 'Write full page ranges in references (e.g. 175-179), not abbreviated spans like 175-9.'
+level: warning
+scope: text
+nonword: true
+tokens:
+  - '\bpp\.[0-9]+-[0-9]{1}\b'
+  - '\bpp\.[0-9]+–[0-9]{1}\b'
+
+---
+extends: existence
+message: 'After a colon or dash in an article title, the following letter is lower case in Emerald Harvard references.'
+level: suggestion
+scope: text
+tokens:
+  - '", [A-Z][^"]*: [A-Z]'

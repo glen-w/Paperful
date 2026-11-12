@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Journal of Cleaner Production desk-rejects regional papers that are not placed in a wider international context."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/about/news/policy-statement-for-rejecting-articles-before-peer-review
+level: suggestion
+scope: raw
+ignorecase: true
+min: 1
+token: '\b(international|global|cross-country|cross-national|across countries|worldwide)\b'

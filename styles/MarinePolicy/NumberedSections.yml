@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Marine Policy asks authors to divide the manuscript into numbered sections (1, 1.1, 1.2) and to use that numbering for cross-references."
+link: https://www.sciencedirect.com/journal/marine-policy/publish/guide-for-authors
+level: suggestion
+scope: raw
+ignorecase: false
+min: 1
+token: '(?m)^(?:\d+\.\d+|\d+\.\s+[A-Z])'

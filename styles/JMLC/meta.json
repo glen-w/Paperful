@@ -1,0 +1,8 @@
+{
+  "name": "JMLC",
+  "description": "Journal of Money Laundering Control (Emerald) — house style derived from Emerald author guidelines and published JMLC articles.",
+  "url": "https://www.emeraldgrouppublishing.com/journal/jmlc",
+  "author": "Paperful",
+  "license": "MIT",
+  "vale_version": ">=2.0.0"
+}

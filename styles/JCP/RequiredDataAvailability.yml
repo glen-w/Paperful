@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Journal of Cleaner Production requires a data availability statement (Option C: deposit and cite, or explain why data cannot be shared)."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/publish/guide-for-authors
+level: warning
+scope: raw
+ignorecase: true
+min: 1
+token: 'data availability|research data|data statement|data cannot be shared'

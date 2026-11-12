@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Declare funding sources, or state that no specific grant was received."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/publish/guide-for-authors
+level: warning
+scope: raw
+ignorecase: true
+min: 1
+token: '\bfunding\b|this research did not receive any specific grant'

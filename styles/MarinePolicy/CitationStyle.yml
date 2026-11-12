@@ -1,0 +1,9 @@
+extends: existence
+message: "Marine Policy uses numbered citations in square brackets (e.g. [1]), not author-date '%s'."
+link: https://www.sciencedirect.com/journal/marine-policy/publish/guide-for-authors
+level: warning
+nonword: true
+ignorecase: false
+tokens:
+  - '\([A-Z][A-Za-z''’-]+(?:\s+(?:et al\.?|and|&)\s+[A-Z][A-Za-z''’-]+)?,?\s+\d{4}[a-z]?(?::\s*\d+(?:[-–]\d+)?)?\)'
+  - '\b[A-Z][A-Za-z''’-]+\s+et al\.?\s+\(\d{4}[a-z]?\)'

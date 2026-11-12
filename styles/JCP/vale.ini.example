@@ -1,0 +1,14 @@
+; Journal of Cleaner Production — Vale config for Paperful critique
+; Copy to your project root as .vale.ini (or set [critique].vale_config).
+;
+;   cp styles/JCP/vale.ini.example .vale.ini
+;   vale --config=.vale.ini path/to/manuscript.txt
+;   uv run paperful critique --file manuscript.docx --vale
+;
+; Do not mix with MarinePolicy (citation styles conflict).
+
+StylesPath = styles
+MinAlertLevel = suggestion
+
+[*]
+BasedOnStyles = JCP

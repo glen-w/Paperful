@@ -1,0 +1,6 @@
+extends: metric
+message: "Extracted text is %s words. Marine Policy full-length articles are normally 4000–6000 words excluding abstract, references, and acknowledgements."
+link: https://www.sciencedirect.com/journal/marine-policy/publish/guide-for-authors
+level: suggestion
+formula: words
+condition: "> 12000"

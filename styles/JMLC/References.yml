@@ -1,0 +1,31 @@
+extends: existence
+message: 'Emerald journal references typically use "Vol. X No. Y" (see JMLC reference list examples).'
+level: suggestion
+scope: text
+tokens:
+  - 'Vol\. [0-9]+ No\. [0-9]+'
+
+---
+extends: existence
+message: 'Include a DOI at the end of reference list entries when one exists (Emerald requirement).'
+level: suggestion
+scope: text
+tokens:
+  - 'https://doi\.org/10\.'
+
+---
+extends: existence
+message: 'Reference list entries use double quotes around article and chapter titles in Emerald Harvard.'
+level: suggestion
+scope: text
+tokens:
+  - '[A-Za-z]\. \([0-9]{4}\), "[^"]+",'
+
+---
+extends: existence
+message: 'Sort the reference list alphabetically by first author surname (Emerald Harvard).'
+level: suggestion
+scope: text
+# Vale cannot verify sort order; this nudges authors to include a References heading.
+tokens:
+  - '(?m)^References\s*$'

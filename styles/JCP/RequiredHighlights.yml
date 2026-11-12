@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Journal of Cleaner Production requires Highlights at submission (3 to 5 bullets, each at most 85 characters including spaces)."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/publish/guide-for-authors
+level: warning
+scope: raw
+ignorecase: true
+min: 1
+token: '\bhighlights\b'

@@ -1,0 +1,20 @@
+extends: substitution
+message: 'Emerald is UK-based; prefer British "%s" over American "%s" unless quoting US legislation or sources.'
+level: suggestion
+ignorecase: true
+swap:
+  organization: organisation
+  organizations: organisations
+  behavior: behaviour
+  behaviors: behaviours
+  analyze: analyse
+  analyzed: analysed
+  analyzing: analysing
+  modeling: modelling
+  modeled: modelled
+  center: centre
+  centers: centres
+  defense: defence
+  labor: labour
+  favor: favour
+  favored: favoured

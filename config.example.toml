@@ -192,7 +192,9 @@ mirror_failures_before_skip = 3
 # ai_model = false                 # optional Binoculars extra (uv pip install git+https://github.com/ahans30/Binoculars.git); --ai-model turns on (no CLI off)
 # vale = false                     # optional Vale house style; --vale turns on (no CLI off)
 # vale_config = ".vale.ini"        # your house .vale.ini (relative to this file)
-#                                  # JMLC target journal: cp styles/JMLC/vale.ini.example .vale.ini
+#                                  # examples: cp styles/JMLC/vale.ini.example .vale.ini
+#                                  #           cp styles/JCP/vale.ini.example .vale.ini
+#                                  #           cp styles/MarinePolicy/vale.ini.example .vale.ini
 # vale_min_alert_level = "suggestion"  # suggestion | warning | error
 # vale_timeout_s = 60
 # forensics = false              # optional PaperGuard scan; --forensics turns on (no CLI off)

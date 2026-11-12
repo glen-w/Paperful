@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Corresponding authors must acknowledge co-author contributions using CRediT roles."
+link: https://www.sciencedirect.com/journal/marine-policy/publish/guide-for-authors
+level: suggestion
+scope: raw
+ignorecase: true
+min: 1
+token: '\bCRediT\b|author contributions|conceptualization|writing – original draft|writing - original draft'

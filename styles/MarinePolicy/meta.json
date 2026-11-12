@@ -1,0 +1,6 @@
+{
+  "author": "paperful house style",
+  "description": "Marine Policy (Elsevier, ISSN 0308-597X) checks from the Guide for Authors. Not an official Elsevier package.",
+  "feed": "https://www.sciencedirect.com/journal/marine-policy/publish/guide-for-authors",
+  "vale_version": ">=3.0.0"
+}

@@ -1,0 +1,16 @@
+extends: substitution
+message: "Prefer inclusive wording ('%s') over '%s'."
+link: https://www.sciencedirect.com/journal/marine-policy/publish/guide-for-authors
+level: warning
+ignorecase: true
+swap:
+  he/she: they
+  s/he: they
+  he or she: they
+  his/her: their
+  his or her: their
+  him/her: them
+  man-made: human-made
+  manpower: workforce
+  "the disabled": people with disabilities
+  "the elderly": older people

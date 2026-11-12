@@ -1,0 +1,11 @@
+extends: existence
+message: "Cross-reference numbered sections (1, 1.1) instead of referring to '%s'."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/publish/guide-for-authors
+level: suggestion
+ignorecase: true
+tokens:
+  - refer to the text
+  - see the text
+  - in the text above
+  - in the text below
+  - as described in the text

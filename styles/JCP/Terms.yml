@@ -1,0 +1,13 @@
+extends: substitution
+message: "Use '%s' (Journal of Cleaner Production / field usage) instead of '%s'."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/publish/guide-for-authors
+level: suggestion
+ignorecase: true
+swap:
+  "clean production": cleaner production
+  "life-cycle assessment": life cycle assessment
+  "eco efficiency": eco-efficiency
+  "post growth": post-growth
+  "circular-economy": circular economy
+  sdgs: SDGs
+  "sustainable development goals (sdg)": Sustainable Development Goals (SDGs)

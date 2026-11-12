@@ -1,0 +1,22 @@
+extends: substitution
+message: 'JMLC serves practitioners and policymakers; prefer plain "%s" over "%s" where possible.'
+level: suggestion
+ignorecase: true
+swap:
+  utilise: use
+  utilized: used
+  utilizing: using
+  in order to: to
+  prior to: before
+  subsequent to: after
+  with regard to: about
+  in the event that: if
+  at this point in time: now
+
+---
+extends: existence
+message: 'Open with the paper’s contribution early; Emerald practitioner guidance discourages long preambles.'
+level: suggestion
+scope: text
+tokens:
+  - '(?is)^1\. introduction\s+\w+(?:\s+\w+){120,}'

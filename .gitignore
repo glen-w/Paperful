@@ -1,5 +1,6 @@
 config.toml
 .vale.ini
+.vale-*.ini
 .venv/
 out/
 state/
@@ -24,3 +25,14 @@ compose.override.yaml
 docker-compose.override.yml
 assessments/
 docs/bbnj-author-lanes.md
+# Local Vale house styles. JCP, JMLC, and MarinePolicy are shipped examples.
+styles/*
+!styles/README.md
+!styles/JCP/
+!styles/JCP/**
+!styles/JMLC/
+!styles/JMLC/**
+!styles/MarinePolicy/
+!styles/MarinePolicy/**
+# Local measurement lists for unshipped Vale packs
+research/iddri-ocean-blogs/

@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Journal of Cleaner Production asks for theoretical as well as practical cleaner production contributions. Name the theoretical contribution, framework, or hypothesis."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/publish/guide-for-authors
+level: warning
+scope: raw
+ignorecase: true
+min: 1
+token: 'theoretical (contribution|gap|framework|basis)|contribution to (theory|the literature)|analytical framework|this (article|paper) (proposes|develops|introduces|extends)|hypothes[ei]s'

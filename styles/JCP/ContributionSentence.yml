@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Name the contribution in the abstract or introduction ('This paper proposes… / develops… / examines…')."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/publish/guide-for-authors
+level: suggestion
+scope: raw
+ignorecase: true
+min: 1
+token: 'this (article|paper) (explores|examines|considers|introduces|argues|provides|proposes|develops|draws|aims|uses|reviews|applies)'

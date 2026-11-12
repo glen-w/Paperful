@@ -1,0 +1,6 @@
+{
+  "author": "paperful house style",
+  "description": "Journal of Cleaner Production (Elsevier, ISSN 0959-6526) checks from the Guide for Authors and the desk-reject policy. Not an official Elsevier package.",
+  "feed": "https://www.sciencedirect.com/journal/journal-of-cleaner-production/publish/guide-for-authors",
+  "vale_version": ">=3.0.0"
+}

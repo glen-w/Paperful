@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Marine Policy requires 1 to 7 English keywords (avoid multi-word phrases with 'and' or 'of')."
+link: https://www.sciencedirect.com/journal/marine-policy/publish/guide-for-authors
+level: warning
+scope: raw
+ignorecase: true
+min: 1
+token: '\bkeywords?\b'

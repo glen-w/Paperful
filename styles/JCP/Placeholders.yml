@@ -1,0 +1,15 @@
+extends: existence
+message: "Replace drafting placeholder '%s' before submission."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/publish/guide-for-authors
+level: warning
+ignorecase: true
+nonword: true
+tokens:
+  - '\[xx\]'
+  - '\[TODO\]'
+  - '\[TBD\]'
+  - '\bTODO\b'
+  - '\bFIXME\b'
+  - lorem ipsum
+  - '\[cite\]'
+  - '\[ref\]'

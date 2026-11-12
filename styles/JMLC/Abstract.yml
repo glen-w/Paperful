@@ -1,0 +1,40 @@
+extends: existence
+message: 'Include a structured abstract subheading "Purpose" (with colon or en dash).'
+level: error
+scope: text
+tokens:
+  - 'Purpose –'
+  - 'Purpose:'
+  - 'Purpose -'
+
+---
+extends: existence
+message: 'Include "Design/methodology/approach" in the structured abstract.'
+level: error
+scope: text
+tokens:
+  - 'Design/methodology/approach –'
+  - 'Design/methodology/approach:'
+  - 'Design/methodology/approach -'
+
+---
+extends: existence
+message: 'Include "Findings" in the structured abstract (required for JMLC).'
+level: error
+scope: text
+tokens:
+  - 'Findings –'
+  - 'Findings:'
+  - 'Findings -'
+
+---
+extends: existence
+message: 'Include "Originality" or "Originality/value" in the structured abstract.'
+level: error
+scope: text
+tokens:
+  - 'Originality/value –'
+  - 'Originality/value:'
+  - 'Originality –'
+  - 'Originality:'
+  - 'Originality -'

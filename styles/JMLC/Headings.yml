@@ -1,0 +1,25 @@
+extends: existence
+message: 'JMLC empirical and review papers often use numbered section headings (e.g. "1. Introduction").'
+level: suggestion
+scope: text
+tokens:
+  - '(?m)^1\.\s+Introduction'
+  - '(?m)^2\.\s+Literature review'
+  - '(?m)^2\.\s+Literature Review'
+
+---
+extends: existence
+message: 'Keep headings concise; Emerald prefers bold first-level headings and italic subheadings in the typeset journal (mark up accordingly in Word).'
+level: suggestion
+scope: text
+tokens:
+  - '(?m)^#{1,2}\s+'
+
+---
+extends: existence
+message: 'Emerald tables in JMLC manuscripts are often numbered with Roman numerals (Table I, II); figures use Arabic numerals (Figure 1).'
+level: suggestion
+scope: text
+tokens:
+  - '\bTable [IVXLC]+\b'
+  - '\bFigure [0-9]+\b'

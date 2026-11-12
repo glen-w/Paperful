@@ -1,0 +1,6 @@
+extends: metric
+message: "Extracted text is %s words. Journal of Cleaner Production original articles are 6000–8000 words (extracted text includes references)."
+link: https://www.sciencedirect.com/journal/journal-of-cleaner-production/publish/guide-for-authors
+level: suggestion
+formula: words
+condition: "> 16000"

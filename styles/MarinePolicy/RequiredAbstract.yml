@@ -1,0 +1,8 @@
+extends: occurrence
+message: "Marine Policy requires an abstract of about 250 words (purpose, policy relevance, methods, outcomes)."
+link: https://www.sciencedirect.com/journal/marine-policy/publish/guide-for-authors
+level: warning
+scope: raw
+ignorecase: true
+min: 1
+token: '\babstract\b'

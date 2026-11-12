@@ -1,0 +1,42 @@
+extends: existence
+message: 'JMLC accepts up to 12 short keywords (journal author guidelines).'
+level: suggestion
+scope: text
+tokens:
+  - '(?im)^keywords?\s*[:\-]'
+
+---
+extends: existence
+message: 'Research papers for JMLC are typically 5,000–8,000 words (journal page); allow ~280 words per table or figure in your count.'
+level: suggestion
+scope: text
+tokens:
+  - '(?m)^Word count'
+
+---
+extends: existence
+message: 'Double-anonymous review: avoid identifying author details in the manuscript file (Emerald submission policy).'
+level: warning
+scope: text
+tokens:
+  - '(?i)\bauthor biography\b'
+  - '(?i)\bORCID\b.*@'
+  - '(?i)\bour previous (research|work|study)\b'
+
+---
+extends: existence
+message: 'Emerald discourages endnotes except when necessary; use Harvard in-text citations instead.'
+level: suggestion
+scope: text
+tokens:
+  - '\[[0-9]+\]'
+  - '(?m)^Notes\s*$'
+  - '(?m)^Endnotes\s*$'
+
+---
+extends: existence
+message: 'Declare external research funding in Acknowledgements (Emerald author guidelines).'
+level: suggestion
+scope: text
+tokens:
+  - '(?im)^acknowledg(e)?ments\s*$'

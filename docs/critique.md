@@ -205,7 +205,11 @@ Follows [llm.md](llm.md): local Ollama by default, egress notice, grounded in
 the extracted text already on disk plus the checked finding list. No web
 search. Comments are `lane=suggested` only. Ungrounded spans are dropped.
 Direct quotations are not rewritten; comments on quoted spans are dropped.
-Never emits scores.
+Never emits scores. JSON critique turns send Ollama `format=json` and
+`think=false` so a thinking model does not spend the wall clock on a
+`<think>` block and then return prose. Builtin JSON reviewers get one
+repair turn when the first reply is not a usable object (`empty_reply` in
+**Incomplete lanes** is after that retry).
 
 Default is **one** reviewer (`[llm].model` + builtin JSON prompt). Add more
 with `[[critique.reviewers]]` — each row has `id`, optional `model` (empty
@@ -317,7 +321,9 @@ Remote GROBID prints the same yellow egress notice as extract-sections
 `advanced_max_workers`, `advanced_max_comments`, `advanced_refine`,
 `advanced_timeout_s` (`0` → `max([llm].timeout_s, 600)`). A duplicated
 leader broadcast is a hard stop (`skipped: loop`). A wall-clock overrun
-records `skipped: timeout` rather than hanging a workbench job.
+records `skipped: timeout` rather than hanging a workbench job. If an
+aspect group never reaches `action=final` and collected no comments, one
+forced final JSON turn runs before the slice is marked `empty_reply`.
 
 ## Optional context (`--lane context` / `--lane context-web`)
 
@@ -411,6 +417,22 @@ is paperful `info`; Vale `warning` and `error` are `warn`, never `major`. More
 than 100 alerts yields `vale_truncated`. Built-in prose checkers
 (`long_sentence`, `hedge_words`, `passive_voice`) still run; overlap with Vale
 rules is expected.
+
+### Example Vale styles
+
+The repo ships three example packs under [`styles/`](../styles/README.md).
+They are not official journal packages. Copy one ini; do not mix `JCP` with
+`MarinePolicy` (author–year vs numbered cites).
+
+| Pack | Venue | Copy |
+| --- | --- | --- |
+| [`styles/JMLC`](../styles/JMLC/) | Journal of Money Laundering Control (Emerald, Harvard) | `cp styles/JMLC/vale.ini.example .vale.ini` |
+| [`styles/JCP`](../styles/JCP/) | Journal of Cleaner Production (Elsevier, author–year) | `cp styles/JCP/vale.ini.example .vale.ini` |
+| [`styles/MarinePolicy`](../styles/MarinePolicy/) | Marine Policy (Elsevier, numbered `[1]`) | `cp styles/MarinePolicy/vale.ini.example .vale.ini` |
+
+Other directories under `styles/` are local house tints and are gitignored.
+Keep them beside the examples so `StylesPath = styles` still finds them, and
+point `vale_config` at a sibling ini that enables only that pack.
 
 ## Optional forensics (`--forensics` / `[critique].forensics`)
 
