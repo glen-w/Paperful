@@ -12,8 +12,16 @@ from typing import Any
 from .config import Config
 from .critique_llm import is_scoreish, parse_llm_json
 from .grounding import budget_slice
-from .rewrite_align import Alignment
+from .rewrite_align import Alignment, unique_span
 from .rewrite_areas import RewriteArea
+from .rewrite_grounding import (
+    apply_freeze,
+    cites_ok,
+    freeze_preserved,
+    freeze_tokens,
+    numbers_ok,
+    thaw,
+)
 from .rewrite_plan import RewriteEdit
 
 _LEAK = re.compile(
@@ -23,8 +31,6 @@ _PROMISE = re.compile(
     r"\b(future work|see (the )?appendix|we will (add|run|include)|placeholder)\b",
     re.I,
 )
-_NUMBER = re.compile(r"\d{2,}")
-_CITE_KEY = re.compile(r"\\cite[t]?(?:\[[^\]]*\])?\{([^}]+)\}")
 
 _DEFAULT_PROMPT = """You revise locatable spans in a manuscript using ONLY PAPER_CONTENT, SELECTED_CONTENT, and the finding.
 Return JSON:
@@ -78,20 +84,6 @@ def load_area_prompt(area: RewriteArea) -> str | None:
     return _DEFAULT_PROMPT
 
 
-def _numbers_ok(text: str, hay: str) -> bool:
-    for num in _NUMBER.findall(text or ""):
-        if num not in hay:
-            return False
-    return True
-
-
-def _cites_ok(text: str, hay: str) -> bool:
-    for key in _CITE_KEY.findall(text or ""):
-        if key not in hay:
-            return False
-    return True
-
-
 def edit_is_grounded(
     *,
     kind: str,
@@ -106,12 +98,14 @@ def edit_is_grounded(
         return "not_actionable"
     if _LEAK.search(replacement or "") or _LEAK.search(body or ""):
         return "leakage"
-    if kind == "replace":
-        if _PROMISE.search(replacement or ""):
+    if kind in {"replace", "insert", "delete"}:
+        if kind == "replace" and _PROMISE.search(replacement or ""):
             return "no_evidence"
-        if not quote or quote.lower() not in hay:
-            return "no_unique_span"
-        if not _numbers_ok(replacement, hay) or not _cites_ok(replacement, hay):
+        if kind in {"replace", "delete", "insert"}:
+            if not quote or unique_span(hay, quote) is None:
+                return "no_unique_span"
+        check = replacement if kind != "delete" else replacement
+        if not numbers_ok(check, hay) or not cites_ok(check, hay):
             return "no_evidence"
     if kind == "comment" and not (body or "").strip():
         return "not_actionable"
@@ -152,26 +146,31 @@ def proposed_from_area(
             model,
         )
 
+    frozen_excerpt, mapping = freeze_tokens(excerpt)
     payload = []
+    selected_frozen: dict[str, str] = {}
     for row in findings:
         fid = str(row.get("id") or "")
         aln = alignments.get(fid)
+        raw_sel = str(aln.quote if aln else row.get("quote") or "")
+        frozen_sel = apply_freeze(raw_sel, mapping)
+        selected_frozen[fid] = frozen_sel
         payload.append(
             {
                 "finding_id": fid,
                 "code": row.get("code"),
                 "detail": row.get("detail"),
-                "selected_content": (aln.quote if aln else row.get("quote") or ""),
+                "selected_content": frozen_sel,
                 "loc": (aln.loc if aln else row.get("loc") or ""),
             }
         )
     user = (
-        f"<PAPER_CONTENT>\n{excerpt}\n</PAPER_CONTENT>\n"
+        f"<PAPER_CONTENT>\n{frozen_excerpt}\n</PAPER_CONTENT>\n"
         f"<FINDINGS>\n{json.dumps(payload, ensure_ascii=False)}\n</FINDINGS>\n"
         "For each finding, treat selected_content as SELECTED_CONTENT and "
-        "detail as QUESTION."
+        "detail as QUESTION. Copy every «PF…» placeholder unchanged."
     )
-    hay = excerpt.lower()
+    hay = excerpt
     from .llm.client import ChatRequest, chat, ctx_tokens_for
 
     timeout = timeout_s or float(cfg.llm_timeout_s or 120)
@@ -217,6 +216,18 @@ def proposed_from_area(
             skips.append({"finding_id": fid, "reason": "needs_author"})
             seen.add(fid)
             continue
+        sel_f = selected_frozen.get(fid, "")
+        reply_for_freeze = replacement if kind == "replace" else f"{quote} {replacement}"
+        if kind in {"replace", "insert", "delete"} and sel_f:
+            if not freeze_preserved(
+                selected_frozen=sel_f, reply=reply_for_freeze, mapping=mapping
+            ):
+                skips.append({"finding_id": fid, "reason": "no_evidence"})
+                seen.add(fid)
+                continue
+        quote = thaw(quote, mapping)
+        replacement = thaw(replacement, mapping)
+        body = thaw(body, mapping)
         reason = edit_is_grounded(
             kind=kind, quote=quote, replacement=replacement, body=body, hay=hay
         )
@@ -225,8 +236,12 @@ def proposed_from_area(
             seen.add(fid)
             continue
         aln = alignments.get(fid)
-        start = aln.start if aln else -1
-        end = aln.end if aln else -1
+        span = unique_span(excerpt, quote)
+        if span is not None:
+            start, end = span
+        else:
+            start = aln.start if aln else -1
+            end = aln.end if aln else -1
         para = aln.paragraph if aln else quote
         target = replacement if kind == "replace" else para
         if kind == "insert":

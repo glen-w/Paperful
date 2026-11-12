@@ -23,6 +23,11 @@ def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip())
 
 
+def unique_span(hay: str, needle: str) -> tuple[int, int] | None:
+    """Public unique-occurrence bind for grounding and sidecar apply."""
+    return _find_unique(hay, needle)
+
+
 def _find_unique(hay: str, needle: str) -> tuple[int, int] | None:
     """Return (start, end) when ``needle`` occurs exactly once, else None."""
     token = _norm(needle)
