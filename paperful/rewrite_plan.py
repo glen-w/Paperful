@@ -21,6 +21,7 @@ SKIP_REASONS = (
     "docx_miss",
     "office_miss",
     "context_overflow",
+    "broken_check",
 )
 
 
