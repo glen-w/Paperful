@@ -122,8 +122,8 @@ def proposed_from_area(
     client: Any,
     timeout_s: float,
     on_status: Callable[[str], None] | None = None,
-) -> tuple[list[RewriteEdit], list[dict[str, str]], str]:
-    """One JSON call for an area. Returns edits, skips, model id."""
+) -> tuple[list[RewriteEdit], list[dict[str, str]], str, dict[str, Any]]:
+    """One JSON call for an area. Returns edits, skips, model id, call meta."""
     say = on_status or (lambda _msg: None)
     model = (area.model or cfg.llm_model or "").strip()
     prompt = load_area_prompt(area)
@@ -135,6 +135,7 @@ def proposed_from_area(
                 for f in findings
             ],
             model,
+            {},
         )
     if client is None or not model:
         return (
@@ -144,6 +145,7 @@ def proposed_from_area(
                 for f in findings
             ],
             model,
+            {},
         )
 
     frozen_excerpt, mapping = freeze_tokens(excerpt)
@@ -171,9 +173,33 @@ def proposed_from_area(
         "detail as QUESTION. Copy every «PF…» placeholder unchanged."
     )
     hay = excerpt
-    from .llm.client import ChatRequest, chat, ctx_tokens_for
+    from . import __version__ as PAPERFUL_VERSION
+    from .llm.client import ChatRequest, chat, ctx_tokens_for, prompt_exceeds_ctx
 
     timeout = timeout_s or float(cfg.llm_timeout_s or 120)
+    max_ctx = int(cfg.llm_max_num_ctx or 32768)
+    blob = prompt + user
+    prompt_sha = sha256(blob.encode("utf-8")).hexdigest()[:12]
+    if prompt_exceeds_ctx(blob, max_num_ctx=max_ctx):
+        return (
+            [],
+            [
+                {
+                    "finding_id": str(f.get("id") or ""),
+                    "reason": "context_overflow",
+                }
+                for f in findings
+            ],
+            model,
+            {
+                "temperature": 0.0,
+                "seed": 0,
+                "num_ctx": max_ctx,
+                "prompt_sha": prompt_sha,
+                "paperful": PAPERFUL_VERSION,
+            },
+        )
+    num_ctx = ctx_tokens_for(blob, max_num_ctx=max_ctx)
     say(f"Rewrite {area.id} ({model})…")
     req = ChatRequest(
         model=model,
@@ -182,10 +208,9 @@ def proposed_from_area(
             {"role": "user", "content": user},
         ),
         timeout_seconds=timeout,
-        temperature=0.2,
-        num_ctx=ctx_tokens_for(
-            prompt + user, max_num_ctx=int(cfg.llm_max_num_ctx or 32768)
-        ),
+        temperature=0.0,
+        seed=0,
+        num_ctx=num_ctx,
     )
     try:
         raw = chat(client, req)
@@ -197,6 +222,7 @@ def proposed_from_area(
                 for f in findings
             ],
             model,
+            {},
         )
     data = parse_llm_json(raw) or {}
     edits: list[RewriteEdit] = []
@@ -266,8 +292,15 @@ def proposed_from_area(
         fid = str(row.get("id") or "")
         if fid and fid not in seen:
             skips.append({"finding_id": fid, "reason": "needs_author"})
-    _ = sha256((prompt + user).encode("utf-8")).hexdigest()[:12]
-    return edits, skips, model
+    meta = {
+        "temperature": 0.0,
+        "seed": 0,
+        "num_ctx": num_ctx,
+        "prompt_sha": prompt_sha,
+        "model": model,
+        "paperful": PAPERFUL_VERSION,
+    }
+    return edits, skips, model, meta
 
 
 def budget_excerpt(cfg: Config, text: str) -> str:

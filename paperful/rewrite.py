@@ -393,7 +393,17 @@ def build_rewrite(
                 det_ids.add(fid)
 
     timeout = float(cfg.rewrite_timeout_s or 0) or max(float(cfg.llm_timeout_s), 600.0)
+    calls: list[dict[str, Any]] = []
+    by_model: dict[str, list[Any]] = {}
+    model_order: list[str] = []
     for spec in specialists:
+        tag = (spec.model or cfg.llm_model or "").strip() or "_"
+        if tag not in by_model:
+            model_order.append(tag)
+            by_model[tag] = []
+        by_model[tag].append(spec)
+    ordered_specs = [spec for tag in model_order for spec in by_model[tag]]
+    for spec in ordered_specs:
         rows = [
             r for r in pending.get(spec.id, []) if str(r.get("id") or "") not in det_ids
         ]
@@ -408,7 +418,7 @@ def build_rewrite(
                 )
             continue
         excerpt = budget_excerpt(cfg, text)
-        edits, extra_skips, model = proposed_from_area(
+        edits, extra_skips, model, meta = proposed_from_area(
             cfg,
             area=spec,
             findings=rows,
@@ -419,6 +429,8 @@ def build_rewrite(
             on_status=on_status,
         )
         models[spec.id] = model
+        if meta:
+            calls.append({"area": spec.id, **meta})
         proposed.extend(edits)
         skips.extend(extra_skips)
 
@@ -429,6 +441,7 @@ def build_rewrite(
     plan.worklog = {
         "addressed": [f"{e.area}:{e.kind}:{e.quote[:60]}" for e in plan.edits],
         "models": models,
+        "calls": calls,
     }
 
     payload: dict[str, Any] = {
