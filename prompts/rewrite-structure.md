@@ -2,7 +2,7 @@ You propose structural locators: missing section headings, float caption/mention
 
 Use ONLY PAPER_CONTENT and FINDINGS.
 Return JSON:
-{"edits":[{"finding_id":"id","kind":"insert|comment","quote":"exact span","replacement":"heading or stub","body":"comment","needs_author":false}]}
+{"edits":[{"finding_id":"id","kind":"insert|comment","paragraph":"full rewritten paragraph","body":"comment","needs_author":false}]}
 
 Rules:
 - Do not invent results, numbers, or limitations-washing.

@@ -32,25 +32,27 @@ _PROMISE = re.compile(
     re.I,
 )
 
-_DEFAULT_PROMPT = """You revise locatable spans in a manuscript using ONLY PAPER_CONTENT, SELECTED_CONTENT, and the finding.
+_DEFAULT_PROMPT = """You rewrite one manuscript paragraph using ONLY PAPER_CONTENT and FINDINGS.
 Return JSON:
 {
   "edits": [
     {
       "finding_id": "id",
       "kind": "replace|insert|comment",
-      "quote": "exact substring of SELECTED_CONTENT or PAPER_CONTENT",
-      "replacement": "new text for replace",
+      "paragraph": "the full rewritten PAPER_CONTENT paragraph",
+      "quote": "optional; Paperful diffs paragraph if omitted",
+      "replacement": "optional span replacement",
       "body": "Word comment text for comment",
       "needs_author": false
     }
   ]
 }
 Rules:
-- At most one edit per finding_id unless the finding needs two non-overlapping spans.
-- quote MUST be a substring of PAPER_CONTENT.
-- Do not paraphrase the finding into the prose. Integrate in the paper's voice.
+- Return ONE replace edit for the whole paragraph covering every finding you can ground.
+- paragraph MUST be the complete paragraph. Unflagged sentences stay word-for-word.
+- Do not paraphrase findings into the prose. Keep the paper's voice.
 - Do not add numbers, experiments, URLs, or citation keys that are not already in PAPER_CONTENT or the finding.
+- Copy every «PF…» placeholder unchanged.
 - Do not promise future work or point at an appendix you did not edit.
 - Do not mention Paperful, the critique pack, or "the reviewer" in replacement text.
 - Do not hide limitations. Do not invent results.
@@ -58,6 +60,27 @@ Rules:
 - needs_author true when you cannot ground a body edit.
 - No score, grade, or accept/reject.
 """
+
+
+def paragraph_span(source: str, target: str) -> tuple[str, str, int, int] | None:
+    """Longest common prefix/suffix diff. Offsets are into ``source``."""
+    src = source or ""
+    tgt = target or ""
+    if src == tgt or not src or not tgt:
+        return None
+    i = 0
+    limit = min(len(src), len(tgt))
+    while i < limit and src[i] == tgt[i]:
+        i += 1
+    j = 0
+    while j < limit - i and src[-(j + 1)] == tgt[-(j + 1)]:
+        j += 1
+    end = len(src) - j
+    quote = src[i:end]
+    replacement = tgt[i : len(tgt) - j]
+    if not quote:
+        return None
+    return quote, replacement, i, end
 
 
 def load_area_prompt(area: RewriteArea) -> str | None:
@@ -238,13 +261,37 @@ def proposed_from_area(
         quote = str(row.get("quote") or "").strip()
         replacement = str(row.get("replacement") or "").strip()
         body = str(row.get("body") or "").strip()
+        paragraph = str(row.get("paragraph") or "").strip()
         if row.get("needs_author"):
             skips.append({"finding_id": fid, "reason": "needs_author"})
             seen.add(fid)
             continue
+        aln = alignments.get(fid)
+        source_para = (aln.paragraph if aln else "") or excerpt
+        if paragraph:
+            if not freeze_preserved(
+                selected_frozen=frozen_excerpt,
+                reply=paragraph,
+                mapping=mapping,
+            ):
+                skips.append({"finding_id": fid, "reason": "no_evidence"})
+                seen.add(fid)
+                continue
+            paragraph = thaw(paragraph, mapping)
+            diff = paragraph_span(source_para, paragraph)
+            if diff is None:
+                skips.append({"finding_id": fid, "reason": "needs_author"})
+                seen.add(fid)
+                continue
+            quote, replacement, _ls, _le = diff
+            kind = "replace"
         sel_f = selected_frozen.get(fid, "")
-        reply_for_freeze = replacement if kind == "replace" else f"{quote} {replacement}"
-        if kind in {"replace", "insert", "delete"} and sel_f:
+        reply_for_freeze = (
+            paragraph
+            if paragraph
+            else (replacement if kind == "replace" else f"{quote} {replacement}")
+        )
+        if kind in {"replace", "insert", "delete"} and sel_f and not paragraph:
             if not freeze_preserved(
                 selected_frozen=sel_f, reply=reply_for_freeze, mapping=mapping
             ):
@@ -261,21 +308,26 @@ def proposed_from_area(
             skips.append({"finding_id": fid, "reason": reason})
             seen.add(fid)
             continue
-        aln = alignments.get(fid)
         span = unique_span(excerpt, quote)
         if span is not None:
             start, end = span
         else:
             start = aln.start if aln else -1
             end = aln.end if aln else -1
-        para = aln.paragraph if aln else quote
-        target = replacement if kind == "replace" else para
-        if kind == "insert":
+        para = source_para or quote
+        target = paragraph if paragraph else (
+            replacement if kind == "replace" else para
+        )
+        if kind == "insert" and not paragraph:
             target = (para + " " + replacement).strip() if replacement else para
+        fids = [fid] if fid else []
+        extra_ids = row.get("finding_ids")
+        if isinstance(extra_ids, list):
+            fids = [str(x) for x in extra_ids if str(x).strip()]
         edits.append(
             RewriteEdit(
                 kind=kind,
-                finding_ids=[fid] if fid else [],
+                finding_ids=fids,
                 area=area.id,
                 loc=(aln.loc if aln else ""),
                 quote=quote,
@@ -288,6 +340,8 @@ def proposed_from_area(
             )
         )
         seen.add(fid)
+        for extra in fids:
+            seen.add(extra)
     for row in findings:
         fid = str(row.get("id") or "")
         if fid and fid not in seen:
