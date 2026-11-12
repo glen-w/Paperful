@@ -208,6 +208,31 @@ def test_no_new_cite_keys():
     assert reason == "no_evidence"
 
 
+def test_hedge_words_are_comment_only(cfg, tmp_path: Path):
+    src = tmp_path / "draft.md"
+    src.write_text("Parties might adopt a new protocol.\n", encoding="utf-8")
+    finding = _finding(
+        code="hedge_words",
+        quote="might",
+        detail="hedge",
+        extra={"suggested": "may"},
+        source="vale",
+    )
+    pack = _pack([finding], path=str(src))
+    result = build_rewrite(
+        cfg,
+        pack=pack,
+        manuscript=src,
+        areas=("style",),
+        outputs=("edits",),
+        dry_run=True,
+        llm_client=None,
+    )
+    edits = (result.get("plan") or {}).get("edits") or []
+    assert edits
+    assert all(e["kind"] == "comment" for e in edits)
+
+
 def test_retracted_cite_is_comment_not_delete(cfg, tmp_path: Path):
     src = tmp_path / "draft.md"
     src.write_text("We cite Retracted Work (2018) throughout.\n", encoding="utf-8")

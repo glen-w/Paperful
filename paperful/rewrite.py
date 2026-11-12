@@ -12,9 +12,10 @@ from .config import Config
 from .critique import critique_id, latest_pack_dir, load_pack
 from .critique_extract import extract_path
 from .fsio import file_sha256
-from .rewrite_align import Alignment, align_finding, _find_unique
+from .rewrite_align import Alignment, align_finding, unique_span
 from .rewrite_areas import (
     COMMENT_ONLY_CODES,
+    STYLE_COMMENT_CODES,
     bucket_findings,
     parse_rewrite_areas_list,
     parse_rewrite_comments,
@@ -330,7 +331,7 @@ def build_rewrite(
         for row in rows:
             fid = str(row.get("id") or "")
             quote = str(row.get("quote") or "").strip()
-            if drift["drift"] and quote and _find_unique(text, quote) is None:
+            if drift["drift"] and quote and unique_span(text, quote) is None:
                 skips.append({"finding_id": fid, "reason": "drift"})
                 continue
             bound = align_finding(row, text=text, paragraphs=doc.paragraphs)
@@ -354,7 +355,11 @@ def build_rewrite(
             if aln is None:
                 continue
             code = str(row.get("code") or "")
-            if code in COMMENT_ONLY_CODES or area == "comments":
+            if (
+                code in COMMENT_ONLY_CODES
+                or code in STYLE_COMMENT_CODES
+                or area == "comments"
+            ):
                 proposed.append(_comment_edit(row, aln, area))
                 det_ids.add(fid)
                 continue

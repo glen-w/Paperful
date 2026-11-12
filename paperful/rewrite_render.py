@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .rewrite_align import unique_span
 from .rewrite_plan import RewriteEdit, RewritePlan
 
 
@@ -135,10 +136,19 @@ def apply_to_text(text: str, edits: list[RewriteEdit]) -> str:
         quote = edit.quote
         if not quote or quote not in body:
             continue
-        start = body.find(quote) if edit.start < 0 else edit.start
-        if start < 0:
-            continue
-        end = start + len(quote)
+        at = (
+            body[edit.start : edit.start + len(quote)]
+            if edit.start >= 0
+            else ""
+        )
+        if edit.start >= 0 and at == quote:
+            start = edit.start
+            end = start + len(quote)
+        else:
+            span = unique_span(body, quote)
+            if span is None:
+                continue
+            start, end = span
         if edit.kind == "replace":
             body = body[:start] + edit.replacement + body[end:]
         elif edit.kind == "delete":

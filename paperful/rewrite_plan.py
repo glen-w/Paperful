@@ -17,6 +17,7 @@ SKIP_REASONS = (
     "dismissed",
     "leakage",
     "cap",
+    "drift",
 )
 
 

@@ -42,6 +42,7 @@ COMMENT_ONLY_CODES = frozenset(
         "cited_expression_of_concern",
     }
 )
+STYLE_COMMENT_CODES = frozenset({"hedge_words", "passive_voice"})
 SKIP_CODES = frozenset(
     {
         "needs_ocr",
