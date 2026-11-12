@@ -30,6 +30,12 @@ SCOREISH = re.compile(
 )
 _SCOREISH = SCOREISH
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*$")
+_THINK_BLOCK = re.compile(r"<think>[\s\S]*?</think>", re.I)
+_TRAILING_COMMA = re.compile(r",(\s*[}\]])")
+JSON_REPAIR_USER = (
+    "Your previous reply was not valid JSON matching the schema. "
+    "Reply with a single JSON object only."
+)
 
 _PROMPT = """You review a manuscript using ONLY the excerpt and the checked findings.
 Return JSON:
@@ -73,7 +79,7 @@ def strip_fences(text: str) -> str:
 
 
 def parse_llm_json(raw: str) -> dict[str, Any] | None:
-    text = (raw or "").strip()
+    text = _THINK_BLOCK.sub("", raw or "").strip()
     if not text:
         return None
     fence = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, re.S)
@@ -82,10 +88,79 @@ def parse_llm_json(raw: str) -> dict[str, Any] | None:
     try:
         start = text.index("{")
         end = text.rindex("}") + 1
-        data = json.loads(text[start:end])
-    except (ValueError, json.JSONDecodeError):
+    except ValueError:
         return None
-    return data if isinstance(data, dict) else None
+    slice_ = text[start:end]
+    for candidate in (slice_, _TRAILING_COMMA.sub(r"\1", slice_)):
+        data = _loads_object(candidate)
+        if isinstance(data, dict):
+            return data
+    return None
+
+
+def _loads_object(text: str) -> Any:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        try:
+            data, _end = json.JSONDecoder().raw_decode(text)
+        except json.JSONDecodeError:
+            return None
+        return data
+
+
+def critique_chat_request(
+    *,
+    model: str,
+    messages: tuple[dict[str, str], ...] | list[dict[str, str]],
+    timeout_seconds: float,
+    temperature: float = 0.2,
+    max_tokens: int | None = None,
+    json_mode: bool = False,
+) -> ChatRequest:
+    """Critique JSON turns pin format=json and turn thinking off (qwen3)."""
+    return ChatRequest(
+        model=model,
+        messages=tuple(messages),
+        timeout_seconds=timeout_seconds,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        json_mode=json_mode,
+        think=False,
+    )
+
+
+def chat_with_json_retry(
+    client: Any,
+    request: ChatRequest,
+    *,
+    on_status: Callable[[str], None] | None = None,
+    label: str = "",
+) -> str:
+    """One chat, then one repair turn if the reply is not a JSON object."""
+    from .llm.client import chat
+
+    say = on_status or (lambda _msg: None)
+    raw = chat(client, request)
+    if parse_llm_json(raw) is not None:
+        return raw
+    if label:
+        say(f"{label} retry (unusable JSON)…")
+    repair = ChatRequest(
+        model=request.model,
+        messages=tuple(request.messages)
+        + (
+            {"role": "assistant", "content": (raw or "")[:8000]},
+            {"role": "user", "content": JSON_REPAIR_USER},
+        ),
+        timeout_seconds=request.timeout_seconds,
+        temperature=request.temperature,
+        max_tokens=request.max_tokens,
+        num_ctx=request.num_ctx,
+        json_mode=True,
+        think=False,
+    )
+    return chat(client, repair)
 
 
 def findings_from_comments(
@@ -297,7 +372,8 @@ def _run_reviewers(
         say(f"{label} · {model} (wall {timeout_s:.0f}s, idle {timeout_s:.0f}s)…")
         prompt_sha = sha256((prompt + user[:2000]).encode("utf-8")).hexdigest()[:12]
         max_tokens = int(getattr(reviewer, "max_tokens", CRITIQUE_REVIEWER_MAX_TOKENS))
-        request = ChatRequest(
+        json_prompt = prompt == _PROMPT
+        request = critique_chat_request(
             model=model,
             messages=(
                 {"role": "system", "content": prompt},
@@ -306,6 +382,7 @@ def _run_reviewers(
             timeout_seconds=timeout_s,
             temperature=0.2,
             max_tokens=max_tokens if max_tokens > 0 else None,
+            json_mode=json_prompt,
         )
         t0 = time.perf_counter()
         try:
@@ -316,6 +393,33 @@ def _run_reviewers(
                 on_status=say,
                 label=label,
             )
+            extra, narrative = _findings_from_reply(
+                raw, hay=hay, reviewer_id=reviewer.id, json_prompt=json_prompt
+            )
+            if json_prompt and not extra and not narrative:
+                say(f"{label} retry (unusable JSON)…")
+                repair = critique_chat_request(
+                    model=model,
+                    messages=tuple(request.messages)
+                    + (
+                        {"role": "assistant", "content": (raw or "")[:8000]},
+                        {"role": "user", "content": JSON_REPAIR_USER},
+                    ),
+                    timeout_seconds=timeout_s,
+                    temperature=0.2,
+                    max_tokens=max_tokens if max_tokens > 0 else None,
+                    json_mode=True,
+                )
+                raw = chat_reviewer_stream(
+                    client,
+                    repair,
+                    wall_s=timeout_s,
+                    on_status=say,
+                    label=label,
+                )
+                extra, narrative = _findings_from_reply(
+                    raw, hay=hay, reviewer_id=reviewer.id, json_prompt=True
+                )
         except Exception as exc:
             dt = time.perf_counter() - t0
             say(
@@ -342,9 +446,6 @@ def _run_reviewers(
                 )
             )
             continue
-        extra, narrative = _findings_from_reply(
-            raw, hay=hay, reviewer_id=reviewer.id, json_prompt=prompt == _PROMPT
-        )
         dt = time.perf_counter() - t0
         bits = [f"{dt:.0f}s"]
         if extra:

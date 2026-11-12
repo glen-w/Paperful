@@ -482,6 +482,18 @@ def test_ollama_chat_stream_yields_content_and_skips_thinking(mock_ollama):
     assert [m["role"] for m in sent["messages"]] == ["system", "user"]
     assert sent["stream"] is True
     assert sent["options"] == {"temperature": 0.2, "num_predict": 50, "num_ctx": 4096}
+    assert "format" not in sent
+    assert "think" not in sent
+
+
+def test_ollama_chat_stream_json_mode_and_think(mock_ollama):
+    body = json.dumps({"message": {"content": "{}"}, "done": True})
+    requests = mock_ollama(lambda req: httpx.Response(200, text=body))
+    client = OllamaClient(base_url="http://127.0.0.1:11434", allow_remote=False)
+    list(client.chat_stream(_chat_request(json_mode=True, think=False)))
+    sent = json.loads(requests[0].content)
+    assert sent["format"] == "json"
+    assert sent["think"] is False
 
 
 def test_ollama_chat_stream_raises_on_error_line(mock_ollama):
@@ -525,6 +537,23 @@ def test_litellm_chat_stream_reads_deltas(monkeypatch):
     assert seen["stream"] is True and seen["max_tokens"] == 9
     assert seen["api_base"] == "https://llm.example/v1"
     assert seen["messages"][0] == {"role": "system", "content": "be brief"}
+    assert "response_format" not in seen
+
+
+def test_litellm_chat_stream_json_mode_sets_response_format(monkeypatch):
+    seen = {}
+
+    def completion(**kwargs):
+        seen.update(kwargs)
+        delta = types.SimpleNamespace(content="{}")
+        return iter([types.SimpleNamespace(choices=[types.SimpleNamespace(delta=delta)])])
+
+    monkeypatch.setitem(
+        sys.modules, "litellm", types.SimpleNamespace(completion=completion)
+    )
+    assert chat(LiteLLMClient(api_base=None), _chat_request(json_mode=True)) == "{}"
+    assert seen["response_format"] == {"type": "json_object"}
+    assert seen["stream"] is True
 
 
 def test_litellm_chat_stream_wraps_errors(monkeypatch):

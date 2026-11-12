@@ -90,15 +90,16 @@ def _chat(
     messages: list[dict[str, str]],
     timeout: float,
 ) -> str:
-    from .llm.client import ChatRequest, chat
+    from .critique_llm import chat_with_json_retry, critique_chat_request
 
-    request = ChatRequest(
+    request = critique_chat_request(
         model=model,
-        messages=tuple(messages),
+        messages=messages,
         timeout_seconds=max(5.0, float(timeout)),
         temperature=0.2,
+        json_mode=True,
     )
-    return chat(client, request)
+    return chat_with_json_retry(client, request)
 
 
 def library_passages(

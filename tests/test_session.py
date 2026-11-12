@@ -127,6 +127,51 @@ def test_cookies_for_playwright_inject_sets_samesite_none_for_secure():
     assert injected[0]["sameSite"] == "None"
 
 
+def test_storage_state_normalizes_samesite_and_bad_expires(tmp_path):
+    path = tmp_path / "state.json"
+    write_storage_state(
+        path,
+        [
+            {
+                "name": "SID",
+                "value": "1",
+                "domain": ".google.com",
+                "path": "/",
+                "sameSite": "lax",
+                "expires": "not-a-number",
+            },
+            {
+                "name": "ezproxy",
+                "value": "tok",
+                "domain": ".scpo.idm.oclc.org",
+                "path": "/",
+                "sameSite": "none",
+                "expires": 1_700_000_000,
+            },
+        ],
+    )
+    loaded = load_storage_state_cookies(path)
+    by_name = {c["name"]: c for c in loaded}
+    assert by_name["SID"]["sameSite"] == "Lax"
+    assert by_name["SID"]["expires"] == -1
+    assert by_name["ezproxy"]["sameSite"] == "None"
+    assert by_name["ezproxy"]["expires"] == 1_700_000_000
+
+
+def test_ezproxy_cookie_status_cas_by_cookie_name_alone():
+    cookies = [
+        {
+            "name": "CASTGC",
+            "value": "TGT-1",
+            "domain": ".campus.example",
+            "path": "/",
+        }
+    ]
+    assert ezproxy_cookie_status(cookies, "https://proxy.example/login?url=") == (
+        "cas_only"
+    )
+
+
 def test_require_ezproxy_proxy_cookies_rejects_cas_only(cfg):
     cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
     cas_only = [

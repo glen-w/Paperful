@@ -89,9 +89,9 @@ def suggested_from_adversary(
     prompt_sha = sha256((_SYSTEM + user[:2000]).encode("utf-8")).hexdigest()[:12]
     meta["prompt_sha"] = prompt_sha
     say("Adversary lane…")
-    from .llm.client import ChatRequest, chat
+    from .critique_llm import chat_with_json_retry, critique_chat_request
 
-    request = ChatRequest(
+    request = critique_chat_request(
         model=model,
         messages=(
             {"role": "system", "content": _SYSTEM},
@@ -99,10 +99,11 @@ def suggested_from_adversary(
         ),
         timeout_seconds=timeout_s,
         temperature=0.2,
+        json_mode=True,
     )
     t0 = time.perf_counter()
     try:
-        raw = chat(client, request)
+        raw = chat_with_json_retry(client, request, on_status=say, label="Adversary")
     except Exception as exc:
         meta["skipped"] = "llm_error"
         meta["error"] = str(exc)

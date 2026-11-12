@@ -1551,6 +1551,166 @@ def test_reviewer_prompt_file_and_id_filter(cfg, tmp_path: Path, monkeypatch):
     assert "## Reviewer notes" not in md
 
 
+def test_parse_llm_json_repairs_think_tags_and_trailing_commas():
+    from paperful.critique_llm import parse_llm_json
+
+    assert parse_llm_json('<think>plan</think>{"summary":"ok"}')["summary"] == "ok"
+    assert parse_llm_json('{"summary":"ok",}')["summary"] == "ok"
+    assert parse_llm_json('Prose first.\n{"summary":"ok"}\nThanks.')["summary"] == "ok"
+    assert parse_llm_json("") is None
+    assert parse_llm_json("<think>only</think>") is None
+    assert parse_llm_json('["not", "an", "object"]') is None
+    assert parse_llm_json('{"summary":"ok"} trailing')["summary"] == "ok"
+
+
+def test_critique_chat_request_pins_think_off():
+    from paperful.critique_llm import critique_chat_request
+
+    req = critique_chat_request(
+        model="m",
+        messages=[{"role": "user", "content": "hi"}],
+        timeout_seconds=12.0,
+        json_mode=True,
+        max_tokens=64,
+    )
+    assert req.think is False
+    assert req.json_mode is True
+    assert req.max_tokens == 64
+    assert req.timeout_seconds == 12.0
+
+
+def test_chat_with_json_retry_returns_good_then_repairs(monkeypatch):
+    from paperful.critique_llm import JSON_REPAIR_USER, chat_with_json_retry
+    from paperful.llm.client import ChatRequest
+
+    calls: list[ChatRequest] = []
+    statuses: list[str] = []
+
+    def fake_chat(_client, request):
+        calls.append(request)
+        if len(calls) == 1:
+            return "not json"
+        assert request.json_mode is True
+        assert request.think is False
+        assert request.messages[-1]["content"] == JSON_REPAIR_USER
+        return '{"summary":"repaired"}'
+
+    monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
+    req = ChatRequest(
+        model="m",
+        messages=({"role": "user", "content": "review"},),
+        timeout_seconds=5.0,
+        json_mode=True,
+        think=False,
+    )
+    out = chat_with_json_retry(
+        object(),
+        req,
+        on_status=statuses.append,
+        label="leader",
+    )
+    assert out == '{"summary":"repaired"}'
+    assert len(calls) == 2
+    assert statuses == ["leader retry (unusable JSON)…"]
+
+    calls.clear()
+    statuses.clear()
+
+    def good_chat(_client, request):
+        calls.append(request)
+        return '{"summary":"first try"}'
+
+    monkeypatch.setattr("paperful.llm.client.chat", good_chat)
+    assert chat_with_json_retry(object(), req, on_status=statuses.append) == (
+        '{"summary":"first try"}'
+    )
+    assert len(calls) == 1
+    assert statuses == []
+
+
+def test_json_reviewer_retries_unusable_reply(cfg, tmp_path: Path, monkeypatch):
+    calls: list[object] = []
+    good = json.dumps(
+        {
+            "summary": "We report a 47.2 percent increase in yield.",
+            "comments": [],
+            "questions": [],
+        }
+    )
+
+    def fake_chat(_client, request, **_kw):
+        calls.append(request)
+        if len(calls) == 1:
+            return "not a JSON object"
+        assert request.json_mode is True
+        assert request.think is False
+        return good
+
+    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", fake_chat)
+    src = tmp_path / "retry.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        use_llm=True,
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert len(calls) == 2
+    llm_rows = [f for f in pack["findings"] if f.get("source") == "llm"]
+    assert any(f["code"] == "llm_summary" for f in llm_rows)
+
+
+def test_marg_force_final_after_empty_leader_turns(cfg, monkeypatch):
+    from paperful.critique_llm import JSON_REPAIR_USER
+    from paperful.critique_marg import Chunk, _run_group
+
+    cfg.critique_advanced_max_rounds = 1
+    hay = "abc protocol sample size methods"
+    chunks = [
+        Chunk(
+            worker_id="w1",
+            heading="Methods",
+            loc="p1",
+            text="The ABC protocol sample size is omitted.",
+        )
+    ]
+
+    def fake_chat(_client, request):
+        last = request.messages[-1]["content"]
+        if "action=final, a summary, and comments now" in last:
+            return json.dumps(
+                {
+                    "action": "final",
+                    "summary": "The ABC protocol sample size is omitted.",
+                    "comments": [
+                        {
+                            "quote": "ABC protocol",
+                            "detail": "State the sample size for the ABC protocol.",
+                        }
+                    ],
+                }
+            )
+        if last == JSON_REPAIR_USER:
+            return "still not json"
+        return "not json"
+
+    monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
+    comments, _narrative, stats = _run_group(
+        cfg,
+        type("C", (), {"provider": "stub"})(),
+        aspect="experiments",
+        chunks=chunks,
+        checked=[],
+        title="T",
+        hay=hay,
+        model="m",
+        deadline=time.monotonic() + 30,
+    )
+    assert comments
+    assert stats.get("skipped") != "empty_reply"
+
+
 def test_chat_reviewer_stream_wall_clock_and_heartbeat(monkeypatch):
     """Heartbeat before wall abort — fake clock so real sleep overshoot cannot flake."""
     from paperful.critique_llm import chat_reviewer_stream

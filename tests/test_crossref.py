@@ -117,3 +117,16 @@ def test_too_short_title_and_api_errors_return_none():
     assert (
         crossref_lookup(bad_json, "A perfectly reasonable title of some length") is None
     )
+
+
+def test_crossref_skips_items_without_titles_then_scores():
+    title = "Marine genetic resources beyond national jurisdiction"
+
+    def handler(req):
+        return _works(
+            {"DOI": "10.1/empty", "title": []},
+            _work("10.1/good", title, 2019),
+        )
+
+    m = crossref_lookup(mock_client(handler), title, year=2019)
+    assert m and m.doi == "10.1/good" and m.score >= 0.9

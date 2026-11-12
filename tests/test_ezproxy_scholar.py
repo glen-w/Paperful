@@ -290,6 +290,33 @@ def test_ezproxy_session_expired(ctx_factory, cfg, tmp_path):
     assert cand.outcome is Outcome.ERROR and "session expired" in cand.note
 
 
+def test_ezproxy_publisher_404_and_http_error(ctx_factory, cfg, tmp_path):
+    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cookie_file = tmp_path / "c.txt"
+    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tFALSE\t0\tx\ty\n")
+    cfg.ezproxy_cookies = cookie_file
+
+    def not_found(req):
+        return httpx.Response(404, text="gone")
+
+    ctx = ctx_factory(not_found)
+    for c in load_netscape_cookies(cookie_file).jar:
+        ctx.client.cookies.set(c.name, c.value, domain=c.domain, path=c.path)
+    miss = ezproxy.find(make_item(), ctx)
+    assert miss.outcome is Outcome.NOT_FOUND
+    assert "404" in miss.note
+
+    def boom(req):
+        raise httpx.ConnectError("down", request=req)
+
+    ctx_err = ctx_factory(boom)
+    for c in load_netscape_cookies(cookie_file).jar:
+        ctx_err.client.cookies.set(c.name, c.value, domain=c.domain, path=c.path)
+    err = ezproxy.find(make_item(), ctx_err)
+    assert err.outcome is Outcome.ERROR
+    assert "proxy request failed" in err.note
+
+
 def test_netscape_cookie_loader(tmp_path):
     p = tmp_path / "c.txt"
     p.write_text("#HttpOnly_.scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsid\tsecret\n")

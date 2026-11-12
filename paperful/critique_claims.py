@@ -257,9 +257,9 @@ def suggested_from_claims(
     ]
     meta["prompt_sha"] = prompt_sha
     say("Claims lane…")
-    from .llm.client import ChatRequest, chat
+    from .critique_llm import chat_with_json_retry, critique_chat_request
 
-    request = ChatRequest(
+    request = critique_chat_request(
         model=model,
         messages=(
             {"role": "system", "content": _EXTRACT_SYSTEM},
@@ -267,10 +267,11 @@ def suggested_from_claims(
         ),
         timeout_seconds=timeout_s,
         temperature=0.2,
+        json_mode=True,
     )
     t0 = time.perf_counter()
     try:
-        raw = chat(client, request)
+        raw = chat_with_json_retry(client, request, on_status=say, label="Claims")
     except Exception as exc:
         meta["skipped"] = "llm_error"
         meta["error"] = str(exc)
@@ -327,7 +328,7 @@ def suggested_from_claims(
         adj_user = f"Excerpt:\n{excerpt[:6000]}\n\nClaims:\n" + json.dumps(
             ledger, ensure_ascii=False
         )
-        adj_req = ChatRequest(
+        adj_req = critique_chat_request(
             model=model,
             messages=(
                 {"role": "system", "content": _DOWNGRADE_SYSTEM},
@@ -335,9 +336,10 @@ def suggested_from_claims(
             ),
             timeout_seconds=timeout_s,
             temperature=0.2,
+            json_mode=True,
         )
         try:
-            adj_raw = chat(client, adj_req)
+            adj_raw = chat_with_json_retry(client, adj_req, label="Claims")
             meta["calls"] = int(meta["calls"]) + 1
             adj = parse_llm_json(adj_raw) or {}
             by_id = {row["id"]: row for row in ledger}

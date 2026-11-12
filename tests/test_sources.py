@@ -799,6 +799,47 @@ def test_scihub_direct_pdf_response_and_404(ctx_factory):
     )
 
 
+def test_scihub_skips_items_without_a_doi(ctx_factory):
+    calls = []
+
+    def handler(req):
+        calls.append(str(req.url))
+        return httpx.Response(500)
+
+    cand = scihub.find(make_item(doi=None), ctx_factory(handler))
+    assert cand.outcome is Outcome.SKIPPED
+    assert cand.note == "no DOI"
+    assert calls == []
+
+
+def test_scihub_captcha_loop_after_repeated_solves(ctx_factory):
+    import hashlib
+
+    captcha = (FIX / "scihub_captcha.html").read_text()
+    salt, number = "loop?expires=1&", 3
+    challenge = {
+        "algorithm": "SHA-256",
+        "salt": salt,
+        "maxNumber": 20,
+        "signature": "sig",
+        "challenge": hashlib.sha256(f"{salt}{number}".encode()).hexdigest(),
+    }
+    pages = {"n": 0}
+
+    def handler(req):
+        if req.url.path.startswith("/captcha/challenge"):
+            return _json(challenge)
+        if req.url.path.startswith("/captcha/solution"):
+            return _json({"success": True})
+        pages["n"] += 1
+        return httpx.Response(200, text=captcha)
+
+    cand = scihub.find(make_item(), ctx_factory(handler))
+    assert cand.outcome is Outcome.CAPTCHA
+    assert "captcha loop" in cand.note
+    assert pages["n"] >= 3
+
+
 def test_ping_mirrors(ctx_factory):
     def handler(req):
         if req.url.host == "m1.test":

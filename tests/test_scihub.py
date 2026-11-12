@@ -76,6 +76,21 @@ def test_solve_altcha_roundtrip():
     assert payload["salt"] == salt and payload["signature"] == "sig"
 
 
+def test_solve_altcha_raises_when_unsolvable():
+    import pytest
+
+    with pytest.raises(ValueError, match="not solvable"):
+        solve_altcha(
+            {
+                "algorithm": "SHA-256",
+                "salt": "x",
+                "challenge": "deadbeef" * 8,
+                "maxNumber": 3,
+                "signature": "sig",
+            }
+        )
+
+
 def test_parse_not_in_database_layout():
     res = parse_page(
         (FIX / "scihub_not_in_db.html").read_text(),
@@ -139,4 +154,19 @@ def test_absolutise_rejects_data_and_non_http_schemes():
 
     assert _absolutise("data:application/pdf;base64,AAA", BASE) is None
     assert _absolutise("javascript:void(0)", BASE) is None
+    assert _absolutise("file:///tmp/x.pdf", BASE) is None
     assert _absolutise("//sci-hub.ru/a.pdf", BASE) == "https://sci-hub.ru/a.pdf"
+
+
+def test_pass_robot_check_needs_both_altcha_urls(ctx_factory):
+    import httpx
+
+    from paperful.sources.scihub import _pass_robot_check
+
+    ctx = ctx_factory(lambda r: httpx.Response(500))
+    assert not _pass_robot_check(
+        ctx,
+        "https://m1.test/",
+        "https://m1.test/10.1/x",
+        "<html><body>Are you a robot?</body></html>",
+    )

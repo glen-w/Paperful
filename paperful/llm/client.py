@@ -42,6 +42,8 @@ class ChatRequest:
     temperature: float = 0.2
     max_tokens: int | None = None
     num_ctx: int | None = None
+    json_mode: bool = False
+    think: bool | None = None
 
 
 def ctx_tokens_for(
@@ -167,6 +169,10 @@ class OllamaClient:
             "stream": True,
             "options": options,
         }
+        if request.json_mode:
+            payload["format"] = "json"
+        if request.think is not None:
+            payload["think"] = bool(request.think)
         url = f"{self._api_root()}/api/chat"
         try:
             with httpx.Client(timeout=request.timeout_seconds) as client:
@@ -249,6 +255,8 @@ class LiteLLMClient:
             kwargs["api_base"] = self.api_base
         if request.max_tokens is not None:
             kwargs["max_tokens"] = request.max_tokens
+        if request.json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
         try:
             for chunk in litellm.completion(**kwargs):
                 choices = getattr(chunk, "choices", None) or []

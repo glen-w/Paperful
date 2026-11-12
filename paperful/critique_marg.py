@@ -268,15 +268,16 @@ def _chat(
     messages: list[dict[str, str]],
     timeout: float,
 ) -> str:
-    from .llm.client import ChatRequest, chat
+    from .critique_llm import chat_with_json_retry, critique_chat_request
 
-    request = ChatRequest(
+    request = critique_chat_request(
         model=model,
-        messages=tuple(messages),
+        messages=messages,
         timeout_seconds=max(5.0, float(timeout)),
         temperature=0.2,
+        json_mode=True,
     )
-    return chat(client, request)
+    return chat_with_json_retry(client, request)
 
 
 def _leader_user(
@@ -450,6 +451,38 @@ def _run_group(
                 + "\nIf you have enough, return action=final.",
             }
         )
+
+    if (
+        not comments
+        and last_action != "final"
+        and stats.get("skipped") not in {"timeout", "llm_error", "loop"}
+        and time.monotonic() < deadline
+    ):
+        leader.append(
+            {
+                "role": "user",
+                "content": (
+                    "Return JSON with action=final, a summary, and comments now. "
+                    "JSON object only."
+                ),
+            }
+        )
+        try:
+            raw = _chat(client, model=model, messages=leader, timeout=remaining())
+            calls += 1
+            data = parse_llm_json(raw) or {}
+            if data.get("comments"):
+                comments.extend(
+                    row for row in data["comments"] if isinstance(row, dict)
+                )
+            summary = str(data.get("summary") or "").strip()
+            if summary and grounded(summary, hay):
+                narrative = narrative or summary
+            if str(data.get("action") or "").strip().lower() == "final":
+                last_action = "final"
+        except Exception as exc:
+            stats["skipped"] = stats.get("skipped") or "llm_error"
+            stats["error"] = str(exc)
 
     stats["rounds"] = rounds
     stats["calls"] = calls

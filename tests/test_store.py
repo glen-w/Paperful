@@ -1,6 +1,7 @@
 import hashlib
 import json as _json
 import os
+from pathlib import Path
 
 from paperful.store import (
     STATUS_ATTACH_FAILED,
@@ -279,6 +280,170 @@ def test_resolve_pdf_path_rewrites_docker_data_prefix(tmp_path):
     docker = f"/data/out/ocean/BBNJ/{pdf.name}"
     assert resolve_pdf_path(tmp_path, docker) == pdf
     assert resolve_pdf_path(tmp_path, "/data/out/missing.pdf") is None
+
+
+def test_resolve_pdf_path_relative_data_prefix_and_empty(tmp_path):
+    from paperful.store import relpaths
+
+    pdf = tmp_path / "ocean" / "paper.pdf"
+    pdf.parent.mkdir(parents=True)
+    pdf.write_bytes(b"%PDF-1.4 x")
+    assert resolve_pdf_path(tmp_path, None) is None
+    assert resolve_pdf_path(tmp_path, "") is None
+    assert resolve_pdf_path(tmp_path, f"data/out/ocean/{pdf.name}") == pdf
+    outside = tmp_path.parent / "elsewhere.pdf"
+    assert relpaths(tmp_path, [pdf, outside]) == [
+        f"ocean/{pdf.name}",
+        str(outside),
+    ]
+
+
+def test_resolve_pdf_path_relative_to_data_out_when_prefix_misses(tmp_path):
+    # Exact ``/data/out`` skips the ``/data/out/`` prefix loop; relative_to still maps.
+    out_as_file = tmp_path / "out-file"
+    out_as_file.write_bytes(b"%PDF-1.4")
+    assert resolve_pdf_path(out_as_file, "/data/out") == out_as_file
+
+
+def test_write_fetch_records_copies_oa_stamp_fields(tmp_path):
+    import json
+
+    from paperful.store import record_path, write_fetch_records
+
+    content = b"%PDF-1.4 oa"
+    md5 = hashlib.md5(content, usedforsecurity=False).hexdigest()
+    item = _item(paths=["BBNJ"])
+    primary, _extras = save_pdf(tmp_path, item, content, md5)
+    written = write_fetch_records(
+        [primary],
+        item,
+        md5=md5,
+        source="unpaywall",
+        fetched_url="https://oa.test/a.pdf",
+        pdf_doi="10.1/oa",
+        oa_stamp={
+            "license": "cc-by",
+            "oa_status": "gold",
+            "version": "publishedVersion",
+        },
+    )
+    card = json.loads(written[0].read_text())
+    assert card["oa_license"] == "cc-by"
+    assert card["oa_status"] == "gold"
+    assert card["oa_version"] == "publishedVersion"
+    assert card["fetch"]["oa"]["license"] == "cc-by"
+    assert record_path(primary.parent) == written[0]
+
+
+def test_manifest_skips_blank_lines(tmp_path):
+    path = tmp_path / "manifest.jsonl"
+    path.write_text(
+        '\n\n{"itemKey": "K", "status": "ok"}\n\n',
+        encoding="utf-8",
+    )
+    assert Manifest(path).get("K").status == STATUS_OK
+
+
+def test_item_dirname_keeps_key_when_stem_is_long():
+    item = _item()
+    item.title = " ".join(["word"] * 80)
+    item.key = "LONGKEY99"
+    name = item_dirname(item)
+    assert name.endswith(" -- LONGKEY99")
+    assert len(name) <= 180
+
+
+def test_unique_path_falls_back_to_md5_suffix(tmp_path):
+    stem_md5 = hashlib.md5(b"same-name-clash", usedforsecurity=False).hexdigest()
+    (tmp_path / "clash.pdf").write_bytes(b"original")
+    for i in range(2, 100):
+        (tmp_path / f"clash ({i}).pdf").write_bytes(b"other")
+    dest = unique_path(tmp_path, "clash.pdf", stem_md5)
+    assert dest.name == f"clash ({stem_md5[:8]}).pdf"
+
+
+def test_safe_filename_caps_overall_length_when_year_is_huge():
+    name = safe_filename("A" * 40, 10**200, "T" * 90)
+    assert name.endswith(".pdf")
+    assert len(name) <= 180
+
+
+def test_item_dirname_uses_untitled_when_truncated_stem_is_punctuation():
+    item = _item()
+    item.title = "..."
+    item.first_author = "..."
+    item.year = None
+    # Long key shrinks the stem budget so truncation leaves only punctuation.
+    item.key = "K" * 170
+    name = item_dirname(item)
+    assert name.startswith("untitled -- ")
+    assert name.endswith(item.key)
+
+
+def test_item_from_record_marks_snapshot_pdf_tier():
+    from paperful.store import item_from_record
+
+    pdf = Path("/tmp/snap.pdf")
+    native = item_from_record(
+        {
+            "title": "Native",
+            "attachments": [
+                {
+                    "contentType": "application/pdf",
+                    "linkMode": "imported_file",
+                    "note": "",
+                }
+            ],
+        },
+        "N1",
+        ["Col"],
+        [pdf],
+    )
+    assert native.pdf_tier == "native"
+    snap = item_from_record(
+        {
+            "title": "Snap",
+            "attachments": [
+                {
+                    "contentType": "application/pdf",
+                    "linkMode": "imported_file",
+                    "note": "snapshot:htmlpdf printed",
+                }
+            ],
+        },
+        "S1",
+        ["Col"],
+        [pdf],
+    )
+    assert snap.pdf_tier == "snapshot"
+
+
+def test_save_pdf_copies_when_hardlink_fails(tmp_path, monkeypatch):
+    content = b"%PDF-1.4 copy-fallback"
+    md5 = hashlib.md5(content, usedforsecurity=False).hexdigest()
+    item = _item(paths=["A", "B"])
+
+    def boom(src, dst):
+        raise OSError("no hardlinks here")
+
+    monkeypatch.setattr(os, "link", boom)
+    primary, extras = save_pdf(tmp_path, item, content, md5)
+    assert primary.read_bytes() == content
+    assert len(extras) == 1
+    assert extras[0].read_bytes() == content
+    assert os.stat(primary).st_ino != os.stat(extras[0]).st_ino
+
+
+def test_mirror_entries_skip_unreadable_pdfs(tmp_path):
+    from paperful.store import mirror_entries
+
+    out = tmp_path / "out"
+    folder = _mirror_item(out, "A", "K1")
+    broken = folder / "gone.pdf"
+    broken.symlink_to(folder / "missing-target.pdf")
+    entries = mirror_entries(out)
+    assert len(entries) == 1
+    assert all(p.name != "gone.pdf" for p in entries[0].pdfs)
 
 
 # ---- items_from_mirror: the catalogue `run` uses when the manager is offline ---

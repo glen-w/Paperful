@@ -39,6 +39,19 @@ def test_with_camofox_lane_cli_off(cfg: Config):
     assert "camofox" not in listed
 
 
+def test_with_camofox_lane_drops_when_present_but_not_ready(cfg: Config):
+    cfg.camofox_enabled = False
+    listed = with_camofox_lane(cfg, ["unpaywall", "camofox", "scihub"])
+    assert listed == ["unpaywall", "scihub"]
+
+
+def test_with_camofox_lane_inserts_after_last_browser_lane(cfg: Config):
+    cfg.camofox_enabled = True
+    listed = with_camofox_lane(cfg, ["unpaywall", "ezproxy", "htmlpdf", "scihub"])
+    assert listed.index("htmlpdf") < listed.index("camofox") < listed.index("scihub")
+    assert "camofox" not in with_camofox_lane(cfg, ["unpaywall", "scihub"])
+
+
 def test_order_run_places_camofox_before_agent(cfg: Config):
     steps = order_run(cfg, ["ezproxy", "camofox", "browser_agent", "scihub"])
     names = [s.name for s in steps]
@@ -224,6 +237,64 @@ def test_source_find_skipped_when_disabled(cfg: Config):
     ctx = Context(config=cfg, client=MagicMock())
     cand = camofox_src.find(make_item(), ctx)
     assert cand.outcome is Outcome.SKIPPED
+
+
+def test_source_find_skips_empty_base_url_and_missing_identifier(cfg: Config):
+    cfg.camofox_enabled = True
+    cfg.camofox_base_url = "   "
+    ctx = Context(config=cfg, client=MagicMock())
+    empty = camofox_src.find(make_item(), ctx)
+    assert empty.outcome is Outcome.SKIPPED
+    assert "base_url empty" in empty.note
+
+    cfg.camofox_base_url = "http://camofox.test"
+    bare = camofox_src.find(make_item(doi=None, url=None, arxiv_id=None), ctx)
+    assert bare.outcome is Outcome.SKIPPED
+    assert "no DOI or URL" in bare.note
+
+
+def test_source_find_maps_recover_outcomes(cfg: Config, monkeypatch):
+    from paperful.camofox_recover import CamofoxResult
+
+    cfg.camofox_enabled = True
+    cfg.camofox_base_url = "http://camofox.test"
+    ctx = Context(config=cfg, client=MagicMock())
+    item = make_item()
+
+    monkeypatch.setattr(
+        "paperful.sources.camofox.run_camofox_recover",
+        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    err = camofox_src.find(item, ctx)
+    assert err.outcome is Outcome.ERROR
+    assert err.note == "RuntimeError"
+
+    monkeypatch.setattr(
+        "paperful.sources.camofox.run_camofox_recover",
+        lambda *_a, **_k: CamofoxResult(None, "blocked", captcha=True),
+    )
+    captcha = camofox_src.find(item, ctx)
+    assert captcha.outcome is Outcome.CAPTCHA
+    assert captcha.note == "blocked"
+
+    monkeypatch.setattr(
+        "paperful.sources.camofox.run_camofox_recover",
+        lambda *_a, **_k: CamofoxResult(
+            PDF_BYTES, "camofox", final_url="https://pub.test/a.pdf"
+        ),
+    )
+    hit = camofox_src.find(item, ctx)
+    assert hit.outcome is Outcome.FOUND
+    assert hit.content == PDF_BYTES
+    assert hit.url == "https://pub.test/a.pdf"
+
+    monkeypatch.setattr(
+        "paperful.sources.camofox.run_camofox_recover",
+        lambda *_a, **_k: CamofoxResult(None, "publisher miss"),
+    )
+    miss = camofox_src.find(item, ctx)
+    assert miss.outcome is Outcome.NOT_FOUND
+    assert miss.note == "publisher miss"
 
 
 def test_source_find_skipped_when_server_unreachable(cfg: Config, monkeypatch):

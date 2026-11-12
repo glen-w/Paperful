@@ -263,6 +263,41 @@ def test_verify_doi_ok_suspect_unknown():
     assert verify_doi(mock_client(down), item, email="a@b.c").status == "unknown"
 
 
+def test_verify_doi_year_penalty_is_weak_match_not_suspect():
+    """Exact title with a far-off year sits between min_score and suspect_score."""
+    import pytest
+
+    from paperful.resolve import verify_doi
+
+    title = "A sufficiently long test title about marine governance"
+
+    def handler(req):
+        return _json(
+            {
+                "message": {
+                    "DOI": "10.1000/test.doi",
+                    "title": [title],
+                    "issued": {"date-parts": [[2005]]},
+                }
+            }
+        )
+
+    item = make_item(title=title, year=2019)
+    result = verify_doi(
+        mock_client(handler),
+        item,
+        email="a@b.c",
+        min_score=0.95,
+        suspect_score=0.7,
+    )
+    assert result.status == "unknown"
+    assert result.note == "weak match"
+    assert result.score == pytest.approx(0.9)
+
+    missing = make_item(doi="", title=title)
+    assert verify_doi(mock_client(handler), missing, email="a@b.c").status == "missing"
+
+
 def test_prepare_swaps_suspect_doi():
     from paperful.resolve import prepare_identifiers
 
