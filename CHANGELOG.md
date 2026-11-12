@@ -6,8 +6,10 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
-- **Example Vale styles.** The repo ships `styles/JMLC`, `styles/JCP`, and `styles/MarinePolicy` for `critique --vale`. Other packs under `styles/` stay local and gitignored.
+## 1.9.1 — 2026-11-12
+
 - **Critique JSON turns.** Review lanes send Ollama `format=json` and `think=false`, parse replies that wrap think-tags or trailing commas, and retry once when the first object is unusable. MARG aspect groups that never `action=final` get one forced final turn before `empty_reply`.
+- **Example Vale styles.** The repo ships `styles/JMLC`, `styles/JCP`, and `styles/MarinePolicy` for `critique --vale`. Other packs under `styles/` stay local and gitignored.
 
 ## 1.9.0 — 2026-11-03
 
