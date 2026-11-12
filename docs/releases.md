@@ -1,6 +1,6 @@
 # Releases and stability
 
-**1.9.1** is the current release (`pipx install paperful` / `uv tool install paperful`
+**1.9.2** is the current release (`pipx install paperful` / `uv tool install paperful`
 after this tag is published; `pip install paperful` still works). Optional extras:
 `[browser]`, `[llm]`, `[rag]`, `[rag-docling]`, `[serve]`, `[browser-agent]`, `[openxml]`, `[network]`. **1.1.0** introduced PyPI and
 trusted publishing. For campus login and HTML PDF paths, install
@@ -33,7 +33,7 @@ be added. Required `paperful.run_report.v1` keys and imported-file attach
 (typed `attach_failed`, provenance note) are the contract. **1.1.1** shipped
 Wanted stop-ship hygiene (Grab scope, Attach at zero, copy). Everything after
 that is a buffet by area (Wanted excellence foundation shipped; residual polish).
-**1.9.1** pins critique JSON turns (`format=json`, `think=false`, one repair)
+**1.9.2** hardens `paperful rewrite` (drift hashes, grounding freeze, fail-closed Word, reproducible LLM calls, post-edit checkers, whole-paragraph returns). **1.9.1** pins critique JSON turns (`format=json`, `think=false`, one repair)
 and ships example Vale packs (`JMLC`, `JCP`, `MarinePolicy`). **1.9.0** cuts GitHub CI to one Ubuntu smoke job (`pytest -m smoke`); the
 OS/Python matrix, lint, audit, socket, fresh-install, browser, and docker
 jobs stay local until each is green on its own. **1.8.0** adds crash-safe ledger appends, one HTTP client, systematic-review

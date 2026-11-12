@@ -6,6 +6,10 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.9.2 — 2026-11-12
+
+- **Rewrite trust.** Critique packs store an input file hash; rewrite records drift, skips loc-only binds on a drifted `--file`, and exits 3 when a finished run proposes no edits and only skips. LLM edits freeze numbers/cites/refs, require a unique quote, fail closed on mixed Word runs, pin temperature 0 and seed 0, re-check glossary/cites/Vale on the edited paragraph, and return a whole paragraph that Paperful diffs. Hedge and passive findings are comments.
+
 ## 1.9.1 — 2026-11-12
 
 - **Critique JSON turns.** Review lanes send Ollama `format=json` and `think=false`, parse replies that wrap think-tags or trailing commas, and retry once when the first object is unusable. MARG aspect groups that never `action=final` get one forced final turn before `empty_reply`.
