@@ -27,7 +27,7 @@ def run_rewrite(
     fmt: str,
 ) -> None:
     from . import cli_runtime as cli_mod
-    from .agent_json import envelope
+    from .agent_json import EXIT_OK, EXIT_PARTIAL, envelope
     from .critique import load_pack
     from .critique_extract import ExtractError
     from .llm import get_client
@@ -72,9 +72,13 @@ def run_rewrite(
             file_path=file_path,
         )
         if folder is None:
+            hint = (
+                f"paperful critique --file {file_path}"
+                if file_path is not None
+                else "paperful critique --file PATH"
+            )
             console.print(
-                "[red]No critique pack on disk. Run paperful critique first "
-                "or pass --pack.[/]"
+                f"[red]No critique pack on disk. Run {hint} or pass --pack.[/]"
             )
             raise typer.Exit(1)
 
@@ -140,30 +144,51 @@ def run_rewrite(
         raise typer.Exit(1) from exc
 
     counts = result.get("counts") or {}
+    inp = result.get("input") if isinstance(result.get("input"), dict) else {}
+    drifted = bool(inp.get("drift"))
+    edits_n = int(counts.get("edits", 0) or 0)
+    skips_n = int(counts.get("skips", 0) or 0)
+    if drifted:
+        msg = (
+            "Manuscript hash differs from the critique pack "
+            f"(file={inp.get('file_hash') or '?'} pack={inp.get('pack_hash') or 'missing'})."
+        )
+        if json_out_flag:
+            print(msg, file=sys.stderr)
+        else:
+            console.print(f"[yellow]{msg}[/]")
+    exit_code = EXIT_OK
+    if edits_n == 0 and (skips_n > 0 or drifted):
+        exit_code = EXIT_PARTIAL
     write_command_report(
         cfg,
         command="rewrite",
         scope=str(result.get("critique_id") or ""),
         summary={
-            "edits": counts.get("edits", 0),
-            "skips": counts.get("skips", 0),
+            "edits": edits_n,
+            "skips": skips_n,
             "pack_dir": result.get("pack_dir") or "",
+            "drift": drifted,
         },
         items=[],
         flags={
             "dry_run": dry_run,
             "areas": list(area_ids),
             "outputs": list(output_ids),
+            "drift": drifted,
         },
         started=started,
     )
     payload = envelope(
         command="rewrite",
         summary={
-            "edits": counts.get("edits", 0),
-            "skips": counts.get("skips", 0),
+            "edits": edits_n,
+            "skips": skips_n,
             "pack_dir": result.get("pack_dir") or "",
             "critique_id": result.get("critique_id") or "",
+            "drift": drifted,
+            "file_hash": inp.get("file_hash") or "",
+            "pack_hash": inp.get("pack_hash") or "missing",
         },
         items=[
             {
@@ -177,8 +202,9 @@ def run_rewrite(
             "dry_run": dry_run,
             "areas": list(area_ids),
             "outputs": list(output_ids),
+            "drift": drifted,
         },
-        exit_code=0,
+        exit_code=exit_code,
     )
 
     def _human() -> None:
@@ -247,3 +273,5 @@ def run_rewrite(
         audits = {"tracked": primary} if isinstance(primary, dict) else {}
     if any(isinstance(a, dict) and a.get("fail") for a in audits.values()):
         raise typer.Exit(1)
+    if exit_code != EXIT_OK:
+        raise typer.Exit(exit_code)

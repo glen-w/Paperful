@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import itertools
 import json
 import os
@@ -104,6 +105,18 @@ def append_jsonl(
     state_dir, name = lock
     with file_lock(state_dir, name):
         _write()
+
+
+def file_sha256(path: Path) -> str | None:
+    """Hex digest of file bytes, or None if unreadable."""
+    try:
+        digest = hashlib.sha256()
+        with path.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(65536), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except OSError:
+        return None
 
 
 def lock_path(state_dir: Path, name: str) -> Path:

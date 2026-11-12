@@ -300,11 +300,132 @@ def test_cli_pack_and_dry_run(cfg, tmp_path: Path):
     body = json.loads(res.stdout)
     assert body["command"] == "rewrite"
     assert body["summary"]["edits"] >= 1
+    assert body["exit"] == 0
     assert (
         not list((cfg.state_dir / "rewrites").glob("**/*"))
         if (cfg.state_dir / "rewrites").exists()
         else True
     )
+
+
+def test_cli_requires_pack_names_critique_command(cfg, tmp_path: Path):
+    from paperful.cli import app
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+    )
+    src = tmp_path / "draft.md"
+    src.write_text(DRAFT, encoding="utf-8")
+    res = runner.invoke(app, ["rewrite", "--file", str(src), "--config", str(cfg_path)])
+    assert res.exit_code == 1
+    assert "paperful critique --file" in (res.output or "")
+
+
+def test_cli_all_skip_dry_run_exits_partial(cfg, tmp_path: Path):
+    from paperful.cli import app
+
+    src = tmp_path / "draft.md"
+    src.write_text(DRAFT, encoding="utf-8")
+    pack_dir = cfg.state_dir / "critiques" / "file-draft" / "20261027T000001Z"
+    pack_dir.mkdir(parents=True)
+    payload = _pack(
+        [_finding(quote="this quote is not in the draft at all")], path=str(src)
+    )
+    (pack_dir / "pack.json").write_text(json.dumps(payload), encoding="utf-8")
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+    )
+    res = runner.invoke(
+        app,
+        [
+            "rewrite",
+            "--pack",
+            str(pack_dir),
+            "--file",
+            str(src),
+            "--output",
+            "edits",
+            "--dry-run",
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 3, res.output
+    body = json.loads(res.stdout)
+    assert body["exit"] == 3
+    assert body["ok"] is False
+    assert body["summary"]["edits"] == 0
+    assert body["summary"]["skips"] >= 1
+
+
+def test_cli_drifted_file_records_drift(cfg, tmp_path: Path):
+    from paperful.cli import app
+    from paperful.fsio import file_sha256
+
+    original = tmp_path / "draft.md"
+    original.write_text(DRAFT, encoding="utf-8")
+    drifted = tmp_path / "drifted.md"
+    drifted.write_text(
+        "The BBNJ Agreement covers Areas Beyond National Jurisdiction.\n",
+        encoding="utf-8",
+    )
+    pack_dir = cfg.state_dir / "critiques" / "file-draft" / "20261027T000002Z"
+    pack_dir.mkdir(parents=True)
+    payload = _pack([_finding()], path=str(original))
+    payload["input"]["hash"] = file_sha256(original)
+    (pack_dir / "pack.json").write_text(json.dumps(payload), encoding="utf-8")
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
+    )
+    res = runner.invoke(
+        app,
+        [
+            "rewrite",
+            "--pack",
+            str(pack_dir),
+            "--file",
+            str(drifted),
+            "--output",
+            "edits",
+            "--dry-run",
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 3, res.output
+    body = json.loads(res.stdout)
+    assert body["flags"]["drift"] is True
+    assert body["summary"]["drift"] is True
+    assert body["summary"]["edits"] == 0
+    assert "hash differs" in (res.stderr or "").lower() or "hash differs" in (
+        res.output or ""
+    ).lower()
+
+
+def test_old_pack_without_hash_still_runs(cfg, tmp_path: Path):
+    src = tmp_path / "draft.md"
+    src.write_text(DRAFT, encoding="utf-8")
+    pack = _pack([_finding()], path=str(src))
+    assert "hash" not in pack["input"]
+    result = build_rewrite(
+        cfg,
+        pack=pack,
+        manuscript=src,
+        areas=("style",),
+        outputs=("edits",),
+        dry_run=True,
+        llm_client=None,
+    )
+    assert result["input"]["pack_hash"] == "missing"
+    assert result["input"]["drift"] is False
+    assert (result.get("plan") or {}).get("edits")
 
 
 def test_tracked_docx_insert_delete(tmp_path: Path):

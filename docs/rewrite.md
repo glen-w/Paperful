@@ -22,7 +22,13 @@ Docs credit the patterns: a worklog, align-then-generate, selected-span prompts.
 
 `--pack`, `--item`, and `--file` locate the critique pack. `--file` with
 `--pack` is allowed: the pack supplies findings; `--file` is the manuscript
-to edit.
+to edit. There is no accept/reject screen in Paperful; accept or reject
+tracked changes in Word (or the office app you use). New critique packs
+store an input file hash. When `--file` does not match that hash (or the
+pack’s original path, for older packs), rewrite warns, records `drift`,
+and still re-aligns unique quotes. A run that proposes no edits and only
+skips (or drifted with nothing to apply) exits **3** (`partial`); a run
+that proposes at least one edit exits **0**.
 
 ```bash
 uv run paperful rewrite --pack state/critiques/file-draft/20261027T...
@@ -32,7 +38,9 @@ uv run paperful rewrite --file ./draft.docx --area cites --area structure --comm
 uv run paperful rewrite --pack PATH --output edits --dry-run
 ```
 
-- Exit 1 if no pack exists. Never calls `build_critique`.
+- Exit 1 if no pack exists. Never calls `build_critique`. Exit 3 when the
+  run finishes with zero edits and every item was skipped (or the file
+  drifted and nothing applied). Envelope `exit` matches.
 - `--area` (repeatable): `style`, `cites`, `structure`, `comments`, or `all`.
 - `--output` (repeatable): `edits`, `sidecar`, `tracked`, `odt`, `pdf`.
 - `--comments`: `off` (default), `substantive`, `all` — reviewer/MARG notes as
