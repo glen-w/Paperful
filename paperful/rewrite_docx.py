@@ -263,6 +263,34 @@ def _para_text(p: ET.Element) -> str:
     return "".join(t.text or "" for t in p.iter(_w("t")))
 
 
+_FRAGILE_LOCAL = frozenset(
+    {
+        "ins",
+        "del",
+        "fldChar",
+        "instrText",
+        "fldSimple",
+        "drawing",
+        "pict",
+        "txbxContent",
+        "hyperlink",
+    }
+)
+
+
+def _para_is_fragile(p: ET.Element) -> bool:
+    """True when a body rewrite would flatten run properties or fields."""
+    for el in p.iter():
+        local = el.tag.rsplit("}", 1)[-1]
+        if local in _FRAGILE_LOCAL:
+            return True
+        if local == "r" and el.find(_w("rPr")) is not None:
+            return True
+        if local == "rPr":
+            return True
+    return False
+
+
 def _is_comment_ref_run(child: ET.Element) -> bool:
     if child.tag != _w("r"):
         return False
@@ -333,11 +361,19 @@ def _apply_edits_to_paras(
     *,
     next_id: int,
     when: str,
-) -> tuple[list[tuple[int, str]], list[str]]:
+) -> tuple[list[tuple[int, str]], list[dict[str, str]]]:
     """Comments may stack on one paragraph; only one body rewrite per paragraph."""
     comments: list[tuple[int, str]] = []
-    skips: list[str] = []
+    skips: list[dict[str, str]] = []
     rewritten: set[int] = set()
+
+    def _skip_row(edit: RewriteEdit, reason: str) -> dict[str, str]:
+        fid = (edit.finding_ids or [""])[0]
+        return {
+            "finding_id": fid,
+            "reason": reason,
+            "detail": (edit.quote or edit.kind)[:80],
+        }
 
     def _match(edit: RewriteEdit, *, body: bool) -> bool:
         nonlocal next_id
@@ -352,6 +388,16 @@ def _apply_edits_to_paras(
                 comments.append((next_id, edit.body or edit.quote))
                 next_id += 1
                 return True
+            if _para_is_fragile(p):
+                note = (
+                    edit.body
+                    or f"Tracked change skipped (complex formatting): {edit.quote[:80]}"
+                )
+                _anchor_comment(p, next_id)
+                comments.append((next_id, note))
+                next_id += 1
+                rewritten.add(i)
+                return True
             if not _rewrite_paragraph(p, edit, next_id, when):
                 continue
             next_id += 2 if edit.kind == "replace" else 1
@@ -362,11 +408,11 @@ def _apply_edits_to_paras(
     for edit in edits:
         if edit.kind == "comment":
             if not _match(edit, body=False):
-                skips.append(edit.quote[:80] or edit.kind)
+                skips.append(_skip_row(edit, "docx_miss"))
     for edit in edits:
         if edit.kind != "comment":
             if not _match(edit, body=True):
-                skips.append(edit.quote[:80] or edit.kind)
+                skips.append(_skip_row(edit, "docx_miss"))
     return comments, skips
 
 
@@ -411,9 +457,11 @@ def _anchor_comment(p: ET.Element, cid: int) -> None:
     p.append(ref_p)
 
 
-def apply_tracked_docx(src: Path, dest: Path, edits: list[RewriteEdit]) -> list[str]:
-    """Copy ``src`` to ``dest`` with ins/del/comments. Returns skip reasons."""
-    skips: list[str] = []
+def apply_tracked_docx(
+    src: Path, dest: Path, edits: list[RewriteEdit]
+) -> list[dict[str, str]]:
+    """Copy ``src`` to ``dest`` with ins/del/comments. Returns skip rows."""
+    skips: list[dict[str, str]] = []
     when = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     try:
         with zipfile.ZipFile(src) as zin:
@@ -485,7 +533,7 @@ def build_docx_from_paragraphs(
     dest: Path,
     paragraphs: list[str],
     edits: list[RewriteEdit],
-) -> list[str]:
+) -> list[dict[str, str]]:
     """Minimal tracked-changes docx from extract paragraphs (md → Word spine)."""
     when = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     document = ET.Element(_w("document"))
