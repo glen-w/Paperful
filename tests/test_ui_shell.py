@@ -75,6 +75,7 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     rewrite = client.get("/rewrite")
     assert rewrite.status_code == 200
     assert "Suggest edits" in rewrite.text
+    assert "accept or reject the tracked changes in Word" in rewrite.text
     assert "Run Critique first" in rewrite.text
     assert 'href="/critique"' in rewrite.text
     stuff = client.get("/stuff")

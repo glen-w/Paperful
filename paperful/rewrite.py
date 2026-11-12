@@ -11,7 +11,8 @@ from typing import Any
 from .config import Config
 from .critique import critique_id, latest_pack_dir, load_pack
 from .critique_extract import extract_path
-from .rewrite_align import Alignment, align_finding
+from .fsio import file_sha256
+from .rewrite_align import Alignment, align_finding, _find_unique
 from .rewrite_areas import (
     COMMENT_ONLY_CODES,
     bucket_findings,
@@ -90,6 +91,28 @@ def _manuscript_path(pack: dict[str, Any], file_path: Path | None) -> Path | Non
             if p.is_file():
                 return p
     return None
+
+
+def manuscript_drift(pack: dict[str, Any], manuscript: Path) -> dict[str, Any]:
+    """Compare the current file to the critique pack's source hash."""
+    file_hash = file_sha256(manuscript) or ""
+    inp = pack.get("input") if isinstance(pack.get("input"), dict) else {}
+    stored = str(inp.get("hash") or "").strip()
+    live = ""
+    for key in ("path", "staged_path"):
+        raw = str(inp.get(key) or "").strip()
+        if not raw:
+            continue
+        digest = file_sha256(Path(raw))
+        if digest:
+            live = digest
+            break
+    compare = stored or live
+    return {
+        "file_hash": file_hash,
+        "pack_hash": stored or "missing",
+        "drift": bool(file_hash and compare) and file_hash != compare,
+    }
 
 
 _ACRONYM_PAREN = re.compile(r"\(([A-Z]{2,12})\)\s*$")
@@ -276,6 +299,7 @@ def build_rewrite(
     say(f"Extracting {manuscript.name}…")
     doc = extract_path(manuscript)
     text = doc.text or ""
+    drift = manuscript_drift(pack, manuscript)
     findings = [f for f in (pack.get("findings") or []) if isinstance(f, dict)]
     llm_block = pack.get("llm") if isinstance(pack.get("llm"), dict) else {}
     if comment_mode in {"substantive", "all"}:
@@ -305,6 +329,10 @@ def build_rewrite(
     for area, rows in buckets.items():
         for row in rows:
             fid = str(row.get("id") or "")
+            quote = str(row.get("quote") or "").strip()
+            if drift["drift"] and quote and _find_unique(text, quote) is None:
+                skips.append({"finding_id": fid, "reason": "drift"})
+                continue
             bound = align_finding(row, text=text, paragraphs=doc.paragraphs)
             if isinstance(bound, str):
                 if comment_mode != "off" and area == "comments":
@@ -382,6 +410,9 @@ def build_rewrite(
             "path": str(manuscript),
             "format": doc.format,
             "critique_pack": str(pack.get("pack_dir") or ""),
+            "file_hash": drift["file_hash"],
+            "pack_hash": drift["pack_hash"],
+            "drift": drift["drift"],
         },
         "areas": list(area_ids),
         "outputs": list(output_ids),

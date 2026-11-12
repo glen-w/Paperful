@@ -179,6 +179,8 @@ def test_pack_keys_and_lanes_offline(cfg, tmp_path: Path, monkeypatch):
     assert pack["schema"] == SCHEMA
     assert CRITIQUE_PACK_KEYS <= set(pack)
     assert pack["input"]["kind"] == "file"
+    assert pack["input"].get("hash")
+    assert len(str(pack["input"]["hash"])) == 64
     folder = Path(pack["pack_dir"])
     on_disk = json.loads((folder / "pack.json").read_text(encoding="utf-8"))
     assert CRITIQUE_PACK_KEYS <= set(on_disk)

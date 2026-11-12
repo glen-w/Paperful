@@ -14,6 +14,7 @@ from typing import Any, Iterable
 from .config import Config
 from .critique_extract import ExtractedDoc, extract_path, loc_of_span, stage_file
 from .dedupe import scope_slug
+from .fsio import file_sha256
 from .store import write_json
 from .zot import Item
 
@@ -783,6 +784,8 @@ def build_critique(
         # JSON keeps dismissed rows; markdown omits them in render_markdown.
         pass
 
+    src_path = Path(src) if src else None
+    digest = file_sha256(src_path) if src_path is not None else None
     inp: dict[str, Any] = {
         "kind": kind,
         "item_key": item_key,
@@ -792,6 +795,8 @@ def build_critique(
         "staged_path": str(staged) if staged else "",
         "extract": doc.finding,
     }
+    if digest:
+        inp["hash"] = digest
     payload = {
         "schema": SCHEMA,
         "input": inp,
