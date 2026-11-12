@@ -219,6 +219,21 @@ def _area_needs_llm(findings: list[dict[str, Any]], det_ids: set[str]) -> bool:
     return any(str(f.get("id") or "") not in det_ids for f in findings)
 
 
+def _paragraph_origin(text: str, paragraph: str, aln: Alignment | None) -> int:
+    """Start offset of ``paragraph`` in the manuscript, or -1."""
+    para = paragraph or ""
+    if not para:
+        return -1
+    span = unique_span(text, para)
+    if span is not None:
+        return span[0]
+    if aln is not None and aln.quote and para.find(aln.quote) >= 0:
+        off = para.find(aln.quote)
+        if aln.start >= off:
+            return aln.start - off
+    return -1
+
+
 def _paragraphs(doc: Any, text: str) -> list[str]:
     paras = [p for p in (doc.paragraphs or []) if str(p).strip()]
     if paras:
@@ -418,22 +433,45 @@ def build_rewrite(
                     {"finding_id": str(r.get("id") or ""), "reason": "needs_author"}
                 )
             continue
-        excerpt = budget_excerpt(cfg, text)
-        edits, extra_skips, model, meta = proposed_from_area(
-            cfg,
-            area=spec,
-            findings=rows,
-            alignments=alignments,
-            excerpt=excerpt,
-            client=llm_client,
-            timeout_s=timeout,
-            on_status=on_status,
-        )
-        models[spec.id] = model
-        if meta:
-            calls.append({"area": spec.id, **meta})
-        proposed.extend(edits)
-        skips.extend(extra_skips)
+        buckets: dict[int, list[dict[str, Any]]] = {}
+        for r in rows:
+            fid = str(r.get("id") or "")
+            aln = alignments.get(fid)
+            idx = aln.paragraph_index if aln is not None else -1
+            buckets.setdefault(idx, []).append(r)
+        for group in buckets.values():
+            aln0 = alignments.get(str(group[0].get("id") or ""))
+            excerpt = (
+                aln0.paragraph
+                if aln0 is not None and (aln0.paragraph or "").strip()
+                else budget_excerpt(cfg, text)
+            )
+            edits, extra_skips, model, meta = proposed_from_area(
+                cfg,
+                area=spec,
+                findings=group,
+                alignments=alignments,
+                excerpt=excerpt,
+                client=llm_client,
+                timeout_s=timeout,
+                on_status=on_status,
+            )
+            origin = _paragraph_origin(text, excerpt, aln0)
+            for edit in edits:
+                if origin >= 0 and edit.start >= 0 and excerpt == (
+                    edit.source_paragraph or excerpt
+                ):
+                    edit.start = origin + edit.start
+                    edit.end = origin + edit.end
+                if len(edits) == 1:
+                    edit.finding_ids = [
+                        str(r.get("id") or "") for r in group if r.get("id")
+                    ]
+            models[spec.id] = model
+            if meta:
+                calls.append({"area": spec.id, **meta})
+            proposed.extend(edits)
+            skips.extend(extra_skips)
 
     proposed = filter_broken_edits(cfg, proposed, skips, full_text=text)
 

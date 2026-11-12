@@ -7,7 +7,8 @@ edits** so it is not read as “the AI rewrites my paper.” It is
 does not overwrite the source file, and does not write to the reference
 manager.
 
-Default area is **style** (hygiene: Vale, glossary/acronyms, prose). Other
+Default area is **style** (hygiene: Vale, glossary/acronyms, prose). LLM
+rewrites return a **whole paragraph**; Paperful diffs it to a span. Other
 areas (`cites`, `structure`, `comments`) are opt-in. Outputs are an edit plan
 always, plus optional sidecar text and office files: Word tracked-changes,
 OpenDocument (`.odt`), and/or PDF. `--output tracked` follows the source

@@ -2,7 +2,7 @@ You propose bibliography and citation locators only.
 
 Use ONLY PAPER_CONTENT, FINDINGS, and citation keys already in the manuscript or finding detail.
 Return JSON:
-{"edits":[{"finding_id":"id","kind":"replace|insert|comment","quote":"exact span","replacement":"new text","body":"comment","needs_author":false}]}
+{"edits":[{"finding_id":"id","kind":"replace|insert|comment","paragraph":"full rewritten paragraph","body":"comment","needs_author":false}]}
 
 Rules:
 - Never invent a citation key, DOI, or author-year that is not already in PAPER_CONTENT or the finding.
