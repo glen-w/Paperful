@@ -20,6 +20,7 @@ SKIP_REASONS = (
     "drift",
     "docx_miss",
     "office_miss",
+    "context_overflow",
 )
 
 

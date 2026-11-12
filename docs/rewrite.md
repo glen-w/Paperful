@@ -83,7 +83,7 @@ areas = ["style"]                 # style | cites | structure | comments | all
 outputs = ["edits", "tracked"]    # edits | sidecar | tracked | odt | pdf
 comments = "off"                  # off | substantive | all
 max_edits = 80
-timeout_s = 0                     # 0 → max([llm].timeout_s, 600)
+timeout_s = 0                     # per area LLM call; 0 → max([llm].timeout_s, 600)
 openxml_audit = false             # optional extra: uv sync --extra openxml (docx/pptx/odt)
 openxml_audit_policy = "warn"     # warn | fail
 

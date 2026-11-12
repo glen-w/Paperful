@@ -44,6 +44,7 @@ class ChatRequest:
     num_ctx: int | None = None
     json_mode: bool = False
     think: bool | None = None
+    seed: int | None = None
 
 
 def ctx_tokens_for(
@@ -57,6 +58,14 @@ def ctx_tokens_for(
     raw = math.ceil(len(prompt) / 3) + reply_headroom
     rounded = max(1024, ((raw + 1023) // 1024) * 1024)
     return min(rounded, max(1024, int(max_num_ctx)))
+
+
+def prompt_exceeds_ctx(
+    prompt: str, *, max_num_ctx: int = 32_768, reply_headroom: int = 2048
+) -> bool:
+    """True when the prompt estimate does not fit ``max_num_ctx``."""
+    raw = math.ceil(len(prompt) / 3) + reply_headroom
+    return raw > max(1024, int(max_num_ctx))
 
 
 class LLMClient(Protocol):
@@ -124,6 +133,8 @@ class OllamaClient:
             options["num_predict"] = request.max_tokens
         if request.num_ctx is not None:
             options["num_ctx"] = request.num_ctx
+        if getattr(request, "seed", None) is not None:
+            options["seed"] = int(request.seed)
         if request.json_mode:
             options["format"] = "json"
         payload: dict[str, Any] = {
@@ -163,6 +174,8 @@ class OllamaClient:
             options["num_predict"] = request.max_tokens
         if request.num_ctx is not None:
             options["num_ctx"] = request.num_ctx
+        if request.seed is not None:
+            options["seed"] = int(request.seed)
         payload: dict[str, Any] = {
             "model": request.model,
             "messages": list(request.messages),
@@ -251,6 +264,8 @@ class LiteLLMClient:
             "timeout": request.timeout_seconds,
             "stream": True,
         }
+        if request.seed is not None:
+            kwargs["seed"] = int(request.seed)
         if self.api_base:
             kwargs["api_base"] = self.api_base
         if request.max_tokens is not None:
