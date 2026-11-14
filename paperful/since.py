@@ -17,6 +17,8 @@ from .dedupe import scope_slug
 from .fsio import atomic_write_json, atomic_write_text
 from .handoff_rank import cites_for, severity
 from .sources import REGISTRY, Candidate, Context, Outcome
+from .urls import UrlFinding, UrlTarget
+from .versions import VersionProposal
 from .zot import Item
 
 SCHEMA = "paperful.since.v1"
@@ -45,6 +47,8 @@ PROBE_LANES = (
 )
 HEALABLE_SURFACES = frozenset({"no_oa", "paywalled", "fetch_failed"})
 STATUS_CODES = ("retracted", "withdrawn", "expression_of_concern")
+VERSION_KIND = "version_of_record"
+DEAD_URL_CODES = frozenset({"hard_dead", "paywall_html"})
 NOTHING_CHANGED = "Nothing changed."
 
 Probe = Callable[[Item], Candidate | None]
@@ -110,35 +114,68 @@ def find_baseline(
     )
 
 
-def prior_status(state_dir: Path, scope: str) -> tuple[set[tuple[str, str]], str]:
-    """``(itemKey, code)`` pairs already reported, and what they came from.
+def prior_holdings(
+    state_dir: Path, scope: str
+) -> tuple[set[tuple[str, str]], dict[str, str]]:
+    """``(itemKey, kind)`` pairs already reported, and a label per verb.
 
-    Reads the newest ``screen`` report and the newest ``since`` pack for the
-    scope, so a retraction is news once.
+    Reads the newest ``screen`` report, the newest ``versions`` pack, and the
+    newest ``since`` pack for the scope, so a holdings row is news once.
     """
     seen: set[tuple[str, str]] = set()
-    sources: list[str] = []
+    labels: dict[str, list[str]] = {}
     found = _newest_report(state_dir, "screen", scope)
     if found is not None:
         _, body = found
-        sources.append(f"screen {str(body.get('finished_at') or '')[:10]}")
+        labels["screen"] = [f"screen {str(body.get('finished_at') or '')[:10]}"]
         for row in body.get("items") or []:
             if isinstance(row, dict):
                 seen.add((str(row.get("itemKey") or ""), str(row.get("status") or "")))
+    packs = state_dir / "version-packs"
+    if packs.is_dir():
+        for path in sorted(packs.glob("*.json"), reverse=True):
+            pack = _read_json(path)
+            if pack is None or pack.get("scope") != scope:
+                continue
+            labels["versions"] = [f"versions {str(pack.get('created_at') or '')[:10]}"]
+            for row in pack.get("proposals") or []:
+                if isinstance(row, dict):
+                    seen.add((str(row.get("item_key") or ""), VERSION_KIND))
+            break
     root = state_dir / "since"
     if root.is_dir():
         for folder in sorted(root.iterdir(), reverse=True):
             pack = _read_json(folder / "since.json")
             if pack is None or pack.get("scope") != scope:
                 continue
-            sources.append(f"since {str(pack.get('created_at') or '')[:10]}")
+            label = f"since {str(pack.get('created_at') or '')[:10]}"
+            for verb in ("screen", "versions"):
+                labels.setdefault(verb, []).append(label)
             for row in pack.get("holdings") or []:
                 if isinstance(row, dict):
                     seen.add(
                         (str(row.get("itemKey") or ""), str(row.get("kind") or ""))
                     )
             break
-    return seen, ", ".join(sources)
+    return seen, {verb: ", ".join(names) for verb, names in labels.items()}
+
+
+def prior_urls(
+    state_dir: Path, scope: str
+) -> tuple[dict[tuple[str, str], str], str] | None:
+    """``(item_key, url)`` → code from the newest ``urls`` report, or None."""
+    found = _newest_report(state_dir, "urls", scope)
+    if found is None:
+        return None
+    _, body = found
+    codes = {
+        (str(row.get("item_key") or ""), str(row.get("url") or "")): str(
+            row.get("code") or ""
+        )
+        for row in body.get("items") or []
+        if isinstance(row, dict)
+    }
+    return codes, f"urls {str(body.get('finished_at') or '')[:10]}"
 
 
 def status_rows(
@@ -167,6 +204,119 @@ def status_rows(
                 }
             )
     return rows
+
+
+def version_rows(
+    proposals: list[VersionProposal],
+    seen: set[tuple[str, str]],
+    compared_to: str,
+) -> list[dict[str, Any]]:
+    """Preprints that now have a version of record. Nothing is merged."""
+    return [
+        {
+            "kind": VERSION_KIND,
+            "itemKey": row.item_key,
+            "title": row.title,
+            "doi": row.published_doi,
+            "confidence": row.confidence,
+            "verb": "versions",
+            "compared_to": compared_to or "no prior versions pack",
+            "suggested_action": "paperful versions",
+        }
+        for row in proposals
+        if (row.item_key, VERSION_KIND) not in seen
+    ]
+
+
+def url_rows(
+    targets: list[UrlTarget],
+    titles: dict[str, str],
+    prior: dict[tuple[str, str], str],
+    probe: Callable[[UrlTarget], UrlFinding],
+    seen: set[tuple[str, str]],
+    compared_to: str,
+) -> list[dict[str, Any]]:
+    """URLs the last ``urls`` report could open that are now dead or paywalled.
+
+    A URL the last report never saw is not probed.
+    """
+    rows: list[dict[str, Any]] = []
+    for target in targets:
+        was = prior.get((target.item_key, target.url))
+        if not was or was in DEAD_URL_CODES:
+            continue
+        code = probe(target).code
+        if code not in DEAD_URL_CODES or (target.item_key, code) in seen:
+            continue
+        rows.append(
+            {
+                "kind": code,
+                "itemKey": target.item_key,
+                "title": titles.get(target.item_key, ""),
+                "url": target.url,
+                "was": was,
+                "verb": "urls check",
+                "compared_to": compared_to,
+                "suggested_action": "paperful urls check",
+            }
+        )
+    return rows
+
+
+def snapshot_rows(
+    items: list[Item],
+    probe: Probe,
+    seen: set[tuple[str, str]],
+    *,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    """Snapshot-only PDFs that a metadata lane can now replace."""
+    todo = [
+        item
+        for item in items
+        if item.pdf_tier == "snapshot" and (item.key, "snapshot_upgrade") not in seen
+    ]
+    rows: list[dict[str, Any]] = []
+    for item in todo[:limit]:
+        cand = probe(item)
+        if cand is None:
+            continue
+        rows.append(
+            {
+                "kind": "snapshot_upgrade",
+                "itemKey": item.key,
+                "title": item.title,
+                "doi": item.doi or "",
+                "lane": cand.source,
+                "url": cand.url,
+                "verb": "run",
+                "compared_to": "stored snapshot PDF",
+                "suggested_action": "paperful run --upgrade-snapshot",
+            }
+        )
+    return rows
+
+
+def keepup_rows(
+    items: list[Item], applied: set[str], seen: set[tuple[str, str]]
+) -> list[dict[str, Any]]:
+    """Parents ``keepup apply`` created that still have no PDF."""
+    return [
+        {
+            "kind": "keepup_no_pdf",
+            "itemKey": item.key,
+            "title": item.title,
+            "doi": item.doi,
+            "verb": "keepup apply",
+            "compared_to": "keepup applied ledger",
+            "suggested_action": "paperful run",
+        }
+        for item in items
+        if item.doi
+        and not item.has_pdf
+        and f"doi:{item.doi.lower()}" in applied
+        and (item.key, "keepup_no_pdf") not in seen
+    ]
 
 
 def probe_item(item: Item, ctx: Context, lanes: list[str]) -> Candidate | None:

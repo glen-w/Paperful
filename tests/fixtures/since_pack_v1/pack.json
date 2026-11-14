@@ -13,7 +13,9 @@
     "healed_candidates": 2,
     "probed": 2
   },
-  "notes": [],
+  "notes": [
+    "No prior URL report: URL health not compared."
+  ],
   "holdings": [
     {
       "kind": "retracted",

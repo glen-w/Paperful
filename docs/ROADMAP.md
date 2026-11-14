@@ -144,12 +144,10 @@ wrote down and did not do.
 (after-17-habit)=
 ### Habit: one report of what changed
 
-**Status:** first slice in tree ([since](since.md)): healed misses and
-retraction / expression-of-concern rows, CLI only. Healed misses probe the
-open-access metadata lanes; a campus (EZProxy) candidate is not probed.
-Still open: version-of-record, URL health, snapshot-tier, and `keepup`
-parent rows, then the four-week dogfood. Do not add a scheduler, an
-email, or a nav item.
+**Status:** in tree, CLI only ([since](since.md)). Both sections are
+built. Probes use the open-access metadata lanes; a campus (EZProxy)
+candidate is not probed. Next is the four-week dogfood. Do not add a
+scheduler, an email, or a nav item before it.
 
 The researcher already has watches (`keepup`), a miss list (`gaps`), a
 retraction pass (`screen`), a version merge (`versions`), a URL check

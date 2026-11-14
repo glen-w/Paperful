@@ -19,9 +19,17 @@ from paperful.since import (
     Baseline,
     find_baseline,
     healed_rows,
+    keepup_rows,
+    prior_holdings,
+    prior_urls,
     probe_item,
+    snapshot_rows,
+    url_rows,
+    version_rows,
     write_pack,
 )
+from paperful.urls import UrlFinding, UrlTarget
+from paperful.versions import VersionProposal
 from paperful.sources import REGISTRY, Candidate, Context, Outcome
 from tests.conftest import make_item, mock_client
 
@@ -116,7 +124,11 @@ def wired(monkeypatch):
             ["retracted"] if refresh and doi in state["retracted"] else []
         ),
     )
+    monkeypatch.setattr(
+        "paperful.versions.classify_versions", lambda items, resolve: state["versions"]
+    )
     state["seen"] = seen
+    state["versions"] = []
     return state
 
 
@@ -175,7 +187,7 @@ def test_no_baseline_says_so_and_still_reports_retractions(tmp_path, cfg_file, w
     pack = _pack(tmp_path)
     assert pack["baseline"] is None
     assert pack["healed"] == []
-    assert "healed misses not compared" in pack["notes"][0]
+    assert "healed misses not compared" in pack["notes"][-1]
     assert {row["itemKey"] for row in pack["holdings"]} == {"HELD0001", "OLDRETR1"}
     assert pack["holdings"][0]["compared_to"] == "no prior screen report"
     assert wired["seen"] == []
@@ -295,3 +307,134 @@ def test_probe_never_uses_a_lane_that_fetches_bytes(cfg, monkeypatch):
     assert got is hit
     assert called == ["unpaywall", "core", "openalex"]
     assert probe_item(make_item(), ctx, ["htmlpdf"]) is None
+
+
+def _proposal(key: str) -> VersionProposal:
+    return VersionProposal(
+        item_key=key,
+        title=f"Preprint {key}",
+        preprint_doi="10.1101/pre",
+        arxiv_id=None,
+        published_doi=f"10.1000/{key.lower()}",
+        source="crossref",
+        confidence="high",
+        title_score=1.0,
+        before={},
+        after={},
+        primary_pdf="",
+        sibling_key=None,
+    )
+
+
+def test_version_of_record_is_new_only_against_the_last_versions_pack(tmp_path):
+    packs = tmp_path / "version-packs"
+    packs.mkdir()
+    body = {
+        "scope": "library",
+        "created_at": "2026-11-05T00:00:00+00:00",
+        "proposals": [{"item_key": "KNOWN001"}],
+    }
+    (packs / "20261105T000000Z-library.json").write_text(json.dumps(body))
+    seen, vs = prior_holdings(tmp_path, "library")
+    rows = version_rows(
+        [_proposal("KNOWN001"), _proposal("FRESH001")], seen, vs["versions"]
+    )
+    assert [row["itemKey"] for row in rows] == ["FRESH001"]
+    assert rows[0]["compared_to"] == "versions 2026-11-05"
+    assert rows[0]["doi"] == "10.1000/fresh001"
+    assert "screen" not in vs  # no screen report: the retraction label says so
+
+
+def test_url_rows_only_reprobe_urls_the_last_report_could_open(tmp_path):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    report = {
+        "scope": "library",
+        "finished_at": "2026-11-06T00:00:00+00:00",
+        "items": [
+            {"item_key": "WASOK001", "url": "https://a.example.org/x", "code": "ok"},
+            {
+                "item_key": "STAYOK01",
+                "url": "https://b.example.org/x",
+                "code": "redirect",
+            },
+            {
+                "item_key": "WASDEAD1",
+                "url": "https://c.example.org/x",
+                "code": "hard_dead",
+            },
+        ],
+    }
+    (runs / "20261106T000000Z-urls.json").write_text(json.dumps(report))
+    assert prior_urls(tmp_path, "other") is None
+    prior, compared_to = prior_urls(tmp_path, "library")
+    targets = [
+        UrlTarget("WASOK001", "https://a.example.org/x", "parent"),
+        UrlTarget("STAYOK01", "https://b.example.org/x", "parent"),
+        UrlTarget("WASDEAD1", "https://c.example.org/x", "parent"),
+        UrlTarget("NEVER001", "https://d.example.org/x", "parent"),
+    ]
+    probed: list[str] = []
+
+    def probe(target):
+        probed.append(target.item_key)
+        code = "ok" if target.item_key == "STAYOK01" else "hard_dead"
+        return UrlFinding(target.item_key, target.url, target.role, code)
+
+    rows = url_rows(targets, {"WASOK001": "T"}, prior, probe, set(), compared_to)
+    assert probed == ["WASOK001", "STAYOK01"]
+    assert [(r["itemKey"], r["kind"], r["was"]) for r in rows] == [
+        ("WASOK001", "hard_dead", "ok")
+    ]
+    assert rows[0]["compared_to"] == "urls 2026-11-06"
+    assert url_rows(targets, {}, prior, probe, {("WASOK001", "hard_dead")}, "") == []
+
+
+def test_snapshot_rows_probe_snapshot_tier_only():
+    items = [
+        make_item(key="SNAP0001", has_pdf=True, pdf_tier="snapshot"),
+        make_item(key="SNAP0002", has_pdf=True, pdf_tier="snapshot"),
+        make_item(key="NATIVE01", has_pdf=True, pdf_tier="native"),
+    ]
+    probed: list[str] = []
+
+    def probe(item):
+        probed.append(item.key)
+        if item.key == "SNAP0002":
+            return None
+        return Candidate(url="https://oa.example.org/s.pdf", source="unpaywall")
+
+    rows = snapshot_rows(items, probe, set())
+    assert probed == ["SNAP0001", "SNAP0002"]
+    assert [row["itemKey"] for row in rows] == ["SNAP0001"]
+    assert rows[0]["suggested_action"] == "paperful run --upgrade-snapshot"
+    probed.clear()
+    assert (
+        snapshot_rows(items, probe, {("SNAP0001", "snapshot_upgrade")}, limit=1) == []
+    )
+    assert probed == ["SNAP0002"]
+
+
+def test_keepup_parents_without_a_pdf():
+    items = [
+        make_item(key="KEEPUP01", doi="10.1000/New"),
+        make_item(key="FILLED01", doi="10.1000/filled", has_pdf=True),
+        make_item(key="OTHER001", doi="10.1000/other"),
+    ]
+    applied = {"doi:10.1000/new", "doi:10.1000/filled"}
+    rows = keepup_rows(items, applied, set())
+    assert [row["itemKey"] for row in rows] == ["KEEPUP01"]
+    assert keepup_rows(items, applied, {("KEEPUP01", "keepup_no_pdf")}) == []
+
+
+def test_cli_joins_version_and_keepup_rows(tmp_path, cfg_file, wired):
+    job = tmp_path / "state" / "keepup" / "weekly"
+    job.mkdir(parents=True)
+    (job / "job.json").write_text("{}")
+    (job / "applied.json").write_text(json.dumps({"identities": ["doi:10.1000/still"]}))
+    wired["versions"] = [_proposal("HELD0001")]
+    wired["retracted"].clear()
+    res = _run(cfg_file)
+    assert res.exit_code == 0, res.output
+    kinds = {(row["itemKey"], row["kind"]) for row in _pack(tmp_path)["holdings"]}
+    assert kinds == {("HELD0001", "version_of_record"), ("STILL001", "keepup_no_pdf")}

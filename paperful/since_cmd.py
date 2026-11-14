@@ -12,6 +12,32 @@ from rich.console import Console
 from .runreport import write_command_report
 
 
+def _url_rows(cfg, backend, items, urls_before, seen, url_rows) -> list[dict]:
+    """Re-probe URLs the last ``urls`` report saw, with that command's client."""
+    from .http import client as http_client
+    from .urls import probe_target, targets_for_item
+
+    prior, compared_to = urls_before
+    known = {key for key, _url in prior}
+    targets = []
+    for item in items:
+        if item.key not in known:
+            continue
+        children = backend.children(item.key) if hasattr(backend, "children") else []
+        targets += targets_for_item(item, children)
+    with http_client(
+        follow_redirects=True, timeout=8.0, retries=0, guard=True
+    ) as client:
+        return url_rows(
+            targets,
+            {item.key: item.title for item in items},
+            prior,
+            lambda target: probe_target(client, target, playbooks=cfg.grey_playbooks),
+            seen,
+            compared_to,
+        )
+
+
 def run_since(
     console: Console,
     *,
@@ -25,7 +51,10 @@ def run_since(
     fmt: str,
 ) -> None:
     """Diff the mirror against the last run report. Always dry-run."""
+    import httpx
+
     from . import cli_runtime as cli_mod
+    from . import keepup, versions
     from .agent_ops import since_envelope
     from .handoff_rank import cite_index
     from .pipeline import make_client
@@ -35,12 +64,18 @@ def run_since(
         NOTHING_CHANGED,
         find_baseline,
         healed_rows,
-        prior_status,
+        prior_holdings,
+        prior_urls,
+        snapshot_rows,
+        url_rows,
+        version_rows,
+        keepup_rows,
         probe_item,
         status_rows,
         write_pack,
     )
-    from .sources import Context
+    from .sources import Candidate, Context
+    from .zot import Item
 
     before: date | None = None
     if since.strip():
@@ -69,17 +104,42 @@ def run_since(
 
     notes: list[str] = []
     baseline = find_baseline(cfg.state_dir, scope, before=before)
-    seen, compared_to = prior_status(cfg.state_dir, scope)
+    seen, vs = prior_holdings(cfg.state_dir, scope)
     client = make_client(cfg)
     try:
         with cli_mod._spinner("Checking retraction status…", json_out=json_out) as say:
             ctx = Context(config=cfg, client=client)
+
+            def probe(item: Item) -> Candidate | None:
+                return probe_item(item, ctx, sources_for_item(item, cfg, sources))
+
             holdings = status_rows(
                 items,
                 lambda doi: lookup_doi_status(client, cfg, doi, refresh=True),
                 seen,
-                compared_to,
+                vs.get("screen", ""),
             )
+            say("Checking versions…")
+            try:
+                proposals = versions.classify_versions(
+                    items, versions.resolver_for(client, cfg.email)
+                )
+            except httpx.HTTPError as exc:
+                proposals = []
+                notes.append(f"Versions not checked: {exc}")
+            holdings += version_rows(proposals, seen, vs.get("versions", ""))
+            urls_before = prior_urls(cfg.state_dir, scope)
+            if urls_before is None:
+                notes.append("No prior URL report: URL health not compared.")
+            else:
+                say("Checking URLs…")
+                holdings += _url_rows(cfg, backend, items, urls_before, seen, url_rows)
+            say("Probing snapshot PDFs…")
+            holdings += snapshot_rows(items, probe, seen, limit=limit)
+            applied: set[str] = set()
+            for job in keepup.list_jobs(cfg):
+                applied |= keepup.load_applied(cfg, job)
+            holdings += keepup_rows(items, applied, seen)
             healed: list[dict] = []
             counts = {"healed_candidates": 0, "probed": 0}
             say("Probing earlier misses…")
@@ -92,9 +152,7 @@ def run_since(
                 healed, counts = healed_rows(
                     baseline,
                     items,
-                    lambda item: probe_item(
-                        item, ctx, sources_for_item(item, cfg, sources)
-                    ),
+                    probe,
                     cite_index(cfg.state_dir),
                     limit=limit,
                 )

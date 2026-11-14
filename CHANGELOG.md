@@ -6,7 +6,7 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
-- **`paperful since`.** A read-only report of what changed since the last `run` on a collection: retractions, withdrawals, and expressions of concern on library items, and earlier misses that an open-access lane now names. It downloads nothing and writes nothing to the manager. Packs land in `state/since/`. See [since](docs/since.md).
+- **`paperful since`.** A read-only report of what changed since the last `run` on a collection: retractions and expressions of concern, preprints with a version of record, URLs that died, snapshot PDFs that can be upgraded, `keepup` parents still without a PDF, and earlier misses that an open-access lane now names. It downloads nothing and writes nothing to the manager. Packs land in `state/since/`. See [since](docs/since.md).
 
 ## 1.9.2 — 2026-11-12
 
