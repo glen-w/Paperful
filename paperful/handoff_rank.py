@@ -4,8 +4,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Protocol
 
 from .handoff import MissingPdf
+
+
+class _Keyed(Protocol):
+    @property
+    def key(self) -> str: ...
+
+    @property
+    def doi(self) -> str | None: ...
+
 
 # Higher weight = spend browser time first.
 _SEVERITY = {
@@ -60,7 +70,7 @@ def cite_index(state_dir: Path) -> dict[str, int]:
     return out
 
 
-def cites_for(row: MissingPdf, index: dict[str, int]) -> int:
+def cites_for(row: _Keyed, index: dict[str, int]) -> int:
     n = index.get(row.key, 0)
     doi = (row.doi or "").strip().lower()
     if doi:

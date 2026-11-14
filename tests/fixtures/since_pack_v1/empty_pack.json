@@ -1,0 +1,19 @@
+{
+  "schema": "paperful.since.v1",
+  "scope": "library",
+  "created_at": "",
+  "baseline": {
+    "report": "20261101T090000Z-run.json",
+    "finished_at": "2026-11-01T09:00:00+00:00",
+    "witness_id": "abc123def456"
+  },
+  "counts": {
+    "holdings": 0,
+    "healed": 0,
+    "healed_candidates": 2,
+    "probed": 2
+  },
+  "notes": [],
+  "holdings": [],
+  "healed": []
+}

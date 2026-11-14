@@ -1,0 +1,11 @@
+{
+  "schema": "paperful.run_report.v1",
+  "command": "screen",
+  "finished_at": "2026-11-02T09:00:00+00:00",
+  "scope": "library",
+  "flags": {},
+  "summary": {},
+  "items": [
+    {"itemKey": "OLDRETR1", "title": "A retraction already reported", "status": "retracted", "reason": "known"}
+  ]
+}

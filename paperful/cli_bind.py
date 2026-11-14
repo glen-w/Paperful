@@ -2210,6 +2210,41 @@ def coverage_cmd(
     )
 
 
+@app.command("since")
+def since_cmd(
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    since: str = typer.Option(
+        "",
+        "--since",
+        help="Compare to the newest run report on or before this date (YYYY-MM-DD).",
+    ),
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="Probe at most N earlier misses, best-ranked first."
+    ),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """What changed since the last run. Always dry-run: no downloads, no writes."""
+    from .since_cmd import run_since
+
+    run_since(
+        console,
+        collection=collection,
+        library=library,
+        since=since,
+        limit=limit,
+        profile=profile,
+        run_config=run_config,
+        config=config,
+        fmt=fmt,
+    )
+
+
 @app.command("precedent")
 def precedent_cmd(
     query: str = typer.Argument(..., help="Methods or hypothesis phrase."),

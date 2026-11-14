@@ -6,6 +6,8 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+- **`paperful since`.** A read-only report of what changed since the last `run` on a collection: retractions, withdrawals, and expressions of concern on library items, and earlier misses that an open-access lane now names. It downloads nothing and writes nothing to the manager. Packs land in `state/since/`. See [since](docs/since.md).
+
 ## 1.9.2 — 2026-11-12
 
 - **Rewrite trust.** Critique packs store an input file hash; rewrite records drift, skips loc-only binds on a drifted `--file`, and exits 3 when a finished run proposes no edits and only skips. LLM edits freeze numbers/cites/refs, require a unique quote, fail closed on mixed Word runs, pin temperature 0 and seed 0, re-check glossary/cites/Vale on the edited paragraph, and return a whole paragraph that Paperful diffs. Hedge and passive findings are comments.

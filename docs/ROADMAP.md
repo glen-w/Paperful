@@ -144,8 +144,12 @@ wrote down and did not do.
 (after-17-habit)=
 ### Habit: one report of what changed
 
-**Status:** roadmap. No command yet. Do not add a scheduler, an email, or
-a nav item in the first slice.
+**Status:** first slice in tree ([since](since.md)): healed misses and
+retraction / expression-of-concern rows, CLI only. Healed misses probe the
+open-access metadata lanes; a campus (EZProxy) candidate is not probed.
+Still open: version-of-record, URL health, snapshot-tier, and `keepup`
+parent rows, then the four-week dogfood. Do not add a scheduler, an
+email, or a nav item.
 
 The researcher already has watches (`keepup`), a miss list (`gaps`), a
 retraction pass (`screen`), a version merge (`versions`), a URL check

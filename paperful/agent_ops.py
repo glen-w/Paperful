@@ -77,6 +77,28 @@ def coverage_envelope(
     )
 
 
+def since_envelope(
+    *,
+    holdings: list[dict[str, Any]],
+    healed: list[dict[str, Any]],
+    counts: dict[str, int],
+    notes: list[str],
+    folder: Any,
+) -> dict[str, Any]:
+    return envelope(
+        command="since",
+        summary={
+            "holdings": len(holdings),
+            "healed": len(healed),
+            **counts,
+            "notes": list(notes),
+        },
+        items=[*holdings, *healed],
+        paths={"pack": str(folder)},
+        flags={"dry_run": True, "read_only": True},
+    )
+
+
 def precedent_envelope(
     *,
     rows: list[Any],

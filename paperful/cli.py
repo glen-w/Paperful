@@ -370,6 +370,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "attach",
         "recover",
         "gaps",
+        "since",
         "inbox",
         "capture",
         "urls",

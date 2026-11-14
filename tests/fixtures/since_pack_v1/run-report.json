@@ -1,0 +1,18 @@
+{
+  "schema": "paperful.run_report.v1",
+  "command": "run",
+  "finished_at": "2026-11-01T09:00:00+00:00",
+  "scope": "library",
+  "flags": {},
+  "witness": {
+    "schema": "paperful.witness.v1",
+    "config_sha256": "abc123def4567890abc123def4567890abc123def4567890abc123def4567890"
+  },
+  "summary": {},
+  "items": [
+    {"itemKey": "HEALED01", "title": "A paper that became open access", "status": "not_found", "miss_surface": "no_oa"},
+    {"itemKey": "STILL001", "title": "A paper that is still closed", "status": "retryable", "miss_surface": "paywalled"},
+    {"itemKey": "GOTPDF01", "title": "A miss the operator filled by hand", "status": "not_found", "miss_surface": "no_oa"},
+    {"itemKey": "HELD0001", "title": "A held paper later retracted", "status": "attached", "miss_surface": "import_ok"}
+  ]
+}
