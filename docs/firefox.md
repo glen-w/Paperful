@@ -136,6 +136,7 @@ The same identity check without the browser:
 
 ```sh
 paperful capture plan --doi 10.1000/example
+paperful capture plan --url https://example.org/paper --pdf-url https://example.org/paper.pdf
 paperful capture session
 ```
 

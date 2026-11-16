@@ -27,6 +27,7 @@ paperful search watch apply iucn -C "Gjerde tribute/grey"          # dry-run
 paperful search watch apply iucn -C "Gjerde tribute/grey" --apply  # metadata parents
 paperful search watch show iucn
 paperful search watch list
+paperful search watch save iucn2 --from-run <run-id>   # copy query and hosts from state/search/<run-id>/
 paperful search watch due           # watches whose interval has elapsed
 ```
 

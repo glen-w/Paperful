@@ -230,6 +230,8 @@ uv run paperful rag search "environmental impact assessment thresholds" -C ocean
 uv run paperful ask "What does the BBNJ Agreement require for EIAs?" -C ocean/BBNJ
 uv run paperful ask "…" --ask-mode advanced
 uv run paperful ask "…" --show-context     # also list the passages used
+uv run paperful ask "…" --top-k 20         # passages sent to the model (default [rag].top_k)
+uv run paperful rag search "…" --top-k 20  # hits to print
 uv run paperful ask "…" --format json      # one paperful.agent.json.v1 object (implies --no-stream)
 uv run paperful ask "…" --focus gaps       # prompt preset (default|questions|gaps|methods|answered|conflict)
 uv run paperful ask --from-file questions.txt -C ocean/BBNJ   # batch → state/ask-batch/

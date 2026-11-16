@@ -18,6 +18,7 @@ paperful network orcid 0000-0001-9025-7632 --out-dir /tmp/gjerde-network
 paperful network show <run-id> --phase igc
 paperful network list
 paperful network export <run-id> --format csv
+paperful network export <run-id> --format gexf --dest ~/graphs/   # default is the run dir
 paperful network attributes <run-id> --write-template
 # edit state/network/<run-id>/attributes.csv, then:
 paperful network attributes <run-id>

@@ -310,15 +310,15 @@ def collections_list(config: Path | None = ConfigOpt) -> None:
 @collections_app.command("children")
 def collections_children_cmd(
     parent: str = typer.Option(
-        "ocean",
+        ...,
         "--parent",
         "-p",
-        help="Parent collection path (default: ocean).",
+        help="Parent collection path.",
     ),
     exclude: str = typer.Option(
-        "BBNJ",
+        "",
         "--exclude",
-        help="Child collection name to omit (default: BBNJ).",
+        help="Child collection name to omit.",
     ),
     config: Path | None = ConfigOpt,
 ) -> None:

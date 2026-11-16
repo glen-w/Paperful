@@ -14,6 +14,13 @@ Config honors `dedupe_scope`, `tag_prefix`, `default_tags`,
 `types`, `oa_only`, venues, `listed_in`, `languages`, `min_seed_citations`,
 `note_provenance`, and `backends`. `--refine` writes query suggestions when
 `[llm]` is on and does not create items. `expand = cited_authors` stays off.
+
+Each of those keys has a flag for one run, and `snowball profile save` takes
+the same flags: `--keyword-min-score`, `--search-keywords` /
+`--no-search-keywords`, `--languages en,fr`, `--min-seed-citations N`,
+`--note-provenance` / `--no-note-provenance`, `--backends openalex,crossref`,
+and (on `profile save`) `--oa-only` and `--seed-collection NAME`, the
+collection whose DOIs seed the crawl.
 Phases live in [ROADMAP](ROADMAP.md#snowball).
 
 Snowball grows a library outward from a keyword (or several), one or more DOIs,
@@ -789,7 +796,8 @@ does not ship the dump. Backends: `local_duckdb` (this machine) or
 `ssh_duckdb` (DuckDB on the data host). DOI / OpenAlex-id batches use the works
 parquet. Citing (citation-map expand, `--direction cites`) needs
 `paperful openalex-store build-cites` then `cites_index_glob` (resumable per
-works `updated_date`). Live API is first; the snapshot is the fallback when
+works `updated_date`; `--timeout-s` sets the per-partition DuckDB timeout,
+default `build_timeout_s` or 7200). Live API is first; the snapshot is the fallback when
 the daily budget is spent. Store cites-query matching is title-only (boolean
 `OR` / `AND` / `NOT` stay on the API). Fallback lookups that miss `timeout_s`
 (default 120s) count as failures; after `fail_limit` (default 3) the run skips
