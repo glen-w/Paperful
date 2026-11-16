@@ -152,7 +152,7 @@ def test_cmd_entry_is_callable(cli_name, mod, entry, _pkg):
 def test_cli_wrapper_delegates_to_cmd(cli_name, mod, entry, pkg):
     wrapper = getattr(cli, cli_name)
     src = inspect.getsource(wrapper)
-    assert f"from .{pkg} import {entry}" in src
+    assert f"from paperful.{pkg} import {entry}" in src
     assert f"{entry}(" in src
     # Thin: no domain orchestration left in the Typer body.
     assert "Manifest(" not in src
@@ -215,4 +215,4 @@ def test_completeness_shim_reexports_split_modules():
 )
 def test_completeness_cli_uses_shim(cli_name, entry):
     src = inspect.getsource(getattr(cli, cli_name))
-    assert f"from .completeness_cmd import {entry}" in src
+    assert f"from paperful.completeness_cmd import {entry}" in src
