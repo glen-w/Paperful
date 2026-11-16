@@ -6,6 +6,8 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.9.3 — 2026-11-16
+
 - **`paperful since`.** A read-only report of what changed since the last `run` on a collection: retractions and expressions of concern, preprints with a version of record, URLs that died, snapshot PDFs that can be upgraded, `keepup` parents still without a PDF, and earlier misses that an open-access lane now names. It downloads nothing and writes nothing to the manager. Packs land in `state/since/`. See [since](docs/since.md).
 - **`since` hardening.** One collection is one scope whether named by name, path, or key. The earlier run is read across every saved `run` report, so a `--retry-failed` run no longer hides older misses. A lane that already answered in the earlier run is not counted as a heal. Failed lookups and lane errors are reported instead of reading as "Nothing changed". Lookups run in parallel and statuses checked in the last 24 hours are reused. The terminal report is grouped, shows what each row was compared to, and names the next command.
 - **Workbench warms up on start.** `paperful serve` fills the collection tree and the System checks in the background, so the first visit to Library or System does not wait for them.
@@ -13,6 +15,8 @@ may still be added). See [releases](docs/releases.md).
 - **Error messages keep square brackets.** Errors that quote a config table, a path, or a title with `[` in it print in full.
 - **Retraction check reads the right Crossref field.** `screen` (and `since`) now read `updated-by`, the field Crossref puts on the affected article. Before, only the notice's own `update-to` was read, so withdrawals and expressions of concern on held papers were missed, and retractions were caught only when OpenAlex also had them. A status lookup that fails is no longer cached as "clean".
 - **Config names show in help and doctor.** `--help`, `doctor`, and config errors printed `[rag].ask_mode` as `.ask_mode` because the terminal renderer took the bracket for a style tag. They print in full now.
+- **Leaner source package.** The sdist no longer carries the maintainer's `research/`, `research_notes/`, and `reports/` folders (sample PDFs and notes). The wheel is unchanged.
+- **Docs.** The roadmap, command reference, and developer guide match what shipped: `since`, the systematic-review reason list, PRISMA counts and CSV/RIS exchange, `search watch due`, and `collections children`.
 
 ## 1.9.2 — 2026-11-12
 
