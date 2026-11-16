@@ -27,6 +27,7 @@ paperful search watch apply iucn -C "Gjerde tribute/grey"          # dry-run
 paperful search watch apply iucn -C "Gjerde tribute/grey" --apply  # metadata parents
 paperful search watch show iucn
 paperful search watch list
+paperful search watch due           # watches whose interval has elapsed
 ```
 
 `--filetype pdf` (default) appends `filetype:pdf` to the query. Pass

@@ -28,8 +28,11 @@ Still not a full-text reading index, not a WebDAV client, and not “AI fetch
 everything.” `paperful ocr` is the optional text layer for scans. **1.0.0 and
 1.1.0 are tagged** (1.1.0 on PyPI). **1.1.1** is stop-ship hygiene (shipped in
 tree). **1.2.0** adds snowball stopping rules, off by default. **1.7.0**
-(2026-11-02) is the hardening and platform cut. The **live map** is
-[After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
+(2026-11-02) is the hardening and platform cut. **1.8.0** hardened the
+workbench and ledgers, **1.9.0** cut GitHub CI back to smoke, **1.9.1** and
+**1.9.2** are the critique and rewrite trust waves, and **1.9.3**
+(2026-11-16) ships [`paperful since`](since.md), the first item on the live
+order. The **live map** is [After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
 still lists jobs by area; many of those rows have shipped. Do not re-pick
 them as the next thing to build.
 
@@ -113,7 +116,7 @@ product decisions.
 | Legal and fetch stance | Written on [legal-privacy](legal-privacy.md). Not legal advice. Publisher terms and campus licences stay the operator’s call |
 | Python | 1.7 put 3.14 on the matrix. The live gate is smoke on 3.12 until the [rebuild](#after-17-ci-rebuild) puts the other versions back. `requires-python >=3.10` stays so existing installs are not stranded. Dropping 3.10 is a separate announced change |
 | Coverage | Gate is **82**. A gate of 85 was measured and missed (82.3% at wave end) because new code grew the denominator. Do not claim 85 |
-| Systematic review | A scaffold exists: `paperful sr init`, `sr screen`, `sr status` write a protocol and an append-only ledger under `state/sr/<slug>/`. That is not the bigger bet. The bet starts at [SR-1](#after-17-sr) |
+| Systematic review | A scaffold exists: `paperful sr init`, `sr screen`, `sr status` write a protocol and an append-only ledger under `state/sr/<slug>/`. 1.8.0 added the reason list, exact PRISMA counts, and CSV/RIS exchange. That is not the bigger bet. What is left starts at [SR-2](#after-17-sr) |
 
 (after-17-eaten)=
 ### What the 1.1 sequence already ate
@@ -135,8 +138,9 @@ are answered in tree. Recorded here so the next plan does not rebuild them.
 | OpenAlex topic housekeeping | Run stamp, watch rebaseline, snapshot warning, frozen fixture. **Topic-native product** is still open — [below](#after-17-topics) |
 | Install route argument | Settled above. PyPI “which route?” is not an open product question |
 
-Still genuinely open, and specified below: a weekly **holdings diff**,
-citation debt that ages, a read-only memory of decisions already on disk,
+The weekly **holdings diff** shipped in 1.9.3 as
+[`paperful since`](since.md); its dogfood is what is open. Still genuinely
+open, and specified below: citation debt that ages, a read-only memory of decisions already on disk,
 Ask used as a **claim check**, the SR scaffold grown into a review you can
 finish, topic gap map, playbook health, and the platform residuals 1.7
 wrote down and did not do.
@@ -144,10 +148,12 @@ wrote down and did not do.
 (after-17-habit)=
 ### Habit: one report of what changed
 
-**Status:** in tree, CLI only ([since](since.md)). Both sections are
-built. Probes use the open-access metadata lanes; a campus (EZProxy)
-candidate is not probed. Next is the four-week dogfood. Do not add a
-scheduler, an email, or a nav item before it.
+**Status:** shipped in 1.9.3, CLI only ([since](since.md)). Both sections
+are built. Probes use the open-access metadata lanes; a campus (EZProxy)
+candidate is not probed. The four-week dogfood started on 14 Nov 2026 (two
+packs on one collection so far). Do not add a scheduler, an email, or a nav
+item before it ends. The sketch below is the design record; where it and
+[since](since.md) differ, the page is what shipped.
 
 The researcher already has watches (`keepup`), a miss list (`gaps`), a
 retraction pass (`screen`), a version merge (`versions`), a URL check
@@ -155,8 +161,7 @@ retraction pass (`screen`), a version merge (`versions`), a URL check
 “what is different since I last looked?” They answer “what is true now?”
 The habit is the diff.
 
-**Command sketch:** `paperful since` (name may change before it lands).
-Always dry-run. Compares the live mirror and a fresh *plan* (no PDF
+**Command sketch:** `paperful since`. Always dry-run. Compares the live mirror and a fresh *plan* (no PDF
 bytes) to the last [run witness](#run-witness-shipped-trust-thicken) for
 a `-C`, or to `--since DATE` when there is no witness. Writes
 `state/since/<stamp>/` (`since.md` + `paperful.since.v1`). Empty output
@@ -334,22 +339,27 @@ before that.
 (after-17-sr)=
 ### Systematic review (the one bigger bet)
 
-**Status:** scaffold shipped; the bet is roadmap. Grey-literature
-watching is no longer the competing annual bet — it shipped. Do not
-start a second bigger bet beside this one.
+**Status:** scaffold, SR-1, and the counts half of SR-4 shipped (1.8.0);
+the rest of the bet is roadmap. Grey-literature watching is no longer the
+competing annual bet — it shipped. Do not start a second bigger bet beside
+this one.
 
-What exists (`paperful/sr_cmd.py`): `sr init` writes
-`state/sr/<slug>/` with title, question, and `exclude_reasons: []`.
-`sr screen` appends a decision (`include` / `exclude` / `maybe`), a
-reason string, and a reviewer string. `sr status` counts. There is no
-queue, no reason checklist, no second-reviewer report, no PRISMA flow,
-no workbench.
+What exists (`paperful/sr_cmd.py`, `paperful/sr/`, [sr-mode](sr-mode.md)):
+`sr init` writes `state/sr/<slug>/` with title, question, and the
+`--reason` list. `sr screen` appends a decision (`include` / `exclude` /
+`maybe`), a reason, and a reviewer string, and refuses an exclude reason
+that is off the list. `sr status` prints counts and a reason histogram and
+writes `prisma.json` and `prisma.svg` from those integers. `sr export` and
+`sr import` speak CSV and RIS (Covidence, Rayyan, and ASReview column
+names); import is a dry-run until `--apply`. Advanced `/review` records a
+decision and is not on the nav. There is still no queue, no
+second-reviewer report, and no methods paragraph.
 
 Interoperate with Covidence, Rayyan, and ASReview. Do not replace them.
 Do not claim a recall percentage. Sits beside Wanted: screening does
 not attach PDFs and does not create parents.
 
-**SR-1 — Reasons are data.** The protocol’s `exclude_reasons` list is
+**SR-1 — Reasons are data (shipped, 1.8.0).** The protocol’s `exclude_reasons` list is
 what `sr screen` will accept for `exclude`. `init` can take repeated
 `--reason`. A reason not on the list is exit 1. `maybe` needs no
 reason. `status` prints a histogram. Acceptance: fixture protocol
@@ -369,11 +379,12 @@ twice does not duplicate a DOI.
 account. `status` adds agreement / conflict / single-screened, matched
 on identity. Conflict is a row the operator reads. Export CSV
 (identity, decisions, reasons) for a tool that does dual-blind
-accounts. Workbench, only after SR-2 has been used on a real queue: one
-page reached from Discover Advanced, keyboard include / exclude / maybe,
-reason chips from the protocol. Not on the default nav.
+accounts. Workbench: Advanced `/review` already records one decision at
+a time. The keyboard queue with reason chips waits until SR-2 has been
+used on a real queue. Not on the default nav.
 
-**SR-4 — PRISMA flow from those integers.** Snowball already emits
+**SR-4 — PRISMA flow from those integers (counts and SVG shipped,
+1.8.0; queue counts and the methods paragraph are not).** Snowball already emits
 `summary.prisma` counts. SR adds its own counts: imported,
 screened, excluded-by-reason, included, still unscreened. Render a
 table, plus an optional SVG built only by placing those integers in
@@ -392,7 +403,7 @@ ASReview-shaped slice; the embeddings buffet does not get a second one
 until this verdict exists. See
 [embeddings order](#after-17-embeddings-order).
 
-**Dogfood gate.** SR-1 and SR-2 may land without a finished review.
+**Dogfood gate.** SR-1 landed and SR-2 may land without a finished review.
 SR-3 and after wait until the maintainer (or one tester) has a protocol
 they are actually screening. A policy or methods desk with a real
 question qualifies. A synthetic queue of fifty famous DOIs does not.
@@ -462,8 +473,8 @@ follow cover the scheduled-by-the-operator case without a second agent.
 (after-17-ledger-finish)=
 ### Finish the ledger (small, after the habit)
 
-These are parked holes with a shape. None of them outranks `since` or
-SR-1. Pick one when a desk hits it.
+These are parked holes with a shape. None of them outranks the `since`
+dogfood or SR-2. Pick one when a desk hits it.
 
 **Playbook health.** `paperful playbooks health` (report). For each row
 in `learned.toml`: win count, last win, consecutive misses, last HTTP
@@ -582,6 +593,8 @@ next tag needs it.
 | Publish attestations | Turn `attestations` back on when the Rekor workaround is obsolete. SBOM from CI stays either way |
 | Python 3.10 | Announce in a release note, then bump `requires-python`. Not inside an unrelated feature PR |
 | Keyring, signed bundle | Stay closed unless a desktop-only tester asks in writing. Asking does not by itself reopen the decision |
+| GitHub Release per tag | Each `v*` tag gets a GitHub Release, so GitHub Latest matches PyPI. 1.2 through 1.9.0 and 1.9.2 were tagged without one |
+| Stale branches and PRs | Merged remote branches deleted; the Dependabot and draft PRs merged or closed. About half of the 58 remote branches are already in `main` |
 
 (after-17-ci-rebuild)=
 ### CI gate, cut back to smoke
@@ -643,15 +656,15 @@ Still open, and small:
 Not a calendar. Each line can be the last line.
 
 1. **`paperful since`** — holdings that changed meaning, and misses that
-   healed. CLI pack, fixture, four-week dogfood. Workbench block only
-   if the packs get opened.
+   healed. **Shipped in 1.9.3** (CLI pack and fixture). The four-week
+   dogfood is running. Workbench block only if the packs get opened.
 2. **`refs gap` memory** — new / still missing / now owned.
 3. **`paperful decisions -C`** — read-only join. Drop it if Discover
    already shows the only rows that matter.
 4. **Claim check** — then, only if used, brief diff and the evidence
    table.
-5. **SR-1 and SR-2** — reasons and a queue. Stop until a real review
-   exists; then SR-3 and the counts diagram.
+5. **SR-2** — a queue (SR-1 reasons and the counts diagram shipped in
+   1.8.0). Stop until a real review exists; then SR-3.
 6. **Topic follow and gap map** — ids now; do not wait for 13 Jan 2027
    to store ids. Rebaseline when the live labels move.
 7. **Playbook health** — cheap, and it tells the policy desk whether
@@ -666,8 +679,8 @@ Not a calendar. Each line can be the last line.
 - After four weekly `since` packs, is the diff a habit or noise?
 - Once claim-check exists, does anyone still want `/ask` on the default
   nav?
-- Is there a real systematic review this year, or do SR-1 and SR-2 sit
-  until there is one?
+- Is there a real systematic review this year, or does SR-2 sit until
+  there is one?
 - When is the Python 3.10 drop announced?
 
 Older questions, with the answers we have, stay under
@@ -698,7 +711,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.2).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.3).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -706,7 +719,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.9.2` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.9.3` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
@@ -1070,7 +1083,8 @@ below stay as the original brief.
   *alongside* Wanted, not in place of it. Audience: librarians and
   Cochrane-style teams (grant money, real pain). Do not claim Elicit-like
   SR recall; independent 2025 work put that UI far below traditional search.
-  Scaffold in tree: `paperful sr init|screen|status`.
+  In tree: `paperful sr init|screen|status|export|import`, exact PRISMA
+  counts, and Advanced `/review` ([sr-mode](sr-mode.md)).
 - **Policy and grey-literature watchers.** BBNJ and RFMO work (for example
   SPRFMO SC14 reports) lives outside DOIs. **`paperful search` + Discover Web
   shipped** (SearXNG query → ranked PDF/landing hits → metadata parents).
@@ -2386,9 +2400,8 @@ Goal: durable domain / topic tags on items (Zotero tags and/or fields that
 survive into `record.json`), so catalogues stay filterable and downstream
 surfaces can use them. One consumer already named: a **domain-engagement
 timeline** on the public site (`glen-w.github.io`) — distinct from that site’s
-career timeline (type/role over years). Site plan:
-`/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`
-(section *Later: domain engagement timeline*).
+career timeline (type/role over years). The plan lives in that site’s
+repository (*Later: domain engagement timeline*).
 
 Staged approach (ship in order; each stage can stop without the next):
 
@@ -2946,8 +2959,6 @@ second doc tree that drifts from the CLI.
   the matrix (not user-facing)
 - [snowball.md](snowball.md) — library-building from a keyword, multi-DOI / multi-ORCID, or collection
 - [bbnj-author-lanes.md](bbnj-author-lanes.md) — dogfood `author_site` + `authorwatch` on `ocean/BBNJ` / `ocean/BBNJ-test`
-- Site career / domain timeline plan (consumer of durable tags):
-  `/Users/89298/Documents/website/glen-w.github.io/docs/dev/career-timeline-plan.md`
 - [firefox.md](firefox.md) — optional Firefox add-on; mirror writes, Zotero read
 - [After 1.7 (live map)](#after-17-live-map) — what to build next
 - [After 1.1.0 (area index)](#after-110-buffet-by-area) — jobs by area;

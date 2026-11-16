@@ -177,7 +177,8 @@ never leave a half-written `record.json` or run report.
 | `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `reachout`, `lint`, `screen`, `critique`, `rewrite`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, `extract-sections`, `ask`, and `snapshot` |
 | `state/packs/<id>.json` | Parent witness (`paperful.pack.v1`) listing those reports for one `pack open` … `pack close` sequence. `state/packs/current` names the open id |
 | `state/mendeley-oauth.json` | Mendeley tokens after `session login mendeley` (mode `0600`) |
-| `state/sr/<slug>/` | `sr` protocol (`protocol.json`) and screening ledger (`screening.jsonl`). Local; no scheduler |
+| `state/sr/<slug>/` | `sr` protocol (`protocol.json`), screening ledger (`screening.jsonl`), and `prisma.json` / `prisma.svg` from `sr status`. Local; no scheduler |
+| `state/since/<stamp>-<scope>/` | `since` pack (`paperful.since.v1`, `since.md`). Always dry-run; no manager writes |
 | `state/network/<run-id>/`, `state/search/<run-id>/`, `state/keepup/<name>/`, `state/authorwatch/<name>/`, `state/precedent/<stamp>/`, `state/htmlpdf/proposals/`, `state/ocr-ignore.jsonl` | Per-verb packs and ledgers; schema ids and writers in [developer.md](developer.md#disk-schemas) |
 | `state/endnote-import/<stamp>/` | EndNote XML+PDF bundle for File → Import. Never an edit of `.enl` |
 

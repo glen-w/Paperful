@@ -108,6 +108,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `dedupe_cmd.py` / `attachments_cmd.py` / `summarize_cmd.py` / `synthesize_cmd.py` | Completeness verbs after flags | domain modules via `cli_runtime` |
 | `completeness_cmd.py` | Re-export shim for the four verbs (keep `cli` imports and monkeypatches stable) | the four `*_cmd` modules |
 | `lint_cmd.py` | `lint` after flags | `lint` |
+| `since.py` / `since_cmd.py` | `since`: read the earlier `run` / `screen` / `versions` / `urls` reports, probe the open-access metadata lanes, and write the `paperful.since.v1` pack. Always dry-run; no manager writes | `sources`, `urls`, `versions`, `handoff_rank`, `fsio`; `since_cmd` adds `screen` and `cli_runtime` |
 | `screen_cmd.py` | `screen` after flags | `screen` |
 | `critique_cmd.py` | `critique` after flags | `critique` |
 | `rewrite_cmd.py` | `rewrite` after flags | `rewrite` |
@@ -242,6 +243,7 @@ Tier policy (1.0 contract):
 | `paperful.network.v1` | `state/network/<run-id>/` | `network` | T2 | ORCID ego graph, phase slices, metrics, `attributes.csv`. Distinct from snowball `coauthors.v1`. |
 | `paperful.search.v1` | `state/search/<run-id>/` | `search` | T2 | SearXNG grey query, ranked hits, probe candidates. Metadata apply only. |
 | `paperful.search.watch.v1` | `state/search/watches/<name>/watch.json` | `search.watch` | T2 | URL seen set (not DOI). `interval_days` is a due-date hint; Paperful does not schedule. |
+| `paperful.since.v1` | `state/since/<stamp>-<scope>/since.json` | `since` | T2 | Holdings rows and healed misses; golden under `tests/fixtures/since_pack_v1/`. See [since.md](since.md) |
 | `paperful.sr.protocol.v1` | `state/sr/<slug>/protocol.json` | `sr.protocol` | T2 | Frozen required keys (`PROTOCOL_KEYS`). Title, question, exclude reasons. No scheduler |
 | `paperful.sr.screen.v1` | `state/sr/<slug>/screening.jsonl` | `sr.screen` | T2 | Frozen required keys (`SCREEN_KEYS`). One decision per line (`include` / `exclude` / `maybe`, reason, reviewer) |
 | `paperful.snowball.stop.v1` | `state/snowball/<run-id>/stop.json` | `snowball.stop` | T2 | Stopping-rule scores per hop |
