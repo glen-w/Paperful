@@ -98,7 +98,7 @@ def run_dedupe(
         try:
             groups = classify(items, phase_name)
         except ValueError as exc:
-            console.print(f"[red]{exc}[/]")
+            console.print(f"[red]{escape(str(exc))}[/]")
             raise typer.Exit(1)
         attach_merge_previews(backend, groups)
     else:
@@ -130,7 +130,7 @@ def run_dedupe(
             try:
                 groups = classify(items, phase_name)
             except ValueError as exc:
-                console.print(f"[red]{exc}[/]")
+                console.print(f"[red]{escape(str(exc))}[/]")
                 raise typer.Exit(1)
             progress.advance(class_id)
             preview_n = merge_preview_total(groups)
@@ -252,7 +252,7 @@ def run_dedupe(
         if errors:
             console.print(f"Errors: {len(errors)}")
             for err in errors[:20]:
-                console.print(f"[yellow]{err}[/]")
+                console.print(f"[yellow]{escape(str(err))}[/]")
 
     if json_out:
         cli_mod._emit_agent(agent, json_out=True, human=_human_dedupe)

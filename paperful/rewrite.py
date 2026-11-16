@@ -241,9 +241,7 @@ def _paragraphs(doc: Any, text: str) -> list[str]:
     return [p for p in text.split("\n\n") if p.strip()]
 
 
-def _as_office_skips(
-    raw: list[Any], *, reason: str
-) -> list[dict[str, str]]:
+def _as_office_skips(raw: list[Any], *, reason: str) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for item in raw:
         if isinstance(item, dict):
@@ -275,11 +273,15 @@ def _write_tracked(
         return dest, manuscript, skips
     if suffix == ".pptx":
         dest = folder / "tracked.pptx"
-        skips = _as_office_skips(apply_pptx(manuscript, dest, edits), reason="office_miss")
+        skips = _as_office_skips(
+            apply_pptx(manuscript, dest, edits), reason="office_miss"
+        )
         return dest, manuscript, skips
     if suffix == ".odt":
         dest = folder / "tracked.odt"
-        skips = _as_office_skips(apply_odt(manuscript, dest, edits), reason="office_miss")
+        skips = _as_office_skips(
+            apply_odt(manuscript, dest, edits), reason="office_miss"
+        )
         return dest, manuscript, skips
     dest = folder / "tracked.docx"
     skips = _as_office_skips(
@@ -296,7 +298,9 @@ def _write_odt(
 ) -> tuple[Path, Path | None, list[dict[str, str]]]:
     dest = folder / "tracked.odt"
     if manuscript.suffix.lower() == ".odt":
-        skips = _as_office_skips(apply_odt(manuscript, dest, edits), reason="office_miss")
+        skips = _as_office_skips(
+            apply_odt(manuscript, dest, edits), reason="office_miss"
+        )
         return dest, manuscript, skips
     skips = _as_office_skips(
         build_odt_from_paragraphs(dest, paragraphs, edits), reason="office_miss"
@@ -458,8 +462,10 @@ def build_rewrite(
             )
             origin = _paragraph_origin(text, excerpt, aln0)
             for edit in edits:
-                if origin >= 0 and edit.start >= 0 and excerpt == (
-                    edit.source_paragraph or excerpt
+                if (
+                    origin >= 0
+                    and edit.start >= 0
+                    and excerpt == (edit.source_paragraph or excerpt)
                 ):
                     edit.start = origin + edit.start
                     edit.end = origin + edit.end
@@ -538,9 +544,7 @@ def build_rewrite(
         office: dict[str, tuple[Path, Path | None]] = {}
         office_skips: list[dict[str, str]] = []
         if "tracked" in output_ids:
-            dest, source, extra = _write_tracked(
-                folder, manuscript, paras, plan.edits
-            )
+            dest, source, extra = _write_tracked(folder, manuscript, paras, plan.edits)
             office[dest.name] = (dest, source)
             office_skips.extend(extra)
             payload["tracked"] = dest.name
@@ -550,9 +554,7 @@ def build_rewrite(
             if "tracked.odt" in office:
                 dest, source = office["tracked.odt"]
             else:
-                dest, source, extra = _write_odt(
-                    folder, manuscript, paras, plan.edits
-                )
+                dest, source, extra = _write_odt(folder, manuscript, paras, plan.edits)
                 office[dest.name] = (dest, source)
                 office_skips.extend(extra)
             payload["odt"] = dest.name

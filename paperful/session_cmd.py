@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 from pathlib import Path
 
 import typer
@@ -156,7 +157,7 @@ def run_session_login(
         try:
             MendeleyClient(cfg).login()
         except MendeleyAuthError as exc:
-            console.print(f"[red]{exc}[/]")
+            console.print(f"[red]{escape(str(exc))}[/]")
             raise typer.Exit(2)
         console.print(
             "[green]Mendeley authorised.[/] Tokens in "
@@ -176,7 +177,7 @@ def run_session_login(
     try:
         url = sess.login_url_for(cfg, key)
     except sess.SessionError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1)
     console.print(f"Opening: {url}")
     try:
@@ -188,7 +189,7 @@ def run_session_login(
             engine=eng,  # type: ignore[arg-type]
         )
     except sess.SessionError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(2)
     for path in written:
         console.print(f"Wrote {path}")
@@ -264,7 +265,7 @@ def run_session_export(console: Console, *, config: Path | None) -> None:
     try:
         written = sess.dump_profile_cookies(cfg)
     except sess.SessionError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(2)
     for path in written:
         console.print(f"Wrote {path}")

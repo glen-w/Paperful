@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import json
 import os
 import sys
@@ -237,6 +238,6 @@ def run_profile_save(
         )
         path = save_profile(cfg, name, body, force=force)
     except RunConfigError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     console.print(f"Wrote [bold]{path}[/]")

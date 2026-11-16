@@ -28,7 +28,9 @@ run's witness id (first 12 characters of its config hash), or its date when
 the report has no witness.
 
 A healed miss is a row whose last `run` status was `not_found`, or whose miss
-was `no_oa`, `paywalled`, or `fetch_failed`. Rows are ranked by cite count
+was `no_oa`, `paywalled`, or `fetch_failed`. A lane that already named a
+copy in that run is not asked again: the run had that answer and could not
+fetch it, so the same answer is not a change. Rows are ranked by cite count
 (from the newest `refs gap` pack) times miss severity, the same score the
 handoff list uses. `--limit` probes only the top of that ranking and the
 pack says how many were skipped.
@@ -36,11 +38,26 @@ pack says how many were skipped.
 `since` does not fetch what it finds. Open Wanted, or run `paperful run` on
 the collection.
 
+The earlier run is the last time each item was seen, read across every saved
+`run` report for the collection. A `run --retry-failed` report lists only
+the rows it retried, so an item it skipped keeps the row from the older run
+that last tried it, and the row names that run. With no `refs gap` pack every
+cite count is 0 and the ranking falls back to miss severity.
+
+## When a check fails
+
+A lookup that fails is not read as "no change". The pack and the terminal say
+how many retraction or version lookups failed and which lanes errored while
+probing. Run `since` again later for those rows. Offline, expect these notes
+rather than "Nothing changed."
+
 ## What it does not report
 
 - **Nothing without a prior observation.** With no earlier `run` report for
   the scope, `since` exits 0, says healed misses were not compared, and
-  still reports retractions.
+  still reports retractions. A collection is one scope whether you name it
+  by name, path, or key. A `run` narrowed by year or item type is a
+  different scope and is not used.
 - **Campus access.** Only the metadata lanes are probed: `unpaywall`,
   `openalex`, `arxiv`, `biorxiv`, `europepmc`, `semanticscholar`, `core`,
   `openaire`, and only those in your configured sources. EZProxy, HTML
@@ -52,11 +69,13 @@ the collection.
 
 ## Cost
 
-Each run re-checks retraction status for every DOI in scope, bypassing the
-`screen` status cache, because that cache does not expire. It also looks up
+Each run re-checks retraction status for every DOI in scope, because the
+`screen` status cache does not expire. A status checked in the last 24 hours
+is not asked for again, so a second `since` the same day is quick. It also looks up
 a published version for each preprint, re-probes URLs the last `urls`
 report could open, and makes one or more metadata requests per earlier miss
-and per snapshot-only PDF. `--limit` caps the last two.
+and per snapshot-only PDF. `--limit` caps the last two. Lookups run
+`concurrency_oa` at a time (4 by default).
 
 ## Output
 

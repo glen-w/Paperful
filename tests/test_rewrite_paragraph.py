@@ -45,10 +45,7 @@ def test_two_findings_one_paragraph_one_call(cfg, tmp_path):
         "Alpha stays put in this sentence. "
         "This is a very long sentence that goes on and on without a pause so that the prose checker can flag it."
     )
-    rewritten = (
-        "Alpha stays put in this sentence. "
-        "This is shorter."
-    )
+    rewritten = "Alpha stays put in this sentence. This is shorter."
     src = tmp_path / "draft.md"
     src.write_text(para + "\n", encoding="utf-8")
     f1 = _finding(

@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from .discover_common import safe_id
 from . import jobs
 from .context import UiContext
 from .prefs import prefs_from_request
@@ -40,6 +41,7 @@ def handle_discover_graph(
 ) -> JSONResponse:
     from ..snowball.citation_graph import CitationGraphError, graph_for_run
 
+    run_id, compare_run = safe_id(run_id), safe_id(compare_run)
     watch_seen, compare_ids = _graph_overlay_context(ui, watch_name, compare_run)
     try:
         graph = graph_for_run(
@@ -78,7 +80,7 @@ async def handle_discover_graph_annotate(
     try:
         graph = annotate_queue(
             ui.cfg,
-            str(body.get("run_id") or ""),
+            safe_id(body.get("run_id")),
             str(body.get("node_id") or ""),
             tags=body.get("tags") if isinstance(body.get("tags"), list) else None,
             note=None if body.get("note") is None else str(body.get("note")),
@@ -107,7 +109,7 @@ async def handle_discover_graph_add(ui: UiContext, request: Request) -> JSONResp
     try:
         result = add_one_to_library(
             ui.cfg,
-            str(body.get("run_id") or ""),
+            safe_id(body.get("run_id")),
             str(body.get("node_id") or ""),
             collection=collection,
         )
@@ -146,7 +148,7 @@ async def handle_discover_graph_find_pdf(
         body = {}
     if not isinstance(body, dict):
         body = {}
-    run_id = str(body.get("run_id") or "")
+    run_id = safe_id(body.get("run_id"))
     node_id = str(body.get("node_id") or "")
     item_key = str(body.get("item_key") or "").strip()
     prefs = prefs_from_request(request)
@@ -194,7 +196,7 @@ async def handle_discover_graph_remove(ui: UiContext, request: Request) -> JSONR
     try:
         graph = remove_from_library(
             ui.cfg,
-            str(body.get("run_id") or ""),
+            safe_id(body.get("run_id")),
             str(body.get("node_id") or ""),
             collection=collection,
         )
@@ -215,7 +217,7 @@ async def handle_discover_graph_repair(ui: UiContext, request: Request) -> JSONR
         body = {}
     if not isinstance(body, dict):
         body = {}
-    run_id = str(body.get("run_id") or "")
+    run_id = safe_id(body.get("run_id"))
     try:
         graph = repair_queue_links(
             ui.cfg.state_dir,
@@ -247,7 +249,7 @@ async def handle_discover_graph_halo(ui: UiContext, request: Request) -> JSONRes
         body = {}
     if not isinstance(body, dict):
         body = {}
-    run_id = str(body.get("run_id") or "")
+    run_id = safe_id(body.get("run_id"))
     node_id = str(body.get("node_id") or "")
     try:
         dest, rows = load_queue(ui.cfg.state_dir, run_id)
@@ -283,7 +285,7 @@ async def handle_discover_graph_expand(ui: UiContext, request: Request) -> JSONR
         body = {}
     if not isinstance(body, dict):
         body = {}
-    run_id = str(body.get("run_id") or "")
+    run_id = safe_id(body.get("run_id"))
     node_id = str(body.get("node_id") or "")
     direction = str(body.get("direction") or "both")
     try:

@@ -7,7 +7,9 @@ row it has no prior observation for.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections import Counter
+from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -50,9 +52,45 @@ STATUS_CODES = ("retracted", "withdrawn", "expression_of_concern")
 VERSION_KIND = "version_of_record"
 DEAD_URL_CODES = frozenset({"hard_dead", "paywall_html"})
 NOTHING_CHANGED = "Nothing changed."
+# A status checked this recently is not asked for again, so a second
+# ``since`` on the same day costs no status lookups.
+STATUS_FRESH_S = 24 * 3600.0
 
-Probe = Callable[[Item], Candidate | None]
+# ``probe(item, skip)``: ``skip`` names lanes that must not be asked.
+Probe = Callable[[Item, frozenset[str]], Candidate | None]
 StatusLookup = Callable[[str], list[str]]
+ScopeMatch = Callable[[dict[str, Any]], bool]
+
+
+def scope_matcher(
+    label: str,
+    roots: frozenset[str] | None = None,
+    resolve: Callable[[str], str] | None = None,
+) -> ScopeMatch:
+    """True for a saved report or pack that covers the same collections.
+
+    A scope label is the text the operator typed, so ``BBNJ``, ``ocean/BBNJ``
+    and the collection key are one scope under three labels. ``resolve`` turns
+    each into a collection key (LookupError when it names none); ``roots`` are
+    the keys of the scope being compared. Year- or type-filtered reports are a
+    different scope.
+    """
+
+    def same(body: dict[str, Any]) -> bool:
+        if body.get("scope") == label:
+            return True
+        if roots is None or resolve is None:
+            return False
+        witness = (body.get("witness") or {}).get("scope") or {}
+        if any(witness.get(k) for k in ("library", "year_from", "year_to", "types")):
+            return False
+        specs = witness.get("collections") or [str(body.get("scope") or "")]
+        try:
+            return frozenset(resolve(str(spec)) for spec in specs) == roots
+        except LookupError:
+            return False
+
+    return same
 
 
 @dataclass(frozen=True)
@@ -62,11 +100,20 @@ class Baseline:
     path: Path
     finished_at: str
     witness_id: str
+    # Newest row per item across every report read; each row carries the
+    # ``compared_to`` label of the report it came from.
     items: list[dict[str, Any]]
+    reports: int = 1
 
     @property
     def label(self) -> str:
         return self.witness_id or self.finished_at[:10]
+
+
+def in_parallel(fn: Callable[[Any], Any], args: list[Any], workers: int) -> list[Any]:
+    """``[fn(a) for a in args]`` on ``workers`` threads, in the order given."""
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        return list(pool.map(fn, args))
 
 
 def _read_json(path: Path) -> dict[str, Any] | None:
@@ -77,16 +124,16 @@ def _read_json(path: Path) -> dict[str, Any] | None:
     return body if isinstance(body, dict) else None
 
 
-def _newest_report(
-    state_dir: Path, command: str, scope: str, *, before: date | None = None
-) -> tuple[Path, dict[str, Any]] | None:
-    """Newest ``state/runs/*-<command>.json`` for ``scope`` that is not a dry run."""
+def _reports(
+    state_dir: Path, command: str, same: ScopeMatch, *, before: date | None = None
+) -> Iterator[tuple[Path, dict[str, Any]]]:
+    """``state/runs/*-<command>.json`` for the scope, newest first, no dry runs."""
     runs = state_dir / "runs"
     if not runs.is_dir():
-        return None
+        return
     for path in sorted(runs.glob(f"*-{command}.json"), reverse=True):
         body = _read_json(path)
-        if body is None or body.get("scope") != scope:
+        if body is None or not same(body):
             continue
         if (body.get("flags") or {}).get("dry_run"):
             continue
@@ -94,28 +141,55 @@ def _newest_report(
             finished = str(body.get("finished_at") or "")[:10]
             if not finished or finished > before.isoformat():
                 continue
-        return path, body
-    return None
+        yield path, body
+
+
+def _newest_report(
+    state_dir: Path, command: str, same: ScopeMatch
+) -> tuple[Path, dict[str, Any]] | None:
+    return next(_reports(state_dir, command, same), None)
+
+
+def _report_label(body: dict[str, Any]) -> str:
+    digest = str((body.get("witness") or {}).get("config_sha256") or "")
+    return digest[:12] or str(body.get("finished_at") or "")[:10]
 
 
 def find_baseline(
-    state_dir: Path, scope: str, *, before: date | None = None
+    state_dir: Path, same: ScopeMatch, *, before: date | None = None
 ) -> Baseline | None:
-    found = _newest_report(state_dir, "run", scope, before=before)
-    if found is None:
+    """The last observation of each item across the scope's ``run`` reports.
+
+    A ``run --retry-failed`` report holds only the rows it retried, so the
+    newest report alone would forget every other earlier miss. Each item
+    keeps the row from the newest report that names it.
+    """
+    newest: tuple[Path, dict[str, Any]] | None = None
+    rows: dict[str, dict[str, Any]] = {}
+    reports = 0
+    for path, body in _reports(state_dir, "run", same, before=before):
+        newest = newest or (path, body)
+        reports += 1
+        label = _report_label(body)
+        for row in body.get("items") or []:
+            if isinstance(row, dict):
+                key = str(row.get("itemKey") or "")
+                rows.setdefault(key, {**row, "compared_to": label})
+    if newest is None:
         return None
-    path, body = found
+    path, body = newest
     digest = str((body.get("witness") or {}).get("config_sha256") or "")
     return Baseline(
         path=path,
         finished_at=str(body.get("finished_at") or ""),
         witness_id=digest[:12],
-        items=[row for row in body.get("items") or [] if isinstance(row, dict)],
+        items=list(rows.values()),
+        reports=reports,
     )
 
 
 def prior_holdings(
-    state_dir: Path, scope: str
+    state_dir: Path, same: ScopeMatch
 ) -> tuple[set[tuple[str, str]], dict[str, str]]:
     """``(itemKey, kind)`` pairs already reported, and a label per verb.
 
@@ -124,7 +198,7 @@ def prior_holdings(
     """
     seen: set[tuple[str, str]] = set()
     labels: dict[str, list[str]] = {}
-    found = _newest_report(state_dir, "screen", scope)
+    found = _newest_report(state_dir, "screen", same)
     if found is not None:
         _, body = found
         labels["screen"] = [f"screen {str(body.get('finished_at') or '')[:10]}"]
@@ -135,7 +209,7 @@ def prior_holdings(
     if packs.is_dir():
         for path in sorted(packs.glob("*.json"), reverse=True):
             pack = _read_json(path)
-            if pack is None or pack.get("scope") != scope:
+            if pack is None or not same(pack):
                 continue
             labels["versions"] = [f"versions {str(pack.get('created_at') or '')[:10]}"]
             for row in pack.get("proposals") or []:
@@ -146,7 +220,7 @@ def prior_holdings(
     if root.is_dir():
         for folder in sorted(root.iterdir(), reverse=True):
             pack = _read_json(folder / "since.json")
-            if pack is None or pack.get("scope") != scope:
+            if pack is None or not same(pack):
                 continue
             label = f"since {str(pack.get('created_at') or '')[:10]}"
             for verb in ("screen", "versions"):
@@ -161,10 +235,10 @@ def prior_holdings(
 
 
 def prior_urls(
-    state_dir: Path, scope: str
+    state_dir: Path, same: ScopeMatch
 ) -> tuple[dict[tuple[str, str], str], str] | None:
     """``(item_key, url)`` → code from the newest ``urls`` report, or None."""
-    found = _newest_report(state_dir, "urls", scope)
+    found = _newest_report(state_dir, "urls", same)
     if found is None:
         return None
     _, body = found
@@ -183,26 +257,35 @@ def status_rows(
     lookup: StatusLookup,
     seen: set[tuple[str, str]],
     compared_to: str,
+    *,
+    workers: int = 1,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> list[dict[str, Any]]:
-    """Retraction, withdrawal, or expression of concern on a library item."""
+    """Retraction, withdrawal, or expression of concern on a library item.
+
+    ``lookup`` is called from ``workers`` threads; rows keep the item order.
+    """
+    held = [item for item in items if item.doi]
     rows: list[dict[str, Any]] = []
-    for item in items:
-        if not item.doi:
-            continue
-        for code in lookup(item.doi):
-            if code not in STATUS_CODES or (item.key, code) in seen:
-                continue
-            rows.append(
-                {
-                    "kind": code,
-                    "itemKey": item.key,
-                    "title": item.title,
-                    "doi": item.doi,
-                    "verb": "screen",
-                    "compared_to": compared_to or "no prior screen report",
-                    "suggested_action": "paperful screen",
-                }
-            )
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        answers = pool.map(lambda item: lookup(item.doi or ""), held)
+        for done, (item, codes) in enumerate(zip(held, answers), start=1):
+            if on_progress is not None:
+                on_progress(done, len(held))
+            for code in codes:
+                if code not in STATUS_CODES or (item.key, code) in seen:
+                    continue
+                rows.append(
+                    {
+                        "kind": code,
+                        "itemKey": item.key,
+                        "title": item.title,
+                        "doi": item.doi,
+                        "verb": "screen",
+                        "compared_to": compared_to or "no prior screen report",
+                        "suggested_action": "paperful screen",
+                    }
+                )
     return rows
 
 
@@ -269,6 +352,7 @@ def snapshot_rows(
     seen: set[tuple[str, str]],
     *,
     limit: int | None = None,
+    workers: int = 1,
 ) -> list[dict[str, Any]]:
     """Snapshot-only PDFs that a metadata lane can now replace."""
     todo = [
@@ -277,8 +361,9 @@ def snapshot_rows(
         if item.pdf_tier == "snapshot" and (item.key, "snapshot_upgrade") not in seen
     ]
     rows: list[dict[str, Any]] = []
-    for item in todo[:limit]:
-        cand = probe(item)
+    todo = todo[:limit]
+    found = in_parallel(lambda item: probe(item, frozenset()), todo, workers)
+    for item, cand in zip(todo, found):
         if cand is None:
             continue
         rows.append(
@@ -319,15 +404,35 @@ def keepup_rows(
     ]
 
 
-def probe_item(item: Item, ctx: Context, lanes: list[str]) -> Candidate | None:
-    """First metadata lane that names a PDF URL. Never fetches the PDF."""
+def probe_item(
+    item: Item,
+    ctx: Context,
+    lanes: list[str],
+    errors: Counter[str] | None = None,
+) -> Candidate | None:
+    """First metadata lane that names a PDF URL. Never fetches the PDF.
+
+    A lane that errored is counted in ``errors``: its silence is not a "no".
+    """
     for name in lanes:
         if name not in PROBE_LANES:
             continue
         cand = REGISTRY[name].find(item, ctx)
         if cand.outcome is Outcome.FOUND and cand.url and cand.content is None:
             return cand
+        if cand.outcome is Outcome.ERROR and errors is not None:
+            errors[name] += 1
     return None
+
+
+def _found_lanes(row: dict[str, Any]) -> frozenset[str]:
+    """Lanes that already named a copy in the baseline run (``lane:found(…)``)."""
+    found = set()
+    for attempt in row.get("attempts") or []:
+        lane, _, outcome = str(attempt).partition(":")
+        if outcome.startswith("found"):
+            found.add(lane)
+    return frozenset(found)
 
 
 def _was_miss(row: dict[str, Any]) -> bool:
@@ -344,24 +449,33 @@ def healed_rows(
     cite_counts: dict[str, int],
     *,
     limit: int | None = None,
+    workers: int = 1,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """Baseline misses, still without a PDF, that a metadata lane now names."""
+    """Baseline misses, still without a PDF, that a metadata lane now names.
+
+    A lane that already named a copy in the baseline run is not asked again:
+    that run could not fetch it, so the same answer is not a change.
+    """
     by_key = {item.key: item for item in items}
-    todo: list[tuple[int, int, Item, str]] = []
+    row_label = {
+        str(row.get("itemKey") or ""): row.get("compared_to") for row in baseline.items
+    }
+    todo: list[tuple[int, int, Item, str, frozenset[str]]] = []
     for row in baseline.items:
         item = by_key.pop(str(row.get("itemKey") or ""), None)
         if item is None or item.has_pdf or not _was_miss(row):
             continue
         was = str(row.get("miss_surface") or row.get("status") or "")
         cites = cites_for(item, cite_counts)
-        todo.append((cites * severity(was), cites, item, was))
-    todo.sort(key=lambda t: (-t[0], t[2].title.lower()))
+        todo.append((cites * severity(was), cites, item, was, _found_lanes(row)))
+    # Without a refs-gap pack every cite count is 0: severity still orders them.
+    todo.sort(key=lambda t: (-t[0], -severity(t[3]), t[2].title.lower()))
     candidates = len(todo)
     if limit is not None:
         todo = todo[:limit]
     rows: list[dict[str, Any]] = []
-    for score, cites, item, was in todo:
-        cand = probe(item)
+    found = in_parallel(lambda t: probe(t[2], t[4]), todo, workers)
+    for (score, cites, item, was, _already), cand in zip(todo, found):
         if cand is None:
             continue
         rows.append(
@@ -376,7 +490,7 @@ def healed_rows(
                 "cites": cites,
                 "score": score,
                 "verb": "run",
-                "compared_to": baseline.label,
+                "compared_to": str(row_label.get(item.key) or baseline.label),
                 "suggested_action": "paperful run",
             }
         )

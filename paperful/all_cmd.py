@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 from pathlib import Path
 from typing import Any
 
@@ -114,7 +115,7 @@ def run_all(
         try:
             pack = open_pack(cfg, label=label or bound.name or "all")
         except PackError as exc:
-            console.print(f"[red]{exc}[/]")
+            console.print(f"[red]{escape(str(exc))}[/]")
             raise typer.Exit(1) from exc
         opened = True
         if not json_out:

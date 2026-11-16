@@ -137,6 +137,7 @@ from .discover_search_routes import (
 )
 
 from .discover_common import (
+    safe_id,
     bad_list_name,
     last_review_token as _last_review_token,
     safe_list_name,
@@ -530,7 +531,7 @@ async def handle_discover_apply_preview(ui: UiContext, request: Request):
     prefs = prefs_from_request(request)
     form = await request.form()
     kind = str(form.get("kind") or "snowball")
-    run_id = str(form.get("run_id") or "")
+    run_id = safe_id(form.get("run_id"))
     list_name = safe_list_name(form.get("list_name"), default="followed")
     if list_name is None:
         return bad_list_name()
@@ -564,7 +565,7 @@ async def handle_discover_apply(ui: UiContext, request: Request):
     prefs = prefs_from_request(request)
     form = await request.form()
     kind = str(form.get("kind") or "snowball")
-    run_id = str(form.get("run_id") or "")
+    run_id = safe_id(form.get("run_id"))
     list_name = safe_list_name(form.get("list_name"), default="followed")
     if list_name is None:
         return bad_list_name()
@@ -612,7 +613,7 @@ async def handle_discover_keep(ui: UiContext, request: Request):
     from ..snowball.citation_graph import CitationGraphError, graph_for_run
 
     form = await request.form()
-    run_id = str(form.get("run_id") or "")
+    run_id = safe_id(form.get("run_id"))
     doi = str(form.get("doi") or "")
     keep = str(form.get("keep") or "1") == "1"
     page_raw = str(form.get("page") or "").strip()
@@ -667,7 +668,7 @@ async def handle_discover_watch(ui: UiContext, request: Request) -> RedirectResp
 
 async def handle_discover_continue(ui: UiContext, request: Request) -> RedirectResponse:
     form = await request.form()
-    run_id = str(form.get("run_id") or "").strip()
+    run_id = safe_id(form.get("run_id"))
     if not run_id:
         return RedirectResponse(
             url=ui.page_url("/discover", tab="queue"), status_code=303
@@ -692,7 +693,7 @@ async def handle_discover_continue(ui: UiContext, request: Request) -> RedirectR
 async def handle_discover_resume(ui: UiContext, request: Request) -> RedirectResponse:
     prefs = prefs_from_request(request)
     form = await request.form()
-    run_id = str(form.get("run_id") or snowball_deferred_run_id(ui.cfg)).strip()
+    run_id = safe_id(form.get("run_id") or snowball_deferred_run_id(ui.cfg))
     if not run_id:
         return RedirectResponse(
             url=ui.page_url("/discover", tab="topic"), status_code=303
@@ -770,7 +771,7 @@ def _maybe_file_note(ui: UiContext, html: str, apply: bool, collection: str) -> 
 async def handle_discover_briefing(ui: UiContext, request: Request) -> RedirectResponse:
     prefs = prefs_from_request(request)
     form = await request.form()
-    run_id = str(form.get("run_id") or "").strip()
+    run_id = safe_id(form.get("run_id"))
     apply_note = form.get("apply") == "1"
     if not run_id:
         return RedirectResponse(
@@ -799,7 +800,7 @@ async def handle_discover_briefing(ui: UiContext, request: Request) -> RedirectR
 async def handle_discover_digest(ui: UiContext, request: Request) -> RedirectResponse:
     prefs = prefs_from_request(request)
     form = await request.form()
-    run_id = str(form.get("run_id") or "").strip()
+    run_id = safe_id(form.get("run_id"))
     apply_note = form.get("apply") == "1"
     if not run_id:
         return RedirectResponse(

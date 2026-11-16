@@ -313,7 +313,7 @@ openalex_store_app = typer.Typer(
     no_args_is_help=True,
     help=(
         "Optional OpenAlex parquet snapshot helpers (local or SSH DuckDB). "
-        "Most installs leave [openalex_store] unset and use the live API."
+        "Most installs leave \\[openalex_store] unset and use the live API."
     ),
 )
 app.add_typer(openalex_store_app, name="openalex-store")

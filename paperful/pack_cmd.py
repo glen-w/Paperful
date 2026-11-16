@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import json
 from pathlib import Path
 
@@ -30,7 +31,7 @@ def run_pack_open(
     try:
         pack = open_pack(cfg, label=label)
     except PackError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1)
     console.print(pack["id"])
 
@@ -44,7 +45,7 @@ def run_pack_close(console: Console, *, config: Path | None) -> None:
     try:
         pack = close_pack(cfg)
     except PackError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1)
     n = len(pack.get("steps") or [])
     console.print(f"Closed {pack['id']} ({n} steps)")

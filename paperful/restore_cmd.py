@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import json
 from pathlib import Path
 
@@ -69,7 +70,7 @@ def run_restore(
             try:
                 root = backend.resolve_collection(spec)
             except LookupError as exc:
-                console.print(f"[red]{exc}[/]")
+                console.print(f"[red]{escape(str(exc))}[/]")
                 raise typer.Exit(1) from exc
             prefixes.append(root.path)
     paths = iter_records(cfg.out_dir, prefixes)

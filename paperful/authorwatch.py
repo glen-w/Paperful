@@ -49,7 +49,8 @@ BRIEFING_MAX_PEOPLE = 10
 SHOW_ENRICH_PEOPLE = 5
 BRIEFING_RECENT_WORKS = 8
 BRIEFING_COAUTHORS = 8
-_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+# Names become folder names: bounded so a long one cannot fail at the filesystem.
+_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 FILE_SOURCES = ("csv", "json", "orcid")
 SOCIAL_SOURCES = ("rg", "researchgate", "linkedin", "academia")

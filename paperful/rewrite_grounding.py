@@ -5,9 +5,7 @@ from __future__ import annotations
 import re
 from typing import Iterable
 
-_LATEX_CITE = re.compile(
-    r"\\cite[A-Za-z]*(?:\[[^\]]*\]){0,2}\{([^}]+)\}"
-)
+_LATEX_CITE = re.compile(r"\\cite[A-Za-z]*(?:\[[^\]]*\]){0,2}\{([^}]+)\}")
 _PANDOC_CITE = re.compile(r"\[@([^\]]+)\]")
 _AUTHOR_YEAR = re.compile(
     r"\b([A-Z][A-Za-z'-]+(?:\s+(?:and|&)\s+[A-Z][A-Za-z'-]+)?)\s+\((\d{4}[a-z]?)\)"
@@ -41,7 +39,11 @@ def _latex_keys(text: str) -> list[str]:
 
 
 def _pandoc_keys(text: str) -> list[str]:
-    return [m.group(1).strip() for m in _PANDOC_CITE.finditer(text or "") if m.group(1).strip()]
+    return [
+        m.group(1).strip()
+        for m in _PANDOC_CITE.finditer(text or "")
+        if m.group(1).strip()
+    ]
 
 
 def numbers_in(text: str) -> list[str]:

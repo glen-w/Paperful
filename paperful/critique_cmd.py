@@ -77,7 +77,7 @@ def run_critique(
             cfg, lane_flags=lane or [], llm=llm, advanced=advanced
         )
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     use_llm = "reviewers" in lanes
     use_ai_model = bool(ai_model) or cfg.critique_ai_model
@@ -210,7 +210,7 @@ def run_critique(
                 on_status=on_status,
             )
     except ExtractError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     finally:
         if http is not None:

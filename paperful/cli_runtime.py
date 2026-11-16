@@ -18,6 +18,7 @@ from typing import Any
 
 import typer
 from rich.console import Console, ConsoleDimensions
+from rich.markup import escape
 from rich.table import Table
 
 from .progress import Track, item_progress, tracker
@@ -77,7 +78,7 @@ def _bind_run(cfg: Config, **kwargs: Any) -> ResolvedRunConfig:
     try:
         return resolve_run_config(cfg, **kwargs)
     except RunConfigError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
 
 
@@ -255,7 +256,7 @@ def _cfg(path: Path | None) -> Config:
     try:
         cfg = load_config(path)
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     cfg.out_dir.mkdir(parents=True, exist_ok=True)
     cfg.state_dir.mkdir(parents=True, exist_ok=True)
@@ -622,7 +623,7 @@ def _flush(backend: LibraryBackend) -> None:
 
 
 def _scope_error(exc: ScopeError) -> None:
-    console.print(f"[red]{exc}[/]")
+    console.print(f"[red]{escape(str(exc))}[/]")
     raise typer.Exit(1) from exc
 
 
@@ -639,7 +640,7 @@ def _resolve_types(item_type: list[str]) -> frozenset[str] | None:
     try:
         return resolve_item_types(item_type)
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1)
 
 
@@ -979,7 +980,7 @@ def _rag_embedder(cfg: Config):
     try:
         embedder = validate_embedder(cfg)
     except LlmConfigError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     if embed_egress_is_remote(cfg):
         console.print(
@@ -1002,7 +1003,7 @@ def _rag_open(cfg: Config):
     try:
         return Index.open(cfg), Ledger(ledger_path(cfg))
     except (RagUnavailable, IndexMissing, IndexMismatch) as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
 
 

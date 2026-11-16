@@ -7,6 +7,12 @@ may still be added). See [releases](docs/releases.md).
 ## Unreleased
 
 - **`paperful since`.** A read-only report of what changed since the last `run` on a collection: retractions and expressions of concern, preprints with a version of record, URLs that died, snapshot PDFs that can be upgraded, `keepup` parents still without a PDF, and earlier misses that an open-access lane now names. It downloads nothing and writes nothing to the manager. Packs land in `state/since/`. See [since](docs/since.md).
+- **`since` hardening.** One collection is one scope whether named by name, path, or key. The earlier run is read across every saved `run` report, so a `--retry-failed` run no longer hides older misses. A lane that already answered in the earlier run is not counted as a heal. Failed lookups and lane errors are reported instead of reading as "Nothing changed". Lookups run in parallel and statuses checked in the last 24 hours are reused. The terminal report is grouped, shows what each row was compared to, and names the next command.
+- **Workbench warms up on start.** `paperful serve` fills the collection tree and the System checks in the background, so the first visit to Library or System does not wait for them.
+- **Workbench hardening.** Form fields with a help tip are now named for screen readers, and clicking the label focuses the field. A collection that was renamed or deleted is said on every page instead of reading as "no items". A form the workbench refuses (a missing field, a bad name, a feature that is off) shows the reason on a "not valid" page rather than "Something went wrong". Run ids from the address bar or a form can no longer name a file outside their folder, and list and watch names are capped at 100 characters.
+- **Error messages keep square brackets.** Errors that quote a config table, a path, or a title with `[` in it print in full.
+- **Retraction check reads the right Crossref field.** `screen` (and `since`) now read `updated-by`, the field Crossref puts on the affected article. Before, only the notice's own `update-to` was read, so withdrawals and expressions of concern on held papers were missed, and retractions were caught only when OpenAlex also had them. A status lookup that fails is no longer cached as "clean".
+- **Config names show in help and doctor.** `--help`, `doctor`, and config errors printed `[rag].ask_mode` as `.ask_mode` because the terminal renderer took the bracket for a style tag. They print in full now.
 
 ## 1.9.2 — 2026-11-12
 

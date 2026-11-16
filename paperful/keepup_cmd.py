@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import json
 import os
 import sys
@@ -27,7 +28,7 @@ def _keepup_call(action: Any) -> Any:
     try:
         return action()
     except (KeepupError, SnowballError) as exc:
-        cli_mod.console.print(f"[red]{exc}[/]")
+        cli_mod.console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(getattr(exc, "code", 2) or 2) from exc
 
 

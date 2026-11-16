@@ -429,9 +429,10 @@ def test_cli_drifted_file_records_drift(cfg, tmp_path: Path):
     assert body["flags"]["drift"] is True
     assert body["summary"]["drift"] is True
     assert body["summary"]["edits"] == 0
-    assert "hash differs" in (res.stderr or "").lower() or "hash differs" in (
-        res.output or ""
-    ).lower()
+    assert (
+        "hash differs" in (res.stderr or "").lower()
+        or "hash differs" in (res.output or "").lower()
+    )
 
 
 def test_old_pack_without_hash_still_runs(cfg, tmp_path: Path):
@@ -519,7 +520,9 @@ def test_tracked_docx_mixed_runs_become_comment(tmp_path: Path):
     assert "w:b" in xml
     assert "w:ins" not in xml
     assert "Maritime Area beyond national jurisdictions" in xml
-    assert "complex formatting" in comments.lower() or "Tracked change skipped" in comments
+    assert (
+        "complex formatting" in comments.lower() or "Tracked change skipped" in comments
+    )
 
 
 def test_second_body_edit_on_paragraph_is_docx_miss(tmp_path: Path):

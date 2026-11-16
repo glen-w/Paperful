@@ -315,8 +315,8 @@ def proposed_from_area(
             start = aln.start if aln else -1
             end = aln.end if aln else -1
         para = source_para or quote
-        target = paragraph if paragraph else (
-            replacement if kind == "replace" else para
+        target = (
+            paragraph if paragraph else (replacement if kind == "replace" else para)
         )
         if kind == "insert" and not paragraph:
             target = (para + " " + replacement).strip() if replacement else para

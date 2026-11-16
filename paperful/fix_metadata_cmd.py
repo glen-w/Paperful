@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import time
 from pathlib import Path
 from typing import Any
@@ -207,7 +208,7 @@ def _print_fix_summary(
     if errors:
         console.print(f"Errors: {len(errors)}")
         for err in errors[:20]:
-            console.print(f"[yellow]{err}[/]")
+            console.print(f"[yellow]{escape(str(err))}[/]")
         if len(errors) > 20:
             console.print(f"[dim]… and {len(errors) - 20} more[/]")
 

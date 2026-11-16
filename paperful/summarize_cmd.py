@@ -91,7 +91,7 @@ def run_summarize(
     try:
         validate_llm_for_verb(cfg)
     except LlmConfigError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1)
     if llm_egress_is_remote(cfg):
         console.print(

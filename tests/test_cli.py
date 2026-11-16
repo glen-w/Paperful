@@ -3126,3 +3126,25 @@ def test_collections_add_apply_mixed_exits_3(
     assert body["partial"] is True
     assert body["summary"]["added"] == 1
     assert body["summary"]["failed"] == 1
+
+
+def test_help_text_keeps_bracketed_config_names():
+    """Rich reads ``[rag]`` in help text as a style tag and prints nothing.
+
+    Write config tables as ``\\[rag].ask_mode`` in help strings.
+    """
+    import re
+
+    from typer.main import get_command
+
+    tag = re.compile(r"(?<!\\)\[[A-Za-z/@#][^\[\]]*\]")
+    eaten: list[str] = []
+
+    def walk(cmd, path: str) -> None:
+        texts = [cmd.help or ""] + [getattr(p, "help", "") or "" for p in cmd.params]
+        eaten.extend(f"{path}: {tok}" for text in texts for tok in tag.findall(text))
+        for name, sub in getattr(cmd, "commands", {}).items():
+            walk(sub, f"{path} {name}")
+
+    walk(get_command(cli.app), "paperful")
+    assert eaten == []

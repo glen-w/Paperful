@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import time
 from pathlib import Path
 from typing import Any
@@ -66,7 +67,7 @@ def run_inbox_watch(
     try:
         root = ensure_inbox_dirs(cfg)
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     loaded = cli_mod._load_scope(
         backend,
@@ -169,7 +170,7 @@ def run_inbox_drain(
     try:
         root = ensure_inbox_dirs(cfg)
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     loaded = cli_mod._load_scope(
         backend,
@@ -306,7 +307,7 @@ def run_inbox_proposals_apply(
     try:
         data = apply_proposal(cfg, backend, manifest, proposal_id, extra_tags=tag)
     except (FileNotFoundError, ValueError, LibraryError) as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     cli_mod._flush(backend)
     payload = envelope(
@@ -346,7 +347,7 @@ def run_inbox_proposals_reject(
     try:
         data = reject_proposal(cfg, proposal_id)
     except (FileNotFoundError, ValueError) as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     payload = envelope(
         command="inbox proposals reject",

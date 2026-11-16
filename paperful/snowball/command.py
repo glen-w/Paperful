@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import json
 import os
 import sys
@@ -887,7 +888,7 @@ def _maybe_dedupe_after(
         col = backend.resolve_collection(collection.strip())
         items = backend.items_in_scope([col.key])
     except Exception as exc:
-        console.print(f"[yellow]dedupe_after skipped: {exc}[/]")
+        console.print(f"[yellow]dedupe_after skipped: {escape(str(exc))}[/]")
         return
     groups = classify(items)
     attach_merge_previews(backend, groups)
@@ -907,7 +908,7 @@ def _maybe_dedupe_after(
     )
     console.print(f"dedupe merged {merged}")
     for err in errors:
-        console.print(f"[yellow]{err}[/]")
+        console.print(f"[yellow]{escape(str(err))}[/]")
 
 
 def _mark_exists(

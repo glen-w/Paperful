@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 from pathlib import Path
 from typing import Any
 
@@ -75,7 +76,7 @@ def run_versions(
                     track=cli_mod._track(progress, "Checking versions"),
                 )
         except Exception as exc:
-            console.print(f"[red]{exc}[/]")
+            console.print(f"[red]{escape(str(exc))}[/]")
             raise typer.Exit(1)
         json_path, md_path = write_pack(
             cfg.state_dir, scope, proposals, n_items=len(items)
@@ -127,7 +128,7 @@ def run_versions(
             if errors:
                 console.print(f"Errors: {len(errors)}")
                 for err in errors[:20]:
-                    console.print(f"[yellow]{err}[/]")
+                    console.print(f"[yellow]{escape(str(err))}[/]")
     finally:
         client.close()
     if errors:

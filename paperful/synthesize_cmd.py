@@ -82,7 +82,7 @@ def run_synthesize(
     try:
         validate_llm_for_verb(cfg)
     except LlmConfigError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1)
     if llm_egress_is_remote(cfg) and not dry_run:
         console.print(
@@ -96,7 +96,7 @@ def run_synthesize(
         try:
             cfg.synthesize_layout = canonical_layout(layout)
         except ValueError as exc:
-            console.print(f"[red]{exc}[/]")
+            console.print(f"[red]{escape(str(exc))}[/]")
             raise typer.Exit(1) from exc
     backend = cli_mod._connect(cfg, quiet=json_out)
     loaded = cli_mod._load_scope(
@@ -121,7 +121,7 @@ def run_synthesize(
             try:
                 targets = [backend.resolve_collection(report_collection)]
             except LookupError as exc:
-                console.print(f"[red]{exc}[/]")
+                console.print(f"[red]{escape(str(exc))}[/]")
                 raise typer.Exit(1)
         elif collection:
             seen_keys: set[str] = set()
@@ -129,7 +129,7 @@ def run_synthesize(
                 try:
                     root = backend.resolve_collection(spec)
                 except LookupError as exc:
-                    console.print(f"[red]{exc}[/]")
+                    console.print(f"[red]{escape(str(exc))}[/]")
                     raise typer.Exit(1)
                 if root.key not in seen_keys:
                     seen_keys.add(root.key)
@@ -218,13 +218,13 @@ def run_synthesize(
                 announce=_announce,
             )
     except ReduceCapError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1)
     except LibraryError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1)
     except (OSError, ValueError, LLMClientError) as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1)
     n_chunks = written.n_chunks
     outcomes = [

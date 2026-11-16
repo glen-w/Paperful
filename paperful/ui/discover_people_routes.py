@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from . import commands, jobs
 from .context import UiContext
-from .discover_common import bad_list_name, safe_list_name
+from .discover_common import safe_id, bad_list_name, safe_list_name
 from .prefs import prefs_from_request
 
 
@@ -343,7 +343,7 @@ def handle_discover_network(
         return JSONResponse(
             {"ok": False, "error": "Co-author network is off."}, status_code=404
         )
-    cleaned = (run_id or "").strip()
+    cleaned = safe_id(run_id)
     if not cleaned:
         return JSONResponse({"ok": False, "error": "run_id required"}, status_code=400)
     try:

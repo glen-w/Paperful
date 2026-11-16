@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import os
 import time
 from pathlib import Path
@@ -360,7 +361,7 @@ def run_run_command(
         try:
             cfg.playbooks_promote = parse_playbooks_promote(promote)
         except ValueError as exc:
-            console.print(f"[red]{exc}[/]")
+            console.print(f"[red]{escape(str(exc))}[/]")
             raise typer.Exit(2)
     bound = cli_mod._bind_run(
         cfg,
@@ -403,7 +404,7 @@ def run_run_command(
                 "--htmlpdf", htmlpdf_mode, ("off", "gated", "auto")
             )
         except ValueError as exc:
-            console.print(f"[red]{exc}[/]")
+            console.print(f"[red]{escape(str(exc))}[/]")
             raise typer.Exit(2)
     if isinstance(serpapi_max, int):
         cfg.serpapi_max_calls = max(0, serpapi_max)

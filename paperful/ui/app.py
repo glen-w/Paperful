@@ -184,6 +184,12 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     static_dir = _ui_dir() / "static"
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
     ui = UiContext(app=app, cfg=cfg, templates=templates)
+    # ``paperful serve`` runs these in the background so the first visit to
+    # Library or System does not wait on a full collection walk or doctor.
+    app.state.warmers = (
+        ui.collections,
+        lambda: ui.doctor_once(lambda: doctor_payload(cfg)),
+    )
     from .errors import install_error_pages
 
     install_error_pages(app, templates, ui.ctx)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 from pathlib import Path
 
 import typer
@@ -119,7 +120,7 @@ def run_htmlpdf_proposals_reject(
     try:
         data = reject_proposal(cfg, proposal_id)
     except FileNotFoundError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     payload = envelope(
         command="htmlpdf proposals reject",

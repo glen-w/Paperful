@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import sys
 import time
 from pathlib import Path
@@ -102,7 +103,7 @@ def run_rewrite(
             output if output else list(cfg.rewrite_outputs)
         )
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
 
     llm_client = None
@@ -140,11 +141,12 @@ def run_rewrite(
             on_status=on_status,
         )
     except ExtractError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
 
     counts = result.get("counts") or {}
-    inp = result.get("input") if isinstance(result.get("input"), dict) else {}
+    raw_input = result.get("input")
+    inp = raw_input if isinstance(raw_input, dict) else {}
     drifted = bool(inp.get("drift"))
     edits_n = int(counts.get("edits", 0) or 0)
     skips_n = int(counts.get("skips", 0) or 0)

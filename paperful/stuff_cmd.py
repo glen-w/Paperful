@@ -62,7 +62,7 @@ def run_stuff(
     try:
         lane_id = resolve_lane(cfg, lane)
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     per_k = resolve_k(cfg, k)
 
@@ -172,7 +172,7 @@ def run_stuff(
                 on_status=on_status,
             )
     except ExtractError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     except LLMClientError as exc:
         console.print(str(exc), markup=False, style="red")

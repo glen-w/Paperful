@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import json
 import os
 import sys
@@ -56,7 +57,7 @@ def run_playbooks_probe(
     try:
         targets = load_corpus(corpus)
     except (OSError, ValueError) as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(2) from exc
     cfg = cli_mod._cfg(config)
     books = playbooks_for_probe(cfg.grey_playbooks, examples=examples)

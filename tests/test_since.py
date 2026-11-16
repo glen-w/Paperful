@@ -23,7 +23,9 @@ from paperful.since import (
     prior_holdings,
     prior_urls,
     probe_item,
+    scope_matcher,
     snapshot_rows,
+    status_rows,
     url_rows,
     version_rows,
     write_pack,
@@ -119,15 +121,20 @@ def wired(monkeypatch):
         "paperful.pipeline.make_client", lambda cfg: mock_client(handler)
     )
     monkeypatch.setattr(
-        "paperful.screen.lookup_doi_status",
-        lambda client, cfg, doi, refresh=False: (
-            ["retracted"] if refresh and doi in state["retracted"] else []
+        "paperful.screen.doi_status",
+        lambda client, cfg, doi, max_age=None: (
+            ["retracted"] if doi in state["retracted"] else [],
+            not state["status_down"],
         ),
     )
     monkeypatch.setattr(
         "paperful.versions.classify_versions", lambda items, resolve: state["versions"]
     )
+    monkeypatch.setattr(
+        "paperful.versions.resolver_for", lambda client, email: lambda doi: None
+    )
     state["seen"] = seen
+    state["status_down"] = False
     state["versions"] = []
     return state
 
@@ -229,12 +236,15 @@ def test_since_date_picks_an_older_report(tmp_path):
     save("20261103T090000Z", "2026-11-03", flags={"dry_run": True})
     (runs / "20261104T090000Z-run.json").write_text("{not json")
 
-    newest = find_baseline(tmp_path, "library")
+    newest = find_baseline(tmp_path, scope_matcher("library"))
     assert newest and newest.finished_at.startswith("2026-11-01")
     assert newest.label == "2026-11-01"  # no witness: the date names it
-    older = find_baseline(tmp_path, "library", before=date(2026, 10, 15))
+    older = find_baseline(tmp_path, scope_matcher("library"), before=date(2026, 10, 15))
     assert older and older.finished_at.startswith("2026-10-01")
-    assert find_baseline(tmp_path, "library", before=date(2026, 9, 1)) is None
+    assert (
+        find_baseline(tmp_path, scope_matcher("library"), before=date(2026, 9, 1))
+        is None
+    )
 
 
 def test_bad_since_date_exits_1(cfg_file):
@@ -265,7 +275,7 @@ def test_healed_rows_rank_by_cites_times_severity_then_limit():
     ]
     probed: list[str] = []
 
-    def probe(item):
+    def probe(item, skip):
         probed.append(item.key)
         return Candidate(
             url=f"https://oa.example.org/{item.key}.pdf", source="openalex"
@@ -335,7 +345,7 @@ def test_version_of_record_is_new_only_against_the_last_versions_pack(tmp_path):
         "proposals": [{"item_key": "KNOWN001"}],
     }
     (packs / "20261105T000000Z-library.json").write_text(json.dumps(body))
-    seen, vs = prior_holdings(tmp_path, "library")
+    seen, vs = prior_holdings(tmp_path, scope_matcher("library"))
     rows = version_rows(
         [_proposal("KNOWN001"), _proposal("FRESH001")], seen, vs["versions"]
     )
@@ -366,8 +376,8 @@ def test_url_rows_only_reprobe_urls_the_last_report_could_open(tmp_path):
         ],
     }
     (runs / "20261106T000000Z-urls.json").write_text(json.dumps(report))
-    assert prior_urls(tmp_path, "other") is None
-    prior, compared_to = prior_urls(tmp_path, "library")
+    assert prior_urls(tmp_path, scope_matcher("other")) is None
+    prior, compared_to = prior_urls(tmp_path, scope_matcher("library"))
     targets = [
         UrlTarget("WASOK001", "https://a.example.org/x", "parent"),
         UrlTarget("STAYOK01", "https://b.example.org/x", "parent"),
@@ -398,7 +408,7 @@ def test_snapshot_rows_probe_snapshot_tier_only():
     ]
     probed: list[str] = []
 
-    def probe(item):
+    def probe(item, skip):
         probed.append(item.key)
         if item.key == "SNAP0002":
             return None
@@ -438,3 +448,161 @@ def test_cli_joins_version_and_keepup_rows(tmp_path, cfg_file, wired):
     assert res.exit_code == 0, res.output
     kinds = {(row["itemKey"], row["kind"]) for row in _pack(tmp_path)["holdings"]}
     assert kinds == {("HELD0001", "version_of_record"), ("STILL001", "keepup_no_pdf")}
+
+
+def test_a_lane_that_already_answered_in_the_baseline_is_not_a_heal():
+    """The baseline run had the URL and could not fetch it: nothing changed."""
+    rows = [
+        {
+            "itemKey": "SAME0001",
+            "miss_surface": "paywalled",
+            "attempts": [
+                "unpaywall:not_found(no OA location)",
+                "semanticscholar:found(BRONZE)",
+                "semanticscholar:download-failed(HTTP 403)",
+            ],
+        },
+        {
+            "itemKey": "NEW00001",
+            "miss_surface": "paywalled",
+            "attempts": ["semanticscholar:not_found"],
+        },
+    ]
+    baseline = Baseline(Path("r.json"), "2026-11-01T09:00:00+00:00", "", rows)
+    items = [make_item(key="SAME0001"), make_item(key="NEW00001")]
+    skipped: dict[str, frozenset[str]] = {}
+
+    def probe(item, skip):
+        skipped[item.key] = skip
+        if "semanticscholar" in skip:
+            return None
+        return Candidate(url="https://oa.example.org/x.pdf", source="semanticscholar")
+
+    healed, _counts = healed_rows(baseline, items, probe, {})
+    assert [row["itemKey"] for row in healed] == ["NEW00001"]
+    assert skipped == {
+        "SAME0001": frozenset({"semanticscholar"}),
+        "NEW00001": frozenset(),
+    }
+
+
+def test_one_collection_under_three_labels_is_one_scope(tmp_path):
+    """-C takes a name, a path, or a key; the saved label is whatever was typed."""
+    keys = {"BBNJ": "COLL0001", "ocean/BBNJ": "COLL0001", "COLL0001": "COLL0001"}
+
+    def resolve(spec: str) -> str:
+        if spec not in keys:
+            raise LookupError(spec)
+        return keys[spec]
+
+    same = scope_matcher("COLL0001", frozenset({"COLL0001"}), resolve)
+    assert same({"scope": "BBNJ"})
+    assert same({"scope": "x", "witness": {"scope": {"collections": ["ocean/BBNJ"]}}})
+    assert not same({"scope": "a collection since deleted"})
+    assert not same(
+        {
+            "scope": "BBNJ, years 2023–2026",
+            "witness": {"scope": {"collections": ["BBNJ"], "year_from": 2023}},
+        }
+    )
+
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    body = {"scope": "ocean/BBNJ", "finished_at": "2026-11-01T09:00:00+00:00"}
+    (runs / "20261101T090000Z-run.json").write_text(json.dumps(body))
+    assert find_baseline(tmp_path, same) is not None
+    assert find_baseline(tmp_path, scope_matcher("COLL0001")) is None
+
+
+def test_limit_must_be_positive(cfg_file):
+    assert _run(cfg_file, "--limit", "0").exit_code == 2
+
+
+def test_baseline_keeps_misses_a_retry_run_did_not_revisit(tmp_path):
+    """A --retry-failed report lists only what it retried."""
+    runs = tmp_path / "runs"
+    runs.mkdir()
+
+    def save(stamp, day, items):
+        body = {"scope": "library", "finished_at": f"{day}T09:00:00+00:00"}
+        (runs / f"{stamp}-run.json").write_text(json.dumps({**body, "items": items}))
+
+    save(
+        "20261001T090000Z",
+        "2026-10-01",
+        [
+            {"itemKey": "OLDMISS1", "miss_surface": "paywalled"},
+            {"itemKey": "RETRIED1", "miss_surface": "paywalled"},
+        ],
+    )
+    save(
+        "20261101T090000Z",
+        "2026-11-01",
+        [{"itemKey": "RETRIED1", "status": "attached", "miss_surface": "import_ok"}],
+    )
+    baseline = find_baseline(tmp_path, scope_matcher("library"))
+    assert baseline.finished_at.startswith("2026-11-01") and baseline.reports == 2
+    rows = {row["itemKey"]: row for row in baseline.items}
+    assert rows["RETRIED1"]["status"] == "attached"  # newest row wins
+    assert rows["OLDMISS1"]["compared_to"] == "2026-10-01"
+
+    items = [make_item(key="OLDMISS1"), make_item(key="RETRIED1")]
+    cand = Candidate(url="https://oa.example.org/x.pdf", source="openalex")
+    healed, counts = healed_rows(baseline, items, lambda item, skip: cand, {})
+    assert [(r["itemKey"], r["compared_to"]) for r in healed] == [
+        ("OLDMISS1", "2026-10-01")
+    ]
+    assert counts["healed_candidates"] == 1
+
+
+def test_severity_orders_misses_when_nothing_has_a_cite_count():
+    rows = [
+        {"itemKey": "AAAA", "miss_surface": "no_oa"},
+        {"itemKey": "ZZZZ", "miss_surface": "paywalled"},
+    ]
+    baseline = Baseline(Path("r.json"), "2026-11-01T09:00:00+00:00", "", rows)
+    items = [make_item(key="AAAA", title="A"), make_item(key="ZZZZ", title="Z")]
+    probed: list[str] = []
+    healed_rows(baseline, items, lambda i, skip: probed.append(i.key), {}, limit=1)
+    assert probed == ["ZZZZ"]
+
+
+def test_status_rows_keep_item_order_across_threads():
+    items = [make_item(key=f"K{n:03d}", doi=f"10.1/{n}") for n in range(40)]
+    items.append(make_item(key="NODOI", doi=None))
+    ticks: list[tuple[int, int]] = []
+    rows = status_rows(
+        items,
+        lambda doi: ["retracted"] if int(doi.split("/")[1]) % 2 else [],
+        {("K001", "retracted")},
+        "",
+        workers=8,
+        on_progress=lambda done, total: ticks.append((done, total)),
+    )
+    assert [row["itemKey"] for row in rows] == [f"K{n:03d}" for n in range(3, 40, 2)]
+    assert ticks[-1] == (40, 40)
+
+
+def test_a_failed_status_lookup_is_said_out_loud(tmp_path, cfg_file, wired):
+    """Offline must not read as "Nothing changed"."""
+    wired["status_down"] = True
+    result = _run(cfg_file)
+    assert result.exit_code == 0
+    notes = " ".join(_pack(tmp_path)["notes"])
+    assert "could not be checked for 5 DOI(s)" in notes
+
+
+def test_a_lane_error_is_counted_not_read_as_no(cfg, monkeypatch):
+    from collections import Counter
+
+    class Down:
+        def find(self, item, ctx):
+            return Candidate(url="", source="core", outcome=Outcome.ERROR)
+
+    monkeypatch.setitem(REGISTRY, "core", Down())
+    errors: Counter[str] = Counter()
+    assert (
+        probe_item(make_item(), Context(config=cfg, client=None), ["core"], errors)
+        is None
+    )
+    assert errors == {"core": 1}

@@ -21,7 +21,8 @@ from .run import run_search
 from .store import SearchError, load_run
 
 SCHEMA = "paperful.search.watch.v1"
-_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+# Names become folder names: bounded so a long one cannot fail at the filesystem.
+_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 DEFAULT_INTERVAL = 7
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import json
 import time
 from collections.abc import Callable
@@ -315,7 +316,7 @@ def run_gaps_command(
     try:
         mode = parse_handoff(handoff, default=cfg.gaps_handoff)
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     if mode in {"tabs", "walk", "watch"} and not list_missing:
         list_missing = True

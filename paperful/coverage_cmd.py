@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 from pathlib import Path
 from typing import Any
 
@@ -54,10 +55,10 @@ def run_coverage(
                 backend, from_note or "", out_dir=cfg.out_dir
             )
     except LookupError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     except OSError as exc:
-        console.print(f"[red]Could not read source: {exc}[/]")
+        console.print(f"[red]Could not read source: {escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
 
     mentions = extract_mentions(text)

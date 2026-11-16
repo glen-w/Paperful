@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import json
 import os
 import sys
@@ -27,7 +28,7 @@ def _authorwatch_call(action: Any) -> Any:
         return action()
     except AuthorwatchError as exc:
         console = cli_mod.console
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
 
 

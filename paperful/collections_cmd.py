@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 from dataclasses import asdict
 from pathlib import Path
 
@@ -88,7 +89,7 @@ def run_collections_add(
     try:
         target = backend.resolve_collection(collection[0])
     except LookupError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     batch = classify_rows(
         keys,

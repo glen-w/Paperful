@@ -219,6 +219,6 @@ def run_attachments(
         if errors:
             console.print(f"Errors: {len(errors)}")
             for err in errors[:20]:
-                console.print(f"[yellow]{err}[/]")
+                console.print(f"[yellow]{escape(str(err))}[/]")
     if errors and apply:
         raise typer.Exit(1)

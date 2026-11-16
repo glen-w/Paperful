@@ -546,7 +546,9 @@ def test_litellm_chat_stream_json_mode_sets_response_format(monkeypatch):
     def completion(**kwargs):
         seen.update(kwargs)
         delta = types.SimpleNamespace(content="{}")
-        return iter([types.SimpleNamespace(choices=[types.SimpleNamespace(delta=delta)])])
+        return iter(
+            [types.SimpleNamespace(choices=[types.SimpleNamespace(delta=delta)])]
+        )
 
     monkeypatch.setitem(
         sys.modules, "litellm", types.SimpleNamespace(completion=completion)

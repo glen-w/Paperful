@@ -316,12 +316,8 @@ def handle_page_system(ui: UiContext, request: Request, run: str = "") -> HTMLRe
     blank. Later visits render instantly; **Re-check** enqueues a ``doctor``
     job and the page reloads when it finishes.
     """
-    checked_at = float(ui.health_cache.get("at") or 0.0)
-    if not checked_at:
-        raw = ui.remember_doctor(_ui_app.doctor_payload(ui.cfg))
-        checked_at = float(ui.health_cache.get("at") or time.time())
-    else:
-        raw = ui.cached_doctor()
+    raw = ui.doctor_once(lambda: _ui_app.doctor_payload(ui.cfg))
+    checked_at = float(ui.health_cache.get("at") or time.time())
     return ui.templates.TemplateResponse(
         request,
         "system.html",

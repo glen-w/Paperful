@@ -8,6 +8,7 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from .config import Config
@@ -43,7 +44,9 @@ def _print_doctor_table(console: Console, checks: list[Check]) -> None:
     table.add_column("Detail")
     colour = {"green": "green", "amber": "yellow", "red": "red"}
     for ch in checks:
-        table.add_row(ch.name, f"[{colour[ch.status]}]{ch.status}[/]", ch.detail)
+        table.add_row(
+            ch.name, f"[{colour[ch.status]}]{ch.status}[/]", escape(ch.detail)
+        )
     console.print(table)
 
 
@@ -72,8 +75,8 @@ def _print_doctor_remediations(
     for check, text in pending:
         colour = "red" if check.status == "red" else "yellow"
         console.print(f"[{colour}]• {check.name}[/] ({check.status})")
-        console.print(f"[dim]{check.detail}[/]")
-        console.print(text)
+        console.print(f"[dim]{escape(check.detail)}[/]")
+        console.print(escape(text))
         console.print()
 
 
@@ -111,8 +114,8 @@ def _guide_doctor(
             continue
         colour = "red" if current.status == "red" else "yellow"
         console.print(f"\n[{colour}]• {current.name}[/] ({current.status})")
-        console.print(f"[dim]{current.detail}[/]")
-        console.print(text)
+        console.print(f"[dim]{escape(current.detail)}[/]")
+        console.print(escape(text))
         if not _wait_doctor_continue(console):
             break
         cfg = cli_mod._cfg(cfg.config_path)
@@ -123,7 +126,9 @@ def _guide_doctor(
         if updated.status == "green":
             console.print(f"[green]✓ {name} is green[/]")
         else:
-            console.print(f"[yellow]Still {updated.status}:[/] {updated.detail}")
+            console.print(
+                f"[yellow]Still {updated.status}:[/] {escape(updated.detail)}"
+            )
 
     console.print()
     _print_doctor_table(console, checks)

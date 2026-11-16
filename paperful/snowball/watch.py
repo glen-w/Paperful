@@ -36,7 +36,8 @@ from .response_cache import classify_drift
 
 SCHEMA = "paperful.snowball.watch.v1"
 TAG = "paperful-snowball"
-_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+# Names become folder names: bounded so a long one cannot fail at the filesystem.
+_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 Lookup = Callable[..., Any]
 
 

@@ -31,7 +31,7 @@ TITLES = {
 }
 
 HINTS = {
-    400: "Go back and check the highlighted field, then try again.",
+    400: "Go back, check the form, and try again.",
     403: "The request did not come from this workbench. Open the page directly at the address in the browser bar and try again.",
     404: "The address may be out of date. Use the navigation above.",
     405: "Open the page from the navigation rather than reloading a form result.",
@@ -40,6 +40,23 @@ HINTS = {
     422: "Go back and fix the field named below, then try again.",
     500: "Open Activity to see whether a job failed, then System for the red check. The full trace is in the server log.",
 }
+
+
+def _refused(exc: Exception) -> bool:
+    """The request was understood and refused: a mistake in the form, not a bug.
+
+    The library layers raise these for a missing field, a bad name, or a
+    feature that is switched off. They are a 400 with the message, not a 500
+    with a stack trace in the log.
+    """
+    from ..network.store import NetworkError
+    from ..search.store import SearchError
+    from ..snowball.citation_graph import CitationGraphError
+    from ..snowball.command import SnowballError
+
+    return isinstance(
+        exc, (SnowballError, SearchError, NetworkError, CitationGraphError)
+    )
 
 
 def same_host_path(url: str, host: str) -> str:
@@ -145,10 +162,16 @@ def install_error_pages(app: FastAPI, templates: Jinja2Templates, ctx: Any) -> N
 
     @app.exception_handler(Exception)
     async def _server_error(request: Request, exc: Exception):
+        message = str(exc) or exc.__class__.__name__
+        if _refused(exc):
+            if not wants_html(request):
+                return JSONResponse({"ok": False, "error": message}, status_code=400)
+            return _render(
+                templates, ctx, request, status_code=400, message=message[:300]
+            )
         log.exception(
             "workbench request failed: %s %s", request.method, request.url.path
         )
-        message = str(exc) or exc.__class__.__name__
         if not wants_html(request):
             return JSONResponse({"ok": False, "error": message}, status_code=500)
         return _render(

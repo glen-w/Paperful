@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 from pathlib import Path
 from typing import Any
 
@@ -131,7 +132,7 @@ def run_ocr(
                 auto_ignore_failures=auto_ignore,
             )
     except OcrUnavailable as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     table = Table(title="paperful ocr" + ("" if apply else " (dry-run)"))
     table.add_column("Key")

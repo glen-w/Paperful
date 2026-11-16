@@ -35,9 +35,10 @@ def test_author_year_not_allowed_as_new_cite_shape():
     selected = apply_freeze("Later work expanded the sample.", mapping)
     reply = apply_freeze("Later work expanded the sample (Doe (2020)).", mapping)
     # New author–year is a new frozen token, not in selected.
-    assert freeze_preserved(
-        selected_frozen=selected, reply=reply, mapping=mapping
-    ) is False
+    assert (
+        freeze_preserved(selected_frozen=selected, reply=reply, mapping=mapping)
+        is False
+    )
 
 
 def test_pandoc_new_key_skipped():
@@ -123,9 +124,7 @@ def test_placeholder_round_trip_keeps_tokens():
     assert "«PF" in frozen
     assert thaw(frozen, mapping) == text
     selected = apply_freeze("There were 7 fish in Figure 3", mapping)
-    assert freeze_preserved(
-        selected_frozen=selected, reply=selected, mapping=mapping
-    )
+    assert freeze_preserved(selected_frozen=selected, reply=selected, mapping=mapping)
     dropped = selected
     for token in placeholders_in(selected):
         dropped = dropped.replace(token, "X")

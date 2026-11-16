@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import json
 import os
 import sys
@@ -67,7 +68,7 @@ def run_sync_command(
     try:
         mode = parse_pdfs(pdfs) if pdfs else cfg.mirror_pdfs
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     backend = cli_mod._live_backend(cfg)
     if not callable(getattr(backend, "changes", None)):
@@ -149,7 +150,7 @@ def run_import_library(
     try:
         records = load_records(path, file_fmt)
     except (ValueError, OSError) as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     n_pdf = sum(1 for r in records if r.get("pdfs"))
     n_notes = sum(len(r.get("notes") or []) for r in records)
@@ -240,7 +241,7 @@ def run_openalex_store_build_cites(
             progress=lambda msg: console.print(msg),
         )
     except OpenAlexStoreError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     example = written.rstrip("/") + "/**/*.parquet"
     console.print(

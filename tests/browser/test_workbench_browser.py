@@ -41,8 +41,9 @@ AUDIT_JS = """
   const unnamed = q('input:not([type=hidden]), select, textarea, button').filter(el => {
     if (el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.getAttribute('title')) return false;
     if (el.tagName === 'BUTTON' && el.textContent.trim()) return false;
-    if (el.id && document.querySelector(`label[for="${el.id}"]`)) return false;
-    if (el.closest('label')) return false;
+    // el.labels is the browser's own answer. Sitting inside a <label> is not
+    // enough: a label names only its first button/input descendant.
+    if (el.labels && el.labels.length) return false;
     return true;
   }).map(el => `${el.tagName.toLowerCase()}[name=${el.getAttribute('name')}]`);
   return {
@@ -187,8 +188,30 @@ def test_mobile_nav_wraps_and_forms_stack(page_factory, workbench):
 def test_help_tip_is_focusable_and_described(page_factory, workbench):
     page = page_factory()
     page.goto(workbench["base"] + "/wanted")
-    tip = page.locator("button.help-tip >> nth=0")
+    tip = page.locator(".help-tip >> nth=0")
     described = tip.get_attribute("aria-describedby")
     assert described and page.locator(f"#{described}[role=tooltip]").count() == 1
     tip.focus()
     assert page.evaluate("() => document.activeElement.classList.contains('help-tip')")
+
+
+def test_help_tip_inside_a_label_leaves_the_field_named(page_factory, workbench):
+    page = page_factory(1440)
+    page.goto(workbench["base"] + "/settings", wait_until="load")
+    email = page.locator("input[name=email]")
+    assert email.evaluate("el => el.labels.length") == 1
+    # Clicking the tip shows the tip; it must not jump to the field.
+    page.locator("label:has(input[name=email]) .help-tip").click()
+    assert page.evaluate("() => document.activeElement.classList.contains('help-tip')")
+    page.keyboard.press("Escape")
+    assert not page.evaluate(
+        "() => document.activeElement.classList.contains('help-tip')"
+    )
+
+
+def test_a_crafted_run_id_is_not_fetched_as_a_path(page_factory, workbench):
+    page = page_factory(1440)
+    asked: list[str] = []
+    page.on("request", lambda req: asked.append(req.url))
+    page.goto(workbench["base"] + "/activity?run=../../etc", wait_until="networkidle")
+    assert not [url for url in asked if url.endswith("/etc/events")]

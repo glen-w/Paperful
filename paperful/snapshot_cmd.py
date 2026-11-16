@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import time
 from pathlib import Path
 
@@ -54,7 +55,7 @@ def run_snapshot_cmd(
     try:
         mode = parse_pdfs(pdfs) if pdfs else cfg.mirror_pdfs
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     backend = cli_mod._live_backend(cfg)
     loaded = cli_mod._load_scope(

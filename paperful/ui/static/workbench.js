@@ -171,7 +171,7 @@
     }
     function tick() {
       if (Date.now() - started > MAX_POLL_MS) { stop(); return; }
-      fetch("/v1/runs/" + id, { headers: { Accept: "application/json" } })
+      fetch("/v1/runs/" + encodeURIComponent(id), { headers: { Accept: "application/json" } })
         .then(function (r) { return r.json(); })
         .then(function (body) {
           if (!body || body.ok === false || !body.status) { stop(); return; }
@@ -199,7 +199,7 @@
     }
     var finished = false;
     var retries = 0;
-    var es = new EventSource("/v1/runs/" + id + "/events");
+    var es = new EventSource("/v1/runs/" + encodeURIComponent(id) + "/events");
     es.addEventListener("status", function (ev) {
       try {
         var body = JSON.parse(ev.data);
@@ -251,6 +251,9 @@
   document.querySelectorAll(".help-tip").forEach(function (tip) {
     tip.addEventListener("mouseenter", function () { placeHelpBubble(tip); });
     tip.addEventListener("focus", function () { placeHelpBubble(tip); });
+    // Inside a <label> a click would jump to the field; keep it on the tip.
+    tip.addEventListener("click", function (ev) { ev.preventDefault(); tip.focus(); });
+    tip.addEventListener("keydown", function (ev) { if (ev.key === "Escape") tip.blur(); });
   });
 
   // Relative "3 min ago" labels for data-ts="<unix seconds>".

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -58,6 +59,20 @@ class UiContext:
     def cached_doctor(self) -> list[dict[str, Any]]:
         return list(self.health_cache["checks"])
 
+    # One fill at a time per cache: a visit that arrives while the startup
+    # warm-up is still running waits for it instead of starting a second one.
+    doctor_lock: threading.Lock = field(default_factory=threading.Lock)
+    collections_lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def doctor_once(
+        self, compute: Callable[[], list[dict[str, Any]]]
+    ) -> list[dict[str, Any]]:
+        """Cached doctor rows. ``compute`` runs only when the cache is empty."""
+        with self.doctor_lock:
+            if not self.health_cache.get("at"):
+                self.remember_doctor(compute())
+            return self.cached_doctor()
+
     # Collection tree (Library page, Discover pickers). Computing it walks
     # every collection's item count, which took 36 s on a 50k-item mirror.
     collections_cache: dict[str, Any] = field(
@@ -68,16 +83,36 @@ class UiContext:
     def collections(self, *, force: bool = False) -> dict[str, Any]:
         from .app import collections_tree as _collections_tree
 
-        now = time.time()
-        cached = self.collections_cache.get("tree")
-        fresh = (
-            now - float(self.collections_cache.get("at") or 0.0) < self.COLLECTIONS_TTL
-        )
-        if cached is not None and cached.get("ok") and fresh and not force:
+        def hit() -> dict[str, Any] | None:
+            cached = self.collections_cache.get("tree")
+            age = time.time() - float(self.collections_cache.get("at") or 0.0)
+            if cached is not None and cached.get("ok") and age < self.COLLECTIONS_TTL:
+                return cached
+            return None
+
+        if not force and (cached := hit()) is not None:
             return cached
-        tree = _collections_tree(self.cfg)
-        self.collections_cache = {"at": now, "tree": tree}
-        return tree
+        with self.collections_lock:
+            if not force and (cached := hit()) is not None:
+                return cached
+            tree = _collections_tree(self.cfg)
+            self.collections_cache = {"at": time.time(), "tree": tree}
+            return tree
+
+    def collection_missing(self, collection: str) -> bool:
+        """The chip names a collection the library no longer has.
+
+        Reads the cached tree only, so no page waits on the library for this.
+        A renamed or deleted collection otherwise reads as "no items".
+        """
+        tree = self.collections_cache.get("tree")
+        if not collection or not tree or not tree.get("ok"):
+            return False
+        wanted = collection.strip().strip("/").lower()
+        return not any(
+            wanted in (str(row.get(k) or "").lower() for k in ("path", "key", "name"))
+            for row in tree.get("collections") or []
+        )
 
     def collections_checked_at(self) -> float:
         return float(self.collections_cache.get("at") or 0.0)
@@ -93,6 +128,7 @@ class UiContext:
         return {
             "request": request,
             "prefs": prefs,
+            "collection_missing": self.collection_missing(prefs.collection),
             "active": active,
             "health": _health_status(checks),
             "health_label": _health_label(checks),

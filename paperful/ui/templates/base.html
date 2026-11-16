@@ -63,6 +63,7 @@ Health: System health from the last check. Green is ready. Amber is a warning. R
     {% endif %}
   </nav>
   <main id="main" tabindex="-1">
+    {% if collection_missing %}<div class="error-banner" role="alert">The collection <strong>{{ prefs.collection }}</strong> is not in the library any more. It may have been renamed or deleted. Pick a collection on <a href="/library">Library</a>.</div>{% endif %}
     {% block content %}{% endblock %}
   </main>
   <dialog class="wb-drawer" id="row-drawer" aria-labelledby="row-drawer-title">

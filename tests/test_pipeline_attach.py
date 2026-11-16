@@ -21,7 +21,9 @@ class _ListingAttacher:
 
     def attach(self, key, path, note=None):
         self.calls.append((key, path))
-        return AttachResult(True, attachment_key="ATT", reason="success", code="success")
+        return AttachResult(
+            True, attachment_key="ATT", reason="success", code="success"
+        )
 
 
 def test_live_parent_key_returns_none_without_a_catalogue():

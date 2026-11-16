@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 from pathlib import Path
 
 import typer
@@ -95,7 +96,7 @@ def run_notes_delete(
             try:
                 cols.append(backend.resolve_collection(spec))
             except LookupError as exc:
-                console.print(f"[red]{exc}[/]")
+                console.print(f"[red]{escape(str(exc))}[/]")
                 raise typer.Exit(1) from exc
     hits = collect(backend, items, cfg, collections=cols)
     matched = select(
@@ -169,7 +170,7 @@ def run_notes_delete(
         if apply:
             console.print(f"Trashed {trashed}. Errors {len(errors)}.")
             for err in errors[:20]:
-                console.print(f"[yellow]{err}[/]")
+                console.print(f"[yellow]{escape(str(err))}[/]")
         else:
             console.print("Dry-run. Pass [bold]--apply[/] to trash these notes.")
 

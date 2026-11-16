@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import json
 import sys
 from enum import Enum
@@ -185,7 +186,7 @@ TwentyWritebackOpt = typer.Option(
     "--twenty-writeback/--no-twenty-writeback",
     help=(
         "Append SearXNG or author-site personal pages onto a unique Twenty Person. "
-        "Does not create People. Default: [twenty].writeback_listings (off)."
+        "Does not create People. Default: \\[twenty].writeback_listings (off)."
     ),
 )
 RequestRgOpt = typer.Option(
@@ -193,7 +194,7 @@ RequestRgOpt = typer.Option(
     "--request-rg/--no-request-rg",
     help=(
         "Open existing ResearchGate publication URLs in the system browser "
-        "so you can click Request full-text. Paperful never clicks. Default: [request].channels."
+        "so you can click Request full-text. Paperful never clicks. Default: \\[request].channels."
     ),
 )
 ReRequestOpt = typer.Option(
@@ -213,7 +214,7 @@ DIRECTION_HELP = (
 ProfileOpt = typer.Option(
     None,
     "--profile",
-    help="Named run config from [profiles.*] or profiles/<name>.toml beside config.toml.",
+    help="Named run config from \\[profiles.*] or profiles/<name>.toml beside config.toml.",
 )
 RunConfigFileOpt = typer.Option(
     None,
@@ -310,7 +311,7 @@ BrowserAgentOpt = typer.Option(
     "--browser-agent/--no-browser-agent",
     help=(
         "Auto-append the browser-agent recover lane when llm.enabled "
-        "(default: [browser_agent].during_run). "
+        "(default: \\[browser_agent].during_run). "
         "--no-browser-agent skips it for this run so other PDF lanes can be tested alone."
     ),
 )
@@ -318,9 +319,9 @@ CamofoxOpt = typer.Option(
     None,
     "--camofox/--no-camofox",
     help=(
-        "Auto-append the camofox recover lane when [camofox].enabled "
-        "(default: [camofox].during_run). "
-        "Needs an external camofox-browser server at [camofox].base_url. "
+        "Auto-append the camofox recover lane when \\[camofox].enabled "
+        "(default: \\[camofox].during_run). "
+        "Needs an external camofox-browser server at \\[camofox].base_url. "
         "See docs/camofox.md."
     ),
 )
@@ -421,7 +422,7 @@ def serve(
     ),
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Localhost workbench and JSON API. Needs paperful[serve]."""
+    """Localhost workbench and JSON API. Needs paperful\\[serve]."""
     from .serve import SERVE_HINT, fastapi_available, run_server
 
     if not fastapi_available():
@@ -436,7 +437,7 @@ def serve(
             ui_token=ui_token or None,
         )
     except RuntimeError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
 
 
@@ -846,7 +847,7 @@ def critique(
     grobid: bool | None = typer.Option(
         None,
         "--grobid/--no-grobid",
-        help="Use the GROBID sidecar for MARG-S / claims / verify PDF chunks. Default is [grobid].enabled.",
+        help="Use the GROBID sidecar for MARG-S / claims / verify PDF chunks. Default is \\[grobid].enabled.",
     ),
     reviewer: list[str] = typer.Option(
         [],
@@ -943,17 +944,17 @@ def rewrite(
     area: list[str] = typer.Option(
         [],
         "--area",
-        help="Rewrite area (repeatable): style, cites, structure, comments, all. Default: [rewrite].areas.",
+        help="Rewrite area (repeatable): style, cites, structure, comments, all. Default: \\[rewrite].areas.",
     ),
     output: list[str] = typer.Option(
         [],
         "--output",
-        help="Output (repeatable): edits, sidecar, tracked, odt, pdf. Default: [rewrite].outputs.",
+        help="Output (repeatable): edits, sidecar, tracked, odt, pdf. Default: \\[rewrite].outputs.",
     ),
     comments: str | None = typer.Option(
         None,
         "--comments",
-        help="Word comments: off, substantive, or all. Default: [rewrite].comments.",
+        help="Word comments: off, substantive, or all. Default: \\[rewrite].comments.",
     ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Print the plan; do not write state/rewrites/."
@@ -1362,12 +1363,12 @@ def search_cmd(
     max_hits: int | None = typer.Option(
         None,
         "--max",
-        help="Max kept hits. Default: [search].max or 20.",
+        help="Max kept hits. Default: \\[search].max or 20.",
     ),
     probe: bool | None = typer.Option(
         None,
         "--probe/--no-probe",
-        help="HEAD/GET first bytes for PDF vs HTML (default: [search].probe, on).",
+        help="HEAD/GET first bytes for PDF vs HTML (default: \\[search].probe, on).",
     ),
     apply: bool = typer.Option(
         False,
@@ -1430,7 +1431,7 @@ def search_watch_save(
     probe: bool | None = typer.Option(
         None,
         "--probe/--no-probe",
-        help="HEAD/GET first bytes (default: [search].probe).",
+        help="HEAD/GET first bytes (default: \\[search].probe).",
     ),
     interval_days: int = typer.Option(
         7,
@@ -1799,7 +1800,7 @@ def run(
     serpapi_max: int | None = typer.Option(
         None,
         "--serpapi-max",
-        help="Cap paid SerpApi Scholar searches this run (0 = unlimited). Default [serpapi].max_calls.",
+        help="Cap paid SerpApi Scholar searches this run (0 = unlimited). Default \\[serpapi].max_calls.",
     ),
     strict_pdf_doi: bool | None = StrictPdfDoiOpt,
     handoff: str | None = typer.Option(
@@ -1826,7 +1827,7 @@ def run(
     promote: str | None = typer.Option(
         None,
         "--promote",
-        help="Override [playbooks].promote for this run: gated or auto.",
+        help="Override \\[playbooks].promote for this run: gated or auto.",
     ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
@@ -1976,7 +1977,7 @@ def inbox_drain(
 ) -> None:
     """One-shot: ingest current PDFs in inbox.dir.
 
-    Default match is DOI-only. ``[inbox].match`` can add title / OCR / LLM stages.
+    Default match is DOI-only. ``\\[inbox].match`` can add title / OCR / LLM stages.
     Defaults to the whole library so one drop folder can serve every topic.
     Pass ``-C`` only when you intentionally want a narrower DOI index."""
     from .inbox_cmd import run_inbox_drain
@@ -2222,7 +2223,11 @@ def since_cmd(
         help="Compare to the newest run report on or before this date (YYYY-MM-DD).",
     ),
     limit: int | None = typer.Option(
-        None, "--limit", "-n", help="Probe at most N earlier misses, best-ranked first."
+        None,
+        "--limit",
+        "-n",
+        min=1,
+        help="Probe at most N earlier misses (best-ranked first) and N snapshot PDFs.",
     ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
@@ -2553,7 +2558,7 @@ def openalex_store_build_cites(
         "--out",
         help=(
             "Directory for the inverted cites parquet tree. "
-            "Default: directory implied by [openalex_store].cites_index_glob."
+            "Default: directory implied by \\[openalex_store].cites_index_glob."
         ),
     ),
     timeout_s: float | None = typer.Option(
@@ -2568,7 +2573,7 @@ def openalex_store_build_cites(
 ) -> None:
     """Invert works.referenced_works into a cites index for store-backed citing.
 
-    Needs [openalex_store] with a works parquet_glob. Point cites_index_glob at
+    Needs \\[openalex_store] with a works parquet_glob. Point cites_index_glob at
     ``<out>/**/*.parquet`` afterward (or use --out that matches that glob).
 
     Builds one works ``updated_date`` partition at a time and writes
@@ -3223,7 +3228,7 @@ def rag_questions(
     llm: bool | None = typer.Option(
         None,
         "--llm/--no-llm",
-        help="Also run the grounded LLM extract lane. Default is [rag].extract_questions_llm.",
+        help="Also run the grounded LLM extract lane. Default is \\[rag].extract_questions_llm.",
     ),
     limit: int | None = typer.Option(None, "--limit", help="Max items this run."),
     dry_run: bool = typer.Option(
@@ -3283,7 +3288,7 @@ def rag_answered(
     ask_mode: str | None = typer.Option(
         None,
         "--ask-mode",
-        help="simple or advanced. Default is [rag].ask_mode.",
+        help="simple or advanced. Default is \\[rag].ask_mode.",
     ),
     force: bool = typer.Option(False, "--force", help="Ignore batch answer cache."),
     profile: str | None = ProfileOpt,
@@ -3345,7 +3350,7 @@ def ask(
     ask_mode: str | None = typer.Option(
         None,
         "--ask-mode",
-        help="simple (raw excerpts) or advanced (score then answer). Default is [rag].ask_mode.",
+        help="simple (raw excerpts) or advanced (score then answer). Default is \\[rag].ask_mode.",
     ),
     force: bool = typer.Option(
         False, "--force", help="Batch: re-answer even when a cached row matches."
@@ -3358,7 +3363,7 @@ def ask(
     to: WriteDest | None = typer.Option(
         None,
         "--to",
-        help="Batch note destination: disk, zotero, or both. Default is [rag].dest.",
+        help="Batch note destination: disk, zotero, or both. Default is \\[rag].dest.",
     ),
     no_stream: bool = typer.Option(
         False, "--no-stream", help="Print the answer when it is complete."
@@ -3511,7 +3516,7 @@ def extract_sections(
     llm: bool | None = typer.Option(
         None,
         "--llm/--no-llm",
-        help="Fill missing MVP fields with a grounded LLM pass. Default is [extract_sections].llm.",
+        help="Fill missing MVP fields with a grounded LLM pass. Default is \\[extract_sections].llm.",
     ),
     limit: int | None = typer.Option(None, "--limit", help="Max items this run."),
     dry_run: bool = typer.Option(
@@ -3527,7 +3532,7 @@ def extract_sections(
     grobid: bool | None = typer.Option(
         None,
         "--grobid/--no-grobid",
-        help="Use the GROBID sidecar when available. Default is [grobid].enabled.",
+        help="Use the GROBID sidecar when available. Default is \\[grobid].enabled.",
     ),
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
@@ -3714,7 +3719,7 @@ def all_cmd(
     promote: str | None = typer.Option(
         None,
         "--promote",
-        help="Override [playbooks].promote on the run step: gated or auto.",
+        help="Override \\[playbooks].promote on the run step: gated or auto.",
     ),
     after_handoff_gaps: bool = typer.Option(
         False,
@@ -3794,7 +3799,7 @@ def playbooks_probe(
     corpus: Path = typer.Option(
         ...,
         "--corpus",
-        help="TOML file of [[targets]] (playbook, url or extra, note).",
+        help="TOML file of \\[\\[targets]] (playbook, url or extra, note).",
         exists=True,
         dir_okay=False,
     ),
@@ -4224,7 +4229,7 @@ def snowball_doi(
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     depth: int | None = typer.Option(
-        None, "--depth", help="Graph hops. Default: [snowball] depth, else 1."
+        None, "--depth", help="Graph hops. Default: \\[snowball] depth, else 1."
     ),
     max_candidates: str | None = MaxCandidatesOpt,
     per_hop_limit: str | None = PerHopLimitOpt,
@@ -4303,7 +4308,7 @@ def snowball_orcid(
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     depth: int | None = typer.Option(
-        None, "--depth", help="Graph hops. Default: [snowball] depth, else 1."
+        None, "--depth", help="Graph hops. Default: \\[snowball] depth, else 1."
     ),
     max_candidates: str | None = MaxCandidatesOpt,
     per_hop_limit: str | None = PerHopLimitOpt,
@@ -4382,7 +4387,7 @@ def snowball_collection(
     year_from: int | None = YearFromOpt,
     year_to: int | None = YearToOpt,
     depth: int | None = typer.Option(
-        None, "--depth", help="Graph hops. Default: [snowball] depth, else 1."
+        None, "--depth", help="Graph hops. Default: \\[snowball] depth, else 1."
     ),
     max_candidates: str | None = MaxCandidatesOpt,
     per_hop_limit: str | None = PerHopLimitOpt,
@@ -4476,7 +4481,7 @@ def _print_briefing(
             col.key, briefing.html, ["paperful:frontier-briefing"]
         )
     except LibraryError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(2) from exc
     _flush(backend)
     console.print(f"Note [bold]{key}[/] in {col.path or collection}")
@@ -5037,7 +5042,7 @@ def _authorwatch_call(action: Callable[[], Any]) -> Any:
     try:
         return action()
     except AuthorwatchError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
 
 
@@ -5306,7 +5311,7 @@ def authorwatch_apply_cmd(
     ),
     config: Path | None = ConfigOpt,
 ) -> None:
-    """Create inbox rows in -C. Independent of [snowball] enabled."""
+    """Create inbox rows in -C. Independent of \\[snowball] enabled."""
     from .authorwatch_cmd import run_authorwatch_apply
 
     run_authorwatch_apply(
@@ -5324,7 +5329,7 @@ def network_orcid_cmd(
     phases: str = typer.Option(
         "bbnj",
         "--phases",
-        help="Named preset (bbnj) or a TOML file with [[phases]].",
+        help="Named preset (bbnj) or a TOML file with \\[\\[phases]].",
     ),
     partition: str = typer.Option(
         "none",
@@ -5440,7 +5445,7 @@ def _keepup_call(action: Callable[[], Any]) -> Any:
     try:
         return action()
     except (KeepupError, SnowballError) as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(getattr(exc, "code", 2) or 2) from exc
 
 
@@ -5464,7 +5469,7 @@ def keepup_save(
     interval_days: int | None = typer.Option(
         None,
         "--interval-days",
-        help="Days between polls (default [keepup].interval_days or 7).",
+        help="Days between polls (default \\[keepup].interval_days or 7).",
     ),
     per_seed_limit: int = typer.Option(
         20, "--per-seed-limit", help="OpenAlex citing works per seed paper."

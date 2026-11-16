@@ -323,7 +323,8 @@ def _write_status_cache(cfg: Config, doi: str, payload: dict[str, Any]) -> None:
 
 def crossref_update_codes(msg: dict[str, Any]) -> list[str]:
     codes: list[str] = []
-    for upd in msg.get("update-to") or []:
+    # Crossref puts ``updated-by`` on the article and ``update-to`` on the notice.
+    for upd in [*(msg.get("updated-by") or []), *(msg.get("update-to") or [])]:
         if not isinstance(upd, dict):
             continue
         kind = str(upd.get("type") or "").lower()
@@ -346,7 +347,8 @@ def lookup_crossref_status(
     client: httpx.Client,
     doi: str,
     email: str,
-) -> list[str]:
+) -> list[str] | None:
+    """Status codes for ``doi``. None when the lookup itself failed."""
     params: dict[str, Any] = {}
     if email:
         params["mailto"] = email
@@ -361,7 +363,7 @@ def lookup_crossref_status(
         resp.raise_for_status()
         msg = resp.json().get("message") or {}
     except (httpx.HTTPError, ValueError, TypeError):
-        return []
+        return None
     return crossref_update_codes(msg)
 
 
@@ -369,7 +371,8 @@ def lookup_openalex_retracted(
     client: httpx.Client,
     doi: str,
     email: str,
-) -> bool:
+) -> bool | None:
+    """Whether OpenAlex marks ``doi`` retracted. None when the lookup failed."""
     params: dict[str, Any] = {"select": "id,doi,is_retracted"}
     if email:
         params["mailto"] = email
@@ -384,7 +387,45 @@ def lookup_openalex_retracted(
         resp.raise_for_status()
         return bool(resp.json().get("is_retracted"))
     except (httpx.HTTPError, ValueError, TypeError):
-        return False
+        return None
+
+
+def doi_status(
+    client: httpx.Client,
+    cfg: Config,
+    doi: str,
+    *,
+    max_age: float | None = None,
+) -> tuple[list[str], bool]:
+    """``(codes, ok)`` for a DOI. ``ok`` is False when a lookup failed.
+
+    A cached answer is used when it is younger than ``max_age`` seconds
+    (None: any age; 0: always ask again).
+    """
+    cleaned = normalize_doi(doi) or doi.lower()
+    if not cleaned:
+        return [], True
+    cached = _read_status_cache(cfg, cleaned)
+    known = list((cached or {}).get("codes") or [])
+    if cached is not None:
+        age = time.time() - float(cached.get("fetched_at") or 0.0)
+        if max_age is None or age < max_age:
+            return known, True
+    crossref = lookup_crossref_status(client, cleaned, cfg.email)
+    retracted = lookup_openalex_retracted(client, cleaned, cfg.email)
+    codes = list(crossref or [])
+    if retracted and "retracted" not in codes:
+        codes.append("retracted")
+    if crossref is None or retracted is None:
+        # A failed lookup is not a clean result: keep the last known status
+        # and leave the cache (which does not expire) as it was.
+        return list(dict.fromkeys([*codes, *known])), False
+    _write_status_cache(
+        cfg,
+        cleaned,
+        {"codes": codes, "fetched_at": time.time()},
+    )
+    return codes, True
 
 
 def lookup_doi_status(
@@ -394,23 +435,7 @@ def lookup_doi_status(
     *,
     refresh: bool = False,
 ) -> list[str]:
-    cleaned = normalize_doi(doi) or doi.lower()
-    if not cleaned:
-        return []
-    if not refresh:
-        cached = _read_status_cache(cfg, cleaned)
-        if cached is not None:
-            return list(cached.get("codes") or [])
-    codes = lookup_crossref_status(client, cleaned, cfg.email)
-    if lookup_openalex_retracted(client, cleaned, cfg.email):
-        if "retracted" not in codes:
-            codes.append("retracted")
-    _write_status_cache(
-        cfg,
-        cleaned,
-        {"codes": codes, "fetched_at": time.time()},
-    )
-    return codes
+    return doi_status(client, cfg, doi, max_age=0 if refresh else None)[0]
 
 
 def pubpeer_lookup(

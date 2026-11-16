@@ -123,6 +123,21 @@ def run_server(
         raise RuntimeError(SERVE_HINT)
     if not is_loopback_bind_host(host) and not allow_remote_bind:
         raise RuntimeError(REMOTE_BIND_HINT.format(host=host))
+    import contextlib
+    import threading
+
     import uvicorn
 
-    uvicorn.run(create_app(cfg, ui_token=ui_token), host=host, port=port)
+    app = create_app(cfg, ui_token=ui_token)
+
+    def warm(fill: Any) -> None:
+        with contextlib.suppress(Exception):  # the page itself reports errors
+            fill()
+
+    def start_warm() -> None:
+        for fill in app.state.warmers:
+            threading.Thread(target=warm, args=(fill,), daemon=True).start()
+
+    # On server start, not here: nothing is probed unless the server runs.
+    app.router.add_event_handler("startup", start_warm)
+    uvicorn.run(app, host=host, port=port)

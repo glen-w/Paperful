@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 from pathlib import Path
 from typing import Any
 
@@ -56,7 +57,7 @@ def run_recover(
     try:
         validate_llm_for_recover(cfg)
     except LlmConfigError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1)
     if not json_out:
         console.print(f"[orange3]{RECOVER_DISCLAIMER}[/]")

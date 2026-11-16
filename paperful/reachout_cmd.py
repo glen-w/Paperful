@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import time
 from pathlib import Path
 
@@ -66,7 +67,7 @@ def run_reachout(
     try:
         mode = parse_handoff(handoff, default="list")
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     if mode == "watch":
         console.print(

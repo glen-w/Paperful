@@ -457,6 +457,10 @@ def _anchor_comment(p: ET.Element, cid: int) -> None:
     p.append(ref_p)
 
 
+def _unreadable(detail: str) -> dict[str, str]:
+    return {"finding_id": "", "reason": "docx_miss", "detail": detail[:80]}
+
+
 def apply_tracked_docx(
     src: Path, dest: Path, edits: list[RewriteEdit]
 ) -> list[dict[str, str]]:
@@ -467,15 +471,15 @@ def apply_tracked_docx(
         with zipfile.ZipFile(src) as zin:
             parts = {name: zin.read(name) for name in zin.namelist()}
     except (OSError, zipfile.BadZipFile) as exc:
-        return [f"docx: {exc}"]
+        return [_unreadable(f"docx: {exc}")]
     xml = parts.get("word/document.xml")
     if not xml:
-        return ["docx: missing word/document.xml"]
+        return [_unreadable("docx: missing word/document.xml")]
     try:
         _register_prefixes(xml)
         root = _DET.fromstring(xml)
     except (ET.ParseError, ValueError) as exc:
-        return [f"docx: {exc}"]
+        return [_unreadable(f"docx: {exc}")]
     existing_comments = parts.get("word/comments.xml")
     comments_root = _parse_comments(existing_comments)
     paras = list(root.iter(_w("p")))

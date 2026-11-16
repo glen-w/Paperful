@@ -133,8 +133,6 @@ class OllamaClient:
             options["num_predict"] = request.max_tokens
         if request.num_ctx is not None:
             options["num_ctx"] = request.num_ctx
-        if getattr(request, "seed", None) is not None:
-            options["seed"] = int(request.seed)
         if request.json_mode:
             options["format"] = "json"
         payload: dict[str, Any] = {

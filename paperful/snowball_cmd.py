@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import json
 import os
 import sys
@@ -66,14 +67,14 @@ def _snowball_request(
         try:
             designs = parse_study_designs(study_designs)
         except ValueError as exc:
-            cli_mod.console.print(f"[red]{exc}[/]")
+            cli_mod.console.print(f"[red]{escape(str(exc))}[/]")
             raise typer.Exit(2) from exc
     lists = None
     if listed_in:
         try:
             lists = parse_listed_in(listed_in)
         except ValueError as exc:
-            cli_mod.console.print(f"[red]{exc}[/]")
+            cli_mod.console.print(f"[red]{escape(str(exc))}[/]")
             raise typer.Exit(2) from exc
     return SnowballRequest(
         gate=gate or cfg.snowball_gate,
@@ -200,9 +201,9 @@ def _run_snowball(
         result = action(cfg)
     except SnowballError as exc:
         if json_out:
-            Console(stderr=True, highlight=False).print(f"[red]{exc}[/]")
+            Console(stderr=True, highlight=False).print(f"[red]{escape(str(exc))}[/]")
         else:
-            cli_mod.console.print(f"[red]{exc}[/]")
+            cli_mod.console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
     cli_mod._rag_auto(cfg, snowball_started)
     # Writing gates and watch polls join the run-report / witness trail.
@@ -250,7 +251,7 @@ def _print_briefing(
             col.key, briefing.html, ["paperful:frontier-briefing"]
         )
     except LibraryError as exc:
-        cli_mod.console.print(f"[red]{exc}[/]")
+        cli_mod.console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(2) from exc
     cli_mod._flush(backend)
     cli_mod.console.print(f"Note [bold]{key}[/] in {col.path or collection}")
@@ -339,7 +340,7 @@ def run_snowball_search(
     try:
         query = _compose_keywords(queries, or_mode=or_mode)
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(2) from exc
     _run_snowball(
         cfg,
@@ -429,7 +430,7 @@ def run_snowball_hybrid(
     try:
         query = _compose_keywords(queries, or_mode=or_mode)
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(2) from exc
     _run_snowball(
         cfg,
@@ -510,7 +511,7 @@ def run_snowball_doi(
     try:
         seeds = _doi_seeds(dois, seeds_file)
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
     _run_snowball(
         cfg,
@@ -591,7 +592,7 @@ def run_snowball_orcid(
     try:
         seeds = _orcid_seeds(orcids, seeds_file)
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
     _run_snowball(
         cfg,
@@ -719,7 +720,7 @@ def run_snowball_briefing(
     try:
         briefing = write_run_briefing(cfg, run_id)
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
     _print_briefing(briefing, apply=apply, collection=collection, cfg=cfg)
 
@@ -741,7 +742,7 @@ def run_snowball_digest(
     try:
         digest = write_run_digest(cfg, run_id)
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
     _print_briefing(digest, apply=apply, collection=collection, cfg=cfg)
 
@@ -966,7 +967,7 @@ def run_snowball_run(
                 f"Profile {profile!r} mode must be search, hybrid, doi, orcid, or collection."
             )
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
     _run_snowball(cfg, action, json_out=json_out, command="snowball run")
 
@@ -1032,7 +1033,7 @@ def run_snowball_profile_save(
         try:
             file_tokens = parse_seed_lines(read_seeds_text(str(seeds_file)))
         except _SB as exc:
-            console.print(f"[red]{exc}[/]")
+            console.print(f"[red]{escape(str(exc))}[/]")
             raise typer.Exit(exc.code) from exc
         if doi:
             doi = list(doi) + file_tokens
@@ -1169,7 +1170,7 @@ def run_snowball_profile_save(
     try:
         path = save_snowball_profile(cfg, name, body, force=force)
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
     console.print(f"Wrote [bold]{path}[/]")
 
@@ -1189,7 +1190,7 @@ def run_snowball_packs_promote(
     try:
         path = promote_pack(cfg, slug)
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
     console.print(f"Promoted [bold]{path}[/]")
 
@@ -1210,7 +1211,7 @@ def run_snowball_watch_save(
     try:
         path = save_watch(cfg, name, profile)
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
     console.print(f"Wrote [bold]{path}[/] · profile {profile}")
 
@@ -1279,7 +1280,7 @@ def run_snowball_watch_rebaseline(
             )
             console.print(f"{n}: {verb} · {res['reason']}")
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
     if not apply and any(True for _ in names):
         console.print("[dim]Dry run. Pass --apply to write.[/]")
@@ -1300,7 +1301,7 @@ def run_snowball_watch_show(
     try:
         show_watch(cfg, name, console=console)
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
 
 
@@ -1321,7 +1322,7 @@ def run_snowball_watch_briefing(
     try:
         briefing = write_watch_briefing(cfg, name)
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
     _print_briefing(briefing, apply=apply, collection=collection, cfg=cfg)
 
@@ -1343,7 +1344,7 @@ def run_snowball_watch_digest(
     try:
         digest = write_watch_digest(cfg, name)
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
     _print_briefing(digest, apply=apply, collection=collection, cfg=cfg)
 
@@ -1382,7 +1383,7 @@ def run_snowball_watch_apply(
     try:
         result = _go()
     except SnowballError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
     if result.failed and result.created:
         raise typer.Exit(3)

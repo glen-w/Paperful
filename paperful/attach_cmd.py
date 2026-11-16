@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 from pathlib import Path
 from typing import Any
 
@@ -50,7 +51,7 @@ def run_attach(
         try:
             rec = attach_pdf_file(cfg, backend, manifest, loaded.items[0], file)
         except (OSError, ValueError, LibraryError) as exc:
-            console.print(f"[red]{exc}[/]")
+            console.print(f"[red]{escape(str(exc))}[/]")
             raise typer.Exit(1) from exc
         cli_mod._flush(backend)
         console.print(f"[green]Attached[/] {rec.itemKey} ← {file}")

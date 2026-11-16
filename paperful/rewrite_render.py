@@ -136,11 +136,7 @@ def apply_to_text(text: str, edits: list[RewriteEdit]) -> str:
         quote = edit.quote
         if not quote or quote not in body:
             continue
-        at = (
-            body[edit.start : edit.start + len(quote)]
-            if edit.start >= 0
-            else ""
-        )
+        at = body[edit.start : edit.start + len(quote)] if edit.start >= 0 else ""
         if edit.start >= 0 and at == quote:
             start = edit.start
             end = start + len(quote)

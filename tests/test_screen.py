@@ -59,6 +59,57 @@ def test_crossref_update_codes_retraction():
     assert "expression_of_concern" in codes
 
 
+def test_crossref_updated_by_marks_the_article_itself():
+    """Crossref lists a notice under ``updated-by`` on the article it updates."""
+    msg = {"updated-by": [{"type": "withdrawal", "DOI": "10.1/notice"}]}
+    assert crossref_update_codes(msg) == ["withdrawn"]
+
+
+def test_failed_status_lookup_keeps_the_last_known_status(cfg):
+    """A network error is not a clean result and must not overwrite the cache."""
+    from paperful.screen import lookup_doi_status
+
+    def retracted(req: httpx.Request) -> httpx.Response:
+        if "crossref" in req.url.host:
+            return httpx.Response(200, json={"message": {}})
+        return httpx.Response(200, json={"is_retracted": True})
+
+    def down(req: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("offline", request=req)
+
+    with httpx.Client(transport=httpx.MockTransport(retracted)) as client:
+        assert lookup_doi_status(client, cfg, "10.1000/x") == ["retracted"]
+    with httpx.Client(transport=httpx.MockTransport(down)) as client:
+        assert lookup_doi_status(client, cfg, "10.1000/x", refresh=True) == [
+            "retracted"
+        ]
+        assert lookup_doi_status(client, cfg, "10.1000/x") == ["retracted"]
+        assert lookup_doi_status(client, cfg, "10.1000/never-seen") == []
+    with httpx.Client(transport=httpx.MockTransport(retracted)) as client:
+        # The failure above was not cached as "clean".
+        assert lookup_doi_status(client, cfg, "10.1000/never-seen") == ["retracted"]
+
+
+def test_doi_status_asks_again_only_when_the_cache_is_old(cfg):
+    from paperful.screen import doi_status
+
+    calls: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        calls.append(req.url.host)
+        return httpx.Response(404)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        assert doi_status(client, cfg, "10.1000/x", max_age=3600) == ([], True)
+        asked = len(calls)
+        assert asked == 2  # Crossref and OpenAlex
+        doi_status(client, cfg, "10.1000/x", max_age=3600)
+        doi_status(client, cfg, "10.1000/x")
+        assert len(calls) == asked
+        doi_status(client, cfg, "10.1000/x", max_age=0)
+        assert len(calls) == asked * 2
+
+
 def test_load_fingerprints_from_cache(tmp_path, monkeypatch):
     from paperful.config import Config
     from paperful.screen import load_fingerprints

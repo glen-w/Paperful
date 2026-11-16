@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from ..config import Config
 from . import commands, jobs
 from .context import UiContext
-from .discover_common import last_review_token
+from .discover_common import safe_id, last_review_token
 from .pages import newest_search_run
 from .prefs import prefs_from_request
 
@@ -42,7 +42,7 @@ def handle_discover_search(ui: UiContext, run_id: str = "") -> JSONResponse:
         return JSONResponse(
             {"ok": False, "error": "Web search is off."}, status_code=404
         )
-    cleaned = (run_id or "").strip()
+    cleaned = safe_id(run_id)
     if not cleaned:
         return JSONResponse({"ok": False, "error": "run_id required"}, status_code=400)
     try:
@@ -137,7 +137,7 @@ async def handle_discover_search_apply(
             status_code=303,
         )
     form = await request.form()
-    run_id = str(form.get("run_id") or "").strip()
+    run_id = safe_id(form.get("run_id"))
     preview = str(form.get("preview") or "").strip() in {"1", "true", "on"}
     urls = [str(v).strip() for v in form.getlist("url") if str(v).strip()]
     collection = str(prefs.collection or "").strip()

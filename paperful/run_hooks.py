@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
 import sys
 import time
 from collections.abc import Callable
@@ -115,7 +116,7 @@ def ezproxy_headed_login_and_probe(
             on_note=lambda msg: console.print(f"[dim]{msg}[/]"),
         )
     except sess.SessionError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         console.print("Run [bold]paperful session login ezproxy[/] and retry.")
         return False
     pipe.refresh_session()
@@ -266,7 +267,7 @@ def inbox_handoff_session(
     try:
         root = ensure_inbox_dirs(cfg)
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     console.print(
         f"[bold]Inbox[/] watching {root} "
@@ -329,7 +330,7 @@ def run_session_handoff(
     try:
         mode = parse_handoff(handoff)
     except ValueError as exc:
-        console.print(f"[red]{exc}[/]")
+        console.print(f"[red]{escape(str(exc))}[/]")
         return
     if mode == "list":
         return

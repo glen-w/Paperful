@@ -103,7 +103,13 @@ def iter_command_status_events(cfg: Config, cmd_id: str):
             yield ": ping\n\n"
 
 
+_COMMAND_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
 def read_command(cfg: Config, cmd_id: str) -> dict[str, Any] | None:
+    # Ids arrive from ``?run=`` on every page: never let one name a path.
+    if not _COMMAND_ID_RE.match(cmd_id or ""):
+        return None
     path = _commands_dir(cfg) / f"{cmd_id}.json"
     try:
         if not path.is_file():
