@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .dedupe import normalize_dedupe_title, scope_slug
+from .fsio import append_jsonl
 from .identity import LibraryFingerprint
 from .pdfid import text_from_pdf
 from .resolve import DOI_RE, normalize_doi
@@ -22,6 +23,9 @@ REFS_GAP_PACK_KEYS = frozenset(
     {"schema", "scope", "created_at", "counts", "findings", "rows"}
 )
 BIBLIO_PAGES = None  # whole PDF; bibliography is often at the end
+MEMORY_FILE = "memory.jsonl"
+# Deltas a row can carry against the last run that saw it missing.
+MISSING_DELTAS = frozenset({"new", "still_missing", "cite_count_up"})
 
 
 @dataclass
@@ -36,6 +40,9 @@ class CiteRef:
     oa_hint: str = ""
     suggested_action: str = "skip"
     finding: str = ""
+    # Set by apply_memory(); empty when the run kept no memory.
+    delta: str = ""
+    first_seen: str = ""
 
 
 @dataclass
@@ -76,6 +83,117 @@ def scan_pdf_citations(path: Path) -> tuple[list[dict[str, Any]], str]:
     return out, "ok"
 
 
+def _identity(doi: str, title: str, year: int | None) -> str:
+    """DOI, else normalized title and year. Empty when there is neither."""
+    ident = doi or f"{normalize_dedupe_title(title)}|{year}"
+    return "" if ident == "|None" else ident
+
+
+def read_memory(state_dir: Path, scope: str) -> dict[str, dict[str, Any]]:
+    """Latest memory row per identity for ``scope``. A torn last line is skipped."""
+    path = state_dir / "refs-gaps" / MEMORY_FILE
+    latest: dict[str, dict[str, Any]] = {}
+    if not path.is_file():
+        return latest
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(row, dict) and row.get("scope") == scope and row.get("key"):
+            latest[str(row["key"])] = row
+    return latest
+
+
+def apply_memory(
+    state_dir: Path,
+    scope: str,
+    refs: list[CiteRef],
+    *,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Stamp each ref with ``delta`` and ``first_seen``, then append this run.
+
+    Returns the rows that were missing last time and are cited by nothing in
+    this run (``gone_from_drafts``). Owned works nobody was waiting for are
+    left out of the memory.
+    """
+    stamp = (now or datetime.now(tz=timezone.utc)).isoformat()
+    before = read_memory(state_dir, scope)
+    lines: list[str] = []
+
+    def remember(key: str, first: str, count: int, delta: str, doi: str, title: str):
+        lines.append(
+            json.dumps(
+                {
+                    "key": key,
+                    "scope": scope,
+                    "first_seen": first,
+                    "last_seen": stamp,
+                    "cited_by_count_in_scope": count,
+                    "delta": delta,
+                    "doi": doi,
+                    "title": title,
+                }
+            )
+        )
+
+    seen: set[str] = set()
+    for row in refs:
+        key = _identity(row.doi, row.title, row.year)
+        seen.add(key)
+        prior = before.get(key)
+        waiting = prior is not None and prior.get("delta") != "now_owned"
+        count = len(row.citing_keys)
+        if row.already_exists:
+            if not waiting:
+                continue
+            row.delta = "now_owned"
+        elif prior is None:
+            row.delta = "new"
+        elif count > int(prior.get("cited_by_count_in_scope") or 0):
+            row.delta = "cite_count_up"
+        else:
+            row.delta = "still_missing"
+        row.first_seen = str(prior.get("first_seen")) if prior else stamp
+        remember(key, row.first_seen, count, row.delta, row.doi, row.title)
+    gone = []
+    for key, prior in before.items():
+        if key in seen or prior.get("delta") not in MISSING_DELTAS:
+            continue
+        gone.append(prior)
+        remember(
+            key,
+            str(prior.get("first_seen") or stamp),
+            # Keep the last count, so a cite that returns is not "up".
+            int(prior.get("cited_by_count_in_scope") or 0),
+            "gone_from_drafts",
+            str(prior.get("doi") or ""),
+            str(prior.get("title") or ""),
+        )
+    if lines:
+        path = state_dir / "refs-gaps" / MEMORY_FILE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        append_jsonl(path, lines)
+    return gone
+
+
+def debt_score(row: CiteRef, *, now: datetime | None = None) -> tuple[int, int]:
+    """Sort key, larger first: cited from a draft passed this run, then
+    cite count times weeks waiting (a new row counts as one week)."""
+    weeks = 1
+    if row.first_seen:
+        try:
+            age = (now or datetime.now(tz=timezone.utc)) - datetime.fromisoformat(
+                row.first_seen
+            )
+            weeks = 1 + max(0, age.days) // 7
+        except ValueError:
+            pass
+    in_draft = any(key.startswith("pdf:") for key in row.citing_keys)
+    return (1 if in_draft else 0, len(row.citing_keys) * weeks)
+
+
 def aggregate_citations(
     sources: list[tuple[str, list[dict[str, Any]]]],
     fingerprint: LibraryFingerprint,
@@ -88,8 +206,8 @@ def aggregate_citations(
             doi = normalize_doi(entry.get("doi")) or ""
             title = str(entry.get("title") or "").strip()
             year = publication_year(entry.get("year"))
-            ident = doi or f"{normalize_dedupe_title(title)}|{year}"
-            if not ident or ident == "|None":
+            ident = _identity(doi, title, year)
+            if not ident:
                 continue
             row = buckets.get(ident)
             if row is None:
@@ -126,6 +244,7 @@ def write_pack(
     findings: list[ScanFinding],
     *,
     stamp: str | None = None,
+    gone: list[dict[str, Any]] | None = None,
 ) -> Path:
     stamp = stamp or datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     folder = state_dir / "refs-gaps" / f"{stamp}-{scope_slug(scope)}"
@@ -154,6 +273,14 @@ def write_pack(
             for r in refs
         ],
     }
+    if gone is not None:
+        deltas = [r.delta for r in refs if r.delta]
+        payload["memory"] = {
+            **{name: deltas.count(name) for name in sorted(set(deltas))},
+            "gone_from_drafts": [
+                {"doi": g.get("doi") or "", "title": g.get("title") or ""} for g in gone
+            ],
+        }
     json_path = folder / "pack.json"
     json_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     (folder / "dois.txt").write_text(
@@ -196,16 +323,19 @@ def _markdown(scope: str, counts: dict[str, Any], refs: list[CiteRef]) -> str:
         f"Cited {counts.get('cited', 0)}; missing {counts.get('missing', 0)}; "
         f"already in library {counts.get('already_exists', 0)}.",
         "",
-        "| Cited by | DOI | Title | Year | In library | Action |",
-        "| ---: | --- | --- | ---: | --- | --- |",
+        "| Cited by | DOI | Title | Year | In library | Action | Since | Change |",
+        "| ---: | --- | --- | ---: | --- | --- | --- | --- |",
     ]
-    ordered = sorted(refs, key=lambda r: (-len(r.citing_keys), r.doi or r.title))
+    ordered = sorted(
+        refs,
+        key=lambda r: (*(-n for n in debt_score(r)), r.doi or r.title),
+    )
     for row in ordered:
         title = (row.title or "").replace("|", "/")
         doi = row.doi or ""
         lib = row.exists_key if row.already_exists else ""
         lines.append(
-            f"| {len(row.citing_keys)} | {doi} | {title} | {row.year or ''} | {lib} | {row.suggested_action} |"
+            f"| {len(row.citing_keys)} | {doi} | {title} | {row.year or ''} | {lib} | {row.suggested_action} | {row.first_seen[:10]} | {row.delta} |"
         )
     lines.append("")
     return "\n".join(lines)

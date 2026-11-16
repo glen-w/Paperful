@@ -26,6 +26,8 @@ def refs_gap_envelope(
             "title": r.title,
             "cited_by_count_in_scope": len(r.citing_keys),
             "suggested_action": r.suggested_action,
+            "delta": getattr(r, "delta", ""),
+            "first_seen": getattr(r, "first_seen", ""),
         }
         for r in sorted(missing, key=lambda r: (-len(r.citing_keys), r.doi or r.title))
     ]

@@ -35,6 +35,8 @@ def run_refs_gap(
     from .refs_gap import (
         ScanFinding,
         aggregate_citations,
+        apply_memory,
+        debt_score,
         scan_items,
         scan_pdf_citations,
         write_pack,
@@ -109,7 +111,10 @@ def run_refs_gap(
                         host.citing_keys.append(key)
             else:
                 refs.append(row)
-    folder = write_pack(cfg.state_dir, scope, refs, findings)
+    # A run narrowed to --item keys sees part of the scope: a row it does
+    # not cite is not gone, so that run keeps no memory.
+    gone = None if item else apply_memory(cfg.state_dir, scope, refs)
+    folder = write_pack(cfg.state_dir, scope, refs, findings, gone=gone)
     missing = [r for r in refs if not r.already_exists]
     ocr_n = sum(1 for f in findings if f.finding == "needs_ocr")
     write_command_report(
@@ -149,17 +154,29 @@ def run_refs_gap(
         table.add_column("DOI")
         table.add_column("Title")
         table.add_column("Action")
+        table.add_column("Since")
+        table.add_column("Change")
         for row in sorted(
-            missing, key=lambda r: (-len(r.citing_keys), r.doi or r.title)
+            missing,
+            key=lambda r: (*(-n for n in debt_score(r)), r.doi or r.title),
         )[:50]:
             table.add_row(
                 str(len(row.citing_keys)),
                 row.doi or "",
                 (row.title or "")[:50],
                 row.suggested_action,
+                row.first_seen[:10],
+                row.delta.replace("_", " "),
             )
         console.print(table)
         console.print(f"Cited {len(refs)} · missing {len(missing)} · needs_ocr {ocr_n}")
+        if gone is not None:
+            owned = sum(1 for r in refs if r.delta == "now_owned")
+            fresh = sum(1 for r in refs if r.delta == "new")
+            console.print(
+                f"Since the last run: {fresh} new · {owned} now in the library · "
+                f"{len(gone)} no longer cited"
+            )
         console.print(f"Pack: {folder}")
         console.print(
             f"Next: paperful ingest-dois --from-file {folder / 'dois.txt'} -C <collection> --dry-run"
