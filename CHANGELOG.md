@@ -6,6 +6,15 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.9.4 — 2026-11-16
+
+- **`refs gap` remembers.** Each run is compared to the last one for the same collection. A cited work is marked new, still missing, cited more often, or now in the library, with the date it was first seen. The pack lists works that are no longer cited. The table ranks by how often a work is cited times how long it has been missing, and puts works cited from a draft you passed with `--pdf` first. The memory is `state/refs-gaps/memory.jsonl`.
+- **First 10 minutes.** A one-page guide to the first visit to the workbench, in the words on the screen. See [first 10 minutes](docs/first-10-minutes.md).
+- **`collections children` needs `--parent`.** The command no longer defaults to the maintainer's own collection names. `--exclude` is optional.
+- **GitHub CI.** Lint, types, and the full offline suite run again on Ubuntu, beside the smoke job. A tag now gets a GitHub Release with that version's changelog section.
+- **Docs.** Every command-line flag is now named in the guide.
+- **Internal.** The command signatures are split into one module per verb family. No command or flag changed.
+
 ## 1.9.3 — 2026-11-16
 
 - **`paperful since`.** A read-only report of what changed since the last `run` on a collection: retractions and expressions of concern, preprints with a version of record, URLs that died, snapshot PDFs that can be upgraded, `keepup` parents still without a PDF, and earlier misses that an open-access lane now names. It downloads nothing and writes nothing to the manager. Packs land in `state/since/`. See [since](docs/since.md).

@@ -143,7 +143,8 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `capture_host.py` | Native-messaging stdio host and `install-host` | `capture` |
 | `doctor.py` | `run_checks` orchestrates domain helpers (`_manager_checks`, `_disk_checks`, `_session_checks`, `_fetch_lane_checks`, `_tool_path_checks`, `_corpus_checks`) | config, optional live ping |
 | `doctor_cmd.py` / `collections_cmd.py` / `session_cmd.py` / `mirrors_cmd.py` / `pack_cmd.py` / `cache_cmd.py` | Operator verbs (doctor, collections, session/ezproxy/scholar, mirrors, pack, cache clean) | `cli_runtime`, domain modules |
-| `cli.py` | Flags, Typer apps, exits. Re-exports `cli_runtime` names | everything |
+| `cli.py` | The Typer app tree and exits. Re-exports `cli_runtime` and `cli_bind` names | everything |
+| `cli_bind/` (`core`, `tidy`, `find`, `mirror`, `ask`, `snowball`, `watch`; `_shared` holds the option objects) | Command signatures, one module per verb family. A body is a call into its `*_cmd` module. Modules load in a fixed order so `--help` keeps its order | `cli`, the `*_cmd` modules |
 | `routing.py` | Per-item lanes; owns `SERIAL_SOURCES` (Sci-Hub and other serial phases) | `config`, `zot` |
 | `agent_json.py` | `--format json` envelope (`paperful.agent.json.v1`) and exit 3 | none |
 | `agent_ops.py` | Shared builders for CLI JSON and MCP (`gaps`, snowball dry-run / trends, `export`, refs-gap, ask) plus CLI `coverage_envelope` | `agent_json`, catalogue, rag, `export_build`, `pack_bib`, `snowball.trends`, `coverage` |
@@ -210,7 +211,7 @@ Tier policy (1.0 contract):
 | `paperful.run_report.v1` | `state/runs/*.json`, `state/last-run.json` | `runreport` | T0 | `RUN_REPORT_*_KEYS`; `tests/fixtures/run_report_v1/` |
 | `paperful.agent.json.v1` | stdout `--format json` | `agent_json` | T0 | `REQUIRED_KEYS`; `tests/fixtures/agent_json*` |
 | `paperful.note.v1` | HTML comment in child notes | `notehtml` | T0 | `NOTE_BLOCK_KEYS`; `tests/fixtures/note_v1/` |
-| `paperful.refs_gap.pack.v1` | `state/refs-gaps/<stamp>/pack.json` | `refs_gap` | T1 | `REFS_GAP_PACK_KEYS`; `tests/fixtures/refs_gap_pack_v1/` |
+| `paperful.refs_gap.pack.v1` | `state/refs-gaps/<stamp>/pack.json` | `refs_gap` | T1 | Additive `memory` counts and per-row `delta` / `first_seen` from `state/refs-gaps/memory.jsonl`. `REFS_GAP_PACK_KEYS`; `tests/fixtures/refs_gap_pack_v1/` |
 | `paperful.coverage.pack.v1` | `state/coverage/<stamp>/pack.json` | `coverage` | T1 | `COVERAGE_PACK_KEYS`; `tests/fixtures/coverage_pack_v1/` |
 | `paperful.precedent.pack.v1` | `state/precedent/<stamp>/pack.json` | `precedent` | T1 | `PRECEDENT_PACK_KEYS`; `tests/fixtures/precedent_pack_v1/` |
 | `paperful.stuff.pack.v1` | `state/stuff/<id>/<stamp>/pack.json` | `stuff` | T1 | `STUFF_PACK_KEYS`; `tests/fixtures/stuff_pack_v1/` |
@@ -315,10 +316,11 @@ Count requests when the point of a change is fewer of them: `FakeZotero.calls`.
 
 ### CI and local pitfalls
 
-GitHub Actions (`.github/workflows/ci.yml`) runs one job: Ubuntu, Python
-3.12, `uv run pytest -m smoke` (CLI version, shell pages, workbench command
-paths), with a ten-minute cap. Lint, audit, the socket gate, fresh-install,
-docker, browser, and the OS/Python suite are not on the gate. The order for
+GitHub Actions (`.github/workflows/ci.yml`) runs three jobs on Ubuntu, Python
+3.12: `uv run pytest -m smoke` (CLI version, shell pages, workbench command
+paths), lint (`ruff`, format, `mypy`), and the full offline suite with
+coverage. Audit, the socket gate, fresh-install, docker, browser, and the
+other OS/Python cells are not on the gate. The order for
 putting them back is [CI gate, cut back to smoke](ROADMAP.md#after-17-ci-rebuild).
 
 Run the rest locally before a release:

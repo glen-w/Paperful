@@ -32,7 +32,8 @@ tree). **1.2.0** adds snowball stopping rules, off by default. **1.7.0**
 workbench and ledgers, **1.9.0** cut GitHub CI back to smoke, **1.9.1** and
 **1.9.2** are the critique and rewrite trust waves, and **1.9.3**
 (2026-11-16) ships [`paperful since`](since.md), the first item on the live
-order. The **live map** is [After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
+order. **1.9.4** ships the second, `refs gap` memory, and restores lint
+and the full suite on CI. The **live map** is [After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
 still lists jobs by area; many of those rows have shipped. Do not re-pick
 them as the next thing to build.
 
@@ -218,8 +219,9 @@ the CLI and do not build the block.
 (after-17-citation-debt)=
 ### Citation debt that ages
 
-**Status:** roadmap. Extend shipped `paperful refs gap`. Do not add a
-second gap verb.
+**Status:** shipped in 1.9.4 on the CLI ([commands](commands.md)). The
+memory, the deltas, and the ranking below are built. `since` does not list
+debt rows yet. Do not add a second gap verb.
 
 `refs gap` is a snapshot of “cited in these PDFs, not in the library.”
 The snapshot forgets itself. The thickening is a fingerprint memory:
@@ -593,21 +595,19 @@ next tag needs it.
 | Publish attestations | Turn `attestations` back on when the Rekor workaround is obsolete. SBOM from CI stays either way |
 | Python 3.10 | Announce in a release note, then bump `requires-python`. Not inside an unrelated feature PR |
 | Keyring, signed bundle | Stay closed unless a desktop-only tester asks in writing. Asking does not by itself reopen the decision |
-| GitHub Release per tag | Each `v*` tag gets a GitHub Release, so GitHub Latest matches PyPI. 1.2 through 1.9.0 and 1.9.2 were tagged without one |
-| Stale branches and PRs | Merged remote branches deleted; the Dependabot and draft PRs merged or closed. About half of the 58 remote branches are already in `main` |
+| GitHub Release per tag | **Done in 1.9.4.** The publish workflow creates the Release from the changelog section when a tag has none |
+| Stale branches and PRs | **Done 16 Nov 2026.** Merged remote branches deleted; Dependabot and draft PRs merged or closed |
 
 (after-17-ci-rebuild)=
 ### CI gate, cut back to smoke
 
 The 15-cell suite (Ubuntu, macOS, and Windows, each on Python 3.10–3.14)
 plus lint, audit, socket, fresh-install, browser, and docker sat in the
-queue, and the Windows cells failed on path spelling and encoding. The
-live GitHub gate is one job: Ubuntu, Python 3.12, `uv run pytest -m smoke`
-(CLI version, shell pages, workbench command paths), with a ten-minute cap.
-
-`uv run pytest` is still the local suite. The coverage `fail_under` of 82
-stays local. The coverage-badge workflow does nothing until a suite job
-uploads `coverage-json` again.
+queue, and the Windows cells failed on path spelling and encoding. 1.9.0
+cut the gate to one job: Ubuntu, Python 3.12, `uv run pytest -m smoke`
+(CLI version, shell pages, workbench command paths). 1.9.4 put back lint
+and the full offline suite on that same cell, with the coverage report the
+badge reads.
 
 Bring jobs back one at a time, and only after the previous step has been
 green on `main` without sitting in a queue. Do not restore the 15-cell
@@ -615,9 +615,9 @@ matrix in one change.
 
 | Step | Job | What it proves |
 | --- | --- | --- |
-| 0 (now) | smoke | The package imports, `paperful` reports its version, and the workbench routes boot |
-| 1 | lint | `ruff`, format, and `mypy` on Ubuntu 3.12 |
-| 2 | suite, Ubuntu 3.12 | Full offline pytest, and the coverage artifact the badge reads |
+| 0 (done) | smoke | The package imports, `paperful` reports its version, and the workbench routes boot |
+| 1 (done, 1.9.4) | lint | `ruff`, format, and `mypy` on Ubuntu 3.12 |
+| 2 (done, 1.9.4) | suite, Ubuntu 3.12 | Full offline pytest, and the coverage artifact the badge reads |
 | 3 | socket | That same suite with sockets disabled |
 | 4 | fresh-install | An isolated `.[serve]` install: `doctor` exits 2 without Zotero, then `/health` answers |
 | 5 | docker | The light image, `doctor` exits 2, no live Zotero |
@@ -637,7 +637,8 @@ own fixes.
 
 Still open, and small:
 
-- **First 10 minutes.** One page, GUI labels only: Wanted, Held, Grab,
+- **First 10 minutes.** Shipped in 1.9.4
+  ([first-10-minutes](first-10-minutes.md)). One page, GUI labels only: Wanted, Held, Grab,
   Attach, the `out/` folder. Steps: open the workbench, see an empty or
   real Wanted, run Preview, understand that Attach is a separate button,
   find `out/` on disk. No Scholar, no Sci-Hub, no model. Link it from
@@ -658,7 +659,8 @@ Not a calendar. Each line can be the last line.
 1. **`paperful since`** — holdings that changed meaning, and misses that
    healed. **Shipped in 1.9.3** (CLI pack and fixture). The four-week
    dogfood is running. Workbench block only if the packs get opened.
-2. **`refs gap` memory** — new / still missing / now owned.
+2. **`refs gap` memory** — new / still missing / now owned. **Shipped in
+   1.9.4.** Dogfood: hand one pack to `ingest-dois` within a month.
 3. **`paperful decisions -C`** — read-only join. Drop it if Discover
    already shows the only rows that matter.
 4. **Claim check** — then, only if used, brief diff and the evidence
@@ -711,7 +713,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.3).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.4).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -719,7 +721,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.9.3` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.9.4` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
@@ -2911,7 +2913,8 @@ remain; keep them aligned with the GUI.
 
 Ship in layers:
 
-0. **First 10 minutes** — one page that uses the **same labels as the GUI**
+0. **First 10 minutes** — shipped
+   ([first-10-minutes](first-10-minutes.md)). One page that uses the **same labels as the GUI**
    (Wanted, Held, Grab, Attach, the `out/` folder on this computer). Walkthroughs
    exist; this is the stranger door that matches first-hour copy in
    [1.1.1](#after-110-1-1-1) and [Docs as product](#after-110-trust-gaps).

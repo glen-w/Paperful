@@ -39,6 +39,7 @@ this machine: [legal and privacy](docs/legal-privacy.md).
 - Optionally ask questions of the PDFs you already have (local models via [Ollama](https://ollama.com) when your machine can run them, or hosted APIs via [LiteLLM](docs/llm.md#litellm-paid--openai-compatible-apis) — off until you turn it on)
 - Optionally, from Firefox, save the page you are reading or the tabs you have open into the folder on this computer ([Firefox add-on](docs/firefox.md)). The Zotero Connector stays the way to save into Zotero. This one writes the folder copy, can search your sources when the page has no PDF, and can take several tabs at once. It does not attach them.
 
+New here: [first 10 minutes](docs/first-10-minutes.md).
 Walkthroughs: [first fill](docs/first-fill.md), [grow the library](docs/grow-library.md),
 [tidy a collection](docs/tidy-library.md). All of them: [Walkthroughs](docs/walkthroughs.md).
 
@@ -86,7 +87,7 @@ No campus access: choose **Open access**. Campus library login: choose
 [Configuration](docs/config.md).
 
 ```sh
-git clone --branch v1.9.3 https://github.com/glen-w/Paperful.git
+git clone --branch v1.9.4 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env          # PAPERFUL_DATA=. PAPERFUL_OUT=./out keeps data here
                               # .env.example sets PAPERFUL_IMAGE_MODE=heavy
@@ -173,7 +174,7 @@ paperful doctor
 Optional extras: `[browser]` (Playwright; session login / htmlpdf), `[llm]`, `[rag]`, `[rag-docling]`, `[browser-agent]` (Python 3.11+), `[openxml]`, `[network]`. The `[serve]` extra
 (workbench) runs without Docker. The operator path is
 **clone + Compose** ([Docker](docs/docker.md)). GitHub CI runs
-`pytest -m smoke` on Ubuntu; it does not build the image or install a fresh
+the smoke tests, lint and types, and the full offline suite on Ubuntu (Python 3.12); it does not build the image or install a fresh
 `paperful[serve]` venv.
 
 ## Develop

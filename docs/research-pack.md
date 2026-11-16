@@ -80,6 +80,7 @@ docker compose run --rm paperful ingest-dois --from-pack state/precedent/<stamp>
 | --- | --- |
 | `state/refs-gaps/<stamp>/pack.json` | `paperful.refs_gap.pack.v1` — cited, missing, `ingest-dois` vs skip |
 | `state/refs-gaps/<stamp>/dois.txt` | Missing DOIs for ingest |
+| `state/refs-gaps/memory.jsonl` | One line per cited work per run: first seen, last seen, cite count, and what changed. The next `refs gap` reads it to say `new`, `still_missing`, `cite_count_up`, or `now_owned` |
 | `state/coverage/<stamp>/pack.json` | `paperful.coverage.pack.v1` — briefing/note/file vs `-C` (`coverage`) |
 | `state/coverage/<stamp>/dois.txt` | Missing DOIs from coverage rows |
 | `state/precedent/<stamp>/pack.json` | `paperful.precedent.pack.v1` — held vs public-metadata-only |

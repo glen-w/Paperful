@@ -15,7 +15,7 @@ help:
 	@echo "  docker-doctor       Run paperful doctor in the container"
 	@echo ""
 	@echo "Test / lint (contributor path; CI parity):"
-	@echo "  test              uv run pytest -m \"not docs\" (needs: uv sync --group dev --extra serve)"
+	@echo "  test              uv run pytest (offline suite; needs: uv sync --group dev --extra serve)"
 	@echo "  lint              ruff check + ruff format --check + mypy (CI lint job)"
 	@echo ""
 	@echo "Release:"
@@ -35,7 +35,7 @@ help:
 	@echo "       uv sync --extra docs && make docs"
 
 test:
-	uv run pytest -m "not docs"
+	uv run pytest -q
 
 lint:
 	uv run ruff check paperful tests

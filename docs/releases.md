@@ -1,12 +1,12 @@
 # Releases and stability
 
-**1.9.3** is the current release (`pipx install paperful` / `uv tool install paperful`
+**1.9.4** is the current release (`pipx install paperful` / `uv tool install paperful`
 after this tag is published; `pip install paperful` still works). Optional extras:
 `[browser]`, `[llm]`, `[rag]`, `[rag-docling]`, `[serve]`, `[browser-agent]`, `[openxml]`, `[network]`. **1.1.0** introduced PyPI and
 trusted publishing. For campus login and HTML PDF paths, install
 `paperful[browser]` and run `playwright install chromium` once. The **operator** install is
 clone plus `docker compose build` on your computer (see [Docker](docker.md)).
-GitHub CI currently runs `pytest -m smoke` only.
+GitHub CI runs the smoke tests, lint and types, and the full offline suite on Ubuntu (Python 3.12).
 
 **1.0.0** is tagged. Required schemas are frozen in this tree.
 Image packs: **light** (`[serve]` only; CI default
@@ -33,7 +33,7 @@ be added. Required `paperful.run_report.v1` keys and imported-file attach
 (typed `attach_failed`, provenance note) are the contract. **1.1.1** shipped
 Wanted stop-ship hygiene (Grab scope, Attach at zero, copy). Everything after
 that is a buffet by area (Wanted excellence foundation shipped; residual polish).
-**1.9.3** adds [`paperful since`](since.md), a read-only report of what changed since the last `run` (retractions, versions of record, dead URLs, upgradable snapshots, healed misses), fixes the Crossref field the retraction check reads, and hardens workbench forms and error pages. **1.9.2** hardens `paperful rewrite` (drift hashes, grounding freeze, fail-closed Word, reproducible LLM calls, post-edit checkers, whole-paragraph returns). **1.9.1** pins critique JSON turns (`format=json`, `think=false`, one repair)
+**1.9.4** gives `refs gap` a memory (new, still missing, cite count up, now owned), adds a [first 10 minutes](first-10-minutes.md) page, and puts lint and the full suite back on GitHub CI. **1.9.3** adds [`paperful since`](since.md), a read-only report of what changed since the last `run` (retractions, versions of record, dead URLs, upgradable snapshots, healed misses), fixes the Crossref field the retraction check reads, and hardens workbench forms and error pages. **1.9.2** hardens `paperful rewrite` (drift hashes, grounding freeze, fail-closed Word, reproducible LLM calls, post-edit checkers, whole-paragraph returns). **1.9.1** pins critique JSON turns (`format=json`, `think=false`, one repair)
 and ships example Vale packs (`JMLC`, `JCP`, `MarinePolicy`). **1.9.0** cuts GitHub CI to one Ubuntu smoke job (`pytest -m smoke`); the
 OS/Python matrix, lint, audit, socket, fresh-install, browser, and docker
 jobs stay local until each is green on its own. **1.8.0** adds crash-safe ledger appends, one HTTP client, systematic-review
@@ -99,7 +99,7 @@ Extra keys may still be added on frozen schemas.
 The release path is still clone, `docker compose build`, and `doctor` exiting
 2 when Zotero is absent. That check is local until the docker job returns
 ([CI rebuild](ROADMAP.md#after-17-ci-rebuild)). GitHub CI runs
-`pytest -m smoke` only.
+the smoke tests, lint and types, and the full offline suite on Ubuntu (Python 3.12).
 
 A second manager is not owed as a finished feature and **does not gate 1.0**.
 Mendeley and EndNote adapters are in the tree and **seeking testers**;

@@ -44,7 +44,7 @@ Zotero must be running with the local API enabled for integration tests that tou
 
 ```sh
 uv sync --group dev --extra serve
-make test                 # pytest -m "not docs" (local suite; CI runs smoke only)
+make test                 # the offline suite (the same one CI runs)
 make lint                 # ruff check + ruff format --check + mypy (local; not a CI job)
                           # mypy covers only [tool.mypy].files in pyproject.toml;
                           # add a new module there once it is typed end to end
@@ -53,8 +53,8 @@ DOCS_STRICT=1 make docs   # after: uv sync --extra docs
 
 Local-trust boundaries and reporting: [SECURITY.md](SECURITY.md).
 
-CI runs `pytest -m smoke` on Ubuntu (`.github/workflows/ci.yml`).
-The rest of the old gate (lint, audit, socket, fresh-install, docker,
+CI runs smoke, lint, and the full offline suite on Ubuntu
+(`.github/workflows/ci.yml`). The rest of the old gate ( audit, socket, fresh-install, docker,
 browser, and the OS/Python suite) is local until it is added back one job
 at a time ([roadmap](docs/ROADMAP.md#after-17-ci-rebuild)). The coverage
 badge refreshes only when a suite job uploads `coverage-json` again. The Docs

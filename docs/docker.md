@@ -23,7 +23,7 @@ lives **outside** the container (and, by default, outside the git root).
 mirror). Separate mounts by default. Compose does not mount Zotero Storage
 writable. See [Terms](TERMS.md).
 
-**What CI proves:** the GitHub gate is `pytest -m smoke` on Ubuntu. It does
+**What CI proves:** the GitHub gate is smoke, lint, and the offline suite on Ubuntu. It does
 not build the image. Build it yourself (`docker compose build`) and run
 `doctor --no-guide` with **no live Zotero**. Exit **2** means the Zotero row
 is red, which is a first-run stranger machine, not a failed Compose install.
@@ -60,7 +60,7 @@ mounts (`PAPERFUL_DATA`).
 ## Quick start
 
 ```sh
-git clone --branch v1.9.3 https://github.com/glen-w/Paperful.git
+git clone --branch v1.9.4 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
 ```
