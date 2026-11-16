@@ -1,6 +1,6 @@
 [project]
 name = "paperful"
-version = "1.9.2"
+version = "1.9.3"
 description = "Find missing PDFs for a Zotero library: clean records, summarise papers, keep a platform-agnostic mirror."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -123,6 +123,10 @@ exclude = [
     "uv.lock",
     "website/",
     "paperful-cloud/",
+    # Maintainer research material and third-party sample PDFs.
+    "research/",
+    "research_notes/",
+    "reports/",
     "docs/_static/",
     "docs/logo.png",
     "docs/logo-dark.png",

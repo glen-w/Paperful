@@ -36,3 +36,4 @@ styles/*
 !styles/MarinePolicy/**
 # Local measurement lists for unshipped Vale packs
 research/iddri-ocean-blogs/
+.claude/
