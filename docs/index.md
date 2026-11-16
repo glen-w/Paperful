@@ -25,6 +25,7 @@ Why this shape: [Why Paperful](why.md).
 :caption: Start here
 
 how-it-works
+first-10-minutes
 walkthroughs
 example-setups
 first-fill

@@ -14,7 +14,8 @@ CLI recipes for the same verbs live in [Workflows](workflows.md)
 
 ## Common workflows
 
-Start here. First-time users should follow **1 → 3** in order.
+Start here. Never opened the workbench? Read
+[First 10 minutes](first-10-minutes.md) first. Then follow **1 → 3** in order.
 
 | # | Walkthrough | Outcome |
 | --- | --- | --- |
