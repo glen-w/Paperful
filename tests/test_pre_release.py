@@ -25,12 +25,24 @@ def _bash() -> str:
     return found or "bash"
 
 
+def _script_env(**extra: str) -> dict[str, str]:
+    """Run maintainer scripts as if on a laptop, not GitHub Actions."""
+    skip = {
+        "GITHUB_ACTIONS",
+        "CI",
+        "PAPERFUL_SKIP_DOGFOOD",
+        "PAPERFUL_SKIP_ASSESSMENT",
+    }
+    env = {key: value for key, value in os.environ.items() if key not in skip}
+    env.update(extra)
+    return env
+
+
 def _run(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
-    env = {"PAPERFUL_RELEASE_ROOT": str(root)}
     return subprocess.run(  # noqa: S603 -- fixed argv, no shell, operator-configured tool
         [_bash(), str(SCRIPT), *args],  # noqa: S607 -- Git bash on Windows, PATH bash elsewhere
         cwd=root,
-        env={**os.environ, **env},
+        env=_script_env(PAPERFUL_RELEASE_ROOT=str(root)),
         capture_output=True,
         text=True,
         check=False,
@@ -80,7 +92,9 @@ def test_dogfood_gate_blocks_release_when_active(tmp_path: Path) -> None:
     shutil.copy(ROOT / "CHANGELOG.md", tmp_path / "CHANGELOG.md")
     shutil.copytree(ROOT / "website", tmp_path / "website")
     (tmp_path / "docs" / "dogfood").mkdir(parents=True)
-    shutil.copy(ROOT / "docs/dogfood/since-bbnj.md", tmp_path / "docs/dogfood/since-bbnj.md")
+    shutil.copy(
+        ROOT / "docs/dogfood/since-bbnj.md", tmp_path / "docs/dogfood/since-bbnj.md"
+    )
 
     proc = _run(root=tmp_path)
     assert proc.returncode != 0
@@ -89,11 +103,13 @@ def test_dogfood_gate_blocks_release_when_active(tmp_path: Path) -> None:
 
 def test_dogfood_status_reports_incomplete(tmp_path: Path) -> None:
     (tmp_path / "docs" / "dogfood").mkdir(parents=True)
-    shutil.copy(ROOT / "docs/dogfood/since-bbnj.md", tmp_path / "docs/dogfood/since-bbnj.md")
+    shutil.copy(
+        ROOT / "docs/dogfood/since-bbnj.md", tmp_path / "docs/dogfood/since-bbnj.md"
+    )
     proc = subprocess.run(  # noqa: S603
         [_bash(), str(DOGFOOD_STATUS)],
         cwd=tmp_path,
-        env={**os.environ, "PAPERFUL_RELEASE_ROOT": str(tmp_path)},
+        env=_script_env(PAPERFUL_RELEASE_ROOT=str(tmp_path)),
         capture_output=True,
         text=True,
         check=False,
@@ -109,7 +125,9 @@ def test_dogfood_status_passes_when_verdicts_met(tmp_path: Path) -> None:
     (tmp_path / "docs" / "dogfood").mkdir(parents=True)
     tracker = tmp_path / "docs/dogfood/since-bbnj.md"
     lines: list[str] = []
-    for line in (ROOT / "docs/dogfood/since-bbnj.md").read_text(encoding="utf-8").splitlines():
+    for line in (
+        (ROOT / "docs/dogfood/since-bbnj.md").read_text(encoding="utf-8").splitlines()
+    ):
         if re.match(r"^\| [1-4] \|", line):
             parts = line.split("|")
             if len(parts) > 8:
@@ -121,7 +139,7 @@ def test_dogfood_status_passes_when_verdicts_met(tmp_path: Path) -> None:
     proc = subprocess.run(  # noqa: S603
         [_bash(), str(DOGFOOD_STATUS)],
         cwd=tmp_path,
-        env={**os.environ, "PAPERFUL_RELEASE_ROOT": str(tmp_path)},
+        env=_script_env(PAPERFUL_RELEASE_ROOT=str(tmp_path)),
         capture_output=True,
         text=True,
         check=False,
@@ -143,7 +161,7 @@ def test_dogfood_status_complete(tmp_path: Path) -> None:
     proc = subprocess.run(  # noqa: S603
         [_bash(), str(DOGFOOD_STATUS)],
         cwd=tmp_path,
-        env={**os.environ, "PAPERFUL_RELEASE_ROOT": str(tmp_path)},
+        env=_script_env(PAPERFUL_RELEASE_ROOT=str(tmp_path)),
         capture_output=True,
         text=True,
         check=False,
