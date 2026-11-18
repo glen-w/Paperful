@@ -290,7 +290,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[critique].verify_max_segments` | `8` | Max logical segments in the `verify` swarm |
 | `[critique].context_timeout_s` | `0` | Wall clock for `context` / `context-web` (`0` → `max([llm].timeout_s, 600)`) |
 | `[critique].context_max_comments` | `12` | Cap on suggested comments from the context pipeline |
-| `[critique].context_max_hits` | `8` | Local RAG hits and OpenAlex / SearXNG rows for historian / scout |
+| `[critique].context_max_hits` | `8` | Cap per retrieve round (and novelty-answer search) for local RAG hits and OpenAlex / SearXNG rows |
 | `[critique].adversary_max_comments` | `12` | Cap on suggested comments from the `adversary` validity red-team lane |
 | `[critique].outline_max_comments` | `12` | Cap on suggested comments from the `outline` plan-review lane |
 | `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file, then shipped `prompts/` in the install), optional `max_tokens` (default `2048`, Ollama `num_predict`; `0` omits the cap). Each reviewer call uses `[llm].timeout_s` as both wall clock and stream idle gap, with progress lines every ~30s. Builtin JSON prompts send `format=json` / `think=false` and retry once on an unusable reply. `--reviewer ID` selects a subset. Unused by `marg` / `adversary` / `outline` / `claims` / `verify` / `context*` |

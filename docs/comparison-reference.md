@@ -3,7 +3,7 @@
 Vendor-by-vendor notes and longer capability tables. Most readers only need
 [How Paperful compares](comparison.md).
 
-**Last reviewed:** 2026-10-26. Feature lists for other products are based on public
+**Last reviewed:** 2026-11-16. Feature lists for other products are based on public
 docs and positioning — not paid pilots.
 
 ## Capability snapshot
@@ -127,6 +127,7 @@ found Elicit Pro Review-mode sensitivity ~40% vs traditional searches
 | Jenni / Paperpal | Partial (200–300M + uploads) | Partial | No | Partial | No | **Yes** (drafting workspace) | No | No | Jenni: one-way |
 | OpenAI / Gemini / Perplexity DR | Yes | Partial (web / uploads) | No | Yes (**report**) | No | No | No | No | No |
 | Sakana AI Scientist | Partial | No | No | Partial | Partial | Yes as **workshop-grade LaTeX** | No | Partial (you run it; LLM APIs) | No |
+| PaperOrchestra | Yes (Google Search → Semantic Scholar; cites for the MS, not your library) | No (abstracts / metadata; no campus fetch) | No | Yes (Intro + Related Work from collected papers) | Partial (cutoff-date concurrent-work rule; not Precedent) | **Yes** (idea + experimental log → conference LaTeX + optional plots) | No | Partial (you run it; LLM + Semantic Scholar APIs) | No |
 | PaperQA2 (OSS) | No (you supply PDFs) | Partial | No | Yes (cited Q&A) | No | No | No | **Yes** | Partial (`paper-qa[zotero]`; last test is old) |
 | Gemini Notebook / Humata | No | No | No | Yes (on uploads) | No | Partial | No | No | No |
 
@@ -231,7 +232,7 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 - **Fit:** Hosted agents that *do research*, not a Zotero helper. Split the jobs in copy: **Literature** (PaperQA3) is cited review over a licensed public corpus (docs 175M+; a 2026 blog says 150M+ with figures). **Precedent** (formerly Has Anyone) is novelty, not a second Literature call. **Kosmos** is UI-only (not on the public task API): ~1,500 papers and ~42k lines of code per run, shared world model, traces; the Kosmos paper’s expert eval is weaker on *interpretation* than on quotes. Academic credits moved between 2025–2026 posts — treat pricing as policy, not SLA. **Analysis** / **Molecules** are lab/chem. Local OSS cousin is **PaperQA2** (`paper-qa`); hosted Literature is **not** “chat with my Zotero.”
 - **With Paperful:** Edison when the question is a public-corpus review, a novelty search, or a Kosmos/Analysis run on a dataset. Paperful when the question is “fill, fix, mirror, and Ask **this** library.” Local analogue of Precedent is `paperful precedent` (held PDFs + OpenAlex metadata, stamped `held` vs `public-metadata-only`; never “nobody has done this”). Typical stack: Edison Literature or Precedent → snowball / `ingest-dois` → `run` / Wanted → local `ask`. Do not treat their workspace as the quiet mirror. Do not borrow their paper-scraper lane as a default (their own docs flag publisher ToS grey).
 - **Not a substitute for:** missing-PDF fetch, EZProxy / grey playbooks, `snapshot` / `restore`, collection-scoped RAG that never leaves the machine, or unattended attach.
-- **Nearby (not Edison):** Google Co-Scientist / Labs Hypothesis Generation (hypotheses, not manuscripts); Sakana AI Scientist (workshop-grade auto-papers; authors documented citation errors); OpenAI / Gemini / Perplexity Deep Research (web memos; vendors warn about hallucinated cites).
+- **Nearby (not Edison):** Google Co-Scientist / Labs Hypothesis Generation (hypotheses, not manuscripts); [PaperOrchestra](#paperorchestra) (idea + lab log → conference LaTeX; not a discovery loop); Sakana AI Scientist (workshop-grade auto-papers; authors documented citation errors); OpenAI / Gemini / Perplexity Deep Research (web memos; vendors warn about hallucinated cites).
 - **Roadmap borrow (not a clone):** [ROADMAP — Hosted AI scientists](ROADMAP.md#hosted-ai-scientists-edison-scientific) and [v2 factory packs](ROADMAP.md#after-110-paper-factory).
 
 ### Hosted literature search
@@ -250,7 +251,27 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 
 - **Sites:** [Jenni](https://jenni.ai/) · [Paperpal](https://paperpal.com/) · SciSpace AI Writer · Writefull in [Overleaf](https://docs.overleaf.com/integrations-and-add-ons/ai-features)
 - **Fit:** Draft + cite from library ∪ a 200–300M index. Mitigations are mostly **existence** checks (real DOIs), not “this sentence is supported by that passage.” Elsevier’s 2026 author factsheet still wants a human intellectual contribution and forbids fabricating references.
-- **With Paperful:** do **not** become Jenni. Extra cites belong in Zotero before `\cite` ([`stuff`](ROADMAP.md#stuff-later-extra-citations-from-the-library)). Living reviews without a model: Better BibTeX → Quarto.
+- **With Paperful:** do **not** become Jenni. Extra cites belong in Zotero before `\cite` ([`stuff`](ROADMAP.md#stuff-later-extra-citations-from-the-library)). Living reviews without a model: Better BibTeX → Quarto. For a local multi-agent LaTeX writer from idea notes (not a writing workspace), see [PaperOrchestra](#paperorchestra).
+
+(paperorchestra)=
+### PaperOrchestra (Google Research)
+
+- **Sites:** [GitHub](https://github.com/google-research/paper-orchestra) · [project page](https://yiwen-song.github.io/paper_orchestra/) · [arXiv:2604.05018](https://arxiv.org/abs/2604.05018)
+- **Fit:** Open multi-agent **paper writer**, not a library helper. Input is unconstrained pre-writing material (idea summary + experimental log) plus a conference LaTeX template. Agents: outline, literature review, section writing, content refinement, optional plotting. The literature agent searches the web, enriches candidates on **Semantic Scholar**, writes `references.bib` + a citation map, then fills Introduction and Related Work from that checklist only (cutoff-date concurrent-work rule; do not claim SOTA unless the log evaluated that paper). Authors report a 50–68% win-margin vs single-agent and AI Scientist-v2 on literature-review quality in an 11-researcher side-by-side, with a remaining gap to human ground truth. **PaperWritingBench** (200 reverse-engineered CVPR/ICLR 2025 packets) is **not** in the code repo. README disclaimer: not an officially supported Google product. You supply LLM keys (Gemini / Vertex / OpenAI) and a Semantic Scholar key.
+- **With Paperful:** PaperOrchestra when the job is “turn this idea and these numbers into conference LaTeX.” Paperful when the job is fill, fix, mirror, and Ask **this** library. Cites it puts in the manuscript are not in Zotero until you ingest them (`ingest-dois` / snowball) and `run`. [`rewrite`](rewrite.md) borrows the **worklog / align-then-generate / selected-span** patterns; it does **not** vendor the pipeline and will not emit a paper from a lab notebook. Typical stack: Paperful for PDFs you own → human draft or PaperOrchestra for a first LaTeX pass → Paperful `critique` / `rewrite` on a file you already have.
+- **Not a substitute for:** missing-PDF fetch, EZProxy / grey playbooks, `snapshot` / `restore`, collection-scoped RAG, or unattended attach. Not Sakana (no experiment loop) and not Edison Literature (no 175M hosted corpus).
+
+| Capability | Paperful | PaperOrchestra |
+| --- | --- | --- |
+| Idea + experimental log → conference LaTeX | No | Yes |
+| Plots / conceptual diagrams from the log | No | Yes (optional plotting agent) |
+| Related work from **web search + Semantic Scholar** | No (OpenAlex hops grow **your** collection) | Yes (abstracts; citation checklist) |
+| Related work / Q&A from **held PDFs** | Yes (`synthesize` / `ask`; text layer) | No |
+| Pre-submission hygiene as tracked changes | Yes (`critique` → `rewrite`) | No (refinement agent rewrites the draft) |
+| Bulk missing-PDF fetch / EZProxy / grey playbooks | Yes | No |
+| Disk mirror + restore ledger | Yes | No |
+| Zotero write-back | Yes | No |
+| Runs on this machine | Yes | Partial (you run it; needs LLM + S2 APIs) |
 
 ### PaperQA2 (local OSS)
 
@@ -327,6 +348,9 @@ Need a web Deep Research memo?
 
 Need a manuscript draft?
   → Jenni / Paperpal / Overleaf. Paperful does not write the paper
+
+Need idea notes + an experimental log turned into CVPR/ICLR LaTeX?
+  → PaperOrchestra. Then ingest cites you want to keep into Zotero and fill PDFs with Paperful
 
 Need local cited Q&A on a folder, no Zotero?
   → PaperQA2. Paperful when the folder should also restore into a manager

@@ -2,6 +2,10 @@
 # Maintainer gate before tagging or publishing. Run from repo root.
 #   bash scripts/release/pre_release.sh           # version + changelog + clean dist/
 #   bash scripts/release/pre_release.sh --dist-only   # after uv build (CI / manual publish)
+#
+# Optional escapes (emergency patches only; document in CHANGELOG):
+#   PAPERFUL_SKIP_DOGFOOD=1       # active since dogfood not finished (see docs/dogfood/since-bbnj.md)
+#   PAPERFUL_SKIP_ASSESSMENT=1    # local assessments/*-full-assessment.md still has open rows
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -34,6 +38,64 @@ errors=0
 
 note() { echo "$*"; }
 fail() { echo "error: $*" >&2; errors=1; }
+
+check_dogfood() {
+  local status
+  if ! status="$(ROOT="$WORK" bash "$ROOT/scripts/release/dogfood_status.sh")"; then
+    case "$status" in
+      missing\ *)
+        fail "${status#missing } (since dogfood tracker)"
+        ;;
+      active\ *)
+        fail "since dogfood incomplete: ${status#active } (set dogfood_gate: complete when done, or PAPERFUL_SKIP_DOGFOOD=1)"
+        ;;
+      *)
+        fail "since dogfood check failed: $status"
+        ;;
+    esac
+    return
+  fi
+  case "$status" in
+    skipped\ \(ci\)) note "dogfood: skipped on CI (run make pre-release locally before the tag)" ;;
+    skipped\ \(env\)) note "dogfood: skipped (PAPERFUL_SKIP_DOGFOOD=1)" ;;
+    complete) note "dogfood: complete (gate off)" ;;
+    active\ *) note "dogfood: ${status#active }" ;;
+    *) note "dogfood: $status" ;;
+  esac
+}
+
+check_assessment() {
+  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    return
+  fi
+  if [[ "${PAPERFUL_SKIP_ASSESSMENT:-}" == "1" ]]; then
+    note "assessment: skipped (PAPERFUL_SKIP_ASSESSMENT=1)"
+    return
+  fi
+  shopt -s nullglob
+  local -a files=(assessments/*-full-assessment.md)
+  shopt -u nullglob
+  if [[ ${#files[@]} -eq 0 ]]; then
+    return
+  fi
+  local latest="${files[0]}"
+  local f mtime=-1
+  for f in "${files[@]}"; do
+    m=$(stat -f '%m' "$f" 2>/dev/null || stat -c '%Y' "$f")
+    if [[ "$m" -gt "$mtime" ]]; then
+      mtime="$m"
+      latest="$f"
+    fi
+  done
+  local hits
+  hits="$(grep -E '\| Not done|NEEDS FIXES' "$latest" || true)"
+  if [[ -n "$hits" ]]; then
+    fail "read $latest before tagging (open assessment rows below) or set PAPERFUL_SKIP_ASSESSMENT=1"
+    while IFS= read -r line; do
+      echo "  $line" >&2
+    done <<<"$hits"
+  fi
+}
 
 artifact_version() {
   local base="${1##*/}"
@@ -117,6 +179,9 @@ if [[ -f website/cleaning-service.html ]]; then
     fail "website/cleaning-service.html footer version does not match ${VERSION}"
   fi
 fi
+
+check_dogfood
+check_assessment
 
 # Stale local builds should not ride along on uv publish.
 shopt -s nullglob

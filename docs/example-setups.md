@@ -252,7 +252,7 @@ Items that still miss can go to a handoff list (`gaps --handoff` or
 `reachout`) so you email an author or open a page yourself. Those commands
 do not download. [Workflows](workflows.md).
 
-### Notes, a collection review, and Ask
+### Notes, a collection review, Ask, and Critique
 
 A model is optional. **Local AI (default path):** [Ollama](https://ollama.com)
 on your computer when you have enough RAM/VRAM for the job — 7B-class for
@@ -273,6 +273,7 @@ Three reading jobs, in order:
 | One summary per PDF        | `summarize`              | A grounded note on the item. `paperful all` runs this when `[llm].enabled`                                                                                                |
 | Summary of those summaries | `synthesize`             | One collection review (themes, agreements, gaps) from the notes `summarize` already wrote. It does not open the PDFs again. Not in the default `all` chain — run it after |
 | Cited answers              | `rag ingest`, then `ask` | An index of `out/`, then answers that name the papers and pages. **Ask** on the workbench. Needs `[rag].enabled`                                                          |
+| Pre-submission pack        | `critique`               | Checkers always. Optional `--lane context` (library RAG) or `--lane context-web` (OpenAlex + SearXNG). Writes `state/critiques/` — not a grade. [Critique](critique.md) |
 
 
 `fix-metadata` (title and identifier patches; `--apply` writes the catalogue)
@@ -316,7 +317,8 @@ or `embed_provider = "litellm"` with a hosted embedding model). The browser
 agent wants 14B or larger on Ollama, or a capable hosted tag on LiteLLM.
 The heavy Docker image includes the RAG and LiteLLM extras; the light image
 does not. A full collection summarize is a multi-night or hosted-budget job —
-not a laptop afternoon. [AI](ai.md) · [LLM](llm.md) · [Ask your library](rag.md).
+not a laptop afternoon. [AI](ai.md) · [LLM](llm.md) · [Ask your library](rag.md)
+· [Critique](critique.md).
 
 ### What you run on a schedule you own
 

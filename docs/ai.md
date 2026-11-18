@@ -58,7 +58,7 @@ unusable for a 1,500-PDF collection overnight.
 | `critique --lane outline` | One outline / plan | Yes (same band as reviewers) | One JSON plan-review turn plus a section skeleton. Not a finished-paper verdict |
 | `critique --lane claims` | One manuscript | Yes (same band as reviewers) | Claim extract + optional downgrade; support labels are deterministic overlap |
 | `critique --lane verify` | One manuscript | Yes locally; slower (per-segment) | Density-budgeted section swarm + local synthesis. Not Deep Review |
-| `critique --lane context` | One manuscript | Yes locally; several extra turns | Summary, library historian, baseline scout, Q&A. Local RAG; `context-web` may call OpenAlex / SearXNG |
+| `critique --lane context` | One manuscript | Yes locally; several extra turns | Summary, 3-round retrieve, historian, scout, novelty Q then A, soundness. Local RAG; `context-web` may call OpenAlex / SearXNG |
 | `rewrite` | One critique pack | Style-only: no model. Other areas: yes (same 7B–12B band) | One JSON call per area still lacking a glossary/Vale swap. Optional XtraGPT Ollama tag. Not a generated paper |
 
 **Try it out** means: one item, five papers, or a free hosted model while you

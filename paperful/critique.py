@@ -415,6 +415,89 @@ def _render_outline(rows: list[dict[str, Any]]) -> list[str]:
     return lines
 
 
+def _render_context_investigation(inv: dict[str, Any]) -> list[str]:
+    """Queries, hit titles, and Q&A from the context lane. Not a novelty verdict."""
+    lines = [
+        "",
+        "## Context investigation",
+        "",
+        "Titles from this library (and optional search). Not a novelty or plagiarism verdict.",
+        "",
+    ]
+    rounds = [r for r in (inv.get("rounds") or []) if isinstance(r, dict)]
+    if rounds:
+        lines.append("Retrieve rounds:")
+        lines.append("")
+        for row in rounds:
+            rid = str(row.get("id") or "round").strip() or "round"
+            query = str(row.get("query") or "").strip()
+            bit = f"- **{rid}**"
+            if query:
+                bit += f": {query[:200]}"
+            lines.append(bit)
+            for label, key in (("library", "library"), ("retrieved", "retrieved")):
+                titles = [
+                    str(t).strip() for t in (row.get(key) or []) if str(t).strip()
+                ]
+                if titles:
+                    lines.append(
+                        f"  - {label}: " + "; ".join(t[:80] for t in titles[:8])
+                    )
+            skip = str(row.get("skipped") or row.get("rag_skipped") or "").strip()
+            if skip:
+                lines.append(f"  - skipped: `{skip}`")
+        lines.append("")
+    nsearch = (
+        inv.get("novelty_search") if isinstance(inv.get("novelty_search"), dict) else {}
+    )
+    nq = [str(q).strip() for q in (nsearch.get("queries") or []) if str(q).strip()]
+    if nq:
+        lines.append("Novelty search:")
+        lines.append("")
+        for q in nq[:6]:
+            lines.append(f"- {q[:200]}")
+        n_lib = [
+            str(t).strip() for t in (nsearch.get("library") or []) if str(t).strip()
+        ]
+        n_rem = [
+            str(t).strip() for t in (nsearch.get("retrieved") or []) if str(t).strip()
+        ]
+        if n_lib:
+            lines.append("- library: " + "; ".join(t[:80] for t in n_lib[:8]))
+        if n_rem:
+            lines.append("- retrieved: " + "; ".join(t[:80] for t in n_rem[:8]))
+        lines.append("")
+    pairs: list[dict[str, Any]] = []
+    for key in ("novelty", "soundness"):
+        for pair in inv.get(key) or []:
+            if isinstance(pair, dict) and (pair.get("q") or pair.get("a")):
+                pairs.append(pair)
+    if pairs:
+        lines.append("Q&A:")
+        lines.append("")
+        for pair in pairs[:12]:
+            q = str(pair.get("q") or "").strip()
+            a = str(pair.get("a") or "").strip()
+            if q:
+                lines.append(f"- **Q:** {q[:300]}")
+            if a:
+                prefix = "  " if q else "- "
+                lines.append(f"{prefix}**A:** {a[:400]}")
+        lines.append("")
+    omitted = [r for r in (inv.get("omitted") or []) if isinstance(r, dict)]
+    if omitted:
+        lines.append("Omitted comparisons:")
+        lines.append("")
+        for row in omitted[:8]:
+            title = str(row.get("title") or "").strip()
+            detail = str(row.get("detail") or "").strip()
+            head = title or detail
+            if head:
+                lines.append(f"- {head[:200]}")
+        lines.append("")
+    return lines
+
+
 def _render_claims(rows: list[dict[str, Any]]) -> list[str]:
     """Ledger of intra-doc claim support. Not a truth verdict."""
     lines = [
@@ -495,6 +578,11 @@ def render_markdown(pack: dict[str, Any], *, show_dismissed: bool = False) -> st
     claims_rows = [r for r in (pack.get("claims") or []) if isinstance(r, dict)]
     if claims_rows:
         lines.extend(_render_claims(claims_rows))
+    if isinstance(llm, dict):
+        ctx = llm.get("context") if isinstance(llm.get("context"), dict) else {}
+        inv = ctx.get("investigation") if isinstance(ctx, dict) else None
+        if isinstance(inv, dict) and inv:
+            lines.extend(_render_context_investigation(inv))
     if suggested:
         lines.extend(_section("Suggested", suggested))
     if pack.get("forensics") is not None:
@@ -831,6 +919,18 @@ def build_critique(
             dest = persist_forensics_report(folder, forensics_raw)
             forensics_meta["report_path"] = str(dest)
             payload["forensics"] = forensics_meta
+            write_json(folder / "pack.json", payload)
+        ctx_meta = None
+        if isinstance(llm_meta, dict) and isinstance(llm_meta.get("context"), dict):
+            ctx_meta = llm_meta["context"]
+        inv = ctx_meta.get("investigation") if ctx_meta else None
+        if isinstance(inv, dict) and inv:
+            from .critique_context import persist_context_log
+
+            dest = persist_context_log(folder, inv)
+            ctx_meta["log"] = dest.name
+            ctx_meta["log_path"] = str(dest)
+            payload["llm"] = llm_meta
             write_json(folder / "pack.json", payload)
         payload["pack_dir"] = str(folder)
     payload["critique_id"] = cid

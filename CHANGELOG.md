@@ -6,6 +6,11 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.9.5 — 2026-11-18
+
+- **Critique `context` / `context-web`.** Three-round retrieve (subdomain, method, temporal), a `context.json` investigation sidecar, and split novelty questions then answers with a second search pass. Soundness stays extract-only. Still ScholarPeer-inspired, not vendored, no venue scores.
+- **Docs.** The Sphinx guide (walkthroughs, example setups) and the public landing name Advanced critique as a local pack, not a grade.
+
 ## 1.9.4 — 2026-11-16
 
 - **`refs gap` remembers.** Each run is compared to the last one for the same collection. A cited work is marked new, still missing, cited more often, or now in the library, with the date it was first seen. The pack lists works that are no longer cited. The table ranks by how often a work is cited times how long it has been missing, and puts works cited from a draft you passed with `--pdf` first. The memory is `state/refs-gaps/memory.jsonl`.

@@ -4,6 +4,8 @@ Inspired by ScholarPeer (Goyal et al., arXiv:2601.22638). Paperful does not
 vendor that stack or open-scholar-peer skills. Suggested lane only; no scores.
 ``context`` stays on the extract plus optional local RAG. ``context-web`` may
 call configured OpenAlex / SearXNG with an egress notice; offline skips search.
+Retrieve is three deterministic rounds (subdomain / method / temporal), then a
+second pass for novelty answers only. Soundness stays extract-only.
 """
 
 from __future__ import annotations
@@ -11,7 +13,9 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable
+from datetime import datetime, timezone
 from hashlib import sha256
+from pathlib import Path
 from typing import Any
 
 from .config import Config
@@ -20,6 +24,10 @@ from .critique_extract import ExtractedDoc
 from .critique_llm import findings_from_comments, grounded, parse_llm_json
 from .grounding import budget_slice
 from .zot import Item
+
+CONTEXT_LOG_SCHEMA = "paperful.critique.context.v1"
+CONTEXT_LOG_NAME = "context.json"
+_PASSAGES_CAP = 12_000
 
 _SUMMARY_SYSTEM = """You write a structured summary of a manuscript excerpt.
 Return JSON only:
@@ -49,12 +57,20 @@ Rules:
 - No score, grade, or accept/reject. At most 8 rows.
 """
 
-_QA_NOVELTY_SYSTEM = """You audit novelty and significance as a skeptic.
+_QA_NOVELTY_QUESTIONS_SYSTEM = """You write novelty and significance questions as a skeptic.
 Return JSON only:
-{"pairs": [{"q": "probing question", "a": "answer grounded in the excerpt or passages"}]}
+{"questions": ["probing question", "..."]}
 Rules:
-- One pair per distinct claim when possible. At most 6 pairs.
-- Answers must not invent literature. No score or accept/reject.
+- One question per distinct claim when possible. At most 6 questions.
+- Do not invent literature, titles, or DOIs. No score or accept/reject.
+"""
+
+_QA_NOVELTY_ANSWERS_SYSTEM = """You answer novelty and significance questions as a skeptic.
+Return JSON only:
+{"pairs": [{"q": "question", "a": "answer grounded in the excerpt or passages"}]}
+Rules:
+- Answer only the given questions. Do not invent titles or DOIs.
+- If passages are empty, say so. No score or accept/reject.
 """
 
 _QA_SOUNDNESS_SYSTEM = """You audit technical soundness as a skeptic.
@@ -81,6 +97,18 @@ def context_timeout_s(cfg: Config) -> float:
     if raw > 0:
         return raw
     return max(float(cfg.llm_timeout_s or 120), 600.0)
+
+
+def persist_context_log(folder: Path, log: dict[str, Any]) -> Path:
+    """Write ``context.json`` beside ``pack.json``. Compact investigation only."""
+    from .store import write_json
+
+    payload = {"schema": CONTEXT_LOG_SCHEMA}
+    if isinstance(log, dict):
+        payload.update({k: v for k, v in log.items() if k != "schema"})
+    dest = folder / CONTEXT_LOG_NAME
+    write_json(dest, payload)
+    return dest
 
 
 def _chat(
@@ -141,7 +169,7 @@ def library_passages(
 
 
 def _openalex_works(
-    cfg: Config, query: str, *, limit: int
+    cfg: Config, query: str, *, limit: int, year_from: int | None = None
 ) -> tuple[list[dict[str, Any]], str]:
     q = (query or "").strip()
     if not q:
@@ -152,7 +180,7 @@ def _openalex_works(
         return [], "openalex_unavailable"
     try:
         client = OpenAlexClient(email=cfg.email or "", sleep_s=0.0)
-        works = client.search(q, limit=limit, year_from=None, year_to=None)
+        works = client.search(q, limit=limit, year_from=year_from, year_to=None)
     except Exception as exc:
         return [], str(exc)[:200] or "openalex_error"
     rows: list[dict[str, Any]] = []
@@ -221,6 +249,170 @@ def _parse_summary(raw: str) -> dict[str, Any]:
     }
 
 
+def _hit_key(row: dict[str, Any]) -> tuple[str, str] | None:
+    doi = str(row.get("doi") or "").strip().lower()
+    if doi:
+        return ("doi", doi)
+    item_key = str(row.get("item_key") or "").strip()
+    if item_key:
+        return ("key", item_key)
+    title = str(row.get("title") or "").strip().lower()
+    if title:
+        return ("title", title)
+    url = str(row.get("url") or "").strip()
+    if url:
+        return ("url", url)
+    return None
+
+
+def _merge_hits(*groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for rows in groups:
+        for row in rows or []:
+            if not isinstance(row, dict):
+                continue
+            key = _hit_key(row)
+            if key is None or key in seen:
+                continue
+            seen.add(key)
+            out.append(row)
+    return out
+
+
+def _titles(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
+    out: list[str] = []
+    for row in rows:
+        title = str(row.get("title") or "").strip()
+        if title:
+            out.append(title[:200])
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _passage_hay(excerpt_hay: str, *groups: list[dict[str, Any]]) -> str:
+    bits = [excerpt_hay]
+    for rows in groups:
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            bits.append(str(row.get("title") or "").lower())
+            bits.append(str(row.get("text") or "").lower()[:1200])
+            bits.append(str(row.get("doi") or "").lower())
+    return " ".join(b for b in bits if b)
+
+
+def _round_specs(
+    summary: dict[str, Any],
+    *,
+    title: str,
+    item: Item | None,
+    excerpt: str,
+) -> list[dict[str, Any]]:
+    claims = list(summary.get("claims") or [])
+    claim_text = " ".join(str(c).strip() for c in claims[:3] if str(c).strip())
+    method = str(summary.get("method") or "").strip()
+    fallback = claim_text or excerpt[:400]
+    subdomain = (
+        " ".join(p for p in (title.strip(), claim_text) if p).strip() or fallback
+    )
+    method_q = method or fallback
+    year = getattr(item, "year", None) if item is not None else None
+    recency = str(year) if year else "recent"
+    temporal = " ".join(p for p in (claim_text or method_q, recency) if p).strip()
+    now_year = datetime.now(tz=timezone.utc).year
+    return [
+        {"id": "subdomain", "query": subdomain, "year_from": None},
+        {"id": "method", "query": method_q, "year_from": None},
+        {
+            "id": "temporal",
+            "query": temporal,
+            "year_from": now_year - 2,
+        },
+    ]
+
+
+def _compact_skip(value: str) -> str:
+    return str(value or "").strip()
+
+
+def _retrieve(
+    cfg: Config,
+    query: str,
+    *,
+    keys: set[str] | None,
+    max_hits: int,
+    search_enabled: bool,
+    offline: bool,
+    year_from: int | None,
+    meta: dict[str, Any],
+) -> dict[str, Any]:
+    local, rag_skip = library_passages(cfg, query, keys=keys, k=max_hits)
+    remote: list[dict[str, Any]] = []
+    oa_skip = ""
+    sx_skip = ""
+    search_skip = ""
+    backends: list[str] = []
+    if not rag_skip:
+        backends.append("rag")
+        if "rag" not in meta["backends"]:
+            meta["backends"] = list(meta["backends"]) + ["rag"]
+    if search_enabled:
+        if offline:
+            search_skip = "offline"
+        else:
+            oa_rows, oa_skip = _openalex_works(
+                cfg, query, limit=max_hits, year_from=year_from
+            )
+            if oa_skip:
+                pass
+            else:
+                remote.extend(oa_rows)
+                if "openalex" not in meta["backends"]:
+                    meta["backends"] = list(meta["backends"]) + ["openalex"]
+                backends.append("openalex")
+            sx_rows, sx_skip = _searxng_hits(cfg, query, limit=max_hits)
+            if not sx_skip:
+                remote.extend(sx_rows)
+                if "searxng" not in meta["backends"]:
+                    meta["backends"] = list(meta["backends"]) + ["searxng"]
+                backends.append("searxng")
+            if not remote and (oa_skip or sx_skip):
+                search_skip = oa_skip or sx_skip
+    return {
+        "library": local,
+        "retrieved": remote,
+        "backends": backends,
+        "rag_skipped": _compact_skip(rag_skip),
+        "openalex_skipped": _compact_skip(oa_skip),
+        "searxng_skipped": _compact_skip(sx_skip),
+        "search_skipped": _compact_skip(search_skip),
+    }
+
+
+def _compact_round(
+    spec: dict[str, Any], result: dict[str, Any], *, max_hits: int
+) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "id": spec.get("id") or "",
+        "query": str(spec.get("query") or "")[:400],
+        "library": _titles(result.get("library") or [], limit=max_hits),
+        "retrieved": _titles(result.get("retrieved") or [], limit=max_hits),
+    }
+    if spec.get("year_from") is not None:
+        row["year_from"] = spec["year_from"]
+    for key in (
+        "rag_skipped",
+        "openalex_skipped",
+        "searxng_skipped",
+        "search_skipped",
+    ):
+        if result.get(key):
+            row[key] = result[key]
+    return row
+
+
 def suggested_from_context(
     cfg: Config,
     doc: ExtractedDoc,
@@ -234,7 +426,7 @@ def suggested_from_context(
     scope_items: list[Item] | None = None,
     on_status: Callable[[str], None] | None = None,
 ) -> tuple[list[Finding], dict[str, Any]]:
-    """Summary → historian → scout → Q&A → synthesis. Suggested lane only."""
+    """Summary → 3-round retrieve → historian → scout → novelty Q/A → soundness → synthesis."""
     say = on_status or (lambda _msg: None)
     model = cfg.llm_model
     lane_id = "context-web" if search_enabled else "context"
@@ -273,16 +465,20 @@ def suggested_from_context(
         if f.lane == "checked" and not f.dismissed
     ][:20]
 
-    def one_call(system: str, user: str, label: str) -> dict[str, Any] | None:
+    def timed_out() -> bool:
         if time.monotonic() >= deadline:
             meta["skipped"] = meta.get("skipped") or "timeout"
+            return True
+        if _remaining(deadline) < 5.0:
+            meta["skipped"] = meta.get("skipped") or "timeout"
+            return True
+        return False
+
+    def one_call(system: str, user: str, label: str) -> dict[str, Any] | None:
+        if timed_out():
             say(f"{label} skipped (timeout)")
             return None
         remain = _remaining(deadline)
-        if remain < 5.0:
-            meta["skipped"] = meta.get("skipped") or "timeout"
-            say(f"{label} skipped (timeout)")
-            return None
         say(f"{label}…")
         meta["calls"] = int(meta["calls"]) + 1
         try:
@@ -320,45 +516,78 @@ def suggested_from_context(
         return [], meta
     summary = _parse_summary(summary_raw)
     meta["prompt_sha"] = sha256(_SUMMARY_SYSTEM.encode("utf-8")).hexdigest()[:12]
-    query_bits = list(summary.get("claims") or [])[:3]
-    if summary.get("method"):
-        query_bits.append(str(summary["method"]))
-    query = " ".join(query_bits) or excerpt[:400]
 
-    local_hits, rag_skip = library_passages(cfg, query, keys=keys, k=max_hits)
-    if rag_skip:
-        meta["rag_skipped"] = rag_skip
-        say(f"Context library retrieve skipped ({rag_skip})")
-    else:
-        meta["backends"] = list(meta["backends"]) + ["rag"]
-        say(f"Context library retrieve ({len(local_hits)} hit(s))")
+    if search_enabled and offline:
+        meta["search_skipped"] = "offline"
+        say("Context-web search skipped (offline)")
 
+    local_hits: list[dict[str, Any]] = []
     remote: list[dict[str, Any]] = []
-    if search_enabled:
-        if offline:
-            meta["search_skipped"] = "offline"
-            say("Context-web search skipped (offline)")
-        else:
-            oa_rows, oa_skip = _openalex_works(cfg, query, limit=max_hits)
-            if oa_skip:
-                meta["openalex_skipped"] = oa_skip
-            else:
-                remote.extend(oa_rows)
-                meta["backends"] = list(meta["backends"]) + ["openalex"]
-            sx_rows, sx_skip = _searxng_hits(cfg, query, limit=max_hits)
-            if sx_skip:
-                meta["searxng_skipped"] = sx_skip
-            else:
-                remote.extend(sx_rows)
-                meta["backends"] = list(meta["backends"]) + ["searxng"]
-            if not remote and (oa_skip or sx_skip):
-                meta.setdefault("search_skipped", oa_skip or sx_skip)
+    round_rows: list[dict[str, Any]] = []
+    rag_skips: list[str] = []
+    for i, spec in enumerate(
+        _round_specs(summary, title=title, item=item, excerpt=excerpt), start=1
+    ):
+        rid = str(spec.get("id") or f"round{i}")
+        if timed_out():
+            say(f"Context retrieve round {i}/3 ({rid}) skipped (timeout)")
+            round_rows.append(
+                {
+                    "id": rid,
+                    "query": str(spec.get("query") or "")[:400],
+                    "library": [],
+                    "retrieved": [],
+                    "skipped": "timeout",
+                }
+            )
+            continue
+        say(f"Context retrieve round {i}/3 ({rid})…")
+        year_from = spec.get("year_from") if search_enabled and not offline else None
+        result = _retrieve(
+            cfg,
+            str(spec.get("query") or ""),
+            keys=keys,
+            max_hits=max_hits,
+            search_enabled=search_enabled,
+            offline=offline,
+            year_from=year_from if isinstance(year_from, int) else None,
+            meta=meta,
+        )
+        local_hits = _merge_hits(local_hits, result.get("library") or [])
+        remote = _merge_hits(remote, result.get("retrieved") or [])
+        if result.get("rag_skipped"):
+            rag_skips.append(str(result["rag_skipped"]))
+        compact = _compact_round(spec, result, max_hits=max_hits)
+        round_rows.append(compact)
+        n_lib = len(result.get("library") or [])
+        n_rem = len(result.get("retrieved") or [])
+        say(f"Context retrieve round {i}/3 ({rid}) {n_lib} library, {n_rem} retrieved")
+
+    if not local_hits and rag_skips:
+        meta["rag_skipped"] = rag_skips[0]
+        say(f"Context library retrieve skipped ({rag_skips[0]})")
+    elif local_hits:
+        say(f"Context library retrieve ({len(local_hits)} unique hit(s))")
+
+    if search_enabled and not offline and not remote:
+        oa_bits = [
+            r.get("openalex_skipped") for r in round_rows if r.get("openalex_skipped")
+        ]
+        sx_bits = [
+            r.get("searxng_skipped") for r in round_rows if r.get("searxng_skipped")
+        ]
+        if oa_bits or sx_bits:
+            meta.setdefault("search_skipped", oa_bits[0] if oa_bits else sx_bits[0])
+        if oa_bits:
+            meta.setdefault("openalex_skipped", oa_bits[0])
+        if sx_bits:
+            meta.setdefault("searxng_skipped", sx_bits[0])
 
     passages_blob = json.dumps(
         {"library": local_hits[:max_hits], "retrieved": remote[:max_hits]},
         ensure_ascii=False,
         default=str,
-    )[:12_000]
+    )[:_PASSAGES_CAP]
     summary_blob = json.dumps(summary, ensure_ascii=False)
 
     hist = one_call(
@@ -376,29 +605,146 @@ def suggested_from_context(
         "Context baseline scout",
     )
     omitted = scout.get("omitted") if isinstance(scout, dict) else []
+    if not isinstance(omitted, list):
+        omitted = []
 
-    novelty = one_call(
-        _QA_NOVELTY_SYSTEM,
-        f"Excerpt:\n{excerpt}\n\nSummary:\n{summary_blob}\n\nPassages:\n{passages_blob}",
-        "Context Q&A novelty",
+    novelty_qs_raw = one_call(
+        _QA_NOVELTY_QUESTIONS_SYSTEM,
+        f"Excerpt:\n{excerpt}\n\nSummary:\n{summary_blob}\n\nNarrative:\n{narrative}\n\n"
+        f"Omitted:\n{json.dumps(omitted, ensure_ascii=False, default=str)[:4000]}",
+        "Context novelty questions",
     )
+    novelty_questions = [
+        str(q).strip()
+        for q in ((novelty_qs_raw or {}).get("questions") or [])
+        if str(q).strip()
+    ][:6]
+
+    novelty_local: list[dict[str, Any]] = []
+    novelty_remote: list[dict[str, Any]] = []
+    novelty_search_rows: list[dict[str, Any]] = []
+    for nq in novelty_questions:
+        if timed_out():
+            novelty_search_rows.append(
+                {
+                    "query": nq[:400],
+                    "library": [],
+                    "retrieved": [],
+                    "skipped": "timeout",
+                }
+            )
+            continue
+        say("Context novelty search…")
+        result = _retrieve(
+            cfg,
+            nq,
+            keys=keys,
+            max_hits=max_hits,
+            search_enabled=search_enabled,
+            offline=offline,
+            year_from=None,
+            meta=meta,
+        )
+        novelty_local = _merge_hits(novelty_local, result.get("library") or [])
+        novelty_remote = _merge_hits(novelty_remote, result.get("retrieved") or [])
+        novelty_search_rows.append(
+            {
+                "query": nq[:400],
+                "library": _titles(result.get("library") or [], limit=max_hits),
+                "retrieved": _titles(result.get("retrieved") or [], limit=max_hits),
+                **{
+                    k: result[k]
+                    for k in (
+                        "rag_skipped",
+                        "openalex_skipped",
+                        "searxng_skipped",
+                        "search_skipped",
+                    )
+                    if result.get(k)
+                },
+            }
+        )
+
+    answer_local = _merge_hits(local_hits, novelty_local)
+    answer_remote = _merge_hits(remote, novelty_remote)
+    novelty_blob = json.dumps(
+        {"library": answer_local[:max_hits], "retrieved": answer_remote[:max_hits]},
+        ensure_ascii=False,
+        default=str,
+    )[:_PASSAGES_CAP]
+    novelty_pairs: list[Any] = []
+    if novelty_questions:
+        novelty_ans = one_call(
+            _QA_NOVELTY_ANSWERS_SYSTEM,
+            "Excerpt:\n"
+            + excerpt
+            + "\n\nQuestions:\n"
+            + json.dumps(novelty_questions, ensure_ascii=False)
+            + "\n\nPassages:\n"
+            + novelty_blob,
+            "Context novelty answers",
+        )
+        raw_pairs = (novelty_ans or {}).get("pairs") if novelty_ans else []
+        if isinstance(raw_pairs, list):
+            novelty_pairs = raw_pairs
+
     soundness = one_call(
         _QA_SOUNDNESS_SYSTEM,
         f"Excerpt:\n{excerpt}\n\nSummary:\n{summary_blob}\n\nChecked findings:\n"
         + json.dumps(checked, ensure_ascii=False),
         "Context Q&A soundness",
     )
+    soundness_pairs = (soundness or {}).get("pairs") if soundness else []
+    if not isinstance(soundness_pairs, list):
+        soundness_pairs = []
+
+    omitted_compact: list[dict[str, str]] = []
+    for row in omitted:
+        if not isinstance(row, dict):
+            continue
+        omitted_compact.append(
+            {
+                "title": str(row.get("title") or "")[:200],
+                "detail": str(row.get("detail") or "")[:500],
+            }
+        )
+
+    def _pair_rows(raw: list[Any]) -> list[dict[str, str]]:
+        rows: list[dict[str, str]] = []
+        for pair in raw:
+            if not isinstance(pair, dict):
+                continue
+            q = str(pair.get("q") or "").strip()[:400]
+            a = str(pair.get("a") or "").strip()[:500]
+            if q or a:
+                rows.append({"q": q, "a": a})
+        return rows
+
+    investigation = {
+        "summary": summary,
+        "rounds": round_rows,
+        "novelty_search": {
+            "queries": [q[:400] for q in novelty_questions],
+            "library": _titles(novelty_local, limit=max_hits),
+            "retrieved": _titles(novelty_remote, limit=max_hits),
+            "hits": novelty_search_rows,
+        },
+        "narrative": narrative[:4000],
+        "omitted": omitted_compact,
+        "novelty": _pair_rows(novelty_pairs),
+        "soundness": _pair_rows(soundness_pairs),
+    }
     log = {
         "summary": summary,
         "narrative": narrative,
         "omitted": omitted,
-        "novelty": (novelty or {}).get("pairs") if novelty else [],
-        "soundness": (soundness or {}).get("pairs") if soundness else [],
+        "novelty": investigation["novelty"],
+        "soundness": investigation["soundness"],
     }
     review = one_call(
         _REVIEW_SYSTEM,
         f"Excerpt:\n{excerpt}\n\nInvestigation:\n"
-        + json.dumps(log, ensure_ascii=False, default=str)[:12_000],
+        + json.dumps(log, ensure_ascii=False, default=str)[:_PASSAGES_CAP],
         "Context review",
     )
     extra: list[Finding] = []
@@ -412,11 +758,10 @@ def suggested_from_context(
             limit=max_comments,
         )
     )
-    for pair in list(log.get("novelty") or []) + list(log.get("soundness") or []):
-        if not isinstance(pair, dict):
-            continue
+    novelty_hay = _passage_hay(hay, answer_local, answer_remote)
+    for pair in investigation["novelty"]:
         detail = str(pair.get("a") or pair.get("q") or "").strip()
-        if not detail or not grounded(detail, hay):
+        if not detail or not grounded(detail, novelty_hay):
             continue
         extra.append(
             make_finding(
@@ -431,9 +776,25 @@ def suggested_from_context(
         if len(extra) >= max_comments:
             extra = extra[:max_comments]
             break
-    for row in omitted or []:
-        if not isinstance(row, dict):
-            continue
+    if len(extra) < max_comments:
+        for pair in investigation["soundness"]:
+            detail = str(pair.get("a") or pair.get("q") or "").strip()
+            if not detail or not grounded(detail, hay):
+                continue
+            extra.append(
+                make_finding(
+                    code="context_qa",
+                    severity="info",
+                    lane="suggested",
+                    detail=detail[:500],
+                    source="llm",
+                    extra={"reviewer": lane_id},
+                )
+            )
+            if len(extra) >= max_comments:
+                extra = extra[:max_comments]
+                break
+    for row in omitted_compact:
         detail = str(row.get("detail") or "").strip()
         if not detail:
             continue
@@ -454,8 +815,12 @@ def suggested_from_context(
     review_summary = str((review or {}).get("summary") or "").strip()
     if review_summary and grounded(review_summary, hay):
         narrative = narrative or review_summary
+    if review_summary:
+        investigation["review"] = review_summary[:4000]
     if narrative:
         meta["narrative"] = narrative[:4000]
+        investigation["narrative"] = narrative[:4000]
+    meta["investigation"] = investigation
     reviewer_row: dict[str, Any] = {
         "id": lane_id,
         "model": model,

@@ -161,7 +161,7 @@ never leave a half-written `record.json` or run report.
 | `state/rq-answered/<stamp>/` | `rag answered` / Index already-answered pack (`paperful.rq_answered.v1`, `pack.md`) |
 | `state/prompts/` | Operator-saved Ask system prompts from the Index form (“Save as…”); listed in the custom-prompt select |
 | `state/gui/uploads/` | Workbench uploads (Discover import, Index prompt/questions files); basename only |
-| `state/critiques/<id>/<stamp>/` | `critique` pack (`paperful.critique.pack.v1`, `pack.md`: findings, metrics, optional reviewer notes). `<id>` is a library item key or `file-<filename-stem>` for uploads. Dismissals: `state/critiques/<id>/dismissed.jsonl`. Uploads: `state/critiques/uploads/` |
+| `state/critiques/<id>/<stamp>/` | `critique` pack (`paperful.critique.pack.v1`, `pack.md`: findings, metrics, optional reviewer notes). Context / context-web also write `context.json` (`paperful.critique.context.v1`). `<id>` is a library item key or `file-<filename-stem>` for uploads. Dismissals: `state/critiques/<id>/dismissed.jsonl`. Uploads: `state/critiques/uploads/` |
 | `state/rewrites/<id>/<stamp>/` | `rewrite` pack (`paperful.rewrite.pack.v1`, `plan.json` `paperful.rewrite.plan.v1`, optional sidecar / `tracked.docx` / `.pptx` / `.odt` / `.pdf`). Never overwrites the source manuscript |
 | `state/stuff/<id>/<stamp>/` | `stuff` pack (`paperful.stuff.pack.v1`, `pack.md`). Extra library cites per claim. No manager writes |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
@@ -206,7 +206,7 @@ below.
 | `extract-sections` | rules always; optional GROBID sidecar; optional `[extract_sections].llm` + `llm.enabled` | `state/sections/<key>.json` | none (disk only) |
 | `ask` | `llm.enabled` + `rag.enabled` | `state/runs/<stamp>-ask.json`; advanced summaries under `state/rag/evidence/` | none unless batch `--apply` |
 | `rag questions` | rules always; optional `[rag].extract_questions_llm` + `llm.enabled` | `state/rag/questions/<key>.json` | none |
-| `critique` | checkers, metrics, heuristic AI-tells always (house glossary expansions when `state/glossary/` has entries); optional `--lane` / `[critique].lanes` suggested review lanes (`reviewers`, `marg`, `adversary`, `outline`, `claims`, `verify`, `context`, `context-web`; `--llm` / `--advanced` aliases; optional GROBID TEI chunks for `marg` / `claims` / `verify`); optional `--ai-model` Binoculars extra; optional `--vale` / `[critique].vale` house-style pass | `state/critiques/<id>/<stamp>/` | child note with `--apply` on `--item` only |
+| `critique` | checkers, metrics, heuristic AI-tells always (house glossary expansions when `state/glossary/` has entries); optional `--lane` / `[critique].lanes` suggested review lanes (`reviewers`, `marg`, `adversary`, `outline`, `claims`, `verify`, `context`, `context-web`; `--llm` / `--advanced` aliases; optional GROBID TEI chunks for `marg` / `claims` / `verify`); `context` / `context-web` use three-round retrieve and may write `context.json`; optional `--ai-model` Binoculars extra; optional `--vale` / `[critique].vale` house-style pass | `state/critiques/<id>/<stamp>/` | child note with `--apply` on `--item` only |
 | `rewrite` | apply an existing critique pack (never re-runs critique). Default area `style` (glossary/Vale swaps without a model). Other areas need `[llm].enabled`. Stdlib tracked-changes OOXML | `state/rewrites/<id>/<stamp>/` | none (never overwrites the source) |
 
 Opt-in **`camofox`** is a registered **serial** source (never in `DEFAULT_SOURCES`) that talks to an external [camofox-browser](https://github.com/jo-inc/camofox-browser) REST server for a scripted DOI→PDF grab. `run` injects it when `[camofox].enabled` and `[camofox].during_run` (default on); `--camofox` / `--no-camofox` override one invocation. Policy order places it after vault lanes and before `browser_agent`. It does not reuse the vault Chromium SSO profile (see [Camofox](camofox.md)).
@@ -300,9 +300,10 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
   routed source list in order (full `sources` when `--try-all`).
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
 - `paperful critique` — local manuscript pack (`state/critiques/`). Checkers,
-  metrics, and heuristic AI-tells without an LLM; optional suggested comments
-  (`--llm` / `--advanced`), Binoculars extra, and Vale house-style pass.
-  Not a grade and not in `all`.
+  metrics, and heuristic AI-tells without an LLM; optional `--lane` suggested
+  comments (`--llm` / `--advanced` aliases), including ScholarPeer-inspired
+  `context` / `context-web` (three-round retrieve; `context.json` sidecar),
+  Binoculars extra, and Vale house-style pass. Not a grade and not in `all`.
 - `paperful rewrite` — apply a critique pack (`state/rewrites/`). Default
   area is style. Never overwrites the source. Not a generated paper and not
   in `all`.

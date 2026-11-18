@@ -15,9 +15,12 @@ OpenDocument (`.odt`), and/or PDF. `--output tracked` follows the source
 suffix (Word spine for markdown / PDF / HTML / RTF). `--output odt` and
 `--output pdf` can be requested for any source.
 
-Paperful does not vendor [Paper Orchestra](https://github.com/google-research/paper-orchestra),
+Paperful does not vendor [PaperOrchestra](https://github.com/google-research/paper-orchestra),
 [ARIES](https://github.com/allenai/aries), or [XtraGPT](https://huggingface.co/collections/Xtra-Computing/xtragpt).
 Docs credit the patterns: a worklog, align-then-generate, selected-span prompts.
+Product routing vs PaperOrchestra (idea+log → conference LaTeX):
+[How Paperful compares](comparison.md) and the
+[comparison reference](comparison-reference.md#paperorchestra).
 
 ## CLI
 

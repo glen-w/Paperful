@@ -9,7 +9,7 @@ PDFs**. Hosted “paper factories” (Edison, Elicit, Deep Research, Jenni) own
 discover and draft; they do not own campus-proxy fetch, grey playbooks, or a
 restore ledger. Factory-stage matrix: [comparison reference](comparison-reference.md#paper-factory-stages).
 
-**Last reviewed:** 2026-10-27. Feature lists for other products are based on public
+**Last reviewed:** 2026-11-18. Feature lists for other products are based on public
 docs and positioning — not paid pilots or exhaustive release testing.
 
 Vendor-by-vendor notes live in the [comparison reference](comparison-reference.md).
@@ -36,7 +36,9 @@ Prefer this page for “is this the right tool?”
 | **Systematic-review screening** (dual review, extraction forms, PRISMA counts; usually no discovery corpus) | [Covidence](https://www.covidence.org/), [Rayyan](https://www.rayyan.ai/), DistillerSR; local [ASReview](https://asreview.nl/). Paperful `sr` can export counts and CSV; it does not replace those tools. Discover Keep/Skip is hop triage, not dual review |
 | **Chat with PDFs you upload** (no scholarly search, no Zotero restore) | Scholarcy, Explainpaper, Humata, [Gemini Notebook](https://notebooklm.google/). Paperful `ask` uses the **same** `out/` tree as fetch |
 | **Draft a manuscript with citations** (library ∪ global index; language/LaTeX) | [Jenni](https://jenni.ai/), [Paperpal](https://paperpal.com/), SciSpace Writer, Writefull in [Overleaf](https://docs.overleaf.com/integrations-and-add-ons/ai-features). Living cites without a model: Better BibTeX → Quarto. Paperful does not draft papers. [`rewrite`](rewrite.md) applies an existing critique pack as locatable edits / tracked changes — it is not a generator |
-| **Apply a pre-submission pack as tracked changes** (hygiene first; no invented numbers or cites) | **Paperful** [`rewrite`](rewrite.md) from a [`critique`](critique.md) pack. Patterns (not vendored code): Paper Orchestra worklog, ARIES align-then-generate, XtraGPT selected-span prompts |
+| **Turn idea notes + experimental logs into conference LaTeX** (outline, related work, plots, self-critique; not your Zotero tree) | [PaperOrchestra](https://github.com/google-research/paper-orchestra) (Google Cloud AI Research; you run it). Nearby: [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) (idea → experiment → workshop paper). Paperful does not generate manuscripts — [reference](comparison-reference.md#paperorchestra) |
+| **Apply a pre-submission pack as tracked changes** (hygiene first; no invented numbers or cites) | **Paperful** [`rewrite`](rewrite.md) from a [`critique`](critique.md) pack. Patterns (not vendored code): PaperOrchestra worklog, ARIES align-then-generate, XtraGPT selected-span prompts |
+| **Literature-grounded pre-submission critique** (your library, optional OpenAlex; no score or accept/reject) | **Paperful** [`critique --lane context`](critique.md) / `context-web`. ScholarPeer *ideas* (three-round retrieve, historian, baseline scout, novelty Q then A). Not [open-scholar-peer](https://github.com/amirkiarafiei/open-scholar-peer) and not a venue referee |
 | **Grounded Q&A over PDFs you already have** (local index; same collection mirror as fetch) | **Paperful** `rag ingest` / `ask` (`simple` default; `--ask-mode advanced` scores passages then answers) — optional `paperful mcp` (`ask`, `refs_gap`, `gaps`, `snowball_search`, `snowball_trends`, `export`, `proposal_export`). OSS cousin: [PaperQA2](https://github.com/future-house/paper-qa) (you supply the PDFs) |
 | **Deep forensics on tables, stats, and figures** (GRIM/statcheck/TIVA, spreadsheet digit tests, image duplication, paper-mill graphs) — flags anomalies with innocent explanations, not verdicts | [PaperGuard](https://github.com/exergyleizhou-ux/PaperGuard) (`paperguard scan`). **Paperful** [`critique --forensics`](critique.md) wraps that CLI when it is on PATH. [`screen`](screen.md) / critique cover retractions, PPS fingerprints, and light stdlib stats on **manuscript** text — complement, not a substitute. Later buffet items: [Research integrity forensics](ROADMAP.md#research-integrity-forensics-paperguard) |
 | **`.bib` normalize / dedupe / upgrade preprints** (no Zotero required) | [bibcite](https://github.com/leo1oel/bibcite), [bibtex-tidy](https://github.com/FlamingTempura/bibtex-tidy), [bibmanager](https://bibmanager.readthedocs.io/) |
@@ -145,7 +147,7 @@ stages](comparison-reference.md#paper-factory-stages).
 - Two-up scan split, or a chat agent over the library (`ocr` adds a text layer; it does not split pages. `summarize` / `synthesize` / `recover` are opt-in and local)
 - Hosted multi-user service
 - Autonomous AI-scientist runs, experimental-data kernels, or molecular design (use [Edison Scientific](https://docs.edisonscientific.com/) or similar)
-- A journal manuscript, related-work draft, or “overnight PhD” (use Jenni/Paperpal/Overleaf for drafting; Edison/Sakana are not Paperful’s job)
+- A journal manuscript, related-work draft, or “overnight PhD” (use Jenni/Paperpal/Overleaf for interactive drafting; [PaperOrchestra](https://github.com/google-research/paper-orchestra) for idea+log → conference LaTeX; Edison/Sakana are not Paperful’s job)
 - Systematic-review dual screening and PRISMA-grade recall (use Covidence / Rayyan / ASReview; Discover Keep/Skip is hop triage)
 - Jeffersonian transcription or qualitative coding
 
@@ -210,8 +212,14 @@ Need a Deep Research memo from the web?
 Need a manuscript draft with extra cites from a huge index?
   → Jenni, Paperpal, SciSpace Writer, Overleaf AI. Paperful will not invent BibTeX; extra cites belong in Zotero first. `paperful rewrite` only applies a critique pack you already ran
 
+Need idea notes and a lab log turned into CVPR/ICLR-shaped LaTeX?
+  → PaperOrchestra (you run it; Semantic Scholar + LLM APIs). Not a Zotero helper. Paperful still owns PDFs and the restore ledger if those cites should live in your library
+
 Need locatable edits from a critique pack (hygiene / tracked-changes Word)?
   → paperful rewrite (see rewrite.md). Not a generated paper
+
+Need a literature-grounded pre-submission critique of a draft you already have (library first, optional OpenAlex; no score)?
+  → paperful critique --lane context / context-web (see critique.md). ScholarPeer ideas, not a venue referee and not the open-scholar-peer installer
 
 Need cited Q&A on a folder of PDFs with no Zotero?
   → PaperQA2 (OSS). Paperful when those PDFs should also live in a restore ledger

@@ -126,7 +126,7 @@ holds readability, lexical diversity, and the AI-tell summary (also rendered
 as a Metrics section in `pack.md`). `pack.md` leads with an **Incomplete lanes**
 banner when a requested review lane skipped, then reviewer notes, counts,
 metrics, **Critical path** (checked findings that are not hygiene, majors
-first), **Outline** (when `--lane outline` ran), **Claims** (when `--lane claims` ran), **Suggested**, and **Hygiene**
+first), **Outline** (when `--lane outline` ran), **Claims** (when `--lane claims` ran), **Context investigation** (when `--lane context` / `context-web` ran), **Suggested**, and **Hygiene**
 (Vale, acronyms, prose metrics, AI-tell codes). JSON `findings` is unsplit.
 `llm` is `null` until a review lane runs;
 then it records `lanes` (ordered ids), a deprecated `mode` string
@@ -143,7 +143,8 @@ optional `adversary` stats (`calls`, `skipped`), optional `outline` stats
 (`parser`, `calls`, `skipped`), optional `verify` stats (`parser`, `segments`,
 `calls`, `skipped`), and optional
 `context` stats (`search_enabled`, `backends`, `rag_skipped`,
-`search_skipped`). Top-level `outline` is the section skeleton when that lane
+`search_skipped`, optional `investigation` plus `log` / `log_path` for
+`context.json`). Top-level `outline` is the section skeleton when that lane
 ran. Top-level `claims` is the intra-doc ledger when that lane
 ran. `ai_model` and `vale` appear only when those extras ran
 (skip reason or alert counts).
@@ -185,8 +186,8 @@ Each lane needs `[llm].enabled`; otherwise the pack records
 | `outline` | — | Plan review: section skeleton, claim/warrant/scope/evidence pressure. Not a finished-manuscript verdict |
 | `claims` | — | Intra-doc claim ledger: extract core claims, bind to methods/results/limitations spans |
 | `verify` | — | Section swarm: density budget, sequential verify, local synthesis (not Deep Review) |
-| `context` | — | ScholarPeer-inspired: summary, library historian, baseline scout, Q&A |
-| `context-web` | — | Same pipeline; literature/baseline may query OpenAlex / optional SearXNG |
+| `context` | — | ScholarPeer-inspired: summary, 3-round library retrieve, historian, baseline scout, novelty Q then A, soundness |
+| `context-web` | — | Same pipeline; retrieve rounds and novelty answers may query OpenAlex / optional SearXNG |
 
 ```toml
 [critique]
@@ -330,19 +331,27 @@ forced final JSON turn runs before the slice is marked `empty_reply`.
 Additive suggested lane inspired by ScholarPeer
 ([Goyal et al., arXiv:2601.22638](https://arxiv.org/abs/2601.22638)).
 Paperful does not vendor that framework or community skill packs. The
-pipeline is summary → historian → baseline scout → multi-aspect Q&A →
-synthesis. Same grounding and no-score rules as reviewers. This is not
-ScholarPeer parity and does not emit venue scores.
+pipeline is summary → three-round retrieve (subdomain, method, temporal) →
+historian → baseline scout → novelty questions → novelty retrieve → novelty
+answers → extract-only soundness Q&A → synthesis. Same grounding and
+no-score rules as reviewers. This is not ScholarPeer parity and does not
+emit venue scores.
 
 `context` retrieves only from the local RAG index (collection / library
 scope when `-C` / `--library` loaded items). Missing index records
-`rag_skipped` and continues on the extract.
+`rag_skipped` and continues on the extract. Novelty answers get a second
+RAG pass from the questions; soundness does not.
 
 `context-web` uses the same pipeline and may query OpenAlex, then optional
-SearXNG when `[searxng].base_url` is set. A yellow egress notice prints.
+SearXNG when `[searxng].base_url` is set, for each retrieve round and for
+novelty answers. A yellow egress notice prints.
 `PAPERFUL_OFFLINE=1` skips those calls and records `search_skipped: offline`.
 Venue filters are not hard-coded to ML conferences. Caps:
-`context_timeout_s`, `context_max_comments`, `context_max_hits`.
+`context_timeout_s`, `context_max_comments`, `context_max_hits` (per retrieve).
+
+A compact investigation log (`paperful.critique.context.v1`) is
+`context.json` next to `pack.json`. `pack.md` has a **Context investigation**
+section (queries, hit titles, Q&A). Passages are not copied into `pack.json`.
 
 ## Optional AI-text extra (`--ai-model` / `[critique].ai_model`)
 
@@ -470,7 +479,7 @@ and can be combined (pre-checked from `[critique].lanes`, or the llm/advanced
 shims when `lanes` is empty). Visible labels: **Get independent reviewer
 notes**, **Review experiments, clarity, and impact**, **Argue against my
 conclusions**, **Review this as an outline**, **Show which claims this text supports**, **Find gaps section
-by section**, **Compare with this library**, **Compare with published work
+by section**, **Compare with this library** (three retrieve rounds), **Compare with published work
 (goes online)**. Tooltips hold the lane ids (`reviewers`, `marg` / MARG-S,
 `adversary`, `outline`, `claims`, `verify` — not a truth check, `context`,
 `context-web`). **GROBID sidecar** is for MARG-S / claims / verify chunks

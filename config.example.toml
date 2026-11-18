@@ -217,7 +217,7 @@ mirror_failures_before_skip = 3
 # verify_max_segments = 8
 # context_timeout_s = 0            # context / context-web; 0 = max([llm].timeout_s, 600)
 # context_max_comments = 12
-# context_max_hits = 8             # local RAG and OpenAlex/SearXNG rows
+# context_max_hits = 8             # per retrieve round and novelty-answer search
 # adversary_max_comments = 12      # validity red-team lane cap
 # outline_max_comments = 12        # plan-review lane cap
 # # lanes = ["reviewers", "marg"]  # when set, llm/advanced bools are ignored

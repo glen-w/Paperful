@@ -33,7 +33,9 @@ workbench and ledgers, **1.9.0** cut GitHub CI back to smoke, **1.9.1** and
 **1.9.2** are the critique and rewrite trust waves, and **1.9.3**
 (2026-11-16) ships [`paperful since`](since.md), the first item on the live
 order. **1.9.4** ships the second, `refs gap` memory, and restores lint
-and the full suite on CI. The **live map** is [After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
+and the full suite on CI. **1.9.5** (2026-11-18) ships critique
+`context` / `context-web` three-round retrieve, a `context.json` sidecar, and
+split novelty Q then A ([critique.md](critique.md)). The **live map** is [After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
 still lists jobs by area; many of those rows have shipped. Do not re-pick
 them as the next thing to build.
 
@@ -151,9 +153,13 @@ wrote down and did not do.
 
 **Status:** shipped in 1.9.3, CLI only ([since](since.md)). Both sections
 are built. Probes use the open-access metadata lanes; a campus (EZProxy)
-candidate is not probed. The four-week dogfood started on 14 Nov 2026 (two
-packs on one collection so far). Do not add a scheduler, an email, or a nav
-item before it ends. The sketch below is the design record; where it and
+candidate is not probed. The four-week dogfood started on 14 Nov 2026; track
+progress in [since dogfood log](dogfood/since-bbnj.md) — BBNJ and Hoops, 0/4
+weekly verdicts per collection until each pack is opened; full `run` on both
+under way 16 Nov 2026. Operator cron only: Nightshift
+[`paperful-since`](../../nightshift/jobs/paperful-since/) runs weekly `since` on
+BBNJ and Hoops; do not add an in-app scheduler, an email, or a nav item before
+it ends. The sketch below is the design record; where it and
 [since](since.md) differ, the page is what shipped.
 
 The researcher already has watches (`keepup`), a miss list (`gaps`), a
@@ -580,6 +586,107 @@ install.
 
 Do not open a fourth desk to justify a feature.
 
+(after-17-relate)=
+### Embedded graph store (Neo4j Relate) — metaplan
+
+**Status:** exploratory. Not on the 1.9.x cut. Not a second source of truth.
+
+**Context.** [Neo4j Relate](https://neo4j.com/product/relate/) (Apache 2.0, in-process
+Rust, MCP) targets agents that need **connected** data without standing up a
+server. Paperful already ships graph-shaped work on disk: snowball
+[`paperful.citation_graph.v1`](snowball.md), co-author
+[`paperful.network.v1`](network.md) (NetworkX → GEXF/GraphML), OpenAlex hops,
+identity/resolver graph items in [Maybe later §3](#maybe-later), and read-only
+[`paperful mcp`](commands.md#agent-channel-format-json-and-mcp). Ask retrieval
+stays **[LanceDB](rag.md)** on the mirror. Relate is a **query and agent
+surface** experiment, not a replacement for `out/` or the RAG index unless a
+spike shows a clear win.
+
+**Why here, not in TranscriptX first.** Literature edges (cites, co-wrote,
+same-topic, held vs proposed) are already first-class Paperful nouns and match
+the Relate launch story (multi-hop + optional vectors in one Cypher hop). TX
+would use a graph for bi-temporal negotiation memory; that is a sibling bet —
+see untangle assessment (Nov 2026), not this file’s product lane.
+
+**What memory is not.** A graph store is not agent memory by itself. Lifecycle
+(what is written, trusted, merged, superseded, forgotten) stays on the mirror
+ledger, `paperful.note.v1`, snowball queue state, and SR ledgers. Relate may
+hold **derived** projections only — same honesty as co-author runs under
+`state/network/`.
+
+**Constraints (do not violate).**
+
+- **Mirror-first.** Canonical items stay `out/<key>/record.json` + PDFs. Relate
+  reads exports; it does not become the write path for parents or attachments.
+- **No dual-schedule.** Do not replace nightshift
+  [`paperful-summarize`](https://github.com/glen-w/nightshift) ingest or add a
+  second embedding pipeline without the [embeddings spike](#after-17-embeddings-order) bar.
+- **No Zotero sqlite.** Same rule as the rest of the tree.
+- **Agent channel.** New reads should reuse `paperful.agent.json.v1` and MCP
+  patterns; cap result size; structured retryable errors like existing batch
+  verbs.
+- **Stop rule.** If two-hop citation + co-author queries are not easier than
+  today’s JSON + `rag search` + MCP `precedent`, file the spike and stop — do
+  not productise Relate.
+
+**Likely node shapes (v0 sketch, not a schema epoch).**
+
+| Label | Source in tree | Id |
+| --- | --- | --- |
+| `Work` | Mirror item / snowball node | DOI or OpenAlex id, else `item_key` |
+| `Author` | Creator lists, network alters | ORCID preferred |
+| `QueueRun` | Snowball run dir | `run-id` |
+| `NetworkRun` | `state/network/<run-id>/` | `run-id` |
+| `Collection` | Adapter collection name | slug as used in CLI |
+
+| Relationship | Meaning |
+| --- | --- |
+| `CITES` | Snowball / OpenAlex ref edge |
+| `CO_AUTHORED` | Undirected co-authorship (phase property optional) |
+| `IN_QUEUE` | Proposed or accepted in a snowball run |
+| `HELD_IN` | Item in collection (mirror read) |
+| `SUPERSEDES` | Optional later: resolver graph / version chain |
+
+Vectors: optional second phase — point Relate at the same embedder as `[rag]` or
+compare against LanceDB on one BBNJ question set; do not fork defaults.
+
+**Metaplan (spike only).**
+
+| Phase | Outcome | Writes library? |
+| --- | --- | --- |
+| **0 — Read the room** | Install Relate CLI or Python binding; run NODES / Devpost
+  hello-world; confirm MCP tool list | No |
+| **1 — One desk import** | Ocean/BBNJ: load **one** saved snowball queue JSON +
+  **one** `network orcid` run into `state/relate/<slug>.db` (or Relate’s single-file
+  store). Document import script path in `assessments/` | No |
+| **2 — Agent questions** | Five Cypher (or MCP) questions the maintainer actually
+  asks (e.g. IGC-phase co-authors who cite work X; held vs refs-gap overlap).
+  Compare latency and answer quality to MCP `precedent` + manual grep | No |
+| **3 — MCP bridge (optional)** | Thin read-only tool `graph_query` wrapping Relate
+  with caps; only if phase 2 wins | No |
+| **4 — Kill or park** | `docs/assessments/YYYY-MM-DD-relate-spike.md` with stop/go;
+  link from this section | No |
+
+**Hackathon window (optional).** Neo4j Relate Devpost **11 Nov – 11 Dec 2026** —
+treat as a **time-boxed** phase 0–2 sitting, not a roadmap commitment. A
+submission is valuable only if it demos **BBNJ desk** data already in the mirror,
+not greenfield graph fiction.
+
+**Cross-repo (pointer only).** TranscriptX derived negotiation graph and Rollup
+edition graphs are lower priority than this spike; Transcribe’s parked
+autobiography `EvidenceLink` model explicitly avoids a graph DB as system of
+record.
+
+**Open questions.**
+
+- Does Relate replace NetworkX for **export-only** SNA, or stay a parallel query
+  engine while matplotlib/D3 keep rendering?
+- Is `sqlite-vec` in [Local embeddings](#local-embeddings) still the right
+  compare target, or does Relate subsume both graph and vector for Ask-adjacent
+  hops?
+- One file per library vs one global `state/relate/` for all collections on this
+  Mac?
+
 (after-17-platform-residuals)=
 ### Platform residuals (named so they are not forgotten)
 
@@ -713,7 +820,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.4).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.5).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -721,7 +828,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.9.4` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.9.5` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
@@ -851,7 +958,8 @@ refuses “fraud” vocabulary in reports. Paperful uses the same copy pattern o
 retraction** on holdings (`screen`); **pre-submission reading packs**
 (`critique`: structure, refs, floats, ethics mentions, library overlap, optional
 Vale and composable review lanes — reviewers, MARG-S, ScholarPeer-inspired
-`context` / `context-web`; not vendored). That is “does this draft hang together and cite retracted
+`context` / `context-web` with three-round retrieve and a compact investigation
+log; not vendored, not venue scores). That is “does this draft hang together and cite retracted
 works?” — not “are these CSV means GRIM-impossible?”
 
 **Buffet — integrate, don’t duplicate (ship in order; each stage can stop):**
@@ -1199,7 +1307,8 @@ here means a sequence of dry-run verbs** (`research-pack.md` already:
 Landscape (route, do not flatten): Edison / Google Co-Scientist / Sakana =
 discovery loops; Elicit / Consensus / Undermind / SciSpace / Scite / Valency
 = public-corpus search; Covidence / Rayyan / ASReview = screening; Jenni /
-Paperpal / Overleaf = draft; PaperQA2 / GPT Researcher / STORM = local or
+Paperpal / Overleaf = interactive draft; PaperOrchestra = idea+log →
+conference LaTeX (you run it); PaperQA2 / GPT Researcher / STORM = local or
 web reports. Detail: [comparison reference](comparison-reference.md#paper-factory-stages).
 
 **1.x stays Wanted.** v2 packs stay off until `[llm]` / `[rag]` / gates, and
@@ -1221,7 +1330,9 @@ until Wanted is honest. Do not grow 1.x into a second product.
 | Point at Better BibTeX + Quarto (do not vendor CSL) | Write / export | Parked until testers ask | [Parked](#after-110-parked) |
 | ASReview-class ranking only as optional local embeddings | Screen | Not dual review | [Embeddings](#after-110-embeddings) |
 | Post-hoc Crossref / retraction check after a draft | Critique | Existence ≠ claim support | [critique.md](critique.md) |
+| ScholarPeer historian / scout / novelty Q&A (three-round retrieve, investigation log; no venue scores) | Critique | Suggested lane only; local RAG or opt-in OpenAlex/SearXNG; not OSP | [critique.md](critique.md) (shipped 1.9.5) |
 | Apply a critique pack as locatable edits / tracked changes (worklog, align-then-generate, selected-span prompts; no vendor) | Write | Pack required; never overwrite the source; no invented numbers/cites | [rewrite.md](rewrite.md) (shipped) |
+| Deepen `rewrite` from PaperOrchestra **patterns** (allowed-facts worklog, citation checklist, fail-closed critic). Do **not** vendor the pipeline | Write | Still pack-required; critic may only reject or comment; local `[llm]`; no web search from rewrite | [Rewrite deepen](#rewrite-deepen-paperorchestra-patterns) (later) |
 | Deep forensics on supplementary tables / stats / figures (external tool) | Screen / audit | No merged score; subprocess or hand-off | [PaperGuard](#research-integrity-forensics-paperguard) |
 | Named MCP read jobs (`ask` vs precedent vs `refs_gap`); writes stay `--apply` | Agent | Table stakes without a hosted corpus | [Literature-discovery](#literature-discovery-complement-waves) |
 
@@ -1232,7 +1343,8 @@ as **default** or in marketing; uploading `out/` to a vendor as Ask;
 auto manuscript in public copy; “has never been done”; replacing Zotero as
 reader; CAPTCHA bypass; “AI fetch everything”; draft-then-stuff extra cites
 from the **open web** without a Zotero queue; genAI blots / graphical
-abstracts; a bird-named agent zoo as UX.
+abstracts; a bird-named agent zoo as UX; vendoring ScholarPeer /
+open-scholar-peer skills, venue-guideline scrape, or accept/reject scores.
 
 **Safe internal subtitle:** after the Wanted list is honest, grow the
 collection, keep it current, and ask **your** PDFs. Complementary sentence
@@ -1341,10 +1453,12 @@ Do not start these until testers ask, or until the main lane is boring.
 - **Kosmos-class autonomous scientist** (multi-hour world-model runs over
   public literature plus uploaded datasets; experimental pipelines;
   molecular design) — [Hosted AI scientists](#after-110-edison-scientific).
-- **Auto manuscript / related-work generator** (Jenni/STORM/Sakana job).
-  `stuff` may queue extra cites into Zotero; it does not write the paper.
-  [`rewrite`](rewrite.md) is apply-from-critique (hygiene default, pack
-  required), not this parked generator.
+- **Auto manuscript / related-work generator** (Jenni/STORM/Sakana/
+  PaperOrchestra job). `stuff` may queue extra cites into Zotero; it does
+  not write the paper. [`rewrite`](rewrite.md) is apply-from-critique
+  (hygiene default, pack required), not this parked generator. A later
+  **pattern** borrow (worklog / checklist / critic, still not a writer) is
+  [Rewrite deepen](#rewrite-deepen-paperorchestra-patterns).
 - **Catalogue unification** (managers as equals).
 - **LibGen** (same opt-in bar as Sci-Hub if ever).
 - **CSL / Quarto export** — point people at Better BibTeX.
@@ -2141,6 +2255,61 @@ Complements `critique` (checkers on the same document), `rag search`
 [`refs gap`](#bibliography-gap-scan-later-not-gaps) (works named in the
 PDF that you do not own). Buffet context:
 [Summaries, briefs, and Ask](#after-110-briefs-ask).
+
+(rewrite-deepen-paperorchestra-patterns)=
+### Rewrite deepen (PaperOrchestra patterns; later)
+
+**Status:** not started. Not on the [live order](#after-17-order). Public
+routing vs the product:
+[comparison reference](comparison-reference.md#paperorchestra). Shipped
+`rewrite` stays apply-from-critique ([rewrite.md](rewrite.md), 1.9.2 trust
+wave). This row is a **pattern** borrow from
+[PaperOrchestra](https://github.com/google-research/paper-orchestra)
+(Google Cloud AI Research; idea+log → conference LaTeX; Gemini/OpenAI only).
+Do **not** vendor their agents, templates, or literature search.
+
+**Already shipped (do not rebuild):** pack required; unique-span align then
+generate; whole-paragraph LLM reply that Paperful diffs; freeze of numbers
+and cite keys (`«PF…»`); Vale/glossary re-check after the edit; hedge/passive
+as comments; `[[rewrite.specialists]]` per-area model/prompt; never overwrite
+the source; local `[llm]` (Ollama / LiteLLM). Those *are* the worklog /
+ARIES align-then-generate / selected-span prompts already credited in docs.
+
+**Job if testers ask:** make applying an existing pack safer and more
+consistent, without growing new prose. **Critique** remains where
+Orchestra-like review quality belongs (`claims`, `adversary`, outline).
+**Rewrite** must not start authoring sections the pack never asked for.
+
+**Direction (each slice can stop; dry-run default, fail closed):**
+
+1. **Allowed-facts worklog in the prompt** — a third block beside
+   `PAPER_CONTENT` and `FINDINGS`: claims ledger, freeze list, bibliography
+   keys already in the extract/pack. Orchestra’s experimental log is the
+   analogue (no SOTA / numbers unless they are on that list).
+2. **Citation checklist** — cites area may insert only keys already in that
+   block or the paragraph. Retracted / withdrawn / EoC stay comments.
+   Extra cites still go through [`stuff`](#stuff-later-extra-citations-from-the-library)
+   → Zotero **before** `\cite`. No Google Search or Semantic Scholar from
+   `rewrite`.
+3. **Fail-closed critic** — after the paragraph comes back, a second pass
+   that may only **reject or comment** (leakage, freeze break, unflagged
+   sentences changed, “we outperform X” when X was not already in the
+   paragraph). Deterministic Vale/glossary/cite re-check stays; the LLM
+   critic does not propose a second authoring pass.
+4. **Writer vs critic tags** — reuse `[[rewrite.specialists]]` (`model`
+   empty → `[llm].model`). A 7B–12B local writer plus an optional stronger
+   critic is enough. Do not require Gemini/OpenAI. Orchestra has no first-class
+   local backend; Paperful does not grow one for them.
+
+**Honesty bar:** pack required; unique quote still required for body edits;
+no invented numbers, experiments, or cite keys; weak alignment → skip or
+Word comment; body text must not mention Paperful, the pack, or “the
+reviewer”; tracked-changes still a new file.
+
+**Stay out (same as factory non-goals):** outline → section writing →
+LaTeX fill; Intro / Related Work generation; plotting or conceptual
+diagrams; web literature search inside rewrite; a bird-named agent zoo in
+the workbench; calling Suggest edits “the AI rewrites my paper.”
 
 (embeddinggemma-2-local-embeddings)=
 ### EmbeddingGemma 2 (later; stronger offline embeddings)

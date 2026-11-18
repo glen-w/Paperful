@@ -2349,7 +2349,24 @@ def _context_chat(_client, request):
                 ]
             }
         )
-    if "novelty and significance" in sys_msg or "technical soundness" in sys_msg:
+    if "write novelty and significance questions" in sys_msg:
+        return json.dumps(
+            {"questions": ["What comparable ABC protocols exist in this corpus?"]}
+        )
+    if "answer novelty and significance questions" in sys_msg:
+        return json.dumps(
+            {
+                "pairs": [
+                    {
+                        "q": "What comparable ABC protocols exist in this corpus?",
+                        "a": (
+                            "Passages name Unseen Dataset 2019 as a comparable ABC protocol."
+                        ),
+                    }
+                ]
+            }
+        )
+    if "technical soundness" in sys_msg:
         return json.dumps(
             {
                 "pairs": [
@@ -2471,22 +2488,42 @@ def test_cli_unknown_lane_exits(cfg, tmp_path):
     assert "unknown critique lane" in ok.output
 
 
-def test_context_lane_writes_suggested_comments(cfg, tmp_path, monkeypatch):
-    monkeypatch.setattr("paperful.llm.client.chat", _context_chat)
-    monkeypatch.setattr(
-        "paperful.critique_context.library_passages",
-        lambda *_a, **_k: (
+def _context_library_passages(_cfg, query, *, keys, k):
+    q = (query or "").lower()
+    if "what comparable" in q or "unseen dataset" in q:
+        return (
             [
                 {
-                    "item_key": "X",
-                    "title": "Prior ABC",
-                    "year": 2020,
-                    "text": "ABC protocol",
+                    "item_key": "Y",
+                    "title": "Unseen Dataset 2019",
+                    "year": 2019,
+                    "text": "Unseen Dataset 2019 comparable ABC protocol",
                 }
             ],
             "",
-        ),
+        )
+    return (
+        [
+            {
+                "item_key": "X",
+                "title": "Prior ABC",
+                "year": 2020,
+                "text": "ABC protocol",
+            }
+        ],
+        "",
     )
+
+
+def test_context_lane_writes_suggested_comments(cfg, tmp_path, monkeypatch):
+    rag_queries: list[str] = []
+
+    def fake_lib(_cfg, query, *, keys, k):
+        rag_queries.append(query)
+        return _context_library_passages(_cfg, query, keys=keys, k=k)
+
+    monkeypatch.setattr("paperful.llm.client.chat", _context_chat)
+    monkeypatch.setattr("paperful.critique_context.library_passages", fake_lib)
 
     def boom_oa(*_a, **_k):
         raise AssertionError("context lane must not call OpenAlex")
@@ -2504,17 +2541,38 @@ def test_context_lane_writes_suggested_comments(cfg, tmp_path, monkeypatch):
     assert pack["llm"]["lanes"] == ["context"]
     assert pack["llm"]["mode"] == "context"
     assert pack["llm"]["context"]["search_enabled"] is False
+    assert len(rag_queries) >= 3
+    round_ids = [r.get("id") for r in pack["llm"]["context"]["investigation"]["rounds"]]
+    assert round_ids == ["subdomain", "method", "temporal"]
     suggested = [f for f in pack["findings"] if f["lane"] == "suggested"]
     assert any(str(f.get("reviewer") or "") == "context" for f in suggested)
     assert any("sample size" in (f.get("detail") or "").lower() for f in suggested)
+    assert any(
+        "unseen dataset 2019" in (f.get("detail") or "").lower() for f in suggested
+    )
+    pack_dir = Path(pack["pack_dir"])
+    sidecar = pack_dir / "context.json"
+    assert sidecar.is_file()
+    log = json.loads(sidecar.read_text(encoding="utf-8"))
+    assert log["schema"] == "paperful.critique.context.v1"
+    assert pack["llm"]["context"]["log"] == "context.json"
+    assert '"text"' not in json.dumps(log)
+    on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
+    inv = on_disk["llm"]["context"]["investigation"]
+    assert '"text"' not in json.dumps(inv)
+    md = (pack_dir / "pack.md").read_text(encoding="utf-8")
+    assert "## Context investigation" in md
 
 
 def test_context_web_offline_skips_search(cfg, tmp_path, monkeypatch):
+    rag_queries: list[str] = []
+
+    def fake_lib(_cfg, query, *, keys, k):
+        rag_queries.append(query)
+        return [], "IndexMissing"
+
     monkeypatch.setattr("paperful.llm.client.chat", _context_chat)
-    monkeypatch.setattr(
-        "paperful.critique_context.library_passages",
-        lambda *_a, **_k: ([], "IndexMissing"),
-    )
+    monkeypatch.setattr("paperful.critique_context.library_passages", fake_lib)
 
     def boom_oa(*_a, **_k):
         raise AssertionError("offline context-web must not call OpenAlex")
@@ -2537,6 +2595,126 @@ def test_context_web_offline_skips_search(cfg, tmp_path, monkeypatch):
     assert pack["llm"]["context"]["search_skipped"] == "offline"
     assert pack["llm"]["context"]["search_enabled"] is True
     assert pack["llm"]["context"].get("rag_skipped") == "IndexMissing"
+    assert len(rag_queries) >= 3
+
+
+def test_context_web_online_retrieves_rounds_and_novelty(cfg, tmp_path, monkeypatch):
+    oa_queries: list[tuple[str, int | None]] = []
+    sx_queries: list[str] = []
+
+    def fake_lib(_cfg, query, *, keys, k):
+        return _context_library_passages(_cfg, query, keys=keys, k=k)
+
+    def fake_oa(_cfg, query, *, limit, year_from=None):
+        oa_queries.append((query, year_from))
+        return (
+            [
+                {
+                    "title": "OpenAlex ABC",
+                    "doi": "10.1/abc",
+                    "year": 2024,
+                    "source": "openalex",
+                }
+            ],
+            "",
+        )
+
+    def fake_sx(_cfg, query, *, limit):
+        sx_queries.append(query)
+        return (
+            [
+                {
+                    "title": "SearXNG ABC",
+                    "url": "https://example.test",
+                    "source": "searxng",
+                }
+            ],
+            "",
+        )
+
+    monkeypatch.setattr("paperful.llm.client.chat", _context_chat)
+    monkeypatch.setattr("paperful.critique_context.library_passages", fake_lib)
+    monkeypatch.setattr("paperful.critique_context._openalex_works", fake_oa)
+    monkeypatch.setattr("paperful.critique_context._searxng_hits", fake_sx)
+    src = tmp_path / "web-on.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=False,
+        lanes=("context-web",),
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    assert pack["llm"]["lanes"] == ["context-web"]
+    assert pack["llm"]["context"]["search_enabled"] is True
+    assert "openalex" in pack["llm"]["context"]["backends"]
+    assert "searxng" in pack["llm"]["context"]["backends"]
+    novelty_qs = pack["llm"]["context"]["investigation"]["novelty_search"]["queries"]
+    assert novelty_qs
+    assert len(oa_queries) == 3 + len(novelty_qs)
+    assert len(sx_queries) == 3 + len(novelty_qs)
+    temporal = [
+        r
+        for r in pack["llm"]["context"]["investigation"]["rounds"]
+        if r["id"] == "temporal"
+    ]
+    assert temporal and temporal[0].get("year_from")
+    assert any("comparable abc" in q.lower() for q, _y in oa_queries)
+    suggested = [f for f in pack["findings"] if f["lane"] == "suggested"]
+    assert any(
+        "unseen dataset 2019" in (f.get("detail") or "").lower() for f in suggested
+    )
+
+
+def test_context_novelty_drops_invented_titles(cfg, tmp_path, monkeypatch):
+    def chat(_client, request):
+        sys_msg = request.messages[0]["content"]
+        if "answer novelty and significance questions" in sys_msg:
+            return json.dumps(
+                {
+                    "pairs": [
+                        {
+                            "q": "What comparable ABC protocols exist in this corpus?",
+                            "a": "FakePaper 2099 zetavariate quuxonium was never compared.",
+                        }
+                    ]
+                }
+            )
+        return _context_chat(_client, request)
+
+    monkeypatch.setattr("paperful.llm.client.chat", chat)
+    monkeypatch.setattr(
+        "paperful.critique_context.library_passages",
+        lambda *_a, **_k: (
+            [
+                {
+                    "item_key": "X",
+                    "title": "Prior ABC",
+                    "year": 2020,
+                    "text": "ABC protocol",
+                }
+            ],
+            "",
+        ),
+    )
+    monkeypatch.setattr(
+        "paperful.critique_context._openalex_works",
+        lambda *_a, **_k: (_ for _ in ()).throw(
+            AssertionError("context lane must not call OpenAlex")
+        ),
+    )
+    src = tmp_path / "ctx-invent.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        lanes=("context",),
+        llm_client=type("C", (), {"provider": "stub"})(),
+    )
+    suggested = [f for f in pack["findings"] if f.get("code") == "context_qa"]
+    assert suggested
+    assert all("fakepaper" not in (f.get("detail") or "").lower() for f in suggested)
 
 
 def test_adversary_lane_writes_suggested_comments(cfg, tmp_path, monkeypatch):
