@@ -504,7 +504,10 @@ def _render_claims(rows: list[dict[str, Any]]) -> list[str]:
         "",
         "## Claims",
         "",
-        "Support is against **this extract** only — not a verdict that a claim is true or false.",
+        "Intra-doc support is against **this extract** only. Cited-source "
+        "status is against **held PDF text** already on disk. Neither is a "
+        "verdict that a claim is true or false, an accept/reject, or a "
+        "generated paper.",
         "",
     ]
     for row in rows:
@@ -515,11 +518,27 @@ def _render_claims(rows: list[dict[str, Any]]) -> list[str]:
         head = f"- **{cid}** ({status}"
         if loc:
             head += f", {loc}"
+        src_status = str(row.get("source_status") or "").strip()
+        if src_status:
+            head += f"; cited {src_status}"
         head += f"): {text}"
         lines.append(head)
         quote = str(row.get("support_quote") or "").strip()
         if quote:
             lines.append(f"  > {quote}")
+        for src in row.get("sources") or []:
+            if not isinstance(src, dict):
+                continue
+            key = str(src.get("item_key") or "").strip() or "—"
+            st = str(src.get("status") or "")
+            sloc = str(src.get("loc") or "")
+            bit = f"  - `{key}` {st}"
+            if sloc:
+                bit += f" ({sloc})"
+            lines.append(bit)
+            squote = str(src.get("quote") or "").strip()
+            if squote:
+                lines.append(f"    > {squote}")
     lines.append("")
     return lines
 

@@ -720,7 +720,7 @@ def suggested_from_context(
                 rows.append({"q": q, "a": a})
         return rows
 
-    investigation = {
+    investigation: dict[str, Any] = {
         "summary": summary,
         "rounds": round_rows,
         "novelty_search": {

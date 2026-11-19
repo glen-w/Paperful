@@ -3,6 +3,10 @@
 Extracts core claims, then binds each to methods/results/limitations spans
 with deterministic content-word overlap. Status is support *in this extract*,
 never a truth verdict. An optional second JSON turn may only downgrade.
+
+When a library scope is loaded, an extra pass attaches locators from held
+cited PDFs already in ``state/rag/text``. Missing text is a skip, never a
+guessed cite. That pass does not fetch PDFs from the web.
 """
 
 from __future__ import annotations
@@ -78,6 +82,13 @@ _STOP = frozenset(
     }
 )
 _STATUS_RANK = {"supported": 0, "thin": 1, "unsupported": 2}
+SUPPORTED_MIN_SCORE = 0.35
+SUPPORTED_MIN_SHARED = 3
+THIN_MIN_SCORE = 0.15
+THIN_MIN_SHARED = 2
+_WINDOW_CHARS = 400
+_NUM_HEAD = re.compile(r"(?m)^\s*(?:\[(\d+)\]|(\d+)\.)\s+")
+_RANGE_SPLIT = re.compile(r"[-–]")
 
 _EXTRACT_SYSTEM = """You extract core claims from a manuscript excerpt.
 Return JSON only:
@@ -142,12 +153,7 @@ def bind_claim(claim: str, support: list[Unit]) -> dict[str, Any]:
             "score": 0.0,
         }
     quote = _best_quote(claim, best)
-    if best_score >= 0.35 and best_shared >= 3:
-        status = "supported"
-    elif best_score >= 0.15 and best_shared >= 2:
-        status = "thin"
-    else:
-        status = "unsupported"
+    status = label_overlap(best_score, best_shared)
     return {
         "status": status,
         "support_quote": quote,
@@ -167,6 +173,300 @@ def _best_quote(claim: str, unit: Unit) -> str:
             best = sent.strip()
     raw = best or (unit.text or "").strip()
     return re.sub(r"\s+", " ", raw)[:200]
+
+
+def label_overlap(score: float, shared: int) -> str:
+    if score >= SUPPORTED_MIN_SCORE and shared >= SUPPORTED_MIN_SHARED:
+        return "supported"
+    if score >= THIN_MIN_SCORE and shared >= THIN_MIN_SHARED:
+        return "thin"
+    return "unsupported"
+
+
+def quote_in_text(quote: str, text: str) -> bool:
+    needle = re.sub(r"\s+", " ", (quote or "").strip()).lower()
+    hay = re.sub(r"\s+", " ", (text or "").strip()).lower()
+    return bool(needle) and needle in hay
+
+
+def claim_window(doc_text: str, claim: str, *, radius: int = _WINDOW_CHARS) -> str:
+    hay = doc_text or ""
+    needle = (claim or "").strip()
+    if not needle:
+        return ""
+    idx = hay.lower().find(needle[:120].lower())
+    if idx < 0:
+        idx = hay.lower().find(needle[:40].lower()) if len(needle) > 40 else -1
+    if idx < 0:
+        return needle
+    start = max(0, idx - radius)
+    end = min(len(hay), idx + len(needle) + radius)
+    return hay[start:end]
+
+
+def numbered_bibliography(text: str) -> dict[int, dict[str, Any]]:
+    from .snowball.bibliography import dehyphenate, parse_bibliography_entries
+
+    entries = parse_bibliography_entries(text)
+    if not entries:
+        return {}
+    _body, biblio = _split_body_biblio_safe(text)
+    hay = dehyphenate(biblio or "")
+    nums = [
+        int(m.group(1) or m.group(2))
+        for m in _NUM_HEAD.finditer(hay)
+        if (m.group(1) or m.group(2))
+    ]
+    out: dict[int, dict[str, Any]] = {}
+    if len(nums) == len(entries):
+        for n, entry in zip(nums, entries, strict=True):
+            out[n] = entry
+        return out
+    for i, entry in enumerate(entries, start=1):
+        out[i] = entry
+    return out
+
+
+def _split_body_biblio_safe(text: str) -> tuple[str, str]:
+    from .critique_checks._common import _split_body_biblio
+
+    return _split_body_biblio(text)
+
+
+def cites_in_window(window: str) -> list[dict[str, Any]]:
+    from .critique_checks._common import _AUTHOR_YEAR, _NUM_CITE
+
+    found: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for m in _NUM_CITE.finditer(window or ""):
+        for part in re.split(r"[,]", m.group(1)):
+            part = part.strip()
+            if not part:
+                continue
+            if _RANGE_SPLIT.search(part):
+                a, b = _RANGE_SPLIT.split(part, maxsplit=1)
+                try:
+                    lo, hi = int(a.strip()), int(b.strip())
+                except ValueError:
+                    continue
+                for n in range(lo, hi + 1):
+                    token = f"n:{n}"
+                    if token in seen:
+                        continue
+                    seen.add(token)
+                    found.append({"kind": "num", "n": n})
+            else:
+                try:
+                    n = int(part)
+                except ValueError:
+                    continue
+                token = f"n:{n}"
+                if token in seen:
+                    continue
+                seen.add(token)
+                found.append({"kind": "num", "n": n})
+    for m in _AUTHOR_YEAR.finditer(window or ""):
+        surname = m.group(1).split()[0]
+        year = m.group(2)[:4]
+        token = f"ay:{surname.lower()}:{year}"
+        if token in seen:
+            continue
+        seen.add(token)
+        found.append({"kind": "author_year", "surname": surname, "year": year})
+    return found
+
+
+def resolve_cite(
+    cite: dict[str, Any],
+    by_num: dict[int, dict[str, Any]],
+    entries: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    if cite.get("kind") == "num":
+        return by_num.get(int(cite.get("n") or 0))
+    surname = str(cite.get("surname") or "").lower()
+    year = str(cite.get("year") or "")
+    if not surname or not year:
+        return None
+    for entry in entries:
+        raw = f"{entry.get('raw') or ''} {entry.get('title') or ''}".lower()
+        if surname in raw and year in raw:
+            return entry
+    return None
+
+
+def bind_claim_to_pages(claim: str, pages: list[tuple[int, str]]) -> dict[str, Any]:
+    """Deterministic support against held PDF pages. Quote must occur in the page."""
+    units = [
+        Unit(heading="", loc=f"p. {n}", text=text) for n, text in pages if text.strip()
+    ]
+    bound = bind_claim(claim, units)
+    quote = str(bound.get("support_quote") or "")
+    loc = str(bound.get("loc") or "")
+    status = str(bound.get("status") or "unsupported")
+    page_text = ""
+    for n, text in pages:
+        if loc == f"p. {n}":
+            page_text = text
+            break
+    if (
+        status in {"supported", "thin"}
+        and quote
+        and not quote_in_text(quote, page_text)
+    ):
+        status = "unsupported"
+        quote = ""
+        loc = ""
+    return {
+        "status": status,
+        "quote": quote,
+        "loc": loc,
+        "score": bound.get("score", 0.0),
+    }
+
+
+def attach_claim_sources(
+    ledger: list[dict[str, Any]],
+    doc: ExtractedDoc,
+    cfg: Config,
+    scope_items: list[Item],
+    *,
+    extra: list[Finding],
+    comment_cap: int,
+    exclude_key: str = "",
+) -> str:
+    """Mutate ledger rows with cited-PDF locators. Returns skip reason or empty."""
+    if not scope_items:
+        return "no_scope"
+    from .identity import LibraryFingerprint
+    from .snowball.bibliography import parse_bibliography_entries
+    from .critique_overlap import load_library_pages
+
+    fingerprint = LibraryFingerprint.from_items(scope_items)
+    entries = parse_bibliography_entries(doc.text or "")
+    by_num = numbered_bibliography(doc.text or "")
+    max_sources = max(1, int(getattr(cfg, "critique_claims_cite_max_sources", 3) or 3))
+    pages_by_key = load_library_pages(cfg, exclude_key=exclude_key)
+    for row in ledger:
+        window = claim_window(doc.text or "", str(row.get("text") or ""))
+        cites = cites_in_window(window)
+        if not cites:
+            row["source_status"] = "no_cite"
+            continue
+        sources: list[dict[str, Any]] = []
+        for cite in cites[:max_sources]:
+            entry = resolve_cite(cite, by_num, entries)
+            if entry is None:
+                continue
+            hit = fingerprint.find(
+                entry.get("doi") or None,
+                entry.get("title") or None,
+                entry.get("year"),
+            )
+            if hit is None:
+                sources.append(
+                    {
+                        "item_key": "",
+                        "status": "not_in_library",
+                        "quote": "",
+                        "loc": "",
+                    }
+                )
+                continue
+            pages = pages_by_key.get(hit.item_key) or []
+            if not pages:
+                sources.append(
+                    {
+                        "item_key": hit.item_key,
+                        "status": "no_text",
+                        "quote": "",
+                        "loc": "",
+                    }
+                )
+                continue
+            bound = bind_claim_to_pages(str(row.get("text") or ""), pages)
+            sources.append(
+                {
+                    "item_key": hit.item_key,
+                    "status": bound["status"],
+                    "quote": bound["quote"][:200],
+                    "loc": bound["loc"],
+                }
+            )
+        row["sources"] = sources
+        if not sources:
+            row["source_status"] = "no_cite"
+            continue
+        statuses = {str(s.get("status") or "") for s in sources}
+        if "supported" in statuses:
+            row["source_status"] = "supported"
+        elif "thin" in statuses:
+            row["source_status"] = "thin"
+        elif "no_text" in statuses:
+            row["source_status"] = "no_text"
+        elif "not_in_library" in statuses:
+            row["source_status"] = "not_in_library"
+        else:
+            row["source_status"] = "unsupported"
+        if len(extra) >= comment_cap:
+            continue
+        claim = str(row.get("text") or "")
+        cid = str(row.get("id") or "")
+        if "no_text" in statuses:
+            extra.append(
+                make_finding(
+                    code="claim_cite_no_text",
+                    severity="info",
+                    lane="suggested",
+                    loc=str(row.get("loc") or ""),
+                    quote=claim,
+                    detail=(
+                        "Cited work is in the library but has no held PDF text "
+                        f"in the index: {claim}"
+                    )[:500],
+                    source="claims",
+                    extra={"reviewer": "claims", "claim_id": cid},
+                )
+            )
+        elif "thin" in statuses and "supported" not in statuses:
+            extra.append(
+                make_finding(
+                    code="claim_source_thin",
+                    severity="info",
+                    lane="suggested",
+                    loc=str(row.get("loc") or ""),
+                    quote=next(
+                        (
+                            str(s.get("quote") or "")
+                            for s in sources
+                            if s.get("status") == "thin" and s.get("quote")
+                        ),
+                        claim,
+                    ),
+                    detail=(
+                        f"Claim is thinly supported by held cited PDF text: {claim}"
+                    )[:500],
+                    source="claims",
+                    extra={"reviewer": "claims", "claim_id": cid},
+                )
+            )
+        elif "unsupported" in statuses and not (
+            statuses & {"supported", "thin", "no_text", "not_in_library"}
+        ):
+            extra.append(
+                make_finding(
+                    code="claim_source_unsupported",
+                    severity="info",
+                    lane="suggested",
+                    loc=str(row.get("loc") or ""),
+                    quote=claim,
+                    detail=(f"Claim is not supported by held cited PDF text: {claim}")[
+                        :500
+                    ],
+                    source="claims",
+                    extra={"reviewer": "claims", "claim_id": cid},
+                )
+            )
+    return ""
 
 
 def _join_units(units: list[Unit], *, limit: int) -> str:
@@ -193,6 +493,7 @@ def suggested_from_claims(
     hay: str,
     pdf_path: Path | None = None,
     use_grobid: bool = False,
+    scope_items: list[Item] | None = None,
     on_status: Callable[[str], None] | None = None,
 ) -> tuple[list[Finding], dict[str, Any]]:
     """Extract claims and bind them to intra-doc support spans."""
@@ -386,6 +687,18 @@ def suggested_from_claims(
         )
         if len(extra) >= comment_cap:
             break
+
+    skip_sources = attach_claim_sources(
+        ledger,
+        doc,
+        cfg,
+        list(scope_items or []),
+        extra=extra,
+        comment_cap=comment_cap,
+        exclude_key=item_key,
+    )
+    if skip_sources:
+        meta["sources_skipped"] = skip_sources
 
     dt = time.perf_counter() - t0
     bits = [f"{dt:.0f}s", f"{len(ledger)} claim(s)"]

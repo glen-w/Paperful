@@ -37,7 +37,7 @@ this machine: [legal and privacy](docs/legal-privacy.md).
 - Check identifiers, review duplicates, and repair broken attachments
 - Keep a folder of your papers that you can back up or give to another tool
 - Optionally ask questions of the PDFs you already have (local models via [Ollama](https://ollama.com) when your machine can run them, or hosted APIs via [LiteLLM](docs/llm.md#litellm-paid--openai-compatible-apis) — off until you turn it on)
-- Optionally check a draft you already wrote (Advanced **Critique**; not a grade) — structure and citations always, optional comparison with your library text ([Critique](docs/critique.md))
+- Optionally check a draft you already wrote (Advanced **Critique**; not a grade) — structure and citations always, optional claim locators against held PDFs, optional comparison with your library text ([Critique](docs/critique.md)). Per-sentence support vs the index is CLI `ask --claim-check` ([Ask](docs/rag.md#claim-check))
 - Optionally, from Firefox, save the page you are reading or the tabs you have open into the folder on this computer ([Firefox add-on](docs/firefox.md)). The Zotero Connector stays the way to save into Zotero. This one writes the folder copy, can search your sources when the page has no PDF, and can take several tabs at once. It does not attach them.
 
 New here: [first 10 minutes](docs/first-10-minutes.md).
@@ -88,7 +88,7 @@ No campus access: choose **Open access**. Campus library login: choose
 [Configuration](docs/config.md).
 
 ```sh
-git clone --branch v1.9.5 https://github.com/glen-w/Paperful.git
+git clone --branch v1.9.6 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env          # PAPERFUL_DATA=. PAPERFUL_OUT=./out keeps data here
                               # .env.example sets PAPERFUL_IMAGE_MODE=heavy

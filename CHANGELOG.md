@@ -6,6 +6,13 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.9.6 — 2026-11-19
+
+- **Cited-source locators on critique claims.** `--lane claims` with `-C` scores held `state/rag/text` pages for works the manuscript already cites. Missing text is `claim_cite_no_text`, not a false “unsupported.” No web PDF fetch.
+- **`ask --claim-check`.** Per-sentence supported / mixed / unsupported pack against the local index (`state/ask-claims/`, no LLM). `--file` or `--item` for the manuscript; `-C` is search scope.
+- **Docs.** Guide, landing, and workbench claims tooltip match cited-source locators and CLI `ask --claim-check` (still not on `/ask`).
+- **Release gate.** The four-week `since` dogfood log is not in the public tree and does not block `make pre-release`. Open the packs on your own collections if you want the habit.
+
 ## 1.9.5 — 2026-11-18
 
 - **Critique `context` / `context-web`.** Three-round retrieve (subdomain, method, temporal), a `context.json` investigation sidecar, and split novelty questions then answers with a second search pass. Soundness stays extract-only. Still ScholarPeer-inspired, not vendored, no venue scores.

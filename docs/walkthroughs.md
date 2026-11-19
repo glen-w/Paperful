@@ -34,8 +34,8 @@ Walkthroughs 1–3 do **not** need a local model. Ask and Briefs do
 | [Author watch](authorwatch.md) | Named people → their new papers |
 | [Snowball](snowball.md) | Keyword / DOI / ORCID crawl (CLI depth) |
 | [Firefox add-on](firefox.md) | Optional. Save the open page, or selected tabs, into `out/`. The Zotero Connector stays for saving into Zotero |
-| [Ask your library](rag.md) | Cited answers from PDFs already on disk |
-| [Critique a draft](critique.md) | Pre-submission pack: checkers always; optional literature-grounded `context` / `context-web` lanes. Not a grade |
+| [Ask your library](rag.md) | Cited answers from PDFs already on disk. CLI `ask --claim-check` labels each sentence against the index (no LLM) |
+| [Critique a draft](critique.md) | Pre-submission pack: checkers always; optional `--lane claims` locators against held cited PDFs; optional `context` / `context-web`. Not a grade |
 
 ## Prerequisites
 

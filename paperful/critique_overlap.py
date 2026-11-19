@@ -63,20 +63,20 @@ def _ngrams(tokens: list[str], n_min: int, n_max: int) -> list[tuple[str, ...]]:
     return out
 
 
-def load_library_texts(
+def load_library_pages(
     cfg: Config,
     *,
     exclude_key: str = "",
     keys: Iterable[str] | None = None,
-) -> dict[str, str]:
-    """``state/rag/text/<key>.json`` pages joined. No ingest side effect."""
+) -> dict[str, list[tuple[int, str]]]:
+    """``state/rag/text/<key>.json`` as 1-indexed page strings. No ingest."""
     from .store import load_json
 
     root = cfg.rag_dir / "text"
     if not root.is_dir():
         return {}
     wanted = set(keys) if keys is not None else None
-    out: dict[str, str] = {}
+    out: dict[str, list[tuple[int, str]]] = {}
     for path in root.glob("*.json"):
         key = path.stem
         if key == exclude_key:
@@ -89,7 +89,27 @@ def load_library_texts(
         pages = stored.get("pages")
         if not isinstance(pages, list):
             continue
-        text = _drop_biblio("\n".join(str(p) for p in pages))
+        numbered: list[tuple[int, str]] = []
+        for i, raw in enumerate(pages, start=1):
+            text = _drop_biblio(str(raw) if raw is not None else "")
+            if text.strip():
+                numbered.append((i, text))
+        if numbered:
+            out[key] = numbered
+    return out
+
+
+def load_library_texts(
+    cfg: Config,
+    *,
+    exclude_key: str = "",
+    keys: Iterable[str] | None = None,
+) -> dict[str, str]:
+    """``state/rag/text/<key>.json`` pages joined. No ingest side effect."""
+    pages = load_library_pages(cfg, exclude_key=exclude_key, keys=keys)
+    out: dict[str, str] = {}
+    for key, numbered in pages.items():
+        text = "\n".join(chunk for _n, chunk in numbered)
         if text.strip():
             out[key] = text
     return out

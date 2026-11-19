@@ -413,6 +413,7 @@ def test_critique_table_is_parsed(tmp_path):
     assert cfg.critique_claims_max == 8
     assert cfg.critique_claims_max_comments == 16
     assert cfg.critique_claims_timeout_s == 0.0
+    assert cfg.critique_claims_cite_max_sources == 3
     assert cfg.critique_verify_timeout_s == 0.0
     assert cfg.critique_verify_max_comments == 16
     assert cfg.critique_verify_max_segments == 8
@@ -603,6 +604,7 @@ def test_critique_claims_verify_and_aspects_are_parsed(tmp_path):
                 "claims_max": 3,
                 "claims_max_comments": 5,
                 "claims_timeout_s": 12,
+                "claims_cite_max_sources": 2,
                 "verify_timeout_s": 90,
                 "verify_max_comments": 7,
                 "verify_max_segments": 4,
@@ -614,6 +616,7 @@ def test_critique_claims_verify_and_aspects_are_parsed(tmp_path):
     assert cfg.critique_claims_max == 3
     assert cfg.critique_claims_max_comments == 5
     assert cfg.critique_claims_timeout_s == 12.0
+    assert cfg.critique_claims_cite_max_sources == 2
     assert cfg.critique_verify_timeout_s == 90.0
     assert cfg.critique_verify_max_comments == 7
     assert cfg.critique_verify_max_segments == 4

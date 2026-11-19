@@ -280,7 +280,9 @@ contribution summary, up to eight comments tied to a finding code or a quoted
 span, and author questions. `--lane marg` (or `--advanced`) adds a MARG-S-style
 multi-agent pass. `--lane adversary` adds a structured validity red-team.
 `--lane outline` reviews the extract as a plan (section skeleton plus claim/warrant/scope pressure).
-`--lane claims` builds an intra-doc claim ledger (support in this extract only).
+`--lane claims` builds an intra-doc claim ledger (support in this extract only)
+and, with `-C`, locators against held cited PDF text. `ask --claim-check` is
+the per-sentence index check and does not call a chat model.
 `--lane verify` is a local section-swarm stress-test (not Deep Review; local
 models will not match hosted proof recall). `--lane context` adds a
 ScholarPeer-inspired local historian /

@@ -38,6 +38,8 @@ def run_ask(
     run_config: Path | None,
     json_out: bool,
     ask_mode: str | None = None,
+    claim_check: bool = False,
+    file_path: Path | None = None,
 ) -> None:
     from . import cli_runtime as cli_mod
     from .agent_json import batch_exit
@@ -51,6 +53,27 @@ def run_ask(
     from .rag.retrieve import scope_keys
 
     batch_mode = from_file is not None
+    if claim_check:
+        run_claim_check(
+            console,
+            cfg,
+            item=item,
+            file_path=file_path,
+            collection=collection,
+            year_from=year_from,
+            year_to=year_to,
+            item_type=item_type,
+            top_k=top_k,
+            question=question,
+            from_file=from_file,
+            apply=apply,
+            thread=thread,
+            json_out=json_out,
+        )
+        return
+    if file_path is not None:
+        console.print("[red]ask --file is only valid with --claim-check.[/]")
+        raise typer.Exit(1)
     if json_out and question is None and not batch_mode:
         console.print("[red]ask --format json needs a question.[/]")
         raise typer.Exit(1)
@@ -349,3 +372,266 @@ def run_ask(
         return
     if question is not None and failures:
         raise typer.Exit(1)
+
+
+def run_claim_check(
+    console: Console,
+    cfg: Config,
+    *,
+    item: list[str],
+    file_path: Path | None,
+    collection: list[str],
+    year_from: int | None,
+    year_to: int | None,
+    item_type: list[str],
+    top_k: int | None,
+    question: str | None,
+    from_file: Path | None,
+    apply: bool,
+    thread: str | None,
+    json_out: bool,
+) -> None:
+    """Stage-1 Ask claim-check: pack only, no LLM, no --apply."""
+    from rich.markup import escape
+    from rich.table import Table
+
+    from . import cli_runtime as cli_mod
+    from .agent_json import envelope
+    from .claim_check import (
+        HONESTY_BANNER,
+        claim_check_id,
+        collect_claim_check,
+        pack_payload,
+        resolve_claim_check_k,
+        write_pack,
+    )
+    from .critique_extract import SUPPORTED, ExtractError, extract_path
+    from .lint import resolve_pdf_path
+    from .rag.retrieve import scope_keys
+    from .store import Manifest
+
+    if apply:
+        console.print(
+            "[red]ask --claim-check does not write notes (--apply is later).[/]"
+        )
+        raise typer.Exit(1)
+    if from_file is not None:
+        console.print(
+            "[red]ask --claim-check cannot use --from-file (that is questions).[/]"
+        )
+        raise typer.Exit(1)
+    if thread is not None:
+        console.print("[red]ask --claim-check cannot use --thread.[/]")
+        raise typer.Exit(1)
+    if question is not None and str(question).strip():
+        console.print(
+            "[red]ask --claim-check takes --file or --item, not a question.[/]"
+        )
+        raise typer.Exit(1)
+
+    item_keys = [tok.strip() for tok in item if tok and str(tok).strip()]
+    if bool(item_keys) == bool(file_path):
+        console.print(
+            "[red]ask --claim-check needs exactly one of --item KEY or --file PATH.[/]"
+        )
+        raise typer.Exit(1)
+    if item_keys and len(item_keys) != 1:
+        console.print("[red]ask --claim-check --item takes one manuscript key.[/]")
+        raise typer.Exit(1)
+    if file_path is not None and file_path.suffix.lower() not in SUPPORTED:
+        console.print(
+            "[red]Unsupported format. Save as pdf, txt, md, html, rtf, docx, "
+            "odt, pptx (legacy .doc needs antiword, catdoc, or LibreOffice).[/]"
+        )
+        raise typer.Exit(1)
+
+    cli_mod._rag_require(cfg)
+    types = cli_mod._resolve_types(item_type)
+    embedder = cli_mod._rag_embedder(cfg)
+    index, ledger = cli_mod._rag_open(cfg)
+    if int(index.count() or 0) <= 0:
+        console.print("[red]RAG index is empty — paperful rag ingest[/]")
+        raise typer.Exit(1)
+
+    target = None
+    src: Path | None = None
+    kind = "file"
+    item_key = ""
+    title = ""
+    if item_keys:
+        kind = "item"
+        cli_mod._require_manager(cfg)
+        backend = cli_mod._connect(cfg, quiet=json_out)
+        loaded = cli_mod._load_scope(
+            backend,
+            json_out=json_out,
+            collection=collection,
+            library=False,
+            year_from=year_from,
+            year_to=year_to,
+            item_type=item_type,
+            item_keys=item_keys,
+        )
+        items = loaded.items
+        if not items:
+            console.print("[red]Item not in the mirror / scope.[/]")
+            raise typer.Exit(1)
+        target = items[0]
+        item_key = target.key
+        title = target.title or target.key
+        manifest = Manifest(cfg.manifest_path)
+        src = resolve_pdf_path(cfg, target, manifest)
+        if src is None:
+            console.print(f"[red]No PDF on disk for {item_key}.[/]")
+            raise typer.Exit(1)
+    else:
+        assert file_path is not None
+        src = file_path
+        title = file_path.name
+
+    collections = [c.strip() for c in collection if c and str(c).strip()]
+    keys = scope_keys(
+        ledger,
+        collections=collections or None,
+        year_from=year_from,
+        year_to=year_to,
+        item_types=types,
+    )
+    scope = ", ".join(collections) if collections else "index"
+    cid = claim_check_id(
+        kind=kind,
+        item_key=item_key,
+        original_name=file_path.name if file_path is not None else "",
+    )
+    per_k = resolve_claim_check_k(cfg, top_k)
+    started = time.time()
+    t0 = time.perf_counter()
+
+    def _on_status(msg: str) -> None:
+        elapsed = time.perf_counter() - t0
+        console.print(f"[dim]{elapsed:5.0f}s[/] {escape(msg)}")
+
+    try:
+        with cli_mod._spinner("Claim-check", json_out=json_out) as spin:
+
+            def on_status(msg: str) -> None:
+                spin(msg)
+                if not json_out:
+                    _on_status(msg)
+
+            on_status(f"Extracting {src.name}…")
+            doc = extract_path(src)
+            on_status(
+                f"Extracted {len((doc.text or '').split()):,} words "
+                f"({doc.format or 'unknown'})"
+            )
+            from .rag.retrieve import search as rag_search
+
+            def search_fn(query: str, *, k: int, keys: set[str] | None) -> list[Any]:
+                return rag_search(
+                    cfg,
+                    query,
+                    k=k,
+                    keys=keys,
+                    embedder=embedder,
+                    index=index,
+                    ledger=ledger,
+                )
+
+            rows, skips = collect_claim_check(
+                cfg,
+                doc,
+                k=per_k,
+                keys=keys,
+                exclude_key=item_key,
+                search_fn=search_fn,
+                on_status=on_status,
+            )
+    except ExtractError as exc:
+        console.print(f"[red]{escape(str(exc))}[/]")
+        raise typer.Exit(1) from exc
+
+    inp = {
+        "kind": kind,
+        "item_key": item_key,
+        "path": str(src),
+        "title": title,
+        "format": doc.format,
+    }
+    payload = pack_payload(
+        cid=cid,
+        scope=scope,
+        k=per_k,
+        inp=inp,
+        rows=rows,
+        skips=skips,
+    )
+    folder = write_pack(cfg, payload)
+    payload["pack_dir"] = str(folder)
+    counts = payload.get("counts") or {}
+    write_command_report(
+        cfg,
+        command="ask",
+        scope=scope,
+        summary={
+            "claim_check": True,
+            "units": counts.get("units", 0),
+            "supported": counts.get("supported", 0),
+            "mixed": counts.get("mixed", 0),
+            "unsupported": counts.get("unsupported", 0),
+            "skips": counts.get("skips", 0),
+            "pack_dir": str(folder),
+        },
+        items=[
+            {
+                "quote": row.quote[:200],
+                "status": row.status,
+                "loc": row.loc,
+            }
+            for row in rows[:200]
+        ],
+        flags={"claim_check": True, "k": per_k, "read_only": True},
+        started=started,
+    )
+    envelope_payload = envelope(
+        command="ask",
+        summary={
+            "claim_check": True,
+            "units": counts.get("units", 0),
+            "supported": counts.get("supported", 0),
+            "mixed": counts.get("mixed", 0),
+            "unsupported": counts.get("unsupported", 0),
+            "skips": counts.get("skips", 0),
+            "pack_dir": str(folder),
+            "claim_check_id": cid,
+        },
+        items=[
+            {
+                "quote": row.quote[:200],
+                "status": row.status,
+                "loc": row.loc,
+                "hits": [
+                    {"item_key": hit.item_key, "pages": hit.pages, "quote": hit.quote}
+                    for hit in row.hits
+                ],
+            }
+            for row in rows[:50]
+        ],
+        paths={"pack": str(folder)},
+        flags={"claim_check": True, "read_only": True, "k": per_k},
+    )
+
+    def _human() -> None:
+        table = Table(title="claim-check")
+        table.add_column("Status")
+        table.add_column("Sentence")
+        table.add_column("Hits")
+        for row in rows[:20]:
+            clip = row.quote if len(row.quote) <= 60 else row.quote[:59] + "…"
+            hit_s = ", ".join(h.item_key for h in row.hits[:3]) or "—"
+            table.add_row(row.status, clip, hit_s)
+        console.print(table)
+        console.print(HONESTY_BANNER)
+        console.print(f"[green]Pack → {folder}[/]")
+
+    cli_mod._emit_agent(envelope_payload, json_out=json_out, human=_human)

@@ -3231,6 +3231,67 @@ def test_claims_lane_writes_ledger_and_gaps(cfg, tmp_path, monkeypatch):
     assert "## Incomplete lanes" not in md
 
 
+def test_claims_lane_cited_source_locators(cfg, tmp_path, monkeypatch):
+    from paperful.store import write_json
+    from paperful.zot import Item
+
+    monkeypatch.setattr("paperful.llm.client.chat", _claims_chat)
+    page = (
+        "Yield rose 47.2 percent under the ABC protocol compared with the control "
+        "across forty field plots in the trial."
+    )
+    write_json(cfg.rag_dir / "text" / "LIB1.json", {"pages": [page]})
+    src = tmp_path / "cited.md"
+    src.write_text(
+        "Abstract\n\n"
+        "We report a 47.2 percent increase in yield under the ABC protocol.\n"
+        "Global coverage is claimed for every ocean basin.\n\n"
+        "Methods\n\nThe ABC protocol was applied to 40 plots. Yield was measured at harvest.\n\n"
+        "Results\n\n"
+        "Yield rose 47.2 percent under the ABC protocol compared with the control [1].\n\n"
+        "Limitations\n\nThe ABC protocol sample was a single season.\n\n"
+        "References\n\n"
+        "[1] Ada. (2001). First paper. Journal. https://doi.org/10.1000/missing\n",
+        encoding="utf-8",
+    )
+    held = Item(
+        key="LIB1",
+        item_type="journalArticle",
+        title="First paper",
+        doi="10.1000/missing",
+        arxiv_id=None,
+        url=None,
+        year=2001,
+        first_author="Ada",
+    )
+    pack = build_critique(
+        cfg,
+        file_path=src,
+        offline=True,
+        lanes=("claims",),
+        llm_client=type("C", (), {"provider": "stub"})(),
+        scope_items=[held],
+    )
+    ledger = pack.get("claims") or []
+    hit = next(row for row in ledger if "47.2 percent" in row["text"])
+    sources = hit.get("sources") or []
+    assert sources
+    assert sources[0]["item_key"] == "LIB1"
+    assert sources[0]["status"] == "supported"
+    assert sources[0]["quote"]
+    assert sources[0]["quote"].lower() in page.lower()
+    md = Path(pack["pack_dir"], "pack.md").read_text(encoding="utf-8")
+    assert "held PDF text" in md
+    assert "`LIB1`" in md
+    codes = {
+        f["code"]
+        for f in pack["findings"]
+        if f.get("source") == "claims"
+        and f.get("extra", {}).get("claim_id") == hit["id"]
+    }
+    assert "claim_source_unsupported" not in codes
+
+
 def test_cli_lane_flag_runs_claims(cfg, tmp_path, monkeypatch):
     from paperful.cli import app
 

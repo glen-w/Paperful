@@ -278,6 +278,16 @@ def ask(
         "--from-file",
         help="Batch: one question per line (file or '-'). Writes state/ask-batch/.",
     ),
+    claim_check: bool = typer.Option(
+        False,
+        "--claim-check",
+        help="Label each sentence against the local index (no LLM). Needs --file or --item.",
+    ),
+    file_path: Path | None = typer.Option(
+        None,
+        "--file",
+        help="With --claim-check: manuscript path (xor --item).",
+    ),
     focus: str | None = typer.Option(
         None,
         "--focus",
@@ -348,6 +358,8 @@ def ask(
         run_config=run_config,
         json_out=json_out,
         ask_mode=ask_mode,
+        claim_check=claim_check,
+        file_path=file_path,
     )
 
 

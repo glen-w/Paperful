@@ -77,6 +77,8 @@ See [config.md](config.md).
 ## What this is not
 
 - Not `ask` (no grounded paragraph).
+- Not [`ask --claim-check`](rag.md#claim-check) (that labels support vs the
+  index; this pack only lists extra held cites).
 - Not [`refs gap`](commands.md) (cited-in-PDF works you do not own).
 - Not `precedent` (no OpenAlex / public-metadata-only rows).
 - Not auto-insert into the manuscript. `--apply` and stance labels stay later.

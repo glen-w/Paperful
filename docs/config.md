@@ -283,8 +283,9 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[critique].advanced_timeout_s` | `0` | Wall clock for the MARG-S pass (`0` → `max([llm].timeout_s, 600)`). Duplicate leader broadcasts abort (`loop`); overrun records `timeout` |
 | `[critique].advanced_aspects` | `[]` | MARG aspect ids. Empty → `experiments`, `clarity`, `impact`. Allowed: those plus `theory`, `policy`, `evidence-base`. Do not enable all six by default |
 | `[critique].claims_max` | `8` | Cap on extracted claims for the `claims` lane |
-| `[critique].claims_max_comments` | `16` | Cap on `claim_thin` / `claim_unsupported_in_text` findings |
+| `[critique].claims_max_comments` | `16` | Cap on `claim_thin` / `claim_unsupported_in_text` / cited-source findings |
 | `[critique].claims_timeout_s` | `0` | Wall clock for the `claims` lane (`0` → `[llm].timeout_s`) |
+| `[critique].claims_cite_max_sources` | `3` | Max held cited works scored per claim (`state/rag/text`; no web fetch) |
 | `[critique].verify_timeout_s` | `0` | Wall clock for the `verify` lane (`0` → `max([llm].timeout_s, 600)`) |
 | `[critique].verify_max_comments` | `16` | Cap on suggested comments from `verify` |
 | `[critique].verify_max_segments` | `8` | Max logical segments in the `verify` swarm |

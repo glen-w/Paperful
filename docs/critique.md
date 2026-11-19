@@ -265,6 +265,7 @@ were a paper.
 uv run paperful critique --file ./outline.docx --lane outline -C "My Collection"
 ```
 
+(optional-claims)=
 ## Optional claims (`--lane claims`)
 
 Additive suggested lane. One JSON turn extracts core claims from abstract /
@@ -278,6 +279,20 @@ rows stay in the `pack["claims"]` ledger and a **Claims** section in
 extract**,” never “the claim is false.” Caps: `claims_max` (default 8),
 `claims_max_comments` (default 16), `claims_timeout_s` (`0` → `[llm].timeout_s`).
 Optional GROBID heading units when `--grobid` / `[grobid].enabled`.
+
+When `-C` / `--library` is set, a second **cited-source** pass maps in-text
+cites to held items and scores `state/rag/text` pages already on disk. Each
+source row is `supported`, `thin`, `unsupported`, `not_in_library`, or
+`no_text`, with a quote that must occur on that page when the status is
+supported or thin. Missing index text is `claim_cite_no_text`, not
+`claim_source_unsupported`. Thin / unsupported held text: `claim_source_thin`
+/ `claim_source_unsupported` (“not supported by **held cited PDF text**”).
+Cap: `claims_cite_max_sources` (default 3). This pass does **not** fetch
+cited PDFs from the web; `context-web` stays metadata-only. It is not a
+truth verdict, not accept/reject, and not a paper generator.
+
+Per-sentence labels against the **whole** index (not only works you cited)
+are `paperful ask --claim-check` — [Ask your library](rag.md#claim-check).
 
 ## Optional verify (`--lane verify`)
 
@@ -478,11 +493,12 @@ When `[llm]` is on, review-lane checkboxes are labeled by what they return
 and can be combined (pre-checked from `[critique].lanes`, or the llm/advanced
 shims when `lanes` is empty). Visible labels: **Get independent reviewer
 notes**, **Review experiments, clarity, and impact**, **Argue against my
-conclusions**, **Review this as an outline**, **Show which claims this text supports**, **Find gaps section
+conclusions**, **Review this as an outline**, **Show which claims this text supports** (held cited-PDF locators when the collection chip is set and `rag ingest` has filled `state/rag/text`), **Find gaps section
 by section**, **Compare with this library** (three retrieve rounds), **Compare with published work
 (goes online)**. Tooltips hold the lane ids (`reviewers`, `marg` / MARG-S,
 `adversary`, `outline`, `claims`, `verify` — not a truth check, `context`,
-`context-web`). **GROBID sidecar** is for MARG-S / claims / verify chunks
+`context-web`). Per-sentence support vs the whole index is CLI
+[`ask --claim-check`](rag.md#claim-check), not this page. **GROBID sidecar** is for MARG-S / claims / verify chunks
 (pre-checked from `[grobid].enabled`).
 Library item form also has force-LLM past identity lint. **Write child note** is `--apply` (item
 only). **Show dismissed** is `--show-dismissed`. **AI model** is `--ai-model`.

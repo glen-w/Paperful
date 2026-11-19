@@ -275,6 +275,11 @@ def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
                 lambda v: max(0.0, float(v)),
             ),
             (
+                "claims_cite_max_sources",
+                "critique_claims_cite_max_sources",
+                lambda v: max(1, int(v)),
+            ),
+            (
                 "verify_timeout_s",
                 "critique_verify_timeout_s",
                 lambda v: max(0.0, float(v)),

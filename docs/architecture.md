@@ -154,6 +154,7 @@ never leave a half-written `record.json` or run report.
 | `state/pdf-cache/` | Throwaway copies of manager PDFs, only when `[mirror].pdfs = "none"`. Otherwise an exported PDF goes into its item folder, and `sync` moves older cache files there. `paperful cache clean` removes absorbed or stale leftovers |
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
 | `state/ask-batch/<stamp>/` | `ask --from-file` / Index batch Ask pack (`paperful.ask_batch.v1`, `answers.md`); resume cache under `by-hash/` |
+| `state/ask-claims/<stamp>/` | `ask --claim-check` pack (`paperful.claim_check.v1`, `pack.md`). No LLM; `--apply` not in this stage |
 | `state/rag/evidence/` | Advanced Ask passage summaries (chunk + question + model cache). Rebuildable |
 | `state/rag/questions/<key>.json` | `rag questions` / Index extract RQs (`paperful.rag.questions.v1`, provenance `rule`\|`llm`) |
 | `state/sections/<key>.json` | `extract-sections` IMRaD fields (`paperful.sections.v1`, provenance `rule`\|`grobid`\|`llm`; optional `engine`; optional `state/section-headings.toml` synonyms) |

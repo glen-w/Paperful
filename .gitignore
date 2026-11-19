@@ -24,6 +24,7 @@ ezproxy-cookies.txt
 compose.override.yaml
 docker-compose.override.yml
 assessments/
+docs/dogfood/
 docs/bbnj-author-lanes.md
 # Local Vale house styles. JCP, JMLC, and MarinePolicy are shipped examples.
 styles/*

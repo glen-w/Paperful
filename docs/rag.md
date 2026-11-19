@@ -235,6 +235,7 @@ uv run paperful rag search "…" --top-k 20  # hits to print
 uv run paperful ask "…" --format json      # one paperful.agent.json.v1 object (implies --no-stream)
 uv run paperful ask "…" --focus gaps       # prompt preset (default|questions|gaps|methods|answered|conflict)
 uv run paperful ask --from-file questions.txt -C ocean/BBNJ   # batch → state/ask-batch/
+uv run paperful ask --claim-check --file ./draft.md -C ocean/BBNJ
 uv run paperful ask                        # prompt for several; follow-ups share a thread
 uv run paperful ask --thread new "…"       # start a stored thread
 uv run paperful ask --thread <id> "and the EIA part?"
@@ -254,6 +255,22 @@ multi-question loop). Agents that can shell out should prefer that over
 Sources
 [S1] Gjøsæter (1973). The food of the myctophid fish … pp. 1-2, p. 7. [2WZ8G7GW]
 ```
+
+### Claim-check
+
+`paperful ask --claim-check --file DRAFT` (or `--item KEY`) labels each
+sentence against the local index. No chat model. `-C` / year / type are
+the search scope (`--item` is the manuscript, not a scope key). Labels:
+
+- **supported** — a quote that occurs in a held chunk, plus item key and pages
+- **mixed** — hits exist; the pack uses the fixed phrase “passages touch this
+  topic and do not state the claim”
+- **unsupported** — no index hit; no guessed citation
+
+Fail closed when `[rag]` is off or the index is empty. Writes
+`state/ask-claims/<stamp>/` (`paperful.claim_check.v1` + `pack.md`).
+`--apply` and `--from-file` are not valid here. Cited works only, on a
+critique pack: `--lane claims` with `-C` — [Critique](critique.md#optional-claims).
 
 The marker in the text, the paper, the pages the passages came from, and the
 item key. When the model cites nothing, the retrieved papers are listed as
@@ -344,7 +361,8 @@ prompts on Ask/batch, in order:
 
 Batch packs list under `state/ask-batch/`; answered packs under
 `state/rq-answered/` (`pack.md`). Routes: [gui.md](gui.md). CLI still owns TTY
-multi-turn, `--show-context`, named run profiles, and `paperful all`.
+multi-turn, `--show-context`, named run profiles, `ask --claim-check`, and
+`paperful all`. Claim-check is not on `/ask` (stage 1 is the pack on disk).
 
 Answers are only as good as the passages found. The model is told to answer
 from the excerpts alone and to say when they do not contain the answer, but a

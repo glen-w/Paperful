@@ -48,7 +48,7 @@
         "url": "https://paperful.app/",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Linux, macOS, Windows",
-        "softwareVersion": "1.9.5",
+        "softwareVersion": "1.9.6",
         "license": "https://opensource.org/licenses/MIT"
       }
     </script>
@@ -203,11 +203,13 @@
             <li>Grow the library from a topic search or from people you follow</li>
             <li>Tidy duplicates, identifiers, and broken attachments</li>
             <li>Keep a folder copy you can back up or hand to another tool</li>
-            <li>Ask the papers you already have — optional local AI, off until you turn it on</li>
-            <li>Check a draft you already wrote — structure, citations, optional comparison with your library (Advanced; not a grade)</li>
+            <li>Ask the papers you already have — optional local AI, off until you turn it on. A claim-check pack (CLI) labels each sentence against that index with no chat model</li>
+            <li>Check a draft you already wrote — structure, citations, optional claim locators against PDFs you already hold (Advanced; not a grade)</li>
           </ul>
           <p>
             <a href="./guide/walkthroughs.html">Walk through a real job</a>
+            ·
+            <a href="./guide/rag.html">Ask your library</a>
             ·
             <a href="./guide/critique.html">Critique a draft</a>
             ·
@@ -271,7 +273,7 @@
             <code>paperful[browser]</code>)
             (<a href="https://pypi.org/project/paperful/">PyPI</a>).
           </p>
-          <pre class="code"><code>git clone --branch v1.9.5 https://github.com/glen-w/Paperful.git
+          <pre class="code"><code>git clone --branch v1.9.6 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
 mkdir -p ../paperful-data ../paperful-out
@@ -290,7 +292,7 @@ docker compose up</code></pre>
             then copy <code>config.toml</code> next to <code>compose.yaml</code>.
           </p>
           <p class="fine">
-            Omit <code>--branch v1.9.5</code> to track latest <code>main</code>.
+            Omit <code>--branch v1.9.6</code> to track latest <code>main</code>.
             <a href="./guide/docker.html">Docker</a>
             ·
             <a href="./guide/zotero.html">Zotero</a>
@@ -305,7 +307,7 @@ docker compose up</code></pre>
 
     <footer class="site-footer">
       <div class="wrap footer-inner">
-        <p><a href="https://glenwright.earth">© Glen Wright</a> · 1.9.5</p>
+        <p><a href="https://glenwright.earth">© Glen Wright</a> · 1.9.6</p>
         <p>
           <a href="./guide/legal-privacy.html">Legal / privacy</a>
         </p>

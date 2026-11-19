@@ -212,6 +212,7 @@ mirror_failures_before_skip = 3
 # claims_max = 8                   # intra-doc claim ledger cap
 # claims_max_comments = 16
 # claims_timeout_s = 0             # 0 = [llm].timeout_s
+# claims_cite_max_sources = 3      # held cited PDFs scored per claim (rag text)
 # verify_timeout_s = 0             # 0 = max([llm].timeout_s, 600)
 # verify_max_comments = 16
 # verify_max_segments = 8

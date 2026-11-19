@@ -92,7 +92,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `resolve/` (`ids.py`, `enrich.py`), `lint.py`, `acronyms.py`, `authors_report.py`, `metadata.py`, `dedupe.py`, `pdfid.py` | Identifier, hygiene, and corpus-frequency logic. Take a backend; never name a manager | the protocol |
 | `glossary.py` / `glossary_cmd.py` | House expansions (`paperful.glossary.v1` in `state/glossary/`). Critique fuzzy-match + Vale alias export | `config` |
 | `rewrite.py`, `rewrite_areas.py`, `rewrite_align.py`, `rewrite_plan.py`, `rewrite_llm.py`, `rewrite_render.py`, `rewrite_docx.py`, `rewrite_office.py`, `rewrite_pdf.py`, `rewrite_openxml.py` | Apply-from-critique (`paperful.rewrite.plan.v1`). Pack required; never overwrites the source; stdlib tracked-changes OOXML (Word), in-place pptx/odt copy or ODF/PDF spines; optional `openxml-audit` extra | `critique` pack + gated `llm` |
-| `critique.py`, `critique_lanes.py`, `critique_checks/` (`run`, `structure`, `biblio`, `floats`, `style`, `overlap`), `critique_extract.py`, `critique_llm.py` (`suggested_from_llm` dispatches `_run_reviewers` / `_run_optional_lane`), `critique_marg.py`, `critique_adversary.py`, `critique_outline.py`, `critique_claims.py`, `critique_verify.py`, `critique_units.py`, `critique_context.py`, `critique_metrics.py`, `critique_ai_tells.py`, `critique_ai_model.py`, `critique_vale.py`, `critique_overlap.py`, `critique_stats.py` | Local manuscript pack (`paperful.critique.pack.v1`). Checkers always; composable suggested review lanes (`reviewers`, MARG-S, adversary, outline, claims, verify, ScholarPeer-inspired context / context-web with three-round retrieve and `context.json`; no vendor); optional GROBID TEI chunks for `marg` / `claims` / `verify`; optional Binoculars extra (git overlay; no torch at import); optional Vale house-style pass (no vale at import); glossary expansions when `state/glossary/` has entries | `cli_runtime`, gated `llm`, optional `grobid_client` |
+| `critique.py`, `critique_lanes.py`, `critique_checks/` (`run`, `structure`, `biblio`, `floats`, `style`, `overlap`), `critique_extract.py`, `critique_llm.py` (`suggested_from_llm` dispatches `_run_reviewers` / `_run_optional_lane`), `critique_marg.py`, `critique_adversary.py`, `critique_outline.py`, `critique_claims.py`, `critique_verify.py`, `critique_units.py`, `critique_context.py`, `critique_metrics.py`, `critique_ai_tells.py`, `critique_ai_model.py`, `critique_vale.py`, `critique_overlap.py`, `critique_stats.py` | Local manuscript pack (`paperful.critique.pack.v1`). Checkers always; composable suggested review lanes (`reviewers`, MARG-S, adversary, outline, claims, verify, ScholarPeer-inspired context / context-web with three-round retrieve and `context.json`; no vendor); optional GROBID TEI chunks for `marg` / `claims` / `verify`; claims cited-source locators from `state/rag/text` when `-C` is set; optional Binoculars extra (git overlay; no torch at import); optional Vale house-style pass (no vale at import); glossary expansions when `state/glossary/` has entries | `cli_runtime`, gated `llm`, optional `grobid_client` |
 | `config_tables.py` | Nested TOML sections applied onto `Config` | `config` parsers |
 | `config_check.py` | `config check`: unknown top-level keys and sections (did-you-mean), secrets that belong in the environment | `config` |
 | `sr/` (`protocol.py`, `screen.py`, `identify.py`, `prisma.py`, `exchange.py`) / `sr_cmd.py` | Systematic review: protocol, screening ledger, PRISMA counts, CSV/RIS exchange under `state/sr/<slug>/`; `sr init` / `screen` / `status` / `export` / `import` | `fsio`, `store` |
@@ -104,7 +104,8 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `run_hooks.py` | EZProxy recovery, handoff, dry-run rows for `run` | `pipeline`, `handoff` |
 | `gaps_cmd.py` | `gaps` body after the CLI parses flags | `handoff`, `run_hooks` |
 | `run_cmd.py` | `run` body after the CLI parses flags | `pipeline`, `run_hooks`, `catalogue` (PDF-todo helpers; not `zot`) |
-| `ask_cmd.py` | `ask` body after the CLI parses flags | `agent_ops`, rag |
+| `ask_cmd.py` | `ask` body after the CLI parses flags | `agent_ops`, rag, `claim_check` |
+| `claim_check.py` | `ask --claim-check` pack (`paperful.claim_check.v1`). Sentence split from `stuff`; labels from `critique_claims` overlap; no LLM | `stuff`, `critique_claims`, rag retrieve |
 | `dedupe_cmd.py` / `attachments_cmd.py` / `summarize_cmd.py` / `synthesize_cmd.py` | Completeness verbs after flags | domain modules via `cli_runtime` |
 | `completeness_cmd.py` | Re-export shim for the four verbs (keep `cli` imports and monkeypatches stable) | the four `*_cmd` modules |
 | `lint_cmd.py` | `lint` after flags | `lint` |
@@ -256,7 +257,8 @@ Tier policy (1.0 contract):
 | `paperful.rag.questions.v1` | `state/rag/questions/` | `rag.questions` | T2 | — |
 | `paperful.sections.v1` | `state/sections/<key>.json` | `extract-sections` | T2 | Required: `schema`, `item_key`, `title`, `year`, `source`, `fields`, `missing`. Optional: `sections`, `engine` (`grobid`\|`rule`), `pdf_sha256`, `notes` (scan skip / GROBID failure). Each `fields.<name>`: `text`, `provenance` (`rule`\|`grobid`\|`llm`), optional `heading`, `pages` |
 | `paperful.grobid.tei.v1` | `state/grobid/<sha256>.json` next to `.tei.xml` | `sections.grobid` | T3 | Rebuildable cache (`extract-sections`, `[rag].parser = "grobid"`, `critique --lane marg` / `claims` / `verify`) |
-| `paperful.critique.pack.v1` | `state/critiques/<id>/<stamp>/pack.json` | `critique` | T1 | `CRITIQUE_PACK_KEYS` (`findings`, `overlap`, `metrics`, `llm`, …). `llm` may be `null`. When set: `mode` `default`\|`marg`\|`both`\|`adversary`\|`outline`\|`claims`\|`verify`\|`context`\|`context-web`, optional `marg.parser` / `claims` / `verify` / `outline`. Optional top-level `outline` skeleton and `claims` ledger. Optional `ai_model` / `vale` / `forensics` only when those extras ran. Context / context-web may add `llm.context.investigation` plus `log` / `log_path` |
+| `paperful.critique.pack.v1` | `state/critiques/<id>/<stamp>/pack.json` | `critique` | T1 | `CRITIQUE_PACK_KEYS` (`findings`, `overlap`, `metrics`, `llm`, …). `llm` may be `null`. When set: `mode` `default`\|`marg`\|`both`\|`adversary`\|`outline`\|`claims`\|`verify`\|`context`\|`context-web`, optional `marg.parser` / `claims` / `verify` / `outline`. Optional top-level `outline` skeleton and `claims` ledger (intra-doc `status` / `support_quote` / `loc`; optional `sources[]` with `item_key`, cited-source `status`, `quote`, `loc` when `-C` ran). Optional `ai_model` / `vale` / `forensics` only when those extras ran. Context / context-web may add `llm.context.investigation` plus `log` / `log_path` |
+| `paperful.claim_check.v1` | `state/ask-claims/<stamp>/` | `ask --claim-check` | T1 | Frozen keys: `schema`, `claim_check_id`, `created_at`, `scope`, `k`, `input`, `counts`, `rows`, `skips`. Row `status` is `supported`\|`mixed`\|`unsupported`. Supported quotes occur in the indexed chunk. No LLM |
 | `paperful.critique.context.v1` | `state/critiques/<id>/<stamp>/context.json` | `critique` (`context` / `context-web`) | T1 | Compact investigation log: summary, retrieve rounds, novelty search, Q&A. No passage text. Written only when that lane ran |
 | `paperful.rewrite.plan.v1` / `paperful.rewrite.pack.v1` | `state/rewrites/<id>/<stamp>/` | `rewrite` | T2 | Edit plan plus pack metadata. Never overwrites the source manuscript |
 | `paperful.rq_answered.v1` | `state/rq-answered/` | `rag.answered` | T2 | — |
@@ -402,17 +404,13 @@ bash scripts/release/pre_release.sh --dist-only
 UV_PUBLISH_TOKEN=pypi-… uv publish dist/paperful-$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")*
 ```
 
-`make pre-release` also checks the active [`since` dogfood
-log](dogfood/since-bbnj.md): eight weekly verdicts (`actionable`, `dismissed`, or
-`noise`) while `dogfood_gate` is `active`, or set `dogfood_gate: complete` when
-the four-week habit ends. `scripts/release/dogfood_status.sh` prints
-`active N/need` or `complete`; Nightshift `paperful-since` uses the same counter
-for index lines (packs are scheduled outside Paperful). If a local `assessments/*-full-assessment.md` exists,
-rows marked `Not done` or `NEEDS FIXES` block the tag until you close them out.
-Emergency patches: `PAPERFUL_SKIP_DOGFOOD=1` or `PAPERFUL_SKIP_ASSESSMENT=1`
-(document why in [CHANGELOG.md](CHANGELOG.md)). GitHub publish still runs the
-version, changelog, and website checks; dogfood and local assessment gates run
-only on the maintainer machine (`make pre-release` before the tag).
+If a local `assessments/*-full-assessment.md` exists, rows marked `Not done`
+or `NEEDS FIXES` block the tag until you close them out. Emergency patches:
+`PAPERFUL_SKIP_ASSESSMENT=1` (document why in [CHANGELOG.md](CHANGELOG.md)).
+GitHub publish still runs the version, changelog, and website checks; the
+assessment gate runs only on the maintainer machine (`make pre-release`
+before the tag). Weekly `since` packs you open on your own collections stay
+off this script.
 
 `uv publish` uploads **every** file in `dist/` unless you pass explicit paths.
 `pre_release.sh` fails if `dist/` contains wheels or sdists for an older

@@ -35,7 +35,9 @@ workbench and ledgers, **1.9.0** cut GitHub CI back to smoke, **1.9.1** and
 order. **1.9.4** ships the second, `refs gap` memory, and restores lint
 and the full suite on CI. **1.9.5** (2026-11-18) ships critique
 `context` / `context-web` three-round retrieve, a `context.json` sidecar, and
-split novelty Q then A ([critique.md](critique.md)). The **live map** is [After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
+split novelty Q then A ([critique.md](critique.md)). **1.9.6** (2026-11-19)
+ships cited-source locators on `--lane claims` and CLI `ask --claim-check`
+([rag.md](rag.md#claim-check)). The **live map** is [After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
 still lists jobs by area; many of those rows have shipped. Do not re-pick
 them as the next thing to build.
 
@@ -142,7 +144,8 @@ are answered in tree. Recorded here so the next plan does not rebuild them.
 | Install route argument | Settled above. PyPI “which route?” is not an open product question |
 
 The weekly **holdings diff** shipped in 1.9.3 as
-[`paperful since`](since.md); its dogfood is what is open. Still genuinely
+[`paperful since`](since.md). Opening those packs on your own collections is
+operator habit, not a public tracker or a tag gate. Still genuinely
 open, and specified below: citation debt that ages, a read-only memory of decisions already on disk,
 Ask used as a **claim check**, the SR scaffold grown into a review you can
 finish, topic gap map, playbook health, and the platform residuals 1.7
@@ -153,14 +156,11 @@ wrote down and did not do.
 
 **Status:** shipped in 1.9.3, CLI only ([since](since.md)). Both sections
 are built. Probes use the open-access metadata lanes; a campus (EZProxy)
-candidate is not probed. The four-week dogfood started on 14 Nov 2026; track
-progress in [since dogfood log](dogfood/since-bbnj.md) — BBNJ and Hoops, 0/4
-weekly verdicts per collection until each pack is opened; full `run` on both
-under way 16 Nov 2026. Operator cron only: Nightshift
-[`paperful-since`](../../nightshift/jobs/paperful-since/) runs weekly `since` on
-BBNJ and Hoops; do not add an in-app scheduler, an email, or a nav item before
-it ends. The sketch below is the design record; where it and
-[since](since.md) differ, the page is what shipped.
+candidate is not probed. Run `since` weekly on collections you actually
+refill if you want the habit; that log is local. Do not add an in-app
+scheduler, an email, or a nav item until those packs are opened. The
+sketch below is the design record; where it and [since](since.md) differ,
+the page is what shipped.
 
 The researcher already has watches (`keepup`), a miss list (`gaps`), a
 retraction pass (`screen`), a version merge (`versions`), a URL check
@@ -286,15 +286,18 @@ snowball queue itself — then delete the join and keep the queue.
 (after-17-claim-check)=
 ### Ask, only as a claim check
 
-**Status:** roadmap. Depends on shipped Ask, not on a new model.
+**Status:** stage 1 shipped (`paperful ask --claim-check --file` / `--item`;
+`paperful.claim_check.v1` under `state/ask-claims/`). Later stages stay
+parked. Cited-source locators on `critique --lane claims` are separate
+(held `state/rag/text` for works you already cited).
 
-Ask today can cite a passage. It can also write a smooth paragraph that
-hides which sentence was unsupported. The trust test is a pack that
-refuses the smooth paragraph.
+Ask can cite a passage. It can also write a smooth paragraph that
+hides which sentence was unsupported. Stage 1 is a pack that
+refuses the smooth paragraph: no LLM, no rewritten sentence, no
+inserted citation.
 
-**Command sketch:** `paperful ask --claim-check --file DRAFT` (or a flag
-on the existing `--from-file` path — pick one when implementing; do not
-ship both). Scope is `-C` / the same index as Ask. For each sentence
+`--claim-check` is not `--from-file` (that flag stays questions.txt).
+Scope is `-C` / year / type, the same index as Ask. For each sentence
 over the `stuff` length floor:
 
 - **supported** — one or more passages, item key, page, quote.
@@ -302,16 +305,14 @@ over the `stuff` length floor:
   The pack says so in a fixed phrase, not a generated hedge.
 - **unsupported** — no passage above the retrieve threshold.
 
-Fail closed when the index is empty (same as Ask). No sentence is
-rewritten. No citation is inserted. Output:
-`state/ask-claims/<stamp>/` (`paperful.claim_check.v1` + `pack.md`).
-`--apply` may file a child note only in a later stage, with
-`paperful.note.v1` type `claim-check`, and only if the operator passes
-`--apply`. Default is the pack on disk.
+Fail closed when the index is empty (same as Ask). `--apply` may file a
+child note only in a later stage, with `paperful.note.v1` type
+`claim-check`, and only if the operator passes `--apply`. Default is the
+pack on disk.
 
 **What this unlocks, in order, each allowed to stop:**
 
-1. **Claim check** (this stage). Dogfood on one real draft extract
+1. **Claim check** (shipped). Dogfood on one real draft extract
    (a JMLC or house-style manuscript slice under `styles/` is the
    fixture shape; a private draft is the dogfood). Acceptance: every
    supported row has a quote that occurs in the indexed chunk; a
@@ -764,8 +765,8 @@ Still open, and small:
 Not a calendar. Each line can be the last line.
 
 1. **`paperful since`** — holdings that changed meaning, and misses that
-   healed. **Shipped in 1.9.3** (CLI pack and fixture). The four-week
-   dogfood is running. Workbench block only if the packs get opened.
+   healed. **Shipped in 1.9.3** (CLI pack and fixture). Workbench block
+   only if you actually open the packs.
 2. **`refs gap` memory** — new / still missing / now owned. **Shipped in
    1.9.4.** Dogfood: hand one pack to `ingest-dois` within a month.
 3. **`paperful decisions -C`** — read-only join. Drop it if Discover
@@ -820,7 +821,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.5).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.6).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -828,7 +829,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.9.5` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.9.6` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=

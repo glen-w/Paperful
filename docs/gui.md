@@ -30,7 +30,7 @@ Three jobs sit on the default nav:
 | --- | --- | --- |
 | **Wanted** | `gaps`, `run`, `attach` | See missing PDFs, preview fetch, grab to `out/`, attach chosen copies |
 | **Discover** | `snowball`, `authorwatch`, watches, `search` | Find new works (topic, person, or web grey hits), review, add metadata parents |
-| **Ask** | `ask`, `ask --from-file` | Cited answers from PDFs already copied to disk (`simple` / `advanced`; needs `[rag]` + `[llm]` and an index) |
+| **Ask** | `ask`, `ask --from-file` | Cited answers from PDFs already copied to disk (`simple` / `advanced`; needs `[rag]` + `[llm]` and an index). Per-sentence support vs the index is CLI `ask --claim-check` (no LLM; not on this page) |
 
 **Library**, **Activity**, and **System** support the loop. **Repair**, **Mirror**,
 **Index** (ingest / search / extract; **Briefs** is reached from it), **Critique**, **Suggest edits**, **Stuff**, and **Settings** appear only
@@ -255,7 +255,8 @@ Uploads stay under `state/critiques/uploads/` and are not imported to `out/`
 or Zotero. Optional review lanes need `[llm]` (item form also has force-LLM
 and write-child-note). Checkboxes are labeled by what they return (independent
 reviewer notes; experiments/clarity/impact; argue against conclusions; review
-as an outline; claims this text supports; section gaps; compare with this
+as an outline; claims this text supports, plus held cited-PDF locators when
+`state/rag/text` exists; section gaps; compare with this
 library, three retrieve rounds; compare with published work, goes online). Tooltips hold the lane ids (`reviewers`, `marg`,
 `adversary`, `outline`, `claims`, `verify` — not a truth check, `context`,
 `context-web`). Checkboxes are independent and pre-check from
@@ -292,7 +293,8 @@ outline section. Writes `state/stuff/` (`pack.md` / `pack.json`). Needs
 
 **Stays CLI** (no GUI control): `session login`, `doctor --guide`, mid-run
 EZProxy re-login, snowball `approve-each`, `collections add`, Sci-Hub source
-toggles; Ask TTY multi-turn, `--show-context`, and named run profiles.
+toggles; Ask TTY multi-turn, `--show-context`, named run profiles, and
+`ask --claim-check`.
 `paperful all` / named run configs stay [workflows](workflows.md).
 
 ---

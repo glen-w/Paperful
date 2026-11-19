@@ -262,6 +262,7 @@ class Config:
     critique_claims_max: int = 8
     critique_claims_max_comments: int = 16
     critique_claims_timeout_s: float = 0.0  # 0 → [llm].timeout_s
+    critique_claims_cite_max_sources: int = 3
     critique_verify_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 600)
     critique_verify_max_comments: int = 16
     critique_verify_max_segments: int = 8

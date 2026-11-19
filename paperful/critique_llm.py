@@ -695,6 +695,7 @@ def suggested_from_llm(
             hay=hay,
             pdf_path=pdf_path,
             use_grobid=use_grobid,
+            scope_items=scope_items or [],
             on_status=say,
         )
 
