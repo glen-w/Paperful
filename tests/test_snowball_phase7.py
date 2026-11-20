@@ -502,6 +502,7 @@ def test_cli_flags_on_search_and_watch_help():
     assert search.exit_code == 0
     search_out = plain_text(search.stdout)
     assert "--dedupe-scope" in search_out
+    assert "--prioritize" in search_out
     assert "author-site" in search_out
     watch = runner.invoke(cli.app, ["snowball", "watch", "run", "--help"])
     assert watch.exit_code == 0

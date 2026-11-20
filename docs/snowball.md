@@ -3,7 +3,8 @@
 **Status:** keyword search (multi-term AND / `--or`, trailing `*` stem
 expansion), multi-DOI / multi-ORCID / collection seeds, `--seeds-file`,
 `hybrid` (keyword hits, then one hop), refs, cited-by, and
-OpenAlex keywords, depth up to 5 under caps, gates
+OpenAlex keywords, hop-0 `--prioritize` (`recency` / `popular` / `historical`),
+depth up to 5 under caps, gates
 `dry-run` / `approve-each` / `approve-batch` / `auto`, overlap ranking,
 `--fetch-pdfs`, `--dedupe-scope` per invocation, optional `--dedupe-after`,
 opt-in author-site preflight / `snowball packs promote`, and pull-only `watch`
@@ -19,6 +20,7 @@ Each of those keys has a flag for one run, and `snowball profile save` takes
 the same flags: `--keyword-min-score`, `--search-keywords` /
 `--no-search-keywords`, `--languages en,fr`, `--min-seed-citations N`,
 `--note-provenance` / `--no-note-provenance`, `--backends openalex,crossref`,
+`--prioritize recency|popular|historical`,
 and (on `profile save`) `--oa-only` and `--seed-collection NAME`, the
 collection whose DOIs seed the crawl.
 Phases live in [ROADMAP](ROADMAP.md#snowball).
@@ -31,6 +33,7 @@ keys just created. How far one command reaches is [drawn below](#how-a-hop-is-cu
 
 ```text
 paperful snowball search "area based management tools" --year-from 2018
+paperful snowball search "area based management tools" --prioritize recency --year-from 2020
 paperful snowball search "marine spatial planning" --listed-in doaj,medline
 paperful snowball search "marine spatial planning" "offshore renewable energy"
 paperful snowball search msp ore --or
@@ -431,8 +434,9 @@ The picture is [How a hop is cut](#how-a-hop-is-cut).
 | `max_candidates` | 200 | Stops after this many `new` + `exists` rows. `all` (or `0`) keeps every row |
 | `per_hop_limit` | 50 | Neighbours kept per seed work per hop (references and cited-by). `all` (or `0`) keeps every one OpenAlex returns |
 | `per_hop_rank` | `most-cited` | How a numeric `per_hop_limit` picks neighbours: `most-cited`, `least-cited`, or `random` |
+| `prioritize` | `popular` | Hop-0 **search** order: `recency` (newest first), `popular` (citation count, the previous default), `historical` (oldest first). OpenAlex `sort=` **and** hop-0 score, so the queue cap does not undo it. Not topical relevance (OpenAlex default `search=` rank). Neighbour hops still use overlap rank and `--per-hop-rank`. `--prioritize overlap` is refused. Watch `from_created_date` is an index cursor, not this knob |
 | `cites_query` | unset | OpenAlex search on every reference batch and every cited-by request (title, abstract, or full text). Needs refs or cites in the direction, and depth of at least 1 |
-| `year_from` / `year_to` | unset | Drop candidates outside the window |
+| `year_from` / `year_to` | unset | Publication-year window. Drop candidates outside it. Distinct from watch `from_created_date` (when OpenAlex indexed the work) |
 | `study_designs` | unset | OpenAlex study design filter (`filter=study_designs.id:…`). OR several with `|` / repeated `--study-design`. Ids: `randomized-controlled-trial`, `clinical-trial`, `observational-study`, `case-report`, `systematic-review`, `meta-analysis`, `study-protocol`. Aliases: `rct`, `meta`, `sr`, `observational`, `protocol`, `case`, `trial`. Parents are included (every RCT is also a clinical trial). Untagged works (no abstract) never match. Also applied client-side after id hops. See [OpenAlex study designs](https://blog.openalex.org/filter-openalex-for-rcts-meta-analyses-and-systematic-reviews/) |
 | `listed_in` | unset | OpenAlex trusted journal lists (`filter=primary_location.source.listed_in:…`). OR several with `,` / `|` / repeated `--listed-in`. Ids are OpenAlex source-list slugs (`doaj`, `medline`, `jufo-3`, `latindex`, `scielo`, …). Family aliases expand to every level: `cwts` → `cwts-core`, `jufo`, `norway`, `ki-jl`, `jpps`, `abdc`. Membership is the maintainer’s list, not Paperful calling a journal good. Preprints, repositories, books, and backends without OpenAlex source metadata never match. Also applied client-side after id hops. Snapshot citing skips the parquet store when this filter is set. See [trusted journal lists](https://blog.openalex.org/trusted-journal-lists-come-to-openalex/) and [source-lists](https://help.openalex.org/data/source-lists/). Full catalog: [openalex.org/source-lists](https://openalex.org/source-lists) |
 | `types` | journal-article-shaped | OpenAlex / Zotero types |
@@ -517,7 +521,7 @@ Schema `paperful.snowball.candidate.v1`:
 | `exists_match` | When `exists`: `item_key` and `doi` or `title_year` |
 | `provenance` | Backend, endpoint, `retrieved_at` |
 | `gate` | The gate for this run |
-| `score` | `overlap * 1000 + cited_by_count` for neighbours. Search hits stay on `cited_by_count` |
+| `score` | Neighbours: `overlap * 1000 + cited_by_count`. Search hits (hop 0): citation count when `prioritize = popular`; publication year when recency/historical |
 
 The dry-run table shows title, year, DOI, why, in library, hop/direction,
 and backend, with `new` rows first. Created items are tagged

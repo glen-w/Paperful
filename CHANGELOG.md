@@ -6,6 +6,12 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.9.7 — 2026-11-20
+
+- **Snowball `--prioritize`.** Keyword and hybrid search order hop-0 hits by `recency`, `popular` (citation count, default), or `historical`. OpenAlex `sort=` and the queue score both follow it, so `max_candidates` does not undo the policy. Neighbour hops still use overlap rank. MCP `snowball_search`, profiles, and Discover Advanced share the same knob. Not topical relevance; published year is not the watch index cursor.
+- **Doctor mirror count.** `doctor` walks `out/` with errors skipped, so one unreadable folder (broken bind mount) no longer aborts the check.
+- **Docs.** Config, commands, and Discover Advanced name `--prioritize`. Critique guide notes how LLM reviewer lanes overweight appendices. Comparison table records OpenResearch and the shipped hop-0 sort.
+
 ## 1.9.6 — 2026-11-19
 
 - **Cited-source locators on critique claims.** `--lane claims` with `-C` scores held `state/rag/text` pages for works the manuscript already cites. Missing text is `claim_cite_no_text`, not a false “unsupported.” No web PDF fetch.

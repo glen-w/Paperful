@@ -130,6 +130,14 @@
           <option value="random">random</option>
         </select>
       </label>
+      <label>Prioritize {{ info("Order of keyword hits (hop 0). popular is citation count, the usual default. recency is newest first. historical is oldest first. Not the same as OpenAlex topical relevance. Neighbour hops still use overlap rank.") }}
+        <select name="prioritize">
+          <option value="">default (popular)</option>
+          <option value="popular">popular</option>
+          <option value="recency">recency</option>
+          <option value="historical">historical</option>
+        </select>
+      </label>
       <label>Hybrid seeds {{ info("For hybrid kind: how many keyword hits become graph seeds. Leave blank for the default.") }} <input name="hybrid_seeds" type="number" min="1" inputmode="numeric"></label>
       <label>Min seed citations {{ info("Ignore seed works cited fewer times than this. Filters noisy or very new seeds.") }} <input name="min_seed_citations" type="number" min="0" inputmode="numeric"></label>
       </div>

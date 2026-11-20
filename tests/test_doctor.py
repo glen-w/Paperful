@@ -276,3 +276,23 @@ def test_osf_check_amber_when_the_demand_bar_is_met(tmp_path):
     assert check.status == "amber"
     assert "enough signal to build a thin OSF source" in check.detail
     assert f"{MIN_OSF_MISSES} of {MIN_OSF_MISSES}" in check.detail
+
+
+def test_count_item_dirs_skips_walk_errors(tmp_path, monkeypatch):
+    import os
+
+    from paperful.snapshot import count_item_dirs
+
+    out = tmp_path / "out"
+    item = out / "Ada - 2020 - Title -- ABCD1234"
+    item.mkdir(parents=True)
+    (item / "paper.pdf").write_bytes(b"%PDF")
+    real_walk = os.walk
+
+    def walk_with_error(root, onerror=None, **kwargs):
+        if onerror is not None:
+            onerror(OSError(22, "Invalid argument", f"{root}/broken"))
+        yield from real_walk(root, onerror=onerror, **kwargs)
+
+    monkeypatch.setattr("paperful.snapshot.os.walk", walk_with_error)
+    assert count_item_dirs(out) == 1

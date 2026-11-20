@@ -729,6 +729,7 @@ def run_snowball_search(
     depth: int | None = None,
     year_from: int | None = None,
     year_to: int | None = None,
+    prioritize: str | None = None,
 ) -> dict[str, Any]:
     """Keyword preview; always dry-run (no parent creates)."""
     import sys
@@ -744,6 +745,18 @@ def run_snowball_search(
             exit_code=EXIT_USER,
             summary={"error": "query is required"},
         )
+    from .snowball.discover import parse_prioritize
+
+    policy = None
+    if prioritize:
+        try:
+            policy = parse_prioritize(prioritize)
+        except ValueError as exc:
+            return envelope(
+                command="snowball search",
+                exit_code=EXIT_USER,
+                summary={"error": str(exc)},
+            )
     request = SnowballRequest(
         gate="dry-run",
         collection=cfg.snowball_target_collection or "",
@@ -752,6 +765,7 @@ def run_snowball_search(
         year_from=year_from,
         year_to=year_to,
         direction=cfg.snowball_direction or "refs+keywords",
+        prioritize=policy,
     )
     console = Console(file=sys.stderr, highlight=False, quiet=True)
     try:

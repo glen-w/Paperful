@@ -323,6 +323,7 @@ class Config:
     snowball_max_candidates: int = 200
     snowball_per_hop_limit: int = 50
     snowball_per_hop_rank: str = "most-cited"  # most-cited | least-cited | random
+    snowball_prioritize: str = "popular"  # popular | recency | historical
     snowball_depth: int = 1
     snowball_direction: str = "refs+keywords"
     snowball_keyword_limit: int = 3
@@ -827,6 +828,10 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         cfg.snowball_per_hop_limit = parse_cap(raw["per_hop_limit"])
     if "per_hop_rank" in raw and raw["per_hop_rank"]:
         cfg.snowball_per_hop_rank = parse_per_hop_rank(raw["per_hop_rank"])
+    if "prioritize" in raw and raw["prioritize"]:
+        from .snowball.discover import parse_prioritize
+
+        cfg.snowball_prioritize = parse_prioritize(raw["prioritize"])
     if "depth" in raw:
         cfg.snowball_depth = int(raw["depth"])
     if "direction" in raw and raw["direction"]:

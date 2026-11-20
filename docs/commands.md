@@ -137,6 +137,7 @@ uv run paperful run -C BBNJ --dry-run --format json
 uv run paperful inbox drain --format json
 uv run paperful ask "What is BBNJ?" --format json
 uv run paperful snowball search "BBNJ" --gate dry-run --format json
+uv run paperful snowball search "BBNJ" --prioritize recency --gate dry-run
 uv run paperful authorwatch save ocean-people
 uv run paperful authorwatch add ocean-people --orcid 0000-0002-1825-0097
 uv run paperful authorwatch suggest ocean-people -C ocean/BBNJ --method mix --limit 15
@@ -385,7 +386,7 @@ envelope in MCP text content. **Read-only** MCP tools today:
 | Tool | CLI equivalent | Notes |
 | --- | --- | --- |
 | `gaps` | `gaps --format json` | Counts only (no `--list-missing` handoff) |
-| `snowball_search` | `snowball search … --gate dry-run --format json` | Always dry-run; never creates parents |
+| `snowball_search` | `snowball search … --gate dry-run --format json` | Always dry-run; never creates parents. Optional `prioritize`: `popular` (default), `recency`, `historical` |
 | `snowball_trends` | `snowball trends … --format json` | Publication-year counts; read-only |
 | `export` | `export` (scoped library) | BibTeX/RIS in `summary.bibliography`; no file path required |
 | `proposal_export` | `export-proposals` | Pack under `state/snowball/` or `state/authorwatch/` |

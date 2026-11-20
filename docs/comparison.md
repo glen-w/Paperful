@@ -9,7 +9,7 @@ PDFs**. Hosted “paper factories” (Edison, Elicit, Deep Research, Jenni) own
 discover and draft; they do not own campus-proxy fetch, grey playbooks, or a
 restore ledger. Factory-stage matrix: [comparison reference](comparison-reference.md#paper-factory-stages).
 
-**Last reviewed:** 2026-11-18. Feature lists for other products are based on public
+**Last reviewed:** 2026-11-20. Feature lists for other products are based on public
 docs and positioning — not paid pilots or exhaustive release testing.
 
 Vendor-by-vendor notes live in the [comparison reference](comparison-reference.md).
@@ -32,6 +32,7 @@ Prefer this page for “is this the right tool?”
 | **Semantic search, citation graph, author/trend tools** over the public literature via MCP (hosted corpus; not your Zotero tree) | [Valency MCP Bond](https://www.valency.io/) — see [reference](comparison-reference.md#valency-mcp-bond-and-hub) |
 | **Hosted literature search / cited review** over a public corpus (not your Zotero tree) | [Elicit](https://elicit.com/), [Consensus](https://consensus.app/), [Undermind](https://undermind.ai/), [SciSpace](https://www.typeset.io/), [Scite](https://scite.ai/) — see [reference](comparison-reference.md#hosted-literature-search) |
 | **Hosted AI scientist** — cited reviews over ~175M papers/trials/patents, “has anyone done this?”, optional multi-hour discovery + experimental analysis | [Edison Scientific](https://docs.edisonscientific.com/) (Literature / Precedent / Kosmos). Nearby loops: [Google Co-Scientist](https://deepmind.google/blog/co-scientist-a-multi-agent-ai-partner-to-accelerate-research/), [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) (workshop-grade, not a library helper) — [reference](comparison-reference.md#edison-scientific) |
+| **Local research-agent harness** — coding agents (Claude Code / Codex / Cursor / …) search lit, hypothesize, run experiments on local/SSH/Slurm/cloud GPUs, keep logs on disk; not your Zotero tree | [OpenResearch](https://github.com/alphaXiv/OpenResearch) (`orx`; alphaXiv project) — [reference](comparison-reference.md#openresearch) |
 | **Web Deep Research memo** (cited longform from the open web in minutes; not a journal manuscript) | OpenAI / Gemini / Perplexity Deep Research. Paperful Ask is over **held** PDFs |
 | **Systematic-review screening** (dual review, extraction forms, PRISMA counts; usually no discovery corpus) | [Covidence](https://www.covidence.org/), [Rayyan](https://www.rayyan.ai/), DistillerSR; local [ASReview](https://asreview.nl/). Paperful `sr` can export counts and CSV; it does not replace those tools. Discover Keep/Skip is hop triage, not dual review |
 | **Chat with PDFs you upload** (no scholarly search, no Zotero restore) | Scholarcy, Explainpaper, Humata, [Gemini Notebook](https://notebooklm.google/). Paperful `ask` uses the **same** `out/` tree as fetch |
@@ -44,7 +45,7 @@ Prefer this page for “is this the right tool?”
 | **`.bib` normalize / dedupe / upgrade preprints** (no Zotero required) | [bibcite](https://github.com/leo1oel/bibcite), [bibtex-tidy](https://github.com/FlamingTempura/bibtex-tidy), [bibmanager](https://bibmanager.readthedocs.io/) |
 | **Mendeley** dedup inside the app; clean **exported** BibTeX | Mendeley Duplicates smart collection; export cleaners such as [mendeley_bibtex_cleaner](https://gist.github.com/alexandrehuat/6d3263f73ccae87d0107977978316c02) |
 | **DOI-list PDF batch** without Zotero | [paperscraper](https://github.com/jannisborn/paperscraper) |
-| **Grow the library** from a keyword, one or more DOIs’ references, one or more ORCIDs, a similar-paper hop, or a hybrid hop, then optionally fill PDFs. Citation maps such as Research Rabbit link out; Paperful downloads. Re-check later with **watch** (baseline once, then propose new arrivals on disk; you schedule `watch run`) | **Paperful snowball** — dry-run, `approve-each`, `approve-batch`, `--gate auto`, `--fetch-pdfs`, and `watch` ([snowball](snowball.md)). In-app one-hop browsers stay separate ([zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist)). General harvesters without the mirror: [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) |
+| **Grow the library** from a keyword, one or more DOIs’ references, one or more ORCIDs, a similar-paper hop, or a hybrid hop, then optionally fill PDFs. Hop-0 keyword order is `--prioritize recency` / `popular` / `historical` (citation count by default, not topical relevance). Citation maps such as Research Rabbit link out; Paperful downloads. Re-check later with **watch** (baseline once, then propose new arrivals on disk; you schedule `watch run`) | **Paperful snowball** — dry-run, `approve-each`, `approve-batch`, `--gate auto`, `--fetch-pdfs`, and `watch` ([snowball](snowball.md)). In-app one-hop browsers stay separate ([zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist)). General harvesters without the mirror: [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) |
 | **People you follow** → their new papers (ORCID / OpenAlex; no hop; corpus `suggest`; briefing with recent works / co-authors; saved social HTML/CSV, no live scrape) | **Paperful authorwatch** ([authorwatch](authorwatch.md)). Distinct from `snowball watch`. |
 | **Alert loop / weekly what-cites** (poll watches + citers of `-C` on a cadence; apply into the library; no email; you cron it) | **Paperful keepup** ([keepup](keepup.md)) |
 | **Local workbench** over the same CLI (Wanted / Discover / Ask; Advanced Repair, Mirror, Index, Briefs) | **Paperful** `docker compose up` or `paperful serve` — [gui.md](gui.md). Grab fetches to disk; Attach writes the library. Zotero stays the catalogue. Browser login stays the CLI |
@@ -146,7 +147,7 @@ stages](comparison-reference.md#paper-factory-stages).
 - Mendeley and EndNote item merge (`dedupe --apply` is Zotero-only)
 - Two-up scan split, or a chat agent over the library (`ocr` adds a text layer; it does not split pages. `summarize` / `synthesize` / `recover` are opt-in and local)
 - Hosted multi-user service
-- Autonomous AI-scientist runs, experimental-data kernels, or molecular design (use [Edison Scientific](https://docs.edisonscientific.com/) or similar)
+- Autonomous AI-scientist runs, experimental-data kernels, or molecular design (use [Edison Scientific](https://docs.edisonscientific.com/), [OpenResearch](https://github.com/alphaXiv/OpenResearch), or similar)
 - A journal manuscript, related-work draft, or “overnight PhD” (use Jenni/Paperpal/Overleaf for interactive drafting; [PaperOrchestra](https://github.com/google-research/paper-orchestra) for idea+log → conference LaTeX; Edison/Sakana are not Paperful’s job)
 - Systematic-review dual screening and PRISMA-grade recall (use Covidence / Rayyan / ASReview; Discover Keep/Skip is hop triage)
 - Jeffersonian transcription or qualitative coding
@@ -199,6 +200,9 @@ Need semantic search / citation graph / trends across all public papers, not jus
 
 Need a hosted cited review, “has this been tried?”, or a Kosmos-style run over a dataset plus the public literature?
   → Edison Scientific (Literature / Precedent / Kosmos). Paperful still owns PDFs, the disk mirror, and Ask over *your* collection
+
+Need a local coding-agent loop that searches papers, runs experiments, and keeps artifacts on disk (not Zotero)?
+  → OpenResearch (orx). Paperful still owns campus PDFs, grey playbooks, and the restore ledger if cites should live in your library
 
 Need Elicit/Consensus-style tables over the public record, not campus PDFs?
   → Elicit, Consensus, Undermind, SciSpace. Then snowball / ingest-dois → paperful run

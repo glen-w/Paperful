@@ -79,6 +79,14 @@ TOOLS = [
                 "depth": {"type": "integer"},
                 "year_from": {"type": "integer"},
                 "year_to": {"type": "integer"},
+                "prioritize": {
+                    "type": "string",
+                    "enum": ["popular", "recency", "historical"],
+                    "description": (
+                        "Hop-0 order. popular is citation count (default). "
+                        "Not topical relevance."
+                    ),
+                },
             },
             "required": ["query"],
         },
@@ -370,6 +378,7 @@ def call_snowball_search(cfg: Config, args: dict[str, Any]) -> dict[str, Any]:
         depth=args.get("depth"),
         year_from=args.get("year_from"),
         year_to=args.get("year_to"),
+        prioritize=args.get("prioritize"),
     )
 
 

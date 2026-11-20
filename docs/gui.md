@@ -198,6 +198,7 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and is
 
 Same shell; extra verbs call the same domain entrypoints as the CLI. Discover
 adds snowball kinds (hybrid/doi/orcid/collection), crawl knobs (including
+**Prioritize** hop-0 `recency` / `popular` / `historical`,
 stop rule, stop eps, stop k, stop max screened, and
 **Twenty writeback** → `cfg.twenty_writeback_listings`), profile save/run,
 resume, briefing, frontier digest, **refs gap**, **ingest-dois**

@@ -96,3 +96,24 @@ def test_run_ask_disabled(cfg, monkeypatch):
 def test_run_snowball_search_empty_query(cfg):
     out = run_snowball_search(cfg, "")
     assert out["exit"] != 0
+
+
+def test_run_snowball_search_forwards_prioritize(cfg, monkeypatch):
+    seen: dict[str, object] = {}
+
+    def fake_search(cfg, query, request, console=None):
+        seen["query"] = query
+        seen["prioritize"] = request.prioritize
+        return SimpleNamespace(summary={"ok": True}, run_dir="", exit_code=0)
+
+    monkeypatch.setattr("paperful.snowball.command.run_search", fake_search)
+    out = run_snowball_search(cfg, "kelp", prioritize="recency")
+    assert seen["query"] == "kelp"
+    assert seen["prioritize"] == "recency"
+    assert out["exit"] == 0
+
+
+def test_run_snowball_search_rejects_overlap(cfg):
+    out = run_snowball_search(cfg, "kelp", prioritize="overlap")
+    assert out["exit"] != 0
+    assert "overlap" in str(out.get("summary", "")).lower()

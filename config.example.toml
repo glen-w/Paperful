@@ -474,6 +474,7 @@ concurrency = 2
 # max_candidates = 200     # all keeps every new+exists row
 # per_hop_limit = 50       # neighbours per seed per hop. all keeps every one
 # per_hop_rank = "most-cited"  # most-cited | least-cited | random
+# prioritize = "popular"     # hop-0 search: popular | recency | historical (not topical relevance)
 # depth = 1
 # direction = "refs+keywords"
 # search_keywords = true  # search/hybrid also pulls matching OpenAlex keyword tags

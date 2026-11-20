@@ -167,6 +167,64 @@ def _search_route(total: int, spend_first: bool):
     return route
 
 
+def test_search_resume_keeps_prioritize_sort():
+    sorts: list[str] = []
+    works = [_work("W0")]
+    state = {"spent": True}
+
+    def route(path: str, params: dict) -> dict:
+        if params.get("sort"):
+            sorts.append(str(params["sort"]))
+        if state["spent"]:
+            state["spent"] = False
+            raise _spent()
+        return {"results": works, "meta": {"count": 1}}
+
+    client = _client(route)
+    rows = search_candidates(
+        client,
+        "kelp",
+        run_id="run-1",
+        gate="dry-run",
+        depth=0,
+        direction="refs",
+        max_candidates=5,
+        per_hop_limit=5,
+        year_from=None,
+        year_to=None,
+        prioritize="recency",
+    )
+    assert rows == []
+    assert client.deferred["prioritize"] == "recency"
+    resumed = continue_deferred(_client(route), client.deferred)
+    assert len(resumed) == 1
+    assert sorts
+    assert all(item == "publication_date:desc" for item in sorts)
+
+
+def test_search_candidates_emits_popular_sort_by_default():
+    seen: dict[str, str] = {}
+
+    def route(path: str, params: dict) -> dict:
+        if params.get("sort"):
+            seen["sort"] = str(params["sort"])
+        return {"results": [], "meta": {"count": 0}}
+
+    search_candidates(
+        _client(route),
+        "kelp",
+        run_id="run-1",
+        gate="dry-run",
+        depth=0,
+        direction="refs",
+        max_candidates=5,
+        per_hop_limit=5,
+        year_from=None,
+        year_to=None,
+    )
+    assert seen["sort"] == "cited_by_count:desc"
+
+
 def test_search_resume_keeps_the_original_max_candidates():
     route = _search_route(30, spend_first=True)
     client = _client(route)

@@ -344,6 +344,7 @@ class OpenAlexClient:
         from_created_date: str | None = None,
         study_designs: list[str] | tuple[str, ...] | None = None,
         listed_in: list[str] | tuple[str, ...] | None = None,
+        sort: str | None = None,
     ) -> list[dict[str, Any]]:
         filters: list[str] = []
         if year_from is not None:
@@ -362,6 +363,8 @@ class OpenAlexClient:
         params: dict[str, Any] = {"search": query, "select": SELECT}
         if filters:
             params["filter"] = ",".join(filters)
+        if sort:
+            params["sort"] = sort
         use_cursor = limit <= 0 or limit > 5000
         return self._collect("/works", params, limit, use_cursor=use_cursor)
 

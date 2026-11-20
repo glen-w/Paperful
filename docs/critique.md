@@ -200,6 +200,46 @@ ignored. When it is empty, those bools still map to `reviewers` / `marg`.
 `--reviewer ID` still subsets only `[[critique.reviewers]]`. Orthogonal extras
 (`--vale`, `--ai-model`, `--grobid`, `--forensics`) are not lanes.
 
+## Reading LLM lanes (main text vs appendix)
+
+Venue-style LLM reviewers often treat a PDF as **one flat document**: on long
+appendices, a large share of “weakness” bullets can quote **supplementary**
+material (extra tables, hyperparameters, ablations) rather than the
+contribution-bearing main text. Human reviewers usually weight the opposite
+way—the main body is the paper; the appendix supports it. See Ghosh, Saim, and
+Jiang, [*AI Reviews Are Biased Towards the Appendix*](https://arxiv.org/abs/2611.17811)
+(arXiv:2611.17811) for empirical numbers on conference drafts and a discussion
+of presentation vs technical appendix nitpicking. That study is **not** a
+Paperful dependency; it is operator literacy for anyone running suggested
+lanes before submission.
+
+**How to read a pack**
+
+- **Critical path** and other **checked** rows are deterministic; they do not
+  share this bias pattern.
+- **`claims`** extracts core claims from abstract / introduction / results /
+  conclusion and binds support in methods / results / limitations—**not** an
+  appendix-wide audit. Prefer this lane when the question is “does the draft
+  support its stated contribution?”
+- **`outline`** and **`adversary`** pressure plan structure and validity of the
+  core claim; they are closer to “what matters” than open-ended weakness lists.
+- **`reviewers`**, **`marg`**, and especially the **`openreview`** persona can
+  resemble generic LLM conference reviews: thorough on every page, including deep
+  appendix. Treat many **Suggested** rows there as **detail checks**, not a
+  ranked verdict on contribution.
+- Long PDFs: `reviewers`, `adversary`, `context`, and `verify` synthesis see a
+  **head + headings + tail** excerpt when the extract exceeds
+  `[critique].max_context_chars` (default 24 000). The **tail** is often
+  appendix-heavy—another reason not to overweight Suggested comments without
+  reading locators.
+
+Paperful does **not** shorten appendices or tell you to drop supporting
+evidence; detailed supplements remain good for reproducibility. When a model
+fills Suggested with appendix nits, use **`claims`** and Critical path to see
+whether the **main narrative** is thin, then fix or dismiss noise. Optional
+prompt guardrails and appendix-share metrics in the pack are **not** shipped
+yet; see [ROADMAP](ROADMAP.md#critique-llm-literacy) if you track follow-ups.
+
 ## Optional reviewers (`--lane reviewers` / `--llm`)
 
 Follows [llm.md](llm.md): local Ollama by default, egress notice, grounded in

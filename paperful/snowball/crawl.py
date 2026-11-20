@@ -197,6 +197,7 @@ def search_candidates(
     search_keywords: bool = True,
     cites_query: str = "",
     hop_end: int | None = None,
+    prioritize: str = "popular",
 ) -> list[Candidate]:
     _remember_keywords(
         client,
@@ -209,8 +210,15 @@ def search_candidates(
     client.stage = "OpenAlex search"
     client.note(client.stage)
     try:
+        from .discover import hop0_score, openalex_sort
+
+        sort = openalex_sort(prioritize)
         works = client.search(
-            query, limit=max_candidates, year_from=year_from, year_to=year_to
+            query,
+            limit=max_candidates,
+            year_from=year_from,
+            year_to=year_to,
+            sort=sort,
         )
     except OpenAlexBudgetExceeded as exc:
         _defer(
@@ -229,6 +237,7 @@ def search_candidates(
             year_from=year_from,
             year_to=year_to,
             why_prefix="search hit",
+            prioritize=prioritize,
         )
         return []
     by_oa: dict[str, dict[str, Any]] = {}
@@ -293,12 +302,16 @@ def search_candidates(
         )
         if shared:
             row.biblio["keyword_overlap"] = len(shared)
+        row.score = hop0_score(
+            row.biblio.get("year"),
+            row.biblio.get("cited_by_count"),
+            prioritize,
+        )
         if _mark_year(row, year_from, year_to):
             expandable.append(work)
         rows.append(row)
     rows.sort(
         key=lambda row: (
-            -int(row.biblio.get("keyword_overlap") or 0),
             -float(row.score or 0),
             row.ids.get("doi") or row.ids.get("openalex") or "",
         )
@@ -1240,6 +1253,7 @@ def hybrid_candidates(
     keyword_min_score: float = 0.0,
     search_keywords: bool = True,
     cites_query: str = "",
+    prioritize: str = "popular",
 ) -> tuple[list[Candidate], list[str]]:
     """Keyword hits, then one hop from the top DOI hits."""
     hits = search_candidates(
@@ -1260,11 +1274,11 @@ def hybrid_candidates(
         keyword_min_score=keyword_min_score,
         search_keywords=search_keywords,
         cites_query=cites_query,
+        prioritize=prioritize,
     )
     ranked = sorted(
         [row for row in hits if row.ids.get("doi") and row.status != "error"],
         key=lambda row: (
-            -int(row.biblio.get("keyword_overlap") or 0),
             -row.score,
             row.ids.get("doi") or "",
         ),
@@ -1637,8 +1651,15 @@ def _resume_search(
     saved = deferred.get("max_candidates")
     limit = per_hop if saved is None else int(saved)
     try:
+        from .discover import openalex_sort
+
+        sort = openalex_sort(str(deferred.get("prioritize") or "popular"))
         found = client.search(
-            remaining[0], limit=limit, year_from=year_from, year_to=year_to
+            remaining[0],
+            limit=limit,
+            year_from=year_from,
+            year_to=year_to,
+            sort=sort,
         )
     except OpenAlexBudgetExceeded as exc:
         _defer(client, exc, **deferred)

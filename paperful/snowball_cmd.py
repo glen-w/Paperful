@@ -31,6 +31,7 @@ def _snowball_request(
     max_candidates: str | int | None,
     per_hop_limit: str | int | None = None,
     per_hop_rank: str | None = None,
+    prioritize: str | None = None,
     year_from: int | None,
     year_to: int | None,
     direction: str | None = None,
@@ -58,6 +59,7 @@ def _snowball_request(
     stop_max_screened: int | None = None,
 ) -> Any:
     from .snowball.command import SnowballRequest
+    from .snowball.discover import parse_prioritize
     from .snowball.expand import parse_listed_in, parse_study_designs
 
     if twenty_writeback is not None:
@@ -66,6 +68,13 @@ def _snowball_request(
     if study_designs:
         try:
             designs = parse_study_designs(study_designs)
+        except ValueError as exc:
+            cli_mod.console.print(f"[red]{escape(str(exc))}[/]")
+            raise typer.Exit(2) from exc
+    policy = None
+    if prioritize:
+        try:
+            policy = parse_prioritize(prioritize)
         except ValueError as exc:
             cli_mod.console.print(f"[red]{escape(str(exc))}[/]")
             raise typer.Exit(2) from exc
@@ -84,6 +93,7 @@ def _snowball_request(
         max_candidates=max_candidates,
         per_hop_limit=per_hop_limit,
         per_hop_rank=per_hop_rank,
+        prioritize=policy,
         year_from=year_from,
         year_to=year_to,
         direction=direction or cfg.snowball_direction or "refs+keywords",
@@ -266,6 +276,7 @@ def run_snowball_search(
     max_candidates: Any,
     per_hop_limit: Any,
     per_hop_rank: Any,
+    prioritize: Any,
     direction: Any,
     keyword_limit: Any,
     keyword_hop_limit: Any,
@@ -310,6 +321,7 @@ def run_snowball_search(
         max_candidates=max_candidates,
         per_hop_limit=per_hop_limit,
         per_hop_rank=per_hop_rank,
+        prioritize=prioritize,
         year_from=year_from,
         year_to=year_to,
         direction=direction,
@@ -358,6 +370,7 @@ def run_snowball_hybrid(
     max_candidates: Any,
     per_hop_limit: Any,
     per_hop_rank: Any,
+    prioritize: Any,
     hybrid_seeds: Any,
     direction: Any,
     keyword_limit: Any,
@@ -401,6 +414,7 @@ def run_snowball_hybrid(
         max_candidates=max_candidates,
         per_hop_limit=per_hop_limit,
         per_hop_rank=per_hop_rank,
+        prioritize=prioritize,
         year_from=year_from,
         year_to=year_to,
         direction=direction,
@@ -858,6 +872,7 @@ def run_snowball_run(
     keyword_hop_limit: Any,
     keyword_min_score: Any,
     cites_query: Any,
+    prioritize: Any,
     tag: Any,
     dedupe_scope: Any,
     dedupe_after: Any,
@@ -909,6 +924,13 @@ def run_snowball_run(
             request.keyword_min_score = keyword_min_score
         if cites_query is not None and cites_query.strip():
             request.cites_query = cites_query.strip()
+        if prioritize:
+            from .snowball.discover import parse_prioritize as _parse_prio
+
+            try:
+                request.prioritize = _parse_prio(prioritize)
+            except ValueError as exc:
+                raise SnowballError(str(exc)) from exc
         if dedupe_scope:
             request.dedupe_scope = dedupe_scope.strip()
         if dedupe_after:
@@ -987,6 +1009,7 @@ def run_snowball_profile_save(
     max_candidates: Any,
     per_hop_limit: Any,
     per_hop_rank: Any,
+    prioritize: Any,
     direction: Any,
     keyword_limit: Any,
     keyword_hop_limit: Any,
@@ -1101,6 +1124,13 @@ def run_snowball_profile_save(
 
         try:
             body["per_hop_rank"] = parse_per_hop_rank(per_hop_rank)
+        except ValueError as exc:
+            raise SnowballError(str(exc)) from exc
+    if prioritize:
+        from .snowball.discover import parse_prioritize
+
+        try:
+            body["prioritize"] = parse_prioritize(prioritize)
         except ValueError as exc:
             raise SnowballError(str(exc)) from exc
     if direction.strip():

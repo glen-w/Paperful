@@ -161,6 +161,7 @@ class SnowballRequest:
     stop_max_screened: int | None = None
     iterative: bool = False
     depth_ceiling: int | None = None
+    prioritize: str | None = None
 
 
 @dataclass
@@ -229,6 +230,7 @@ def run_search(
             search_keywords=_search_keywords_on(cfg, request),
             cites_query=cites_query,
             hop_end=hop_end,
+            prioritize=_prioritize_policy(cfg, request),
         ),
     )
 
@@ -286,6 +288,7 @@ def run_hybrid(
             keyword_min_score=keywords[2],
             search_keywords=_search_keywords_on(cfg, request),
             cites_query=cites_query,
+            prioritize=_prioritize_policy(cfg, request),
         )
 
     return _execute(
@@ -578,6 +581,7 @@ def _open_stop(
             "max_candidates": caps[0],
             "year_from": request.year_from,
             "year_to": request.year_to,
+            "prioritize": _prioritize_policy(cfg, request),
             "min_seed_citations": _min_cites(cfg, request),
             "keyword_limit": keywords[0],
             "keyword_hop_limit": keywords[1],
@@ -1076,6 +1080,12 @@ def _min_cites(cfg: Config, request: SnowballRequest) -> int:
     return request.min_seed_citations
 
 
+def _prioritize_policy(cfg: Config, request: SnowballRequest) -> str:
+    from .discover import prioritize_for
+
+    return prioritize_for(cfg, request)
+
+
 def _backends(cfg: Config, request: SnowballRequest) -> tuple[str, ...]:
     names = cfg.snowball_backends if request.backends is None else request.backends
     cleaned = tuple(part.strip().lower() for part in names if str(part).strip())
@@ -1232,8 +1242,13 @@ def _summary_meta(
     suggester: Any,
     console: Console,
 ) -> dict[str, Any]:
+    from .discover import hop0_formula
+
+    policy = _prioritize_policy(cfg, request)
     meta: dict[str, Any] = {
         "score": FORMULA,
+        "hop0_score": hop0_formula(policy),
+        "prioritize": policy,
         "max_candidates": caps[0],
         "per_hop_limit": caps[1],
         "per_hop_rank": caps[2],

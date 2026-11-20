@@ -56,6 +56,15 @@ def _profile_rank(value: Any) -> str:
         raise SnowballError(str(exc)) from exc
 
 
+def _profile_prioritize(value: Any) -> str:
+    from .discover import parse_prioritize
+
+    try:
+        return parse_prioritize(value)
+    except ValueError as exc:
+        raise SnowballError(str(exc)) from exc
+
+
 def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
     depth = raw.get("depth")
     max_candidates = raw.get("max_candidates")
@@ -77,6 +86,9 @@ def request_from_profile(raw: dict[str, Any], cfg: Config) -> SnowballRequest:
         per_hop_limit=_profile_cap(per_hop) if per_hop is not None else None,
         per_hop_rank=_profile_rank(raw["per_hop_rank"])
         if raw.get("per_hop_rank")
+        else None,
+        prioritize=_profile_prioritize(raw["prioritize"])
+        if raw.get("prioritize")
         else None,
         year_from=int(raw["year_from"]) if raw.get("year_from") is not None else None,
         year_to=int(raw["year_to"]) if raw.get("year_to") is not None else None,

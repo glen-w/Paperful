@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 from dataclasses import dataclass, field
@@ -683,14 +684,19 @@ def snapshot_report(
 
 
 def count_item_dirs(out_dir: Path) -> int:
-    """Count item directories in the mirror."""
+    """Count item directories in the mirror.
+
+    Skip directories ``os.walk`` cannot read (broken bind mounts, EINVAL).
+    ``Path.rglob`` would abort the whole doctor check on the first error.
+    """
     if not out_dir.is_dir():
         return 0
     seen: set[Path] = set()
-    for pdf in out_dir.rglob("*.pdf"):
-        if is_item_dirname(pdf.parent.name):
-            seen.add(pdf.parent)
-    for rec in out_dir.rglob("record.json"):
-        if is_item_dirname(rec.parent.name):
-            seen.add(rec.parent)
+    for dirpath, _dirnames, filenames in os.walk(out_dir, onerror=lambda _exc: None):
+        parent = Path(dirpath)
+        if not is_item_dirname(parent.name):
+            continue
+        names = {name.lower() for name in filenames}
+        if "record.json" in names or any(name.endswith(".pdf") for name in names):
+            seen.add(parent)
     return len(seen)

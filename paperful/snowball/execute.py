@@ -17,6 +17,7 @@ from .expand import apply_filters, normalize_direction, truncate
 from .fill import FillPaused, s2_api_key, s2_paper
 from .openalex import OpenAlexClient
 from .queue import write_queue, write_report
+from .discover import prioritize_for
 from .rank import apply_overlap
 from .tally import Tally, paint
 from .titles import repair_reference_titles
@@ -200,7 +201,8 @@ def _snowball_prepare_queue(
         direction = normalize_direction(request.direction)
     except ValueError:
         direction = "refs"
-    apply_overlap(rows)
+    policy = prioritize_for(cfg, request)
+    apply_overlap(rows, prioritize=policy)
     rows, paused = _fill_metadata(
         cfg,
         request,
@@ -223,6 +225,7 @@ def _snowball_prepare_queue(
         remaining = _blocked_dois(paused)
         oa.deferred = {
             "kind": "fill",
+            "prioritize": policy,
             "backend": next(iter(paused)),
             "remaining_ids": sorted(remaining),
             "pauses": paused,
@@ -232,7 +235,7 @@ def _snowball_prepare_queue(
             "direction": direction,
             "expand_neighbors": expand_neighbors,
         }
-    apply_overlap(rows)
+    apply_overlap(rows, prioritize=policy)
     rows = apply_filters(
         rows,
         year_from=request.year_from,

@@ -4612,6 +4612,128 @@ def test_openalex_search_uses_cursor_past_the_page_cap():
     assert pages == ["1"]
 
 
+def test_openalex_search_emits_sort():
+    seen: dict[str, dict] = {}
+
+    def getter(path: str, params: dict) -> dict:
+        seen["params"] = dict(params)
+        return {"results": []}
+
+    client = OpenAlexClient(email="t@example.org", api_key="", sleep_s=0, getter=getter)
+    client.search(
+        "basketball",
+        limit=10,
+        year_from=None,
+        year_to=None,
+        sort="publication_date:desc",
+    )
+    assert seen["params"].get("sort") == "publication_date:desc"
+
+
+def test_parse_prioritize_and_hop0_score():
+    from paperful.snowball.discover import hop0_score, parse_prioritize
+
+    assert parse_prioritize(None) == "popular"
+    assert parse_prioritize("recent") == "recency"
+    with pytest.raises(ValueError, match="overlap"):
+        parse_prioritize("overlap")
+    with pytest.raises(ValueError, match="historical"):
+        parse_prioritize("relevance")
+    assert hop0_score(2024, 2, "recency") > hop0_score(2010, 900, "recency")
+    assert hop0_score(2010, 900, "popular") > hop0_score(2024, 2, "popular")
+    assert hop0_score(2010, 2, "historical") > hop0_score(2024, 2, "historical")
+    assert hop0_score(None, 900, "recency") < hop0_score(1900, 0, "recency")
+    assert hop0_score(None, 900, "historical") < hop0_score(1900, 0, "historical")
+
+
+def test_search_prioritize_orders_hop0(tmp_path: Path):
+    old = _work("Wold", "10.1000/old", "Old classic", 2010, 900)
+    new = _work("Wnew", "10.1000/new", "New paper", 2024, 2)
+    works = {"Wold": old, "Wnew": new}
+
+    def dois_for(policy: str) -> list[str]:
+        result = run_search(
+            _cfg(tmp_path),
+            "basketball",
+            SnowballRequest(
+                prioritize=policy,
+                max_candidates=10,
+                backends=("openalex",),
+            ),
+            console=Console(file=StringIO(), highlight=False, width=160),
+            client=_client(works),
+            lookup=lambda doi, title: None,
+        )
+        assert result.exit_code == 0
+        rows = [
+            json.loads(line)
+            for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+            if line.strip()
+        ]
+        summary = json.loads((result.run_dir / "summary.json").read_text())
+        assert summary.get("prioritize") == policy
+        return [row["ids"]["doi"] for row in rows if int(row.get("hop") or 0) == 0]
+
+    assert dois_for("recency")[0] == "10.1000/new"
+    assert dois_for("popular")[0] == "10.1000/old"
+    assert dois_for("historical")[0] == "10.1000/old"
+
+
+def test_search_omitted_prioritize_matches_popular(tmp_path: Path):
+    old = _work("Wold", "10.1000/old", "Old classic", 2010, 900)
+    new = _work("Wnew", "10.1000/new", "New paper", 2024, 2)
+    works = {"Wold": old, "Wnew": new}
+    result = run_search(
+        _cfg(tmp_path),
+        "basketball",
+        SnowballRequest(max_candidates=10, backends=("openalex",)),
+        console=Console(file=StringIO(), highlight=False, width=160),
+        client=_client(works),
+        lookup=lambda doi, title: None,
+    )
+    rows = [
+        json.loads(line)
+        for line in (result.run_dir / "candidates.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+    hop0 = [row["ids"]["doi"] for row in rows if int(row.get("hop") or 0) == 0]
+    summary = json.loads((result.run_dir / "summary.json").read_text())
+    assert hop0[0] == "10.1000/old"
+    assert summary.get("prioritize") == "popular"
+
+
+def test_profile_prioritize_round_trip(tmp_path: Path):
+    from paperful.snowball.profile import (
+        load_profile,
+        request_from_profile,
+        save_profile,
+    )
+
+    cfg = _cfg(tmp_path)
+    path = save_profile(
+        cfg,
+        "recency-scout",
+        {
+            "mode": "search",
+            "query": "kelp",
+            "gate": "dry-run",
+            "prioritize": "recency",
+        },
+        force=False,
+    )
+    assert 'prioritize = "recency"' in path.read_text()
+    loaded = request_from_profile(load_profile(cfg, "recency-scout"), cfg)
+    assert loaded.prioritize == "recency"
+
+
+def test_cli_refuses_prioritize_overlap():
+    result = runner.invoke(
+        cli.app, ["snowball", "search", "kelp", "--prioritize", "overlap"]
+    )
+    assert result.exit_code != 0
+    assert "overlap" in plain_text(result.stdout + result.stderr).lower()
+
+
 def test_openalex_search_emits_listed_in_filter():
     seen: dict[str, dict] = {}
 

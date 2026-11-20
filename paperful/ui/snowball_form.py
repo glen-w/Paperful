@@ -33,6 +33,7 @@ class DiscoverTopicPayload:
     or_mode: bool
     hybrid_seeds: int | None
     per_hop_rank: str | None = None
+    prioritize: str | None = None
     fetch_pdfs: str | None = None
     keyword_limit: str | None = None
     keyword_hop_limit: str | None = None
@@ -167,6 +168,7 @@ def parse_discover_topic(
         or_mode=or_mode,
         hybrid_seeds=hybrid_seeds,
         per_hop_rank=_opt_str(form.get("per_hop_rank")),
+        prioritize=_opt_str(form.get("prioritize")),
         fetch_pdfs=_opt_str(form.get("fetch_pdfs")),
         keyword_limit=_opt_str(form.get("keyword_limit")),
         keyword_hop_limit=_opt_str(form.get("keyword_hop_limit")),
@@ -197,6 +199,14 @@ def parse_discover_topic(
 def build_request(
     cfg: Config, payload: DiscoverTopicPayload, collection: str
 ) -> SnowballRequest:
+    policy = None
+    if payload.prioritize:
+        from ..snowball.discover import parse_prioritize
+
+        try:
+            policy = parse_prioritize(payload.prioritize)
+        except ValueError as exc:
+            raise SnowballError(str(exc)) from exc
     return SnowballRequest(
         gate="dry-run",
         collection=collection or "",
@@ -205,6 +215,7 @@ def build_request(
         max_candidates=payload.max_candidates,
         per_hop_limit=payload.per_hop_limit,
         per_hop_rank=payload.per_hop_rank,
+        prioritize=policy,
         year_from=payload.year_from,
         year_to=payload.year_to,
         direction=payload.direction or cfg.snowball_direction or "refs+keywords",
@@ -277,6 +288,7 @@ def profile_body_from_payload(
         "max_candidates": payload.max_candidates,
         "per_hop_limit": payload.per_hop_limit,
         "per_hop_rank": payload.per_hop_rank,
+        "prioritize": payload.prioritize,
         "year_from": payload.year_from,
         "year_to": payload.year_to,
         "hybrid_seeds": payload.hybrid_seeds,

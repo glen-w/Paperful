@@ -29,6 +29,7 @@ def test_advanced_parses_crawl_knobs():
             "kind": "search",
             "query": "BBNJ",
             "per_hop_rank": "most-cited",
+            "prioritize": "recency",
             "fetch_pdfs": "fast",
             "twenty_writeback": "1",
             "languages": "en,fr",
@@ -36,6 +37,7 @@ def test_advanced_parses_crawl_knobs():
         advanced=True,
     )
     assert payload.per_hop_rank == "most-cited"
+    assert payload.prioritize == "recency"
     assert payload.fetch_pdfs == "fast"
     assert payload.twenty_writeback is True
     assert payload.languages == ("en", "fr")

@@ -349,6 +349,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[stuff].max_units` | `200` | Cap on searched claims; overflow rows skip as `over_cap` |
 | `[stuff].lane` | `manuscript` | `manuscript` (sentences) or `outline` (sections). CLI `--lane` overrides |
 | `[snowball].default_tags` | `()` | Extra tags on snowball `--gate auto` / `apply` creates, with `--tag` and `from-<seed-slug>` |
+| `[snowball].prioritize` | `popular` | Hop-0 **search** / hybrid order: `popular` (citation count), `recency` (newest first), `historical` (oldest first). CLI `--prioritize`. OpenAlex `sort=` and the queue score; not topical relevance. Neighbour hops still use overlap rank. See [snowball](snowball.md) |
 | `[snowball].study_designs` | `()` | OpenAlex study design filter (`rct`, `meta-analysis`, …). CLI `--study-design`. See [snowball stop rules](snowball.md#stop-rules) |
 | `[snowball].listed_in` | `()` | OpenAlex trusted journal lists (`doaj`, `medline`, `jufo-3`, …). CLI `--listed-in`. Family aliases `cwts`, `jufo`, `norway`, `ki-jl`, `jpps`, `abdc`. Membership is not a quality score. See [snowball stop rules](snowball.md#stop-rules) |
 | `[snowball].map_categories` | ten built-ins | Which literature-category ids appear on the citation map (badges/filters). Defaults include study-design ids (`evidence-synthesis`, `trials`, `clinical-trials`, …) and type ids (`preprints`, `books`, `narrative-reviews`, `commentary`). See [Citation map](snowball.md#citation-map) |

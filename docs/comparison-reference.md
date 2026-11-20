@@ -3,7 +3,7 @@
 Vendor-by-vendor notes and longer capability tables. Most readers only need
 [How Paperful compares](comparison.md).
 
-**Last reviewed:** 2026-11-16. Feature lists for other products are based on public
+**Last reviewed:** 2026-11-20. Feature lists for other products are based on public
 docs and positioning — not paid pilots.
 
 ## Capability snapshot
@@ -127,6 +127,7 @@ found Elicit Pro Review-mode sensitivity ~40% vs traditional searches
 | Jenni / Paperpal | Partial (200–300M + uploads) | Partial | No | Partial | No | **Yes** (drafting workspace) | No | No | Jenni: one-way |
 | OpenAI / Gemini / Perplexity DR | Yes | Partial (web / uploads) | No | Yes (**report**) | No | No | No | No | No |
 | Sakana AI Scientist | Partial | No | No | Partial | Partial | Yes as **workshop-grade LaTeX** | No | Partial (you run it; LLM APIs) | No |
+| OpenResearch (orx) | Yes (alphaXiv / OpenAlex / bioRxiv / PubMed; no key for search) | No (reads reports / abstracts / full text for agents; no campus fetch into Zotero) | No | Partial (lit grounding for hypotheses; not a review product) | Partial (agent-driven; not Precedent) | Partial (LaTeX templates / `orx-paper` skill; experiment artifacts, not a Zotero MS) | No | **Yes** (local app + SQLite + git experiment tree; optional managed GPUs) | No |
 | PaperOrchestra | Yes (Google Search → Semantic Scholar; cites for the MS, not your library) | No (abstracts / metadata; no campus fetch) | No | Yes (Intro + Related Work from collected papers) | Partial (cutoff-date concurrent-work rule; not Precedent) | **Yes** (idea + experimental log → conference LaTeX + optional plots) | No | Partial (you run it; LLM + Semantic Scholar APIs) | No |
 | PaperQA2 (OSS) | No (you supply PDFs) | Partial | No | Yes (cited Q&A) | No | No | No | **Yes** | Partial (`paper-qa[zotero]`; last test is old) |
 | Gemini Notebook / Humata | No | No | No | Yes (on uploads) | No | Partial | No | No | No |
@@ -232,8 +233,32 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 - **Fit:** Hosted agents that *do research*, not a Zotero helper. Split the jobs in copy: **Literature** (PaperQA3) is cited review over a licensed public corpus (docs 175M+; a 2026 blog says 150M+ with figures). **Precedent** (formerly Has Anyone) is novelty, not a second Literature call. **Kosmos** is UI-only (not on the public task API): ~1,500 papers and ~42k lines of code per run, shared world model, traces; the Kosmos paper’s expert eval is weaker on *interpretation* than on quotes. Academic credits moved between 2025–2026 posts — treat pricing as policy, not SLA. **Analysis** / **Molecules** are lab/chem. Local OSS cousin is **PaperQA2** (`paper-qa`); hosted Literature is **not** “chat with my Zotero.”
 - **With Paperful:** Edison when the question is a public-corpus review, a novelty search, or a Kosmos/Analysis run on a dataset. Paperful when the question is “fill, fix, mirror, and Ask **this** library.” Local analogue of Precedent is `paperful precedent` (held PDFs + OpenAlex metadata, stamped `held` vs `public-metadata-only`; never “nobody has done this”). Typical stack: Edison Literature or Precedent → snowball / `ingest-dois` → `run` / Wanted → local `ask`. Do not treat their workspace as the quiet mirror. Do not borrow their paper-scraper lane as a default (their own docs flag publisher ToS grey).
 - **Not a substitute for:** missing-PDF fetch, EZProxy / grey playbooks, `snapshot` / `restore`, collection-scoped RAG that never leaves the machine, or unattended attach.
-- **Nearby (not Edison):** Google Co-Scientist / Labs Hypothesis Generation (hypotheses, not manuscripts); [PaperOrchestra](#paperorchestra) (idea + lab log → conference LaTeX; not a discovery loop); Sakana AI Scientist (workshop-grade auto-papers; authors documented citation errors); OpenAI / Gemini / Perplexity Deep Research (web memos; vendors warn about hallucinated cites).
+- **Nearby (not Edison):** Google Co-Scientist / Labs Hypothesis Generation (hypotheses, not manuscripts); [OpenResearch](#openresearch) (local coding-agent harness + experiment tree; lit search without a 175M hosted corpus); [PaperOrchestra](#paperorchestra) (idea + lab log → conference LaTeX; not a discovery loop); Sakana AI Scientist (workshop-grade auto-papers; authors documented citation errors); OpenAI / Gemini / Perplexity Deep Research (web memos; vendors warn about hallucinated cites).
 - **Roadmap borrow (not a clone):** [ROADMAP — Hosted AI scientists](ROADMAP.md#hosted-ai-scientists-edison-scientific) and [v2 factory packs](ROADMAP.md#after-110-paper-factory).
+
+(openresearch)=
+### OpenResearch (alphaXiv)
+
+- **Sites:** [GitHub](https://github.com/alphaXiv/OpenResearch) · [docs](https://openresearch.sh/docs) · [openresearch.sh](https://openresearch.sh/)
+- **Fit:** Local-first **research-agent harness**, not a Zotero helper. Wraps coding agents (Claude Code, Codex, OpenCode, Cursor, Google Antigravity; local models via OpenCode) so they search literature, form hypotheses, run experiments, and keep logs/metrics/artifacts on disk. Lit sources (no account/API key for search): **alphaXiv** (full-text keyword + semantic; paper reports), OpenAlex, bioRxiv (via OpenAlex), PubMed. Experiment model is a **git tree + local SQLite**: immutable nodes once a run answers, children for new hypotheses, fixed run command across siblings. Compute: local, SSH, Slurm, Kubernetes, Modal, Ray, Hugging Face Jobs, optional managed GPUs (account). Desktop app + `orx` CLI; loopback dashboard by default. MIT. Opt-out coarse analytics in official builds.
+- **With Paperful:** OpenResearch when the job is “agent proposes and runs experiments grounded in public lit.” Paperful when the job is fill, fix, mirror, and Ask **this** library. Cites an agent finds are not in Zotero until you `ingest-dois` / snowball and `run`. Do not treat their project tree as the quiet mirror. Typical stack: OpenResearch (or Edison/Sakana) for the experiment loop → ingest keepers → Paperful for PDFs and restore.
+- **Not a substitute for:** missing-PDF fetch, EZProxy / grey playbooks, `snapshot` / `restore`, collection-scoped RAG, unattended attach, dual-review screening, or a hosted 175M PaperQA corpus.
+- **Useful to watch (do not vendor):** hop-0 `--prioritize` (Wave 5, shipped);
+  later: MCP filter knobs, optional `discover` facade, ID router, measured
+  PubMed/alphaXiv search adapters. Detail:
+  [ROADMAP — Discover surface](ROADMAP.md#literature-discovery-complement-waves).
+  Experiment-tree discipline and GPU orchestration stay out (no autonomous
+  AI-scientist). Date bounds already exist on snowball (`year_from` / `year_to`).
+
+| Capability | Paperful | OpenResearch |
+| --- | --- | --- |
+| Lit search for agents (alphaXiv / OpenAlex / PubMed) | Partial (`snowball` OpenAlex hops grow **your** collection) | Yes (`orx discover`; no key for search) |
+| Bulk missing-PDF fetch / EZProxy / grey playbooks | Yes | No |
+| Disk mirror + restore ledger | Yes | No (git + SQLite experiment store; different job) |
+| Grounded Q&A over **held** PDFs | Yes (`ask` / `synthesize`) | Partial (agents read paper reports / full text for hypotheses) |
+| Hypothesize → run experiment → keep artifacts | No | Yes |
+| Zotero write-back | Yes | No |
+| Runs on this machine | Yes | Yes (optional managed compute) |
 
 ### Hosted literature search
 
@@ -336,6 +361,9 @@ Chat agent needs the whole public literature (graph, trends, author intel), not 
 
 Need a hosted cited review, “has anyone done this?”, or Kosmos on a dataset?
   → Edison Scientific. Keep Paperful for PDFs, the disk ledger, and Ask over held papers
+
+Need a local coding-agent loop (lit → hypothesis → experiment → artifacts on disk)?
+  → OpenResearch (orx). Then ingest cites you want to keep into Zotero and fill PDFs with Paperful
 
 Need Elicit/Consensus tables over the public record?
   → those UIs, then Paperful for PDFs you will own

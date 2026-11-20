@@ -37,7 +37,9 @@ and the full suite on CI. **1.9.5** (2026-11-18) ships critique
 `context` / `context-web` three-round retrieve, a `context.json` sidecar, and
 split novelty Q then A ([critique.md](critique.md)). **1.9.6** (2026-11-19)
 ships cited-source locators on `--lane claims` and CLI `ask --claim-check`
-([rag.md](rag.md#claim-check)). The **live map** is [After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
+([rag.md](rag.md#claim-check)). **1.9.7** (2026-11-20) ships hop-0
+`--prioritize` (`recency` / `popular` / `historical`) on keyword and hybrid
+search ([snowball](snowball.md)). The **live map** is [After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
 still lists jobs by area; many of those rows have shipped. Do not re-pick
 them as the next thing to build.
 
@@ -821,7 +823,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.6).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.7).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -829,7 +831,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.9.6` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.9.7` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
@@ -883,7 +885,10 @@ headline.
 - **Snowball done well.** Start from a paper’s references and citations via
   OpenAlex, drop anything already in the library, rank, say why each was
   suggested, then feed results into Wanted. See [Snowball](#snowball) and
-  [Snowballing and review methods](#after-110-snowball-review).
+  [Snowballing and review methods](#after-110-snowball-review). Hop-0 sort
+  (`--prioritize`) and a DiscoverQuery spine shipped (Wave 5);
+  a `discover` verb, ID router, and extra search sources stay later —
+  [Discover surface](#literature-discovery-complement-waves).
 - **ORCID / author harvest** is cheap but niche; keep, do not headline.
 - **OSF Preprints** as a thin DOI source: *test* by counting recent misses
   with an OSF location before building.
@@ -1332,6 +1337,7 @@ until Wanted is honest. Do not grow 1.x into a second product.
 | ASReview-class ranking only as optional local embeddings | Screen | Not dual review | [Embeddings](#after-110-embeddings) |
 | Post-hoc Crossref / retraction check after a draft | Critique | Existence ≠ claim support | [critique.md](critique.md) |
 | ScholarPeer historian / scout / novelty Q&A (three-round retrieve, investigation log; no venue scores) | Critique | Suggested lane only; local RAG or opt-in OpenAlex/SearXNG; not OSP | [critique.md](critique.md) (shipped 1.9.5) |
+| Main-body-first reading of LLM critique (appendix bias literacy; optional prompt/pack slices later) | Critique | Suggested lanes only; no scores; see arXiv:2611.17811 | [critique.md](critique.md#reading-llm-lanes-main-text-vs-appendix), [ROADMAP](#critique-llm-literacy) |
 | Apply a critique pack as locatable edits / tracked changes (worklog, align-then-generate, selected-span prompts; no vendor) | Write | Pack required; never overwrite the source; no invented numbers/cites | [rewrite.md](rewrite.md) (shipped) |
 | Deepen `rewrite` from PaperOrchestra **patterns** (allowed-facts worklog, citation checklist, fail-closed critic). Do **not** vendor the pipeline | Write | Still pack-required; critic may only reject or comment; local `[llm]`; no web search from rewrite | [Rewrite deepen](#rewrite-deepen-paperorchestra-patterns) (later) |
 | Deep forensics on supplementary tables / stats / figures (external tool) | Screen / audit | No merged score; subprocess or hand-off | [PaperGuard](#research-integrity-forensics-paperguard) |
@@ -1819,7 +1825,8 @@ daemon.
 (near-term-research-ops)=
 ### Near-term research-ops
 
-**Status:** rows 1–24 shipped (literature-discovery complement waves 1–4 in rows 22–24 plus Wave 4 pack). Same bars:
+**Status:** rows 1–26 shipped (literature-discovery waves 1–4 in rows 22–24).
+Row 27 is Wave 5 (shipped). Same bars:
 dry-run default, explicit `--apply`, fail closed, no silent library writes. See
 [Documentation (thicken) — research pack](#documentation-thicken)
 for the end-to-end operator story.
@@ -1853,6 +1860,7 @@ for the end-to-end operator story.
 | 24 | Same — **Wave 3:** thicker `authorwatch` briefing (co-authors + recent works via OpenAlex) | **Shipped** |
 | 25 | ORCID ego co-authorship SNA (`paperful network`, Discover People map, BBNJ phase slices) | **Shipped** — [network](network.md); extra `paperful[network]` |
 | 26 | `paperful search` + Discover Web (SearXNG grey query; metadata parents; PDFs via Wanted) | **Shipped** — [search](search.md); `search watch` URL poll shipped (you cron it) |
+| 27 | [Literature-discovery Wave 5](#literature-discovery-complement-waves) — hop-0 `--prioritize` + DiscoverQuery spine (CLI/MCP/GUI share it; public verb stays `snowball`) | **Shipped** |
 
 (literature-discovery-complement-waves)=
 ### Literature-discovery complement (waves)
@@ -1875,10 +1883,24 @@ envelope for CLI and MCP.
 | **2** | **Publication trends** — Count works by publication year for an OpenAlex query or a saved snowball profile seed; reuse `OpenAlexClient` and budget posture as snowball. | **Shipped** — `snowball trends`, MCP `snowball_trends`; dry-run table + `--format json`; no library writes. |
 | **3** | **Author briefing thicken** — `authorwatch show` / list briefing adds co-author network and recent works from OpenAlex (same resolution paths as `resolve` / `suggest`). | **Shipped** — `authorwatch briefing` + compact `show`; `--format json`; no new polling scheduler. |
 | **4** | **Precedent / novelty pack** — Edison Precedent shape, local honesty: phrase in → `rag search` over held PDFs **plus** OpenAlex keyword/similar works not in the library; stamp `held` vs `public-metadata-only`; dry-run pack + read-only MCP tool; never a “nobody has done this” claim. | **Shipped** — `paperful precedent`, MCP `precedent`; [commands](commands.md). |
+| **5** | **Hop-0 sort + DiscoverQuery spine** — `--prioritize recency\|popular\|historical` on keyword/hybrid search (OpenAlex `sort=` **and** hop-0 score so `truncate` does not undo it). Default `popular` = today’s `cited_by_count`. Shared `DiscoverQuery` fields on CLI, MCP `snowball_search`, profiles, Discover Advanced. Public verb stays `snowball`. Neighbour overlap rank and `--per-hop-rank` unchanged. Date window stays `year_from`/`year_to`; watch `from_created_date` stays an index cursor. | **Shipped** — [`discover.py`](../paperful/snowball/discover.py) |
+
+**Later (after Wave 5 has lived a release).** Borrow shapes from [OpenResearch](comparison-reference.md#openresearch) `orx discover` / `orx paper`. Do **not** vendor the experiment tree, GPU backends, or full-text-as-the-deliverable. Keyword search stays thin; the join with the library is still the product.
+
+| Wave | Scope | Gate |
+| --- | --- | --- |
+| **6** | **MCP knobs** — `snowball_search` (still dry-run) accepts the CLI filters agents already lack: `listed_in`, `study_designs`, `oa_only`, `limit` / `max_candidates`, `search_keywords`. Same JSON envelope. | Agent can express a Wave-5 search without shelling out to CLI flags |
+| **7** | **`paperful discover` facade** — read-only alias that always dry-runs, classifies nothing new, calls the same DiscoverQuery. Docs today say there is no `harvest` / `discover` verb; this is a deliberate exception once MCP/GUI naming pays rent. Writes stay `snowball apply` / `--gate`. | One agent-facing name; no second engine |
+| **8** | **ID router** — one seed token that classifies DOI / arXiv / OpenAlex `W…` / ORCID / PMID / collection path into the existing constructors (`doi` / `orcid` / `collection` / search). OpenResearch `orx paper <id\|url>` shape. Does **not** return full text or a paper report as a Paperful product (that is `run` / `ask` over held PDFs). | Typed constructors remain underneath; help text names the detected kind |
+| **9** | **`relevance` prioritize** — OpenAlex default `search=` rank (no `sort=`). Distinct from `popular` (citation count). Opt-in; do not change the Wave-5 default. | Documented as “topical match, not cited-by”; fixture proves order ≠ popular |
+| **10** | **SearchSource adapters** — `search(query, window, prioritize, limit) → Candidate[]`. OpenAlex remains required. Optional PubMed (NCBI) and/or alphaXiv (CS/ML full-text + reports) behind config, union by DOI / PMID / OpenAlex id. **Test first:** miss rate on one CS collection and one biomed collection vs OpenAlex-only. Sci-Hub and Google Scholar stay **out** of discover sources. | Measured miss, then one adapter; identity merge + rate limits before a second |
+| **11** | **CLI product split** — `discover` (search) / `grow` (hops + gates) / `follow` (watch + authorwatch). Hide seed verbs under grow. Largest docs churn. | Only after Waves 5–7 have shipped a release; workbench tabs already use this split |
 
 **Non-goals for these waves:** hosting a global full-text index; Valency Hub–style
 publishing; replacing Bond or Edison Literature for “ask the whole literature”
-chat; wrapping Edison Kosmos / Analysis / Molecules.
+chat; wrapping Edison Kosmos / Analysis / Molecules; OpenResearch experiment
+trees, `autoarxiv.org` reproduce-from-paper, or a second scheduler (`keepup`
+already owns the alert loop). `expand = cited_authors` stays off.
 
 **Spike acceptance (one week, eng):** `refs gap` dry-run pack with zero manager
 writes; `ingest-dois` idempotent apply + `held` on ambiguous resolve; `collections
@@ -2256,6 +2278,35 @@ Complements `critique` (checkers on the same document), `rag search`
 [`refs gap`](#bibliography-gap-scan-later-not-gaps) (works named in the
 PDF that you do not own). Buffet context:
 [Summaries, briefs, and Ask](#after-110-briefs-ask).
+
+(critique-llm-literacy)=
+### Critique LLM literacy (appendix bias; later)
+
+**Status:** operator copy shipped in
+[critique.md — Reading LLM lanes](critique.md#reading-llm-lanes-main-text-vs-appendix).
+No code change required to use critique; these slices are optional if long
+appendix drafts flood Suggested with noise.
+
+**Context:** Ghosh, Saim, and Jiang
+[*AI Reviews Are Biased Towards the Appendix*](https://arxiv.org/abs/2611.17811)
+— venue LLM reviewers often draw most “weakness” bullets from supplementary
+material; humans weight the main body. Paperful is pre-submission, not
+OpenReview, but `reviewers` / `marg` / `openreview` can show the same flat-PDF
+thoroughness unless you read the pack with contribution-first lanes (`claims`,
+Critical path).
+
+**Parked slices (not on the [live order](#after-17-order) unless dogfood asks):**
+
+1. **Prompt guardrail** — one shared line in reviewer, MARG leader, openreview,
+   and verify synthesis prompts: prioritize contribution-bearing sections;
+   surface appendix quotes mainly when they contradict the main text or block
+   reproduction of a stated claim.
+2. **Pack disclosure** — one line in `pack.md`: fraction of Suggested comments
+   whose quotes fall in `appendix` / supplementary heading families (existing
+   `family_of` on heading units).
+3. **Checked heuristic** — warn when named core sections are empty in the main
+   body but substantial under appendix (human “presentation” appendix criticism;
+   complements `missing_section`).
 
 (rewrite-deepen-paperorchestra-patterns)=
 ### Rewrite deepen (PaperOrchestra patterns; later)
@@ -2774,7 +2825,10 @@ as the **Large corpus from scratch** worked example under [Documentation
 
 Still outside this lane: every paper by every cited author; a snowball step
 inside `paperful all`; a built-in scheduler; a review UI; systematic-review screening;
-Sci-Hub or Google Scholar as snowball sources. The Discover map
+Sci-Hub or Google Scholar as snowball sources. A public `discover` verb, ID
+router, PubMed/alphaXiv search adapters, and a CLI discover/grow/follow split
+are later literature-discovery waves (after hop-0 `--prioritize`) —
+[Discover surface](#literature-discovery-complement-waves). The Discover map
 (`paperful.citation_graph.v1`) is a view of one queue, with one-hop expand.
 Post-1.1 buffet for stopping rules, drift cache, PRISMA counts, SnowBallSLR
 interop, and a possible systematic-review mode —

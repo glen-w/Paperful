@@ -148,7 +148,10 @@ def test_tools_call_routes_each_tool_with_normalised_args(cfg, monkeypatch):
         "depth": 2,
         "year_from": 2020,
         "year_to": None,
+        "prioritize": None,
     }
+    call("snowball_search", query="kelp", prioritize="recency")
+    assert calls["snowball_search"][1]["prioritize"] == "recency"
     call("snowball_trends", profile="p")
     assert calls["snowball_trends"][0] == (cfg, None)
     assert calls["snowball_trends"][1]["profile"] == "p"

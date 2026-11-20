@@ -42,6 +42,14 @@ PerHopRankOpt = typer.Option(
     "--per-hop-rank",
     help="Which neighbours a numeric limit keeps: most-cited, least-cited, or random.",
 )
+PrioritizeOpt = typer.Option(
+    None,
+    "--prioritize",
+    help=(
+        "Hop-0 search order: recency, popular (citation count, default), or historical. "
+        "Not topical relevance. Neighbour hops still use overlap rank."
+    ),
+)
 KeywordLimitOpt = typer.Option(
     None,
     "--keyword-limit",
