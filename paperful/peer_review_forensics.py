@@ -1,4 +1,4 @@
-"""Optional PaperGuard forensics extra for critique.
+"""Optional PaperGuard forensics extra for peer-review.
 
 Not a core dependency. Requires ``paperguard`` on PATH. Missing binary or
 input returns a skip so the pack can record ``paperguard_unavailable`` /
@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import Config
-from .critique import Finding, make_finding
+from .peer_review import Finding, make_finding
 
 MAX_FORENSICS_FINDINGS = 100
 SIBLING_TABLE_SUFFIXES = frozenset({".csv", ".xlsx", ".xls"})
@@ -109,7 +109,7 @@ def run_forensics(
     if not paths:
         findings, meta = _skip("no_input")
         return findings, meta, None
-    timeout_s = float(cfg.critique_forensics_timeout_s or 300.0)
+    timeout_s = float(cfg.peer_review_forensics_timeout_s or 300.0)
     doi_flag = (doi or "").strip() if not offline else ""
     try:
         with tempfile.TemporaryDirectory(prefix="paperful-paperguard-") as tmp:

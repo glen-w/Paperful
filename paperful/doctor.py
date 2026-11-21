@@ -194,13 +194,13 @@ def remediation_text(
         )
     if check.name == "vale":
         return (
-            "Install Vale for optional critique house-style lint "
+            "Install Vale for optional peer-review house-style lint "
             "(brew install vale / see https://vale.sh). "
-            "Set [critique].vale_config to your .vale.ini; Paperful does not run vale sync."
+            "Set [peer_review].vale_config to your .vale.ini; Paperful does not run vale sync."
         )
     if check.name == "paperguard":
         return (
-            "Install PaperGuard for optional critique --forensics "
+            "Install PaperGuard for optional peer-review --forensics "
             "(pipx install paperguard / see https://github.com/exergyleizhou-ux/PaperGuard). "
             "Paperful does not vendor detectors or fold PaperGuard scores into a grade."
         )
@@ -258,9 +258,9 @@ def remediation_text(
         )
     if check.name == "binoculars":
         return (
-            "Install Binoculars for critique --ai-model: uv pip install "
+            "Install Binoculars for peer-review --ai-model: uv pip install "
             '"binoculars @ git+https://github.com/ahans30/Binoculars.git". '
-            "Or set [critique].ai_model = false."
+            "Or set [peer_review].ai_model = false."
         )
     if check.name == "browser-agent extra":
         if "not installed" in check.detail:
@@ -807,7 +807,7 @@ def _tool_path_checks() -> list[Check]:
             Check(
                 "vale",
                 "amber",
-                "missing — optional for critique house style "
+                "missing — optional for peer-review house style "
                 "(https://vale.sh; brew install vale)",
             )
         )
@@ -818,7 +818,7 @@ def _tool_path_checks() -> list[Check]:
             Check(
                 "paperguard",
                 "amber",
-                "missing — optional for critique --forensics "
+                "missing — optional for peer-review --forensics "
                 "(https://github.com/exergyleizhou-ux/PaperGuard)",
             )
         )
@@ -1113,7 +1113,7 @@ def _model_below_agent_floor(model: str) -> bool:
 
 
 def _grobid_checks(cfg) -> list[Check]:
-    """External GROBID sidecar for extract-sections / RAG parser / critique --advanced."""
+    """External GROBID sidecar for extract-sections / RAG parser / peer-review --advanced."""
     if not cfg.grobid_enabled:
         return [Check("GROBID", "green", "disabled (grobid.enabled false)")]
     from .grobid_client import GrobidConfigError, grobid_client_from_config
@@ -1167,10 +1167,10 @@ def _openxml_audit_check(cfg) -> Check | None:
 
 
 def _binoculars_check(cfg) -> Check | None:
-    """Amber when critique asked for Binoculars but the extra is missing."""
-    if not getattr(cfg, "critique_ai_model", False):
+    """Amber when peer-review asked for Binoculars but the extra is missing."""
+    if not getattr(cfg, "peer_review_ai_model", False):
         return None
-    from .critique_ai_model import extra_available
+    from .peer_review_ai_model import extra_available
 
     if extra_available():
         return Check("binoculars", "green", "binoculars importable")

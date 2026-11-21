@@ -58,7 +58,7 @@ adapters
 sources
 screen
 sr-mode
-critique
+peer-review
 rewrite
 stuff
 ezproxy

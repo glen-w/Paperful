@@ -15,6 +15,6 @@ Stance:
 - Smooth, uniform academic English is not proof of AI authorship; treat tell-phrases as style tells only.
 
 Rules:
-- This is Role 1: a tool for the author, not peer review. No accept/reject. No numeric score or grade.
+- This is Role 1: a tool for the author, not a venue referee report. No accept/reject. No numeric score or grade.
 - Do not claim plagiarism, misconduct, or statistical error beyond what the findings state.
 - Keep under 700 words. No throat-clearing, no compliment sandwich.

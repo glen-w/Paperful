@@ -1,9 +1,9 @@
-# Rewrite (apply a critique pack)
+# Rewrite (apply a peer-review pack)
 
-`paperful rewrite` takes an existing [`critique`](critique.md) pack and
+`paperful rewrite` takes an existing [`peer-review`](peer-review.md) pack and
 proposes locatable edits. The Advanced workbench labels this **Suggest
 edits** so it is not read as “the AI rewrites my paper.” It is
-**apply-from-critique**, not a paper generator. It does not re-run critique,
+**apply-from-peer-review**, not a paper generator. It does not re-run peer-review,
 does not overwrite the source file, and does not write to the reference
 manager.
 
@@ -24,10 +24,10 @@ Product routing vs PaperOrchestra (idea+log → conference LaTeX):
 
 ## CLI
 
-`--pack`, `--item`, and `--file` locate the critique pack. `--file` with
+`--pack`, `--item`, and `--file` locate the peer-review pack. `--file` with
 `--pack` is allowed: the pack supplies findings; `--file` is the manuscript
 to edit. There is no accept/reject screen in Paperful; accept or reject
-tracked changes in Word (or the office app you use). New critique packs
+tracked changes in Word (or the office app you use). New peer-review packs
 store an input file hash. When `--file` does not match that hash (or the
 pack’s original path, for older packs), rewrite warns, records `drift`,
 and still re-aligns unique quotes. A run that proposes no edits and only
@@ -35,14 +35,14 @@ skips (or drifted with nothing to apply) exits **3** (`partial`); a run
 that proposes at least one edit exits **0**.
 
 ```bash
-uv run paperful rewrite --pack state/critiques/file-draft/20261027T...
+uv run paperful rewrite --pack state/peer-reviews/file-draft/20261027T...
 uv run paperful rewrite --file ./draft.docx
 uv run paperful rewrite --item KEY
 uv run paperful rewrite --file ./draft.docx --area cites --area structure --comments substantive
 uv run paperful rewrite --pack PATH --output edits --dry-run
 ```
 
-- Exit 1 if no pack exists. Never calls `build_critique`. Exit 3 when the
+- Exit 1 if no pack exists. Never calls `build_peer_review`. Exit 3 when the
   run finishes with zero edits and every item was skipped (or the file
   drifted and nothing applied). Envelope `exit` matches.
 - `--area` (repeatable): `style`, `cites`, `structure`, `comments`, or `all`.
@@ -53,7 +53,7 @@ uv run paperful rewrite --pack PATH --output edits --dry-run
 - `--format json` → agent envelope. Phase lines on stderr.
 - Not in `paperful all`. `paperful jobs` → completeness.
 
-Packs land in `state/rewrites/<critique-id>/<stamp>/` as `plan.json`
+Packs land in `state/rewrites/<peer-review-id>/<stamp>/` as `plan.json`
 (`paperful.rewrite.plan.v1`), `pack.md`, and `pack.json`
 (`paperful.rewrite.pack.v1`). `--output tracked` writes `tracked.docx` /
 `tracked.pptx` / `tracked.odt` matching the source (markdown and other
@@ -109,7 +109,7 @@ drafts should not assume them. See [llm.md](llm.md).
 - No new numbers, experiments, or cite keys unless they already appear in the
   extract, the finding, or the pack.
 - Unflagged text is unchanged.
-- Body edits must not mention Paperful, the critique pack, or “the reviewer”.
+- Body edits must not mention Paperful, the peer-review pack, or “the reviewer”.
 - Weak alignment → skip or a Word comment, not a guessed rewrite.
 - Tracked-changes v1 uses stdlib OOXML for `.docx`. Unique paragraph match
   only; miss → skip. If a paragraph has run properties, fields, existing
@@ -133,11 +133,11 @@ drafts should not assume them. See [llm.md](llm.md).
 
 ![Suggest edits in the workbench: pack picker, areas, outputs, comments](_static/workflows/rewrite.png)
 
-Advanced **Suggest edits** (next to Critique; CLI is still `paperful rewrite`):
-pick a recent critique pack, optional replacement draft, area/output/comments
+Advanced **Suggest edits** (next to Peer review; CLI is still `paperful rewrite`):
+pick a recent peer-review pack, optional replacement draft, area/output/comments
 controls, download the result. With no pack on disk, the page shows only
-**Run Critique first** with an **Open Critique** link.
+**Run Peer review first** with an **Open Peer review** link.
 
 ## See also
 
-[critique](critique.md) · [config](config.md) · [llm](llm.md)
+[peer_review](peer-review.md) · [config](config.md) · [llm](llm.md)

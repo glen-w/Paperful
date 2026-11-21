@@ -14,9 +14,9 @@ from .pages import (
     ASK_ERROR_MESSAGES,
     command_by_id,
     last_job_result,
-    list_recent_critiques,
+    list_recent_peer_reviews,
 )
-from ..critique_extract import (
+from ..peer_review_extract import (
     ACCEPT,
     MAX_UPLOAD_BYTES,
     SUPPORTED,
@@ -82,7 +82,7 @@ def handle_page_rewrite(
             result=result,
             pack_md=pack_md,
             downloads=_downloads(pack_dir),
-            recent=list_recent_critiques(ui.cfg),
+            recent=list_recent_peer_reviews(ui.cfg),
             accept=ACCEPT,
             llm_on=bool(ui.cfg.llm_enabled),
             rewrite_areas=list(ui.cfg.rewrite_areas),
@@ -118,7 +118,7 @@ async def handle_rewrite_run(ui: UiContext, request: Request) -> RedirectRespons
         return RedirectResponse(url="/rewrite?error=target", status_code=303)
     try:
         folder = Path(pack_dir).resolve()
-        folder.relative_to((ui.cfg.state_dir / "critiques").resolve())
+        folder.relative_to((ui.cfg.state_dir / "peer-reviews").resolve())
     except (ValueError, OSError):
         return RedirectResponse(url="/rewrite?error=target", status_code=303)
     if not (folder / "pack.json").is_file():

@@ -12,14 +12,14 @@ from pathlib import Path
 from typing import Any
 
 from .config import (
-    CRITIQUE_REVIEWER_MAX_TOKENS,
+    PEER_REVIEW_REVIEWER_MAX_TOKENS,
     Config,
-    CritiqueReviewer,
-    critique_reviewers_for,
+    PeerReviewer,
+    peer_review_reviewers_for,
 )
-from .critique import Finding, make_finding
-from .critique_direct_quotes import snippet_in_direct_quote
-from .critique_extract import ExtractedDoc
+from .peer_review import Finding, make_finding
+from .peer_review_direct_quotes import snippet_in_direct_quote
+from .peer_review_extract import ExtractedDoc
 from .grounding import budget_slice
 from .llm.client import ChatRequest, LLMClientError
 from .zot import Item
@@ -109,7 +109,7 @@ def _loads_object(text: str) -> Any:
         return data
 
 
-def critique_chat_request(
+def peer_review_chat_request(
     *,
     model: str,
     messages: tuple[dict[str, str], ...] | list[dict[str, str]],
@@ -118,7 +118,7 @@ def critique_chat_request(
     max_tokens: int | None = None,
     json_mode: bool = False,
 ) -> ChatRequest:
-    """Critique JSON turns pin format=json and turn thinking off (qwen3)."""
+    """Peer review JSON turns pin format=json and turn thinking off (qwen3)."""
     return ChatRequest(
         model=model,
         messages=tuple(messages),
@@ -218,7 +218,7 @@ _strip_fences = strip_fences
 _parse_json = parse_llm_json
 
 
-def load_reviewer_prompt(reviewer: CritiqueReviewer) -> str | None:
+def load_reviewer_prompt(reviewer: PeerReviewer) -> str | None:
     """Builtin JSON prompt, or file contents. None if the path is missing."""
     raw = (reviewer.prompt or "default").strip() or "default"
     if raw == "default":
@@ -345,7 +345,7 @@ def _run_reviewers(
     *,
     cfg: Config,
     client: Any,
-    reviewers: tuple[CritiqueReviewer, ...],
+    reviewers: tuple[PeerReviewer, ...],
     user: str,
     hay: str,
     say: Callable[[str], None],
@@ -371,9 +371,9 @@ def _run_reviewers(
         label = f"Reviewer {i}/{n_reviewers} {reviewer.id}"
         say(f"{label} · {model} (wall {timeout_s:.0f}s, idle {timeout_s:.0f}s)…")
         prompt_sha = sha256((prompt + user[:2000]).encode("utf-8")).hexdigest()[:12]
-        max_tokens = int(getattr(reviewer, "max_tokens", CRITIQUE_REVIEWER_MAX_TOKENS))
+        max_tokens = int(getattr(reviewer, "max_tokens", PEER_REVIEW_REVIEWER_MAX_TOKENS))
         json_prompt = prompt == _PROMPT
-        request = critique_chat_request(
+        request = peer_review_chat_request(
             model=model,
             messages=(
                 {"role": "system", "content": prompt},
@@ -398,7 +398,7 @@ def _run_reviewers(
             )
             if json_prompt and not extra and not narrative:
                 say(f"{label} retry (unusable JSON)…")
-                repair = critique_chat_request(
+                repair = peer_review_chat_request(
                     model=model,
                     messages=tuple(request.messages)
                     + (
@@ -501,7 +501,7 @@ def suggested_from_llm(
     scope_items: list[Item] | None = None,
     on_status: Callable[[str], None] | None = None,
 ) -> tuple[list[Finding], dict[str, Any] | None]:
-    from .critique_lanes import mode_for_lanes, ordered_lanes
+    from .peer_review_lanes import mode_for_lanes, ordered_lanes
 
     say = on_status or (lambda _msg: None)
     if lanes is None:
@@ -532,7 +532,7 @@ def suggested_from_llm(
     lane_list = list(lanes)
     mode = mode_for_lanes(lanes)
     wanted = [w for w in (reviewer_ids or []) if str(w).strip()]
-    reviewers = critique_reviewers_for(cfg, wanted or None) if run_reviewers else ()
+    reviewers = peer_review_reviewers_for(cfg, wanted or None) if run_reviewers else ()
     if (
         run_reviewers
         and wanted
@@ -566,7 +566,7 @@ def suggested_from_llm(
                         source="llm",
                     )
                 ], None
-    excerpt = budget_slice(doc.text, cfg.critique_max_context_chars)
+    excerpt = budget_slice(doc.text, cfg.peer_review_max_context_chars)
     hay = excerpt.lower()
     checked = [
         {
@@ -616,7 +616,7 @@ def suggested_from_llm(
         state.skip_reason = state.skip_reason or skip_reason
 
     def _marg() -> tuple[list[Finding], dict[str, Any]]:
-        from .critique_marg import suggested_from_marg
+        from .peer_review_marg import suggested_from_marg
 
         return suggested_from_marg(
             cfg,
@@ -640,7 +640,7 @@ def suggested_from_llm(
     state.absorb(extra_m, state.marg_meta)
 
     def _adversary() -> tuple[list[Finding], dict[str, Any]]:
-        from .critique_adversary import suggested_from_adversary
+        from .peer_review_adversary import suggested_from_adversary
 
         return suggested_from_adversary(
             cfg,
@@ -662,7 +662,7 @@ def suggested_from_llm(
     state.absorb(extra_a, state.adversary_meta)
 
     def _outline() -> tuple[list[Finding], dict[str, Any]]:
-        from .critique_outline import suggested_from_outline
+        from .peer_review_outline import suggested_from_outline
 
         return suggested_from_outline(
             cfg,
@@ -684,7 +684,7 @@ def suggested_from_llm(
     state.absorb(extra_o, state.outline_meta, keep_if_ledger=True)
 
     def _claims() -> tuple[list[Finding], dict[str, Any]]:
-        from .critique_claims import suggested_from_claims
+        from .peer_review_claims import suggested_from_claims
 
         return suggested_from_claims(
             cfg,
@@ -714,7 +714,7 @@ def suggested_from_llm(
     )
 
     def _verify() -> tuple[list[Finding], dict[str, Any]]:
-        from .critique_verify import suggested_from_verify
+        from .peer_review_verify import suggested_from_verify
 
         return suggested_from_verify(
             cfg,
@@ -738,7 +738,7 @@ def suggested_from_llm(
     state.absorb(extra_v, state.verify_meta)
 
     def _context() -> tuple[list[Finding], dict[str, Any]]:
-        from .critique_context import suggested_from_context
+        from .peer_review_context import suggested_from_context
 
         return suggested_from_context(
             cfg,

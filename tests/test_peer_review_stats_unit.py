@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from paperful.critique_stats import (
+from paperful.peer_review_stats import (
     _p_matches,
     _parse_p,
     chi2_right_p,

@@ -1,4 +1,4 @@
-"""Workbench HTTP routes (Advanced Critique)."""
+"""Workbench HTTP routes (Advanced Peer review)."""
 
 from __future__ import annotations
 
@@ -14,23 +14,23 @@ from .page_common import picker_title
 from .pages import (
     ASK_ERROR_MESSAGES,
     command_by_id,
-    critique_pack_markdown,
+    peer_review_pack_markdown,
     last_job_result,
-    list_recent_critiques,
+    list_recent_peer_reviews,
 )
 from .prefs import prefs_from_request
-from ..critique_extract import (
+from ..peer_review_extract import (
     ACCEPT,
     MAX_UPLOAD_BYTES,
     SUPPORTED,
     ExtractError,
     stage_bytes,
 )
-from ..critique_lanes import resolve_critique_lanes
+from ..peer_review_lanes import resolve_peer_review_lanes
 
 
 def _default_lanes(cfg: Any) -> tuple[str, ...]:
-    return resolve_critique_lanes(cfg)
+    return resolve_peer_review_lanes(cfg)
 
 
 def _picker_items(ui: UiContext, collection: str) -> list[dict[str, Any]]:
@@ -47,41 +47,41 @@ def _picker_items(ui: UiContext, collection: str) -> list[dict[str, Any]]:
     return rows
 
 
-def handle_page_critique(
+def handle_page_peer_review(
     ui: UiContext, request: Request, run: str = "", error: str = ""
 ) -> HTMLResponse:
     prefs = prefs_from_request(request)
     run_rec = command_by_id(ui.cfg, run) if run else None
-    result = last_job_result(ui.cfg, "critique", run)
+    result = last_job_result(ui.cfg, "peer-review", run)
     pack_md = ""
     pack_dir = str((result or {}).get("pack_dir") or "")
     if pack_dir:
-        pack_md = critique_pack_markdown(ui.cfg, pack_dir)
+        pack_md = peer_review_pack_markdown(ui.cfg, pack_dir)
     err = ASK_ERROR_MESSAGES.get(error, error)
     return ui.templates.TemplateResponse(
         request,
-        "critique.html",
+        "peer_review.html",
         ui.ctx(
             request,
-            "critique",
+            "peer-review",
             error=err,
             run_rec=run_rec,
             poll_run=run,
             result=result,
             pack_md=pack_md,
             items=_picker_items(ui, prefs.collection),
-            recent=list_recent_critiques(ui.cfg),
+            recent=list_recent_peer_reviews(ui.cfg),
             accept=ACCEPT,
             llm_on=bool(ui.cfg.llm_enabled),
-            critique_llm=bool(ui.cfg.critique_llm),
-            critique_advanced=bool(ui.cfg.critique_advanced),
-            critique_lanes=list(_default_lanes(ui.cfg)),
+            peer_review_llm=bool(ui.cfg.peer_review_llm),
+            peer_review_advanced=bool(ui.cfg.peer_review_advanced),
+            peer_review_lanes=list(_default_lanes(ui.cfg)),
             grobid_enabled=bool(ui.cfg.grobid_enabled),
         ),
     )
 
 
-async def handle_critique_run(ui: UiContext, request: Request) -> RedirectResponse:
+async def handle_peer_review_run(ui: UiContext, request: Request) -> RedirectResponse:
     prefs = prefs_from_request(request)
     form = await request.form()
     item_key = str(form.get("item_key") or "").strip()
@@ -107,29 +107,29 @@ async def handle_critique_run(ui: UiContext, request: Request) -> RedirectRespon
         raw = await upload.read()  # type: ignore[union-attr]
         data = raw if raw else None
     if bool(item_key) == bool(data):
-        return RedirectResponse(url="/critique?error=target", status_code=303)
+        return RedirectResponse(url="/peer-review?error=target", status_code=303)
     staged: Path | None = None
     if data is not None:
         suffix = Path(name or "upload.bin").suffix.lower()
         if suffix not in SUPPORTED:
-            return RedirectResponse(url="/critique?error=format", status_code=303)
+            return RedirectResponse(url="/peer-review?error=format", status_code=303)
         if len(data) > MAX_UPLOAD_BYTES:
-            return RedirectResponse(url="/critique?error=size", status_code=303)
+            return RedirectResponse(url="/peer-review?error=size", status_code=303)
         try:
             staged = stage_bytes(ui.cfg, data, name)
         except ExtractError:
-            return RedirectResponse(url="/critique?error=format", status_code=303)
+            return RedirectResponse(url="/peer-review?error=format", status_code=303)
         try:
             staged.resolve().relative_to(
-                (ui.cfg.state_dir / "critiques" / "uploads").resolve()
+                (ui.cfg.state_dir / "peer-reviews" / "uploads").resolve()
             )
         except ValueError:
-            return RedirectResponse(url="/critique?error=format", status_code=303)
+            return RedirectResponse(url="/peer-review?error=format", status_code=303)
     if apply and staged is not None:
         apply = False
 
     def work(cmd_id: str) -> None:
-        jobs.critique(
+        jobs.peer_review(
             ui.cfg,
             cmd_id,
             item_key=item_key,
@@ -149,20 +149,20 @@ async def handle_critique_run(ui: UiContext, request: Request) -> RedirectRespon
 
     cmd_id = commands.enqueue(
         ui.cfg,
-        "critique",
+        "peer-review",
         work,
         args={"item_key": item_key, "upload": name, "apply": apply},
     )
-    return ui.after_job("/critique", cmd_id)
+    return ui.after_job("/peer-review", cmd_id)
 
 
-def register_critique(ui: UiContext) -> None:
+def register_peer_review(ui: UiContext) -> None:
     app = ui.app
 
-    @app.get("/critique", response_class=HTMLResponse)
-    def page_critique(request: Request, run: str = "", error: str = "") -> HTMLResponse:
-        return handle_page_critique(ui, request=request, run=run, error=error)
+    @app.get("/peer-review", response_class=HTMLResponse)
+    def page_peer_review(request: Request, run: str = "", error: str = "") -> HTMLResponse:
+        return handle_page_peer_review(ui, request=request, run=run, error=error)
 
-    @app.post("/critique")
-    async def critique_run(request: Request) -> RedirectResponse:
-        return await handle_critique_run(ui, request=request)
+    @app.post("/peer-review")
+    async def peer_review_run(request: Request) -> RedirectResponse:
+        return await handle_peer_review_run(ui, request=request)

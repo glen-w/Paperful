@@ -1,6 +1,6 @@
 # Vale house styles
 
-Example Vale packs for optional `paperful critique --vale`. They live under
+Example Vale packs for optional `paperful peer-review --vale`. They live under
 `styles/` so a repo-root `.vale.ini` can set `StylesPath = styles`. None of
 them is an official journal package.
 
@@ -20,10 +20,10 @@ cp styles/JMLC/vale.ini.example .vale.ini
 # or: cp styles/MarinePolicy/vale.ini.example .vale.ini
 ```
 
-Then `[critique].vale = true` or `paperful critique --vale`. See
-[critique](../docs/critique.md#example-vale-styles).
+Then `[peer_review].vale = true` or `paperful peer-review --vale`. See
+[peer_review](../docs/peer-review.md#example-vale-styles).
 
 Other directories under `styles/` (personal or venue tints) stay local and
 are gitignored. Keep them next to the examples so `StylesPath = styles` still
-finds them; point `[critique].vale_config` at a sibling ini that names that
+finds them; point `[peer_review].vale_config` at a sibling ini that names that
 pack only.

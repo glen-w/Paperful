@@ -19,13 +19,13 @@ from pathlib import Path
 from typing import Any
 
 from .config import Config
-from .critique import Finding, make_finding
-from .critique_extract import ExtractedDoc
-from .critique_llm import findings_from_comments, grounded, parse_llm_json
+from .peer_review import Finding, make_finding
+from .peer_review_extract import ExtractedDoc
+from .peer_review_llm import findings_from_comments, grounded, parse_llm_json
 from .grounding import budget_slice
 from .zot import Item
 
-CONTEXT_LOG_SCHEMA = "paperful.critique.context.v1"
+CONTEXT_LOG_SCHEMA = "paperful.peer_review.context.v1"
 CONTEXT_LOG_NAME = "context.json"
 _PASSAGES_CAP = 12_000
 
@@ -81,7 +81,7 @@ Rules:
 - Do not invent numbers. No score or accept/reject.
 """
 
-_REVIEW_SYSTEM = """You synthesize a constructive manuscript critique from the
+_REVIEW_SYSTEM = """You synthesize a constructive manuscript peer-review from the
 investigation log. Return JSON only:
 {"summary": "one paragraph", "comments": [{"quote": "span from the excerpt", "detail": "actionable comment", "code": "short_code"}], "questions": ["author question"]}
 Rules:
@@ -93,7 +93,7 @@ Rules:
 
 
 def context_timeout_s(cfg: Config) -> float:
-    raw = float(getattr(cfg, "critique_context_timeout_s", 0) or 0)
+    raw = float(getattr(cfg, "peer_review_context_timeout_s", 0) or 0)
     if raw > 0:
         return raw
     return max(float(cfg.llm_timeout_s or 120), 600.0)
@@ -118,9 +118,9 @@ def _chat(
     messages: list[dict[str, str]],
     timeout: float,
 ) -> str:
-    from .critique_llm import chat_with_json_retry, critique_chat_request
+    from .peer_review_llm import chat_with_json_retry, peer_review_chat_request
 
-    request = critique_chat_request(
+    request = peer_review_chat_request(
         model=model,
         messages=messages,
         timeout_seconds=max(5.0, float(timeout)),
@@ -432,9 +432,9 @@ def suggested_from_context(
     lane_id = "context-web" if search_enabled else "context"
     timeout = context_timeout_s(cfg)
     deadline = time.monotonic() + timeout
-    excerpt = budget_slice(doc.text, cfg.critique_max_context_chars)
-    max_comments = max(1, int(getattr(cfg, "critique_context_max_comments", 12) or 12))
-    max_hits = max(1, int(getattr(cfg, "critique_context_max_hits", 8) or 8))
+    excerpt = budget_slice(doc.text, cfg.peer_review_max_context_chars)
+    max_comments = max(1, int(getattr(cfg, "peer_review_context_max_comments", 12) or 12))
+    max_hits = max(1, int(getattr(cfg, "peer_review_context_max_hits", 8) or 8))
     meta: dict[str, Any] = {
         "id": lane_id,
         "model": model,

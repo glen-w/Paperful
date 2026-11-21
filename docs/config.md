@@ -49,7 +49,7 @@ and [architecture](architecture.md).
 | `[camofox].during_run` | `true` | Inject on `run` when enabled. `--camofox` / `--no-camofox` override one run |
 | `[camofox].base_url` | `http://127.0.0.1:9377` | REST base for the camofox-browser server |
 | `[camofox].max_wall_s` | `90` | Wall-clock budget per item for the scripted grab |
-| `[grobid].enabled` | `false` | Opt-in GROBID sidecar for `extract-sections`, `[rag].parser = "grobid"`, and critique `--lane marg` chunking. Needs an external GROBID server. Never a silent default. See [GROBID](grobid.md) |
+| `[grobid].enabled` | `false` | Opt-in GROBID sidecar for `extract-sections`, `[rag].parser = "grobid"`, and peer-review `--lane marg` chunking. Needs an external GROBID server. Never a silent default. See [GROBID](grobid.md) |
 | `[grobid].base_url` | `http://127.0.0.1:8070` | REST base. Loopback is rewritten to `host.docker.internal` inside Compose (`PAPERFUL_GROBID_HOST`) |
 | `[grobid].timeout_s` | `120` | Full-text POST budget |
 | `[grobid].allow_remote` | `false` | Permit a non-local host. PDF bytes then leave this machine |
@@ -255,46 +255,46 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[llm].base_url` | `http://127.0.0.1:11434` | Ollama API. Inside Compose, a loopback URL is rewritten to `host.docker.internal` (`PAPERFUL_OLLAMA_HOST`). A remote hostname stays as configured and still needs `allow_remote` |
 | `[llm].api_base` | `""` | OpenAI-compatible base when `provider = litellm` |
 | `[fix_metadata].llm_title` | `false` | Grounded title proposals in `fix-metadata` |
-| `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding; `summarize` and critique review lanes refuse flagged items unless `--force` |
+| `[lint].llm_pdf_match` | `false` | `pdf_identity_mismatch` finding; `summarize` and peer-review review lanes refuse flagged items unless `--force` |
 | `[screen].detectors` | `retracted`, `withdrawn`, `expression_of_concern`, `pubpeer`, `tortured`, `scigen`, `mathgen`, `suspect` | Which lanes run (these are the ids the config accepts). PubPeer needs `[screen].pubpeer = true` and `PUBPEER_DEVKEY` |
 | `[screen].tortured_min` | `5` | Minimum tortured-phrase hits before flagging (obvious phrases always flag) |
 | `[screen].pubpeer` | `false` | PubPeer batch lookup |
 | `[screen].fingerprint_max_age_days` | `14` | Re-download PPS CSV dumps after this age (`doctor` ambers when stale) |
 | `[screen].fingerprint_dir` | unset | Optional folder with `tortured.csv` / `.json` (and `scigen`, `mathgen`, `suspect`). Relative paths resolve from the config file. Used when cache is missing or offline |
 | `[screen].tag` | `paperful-pps` | Child note tag for `--apply` |
-| `[critique].llm` | `false` | Shim for lane `reviewers` when `[critique].lanes` is empty (`--llm` / `--no-llm` add or remove that lane) |
-| `[critique].lanes` | `[]` | Suggested review lanes to run together: `reviewers`, `marg`, `adversary`, `outline`, `claims`, `verify`, `context`, `context-web`. Empty → use `llm` / `advanced` shims. When non-empty those bools are ignored. `--lane` selects for one run |
-| `[critique].tag` | `paperful-critique` | Child note tag for `critique --apply` |
-| `[critique].ai_model` | `false` | Optional Binoculars extra (`uv pip install "binoculars @ git+https://github.com/ahans30/Binoculars.git"`). `--ai-model` turns it on for one run (no `--no-ai-model`). Missing extra records `ai_model_unavailable`. `paperful doctor` ambers only when this is on and the extra is missing |
-| `[critique].vale` | `false` | Optional Vale house-style pass. `--vale` turns it on for one run (no `--no-vale`). Needs `vale` on PATH and a `.vale.ini`; missing extra records `vale_unavailable` / `vale_no_config` / `vale_failed`. Not in the Compose image |
-| `[critique].vale_config` | unset | Path to your `.vale.ini`. Relative paths resolve from the config file. If unset, `.vale.ini` next to the paperful config is used when present. Example inis: `styles/JMLC/vale.ini.example`, `styles/JCP/vale.ini.example`, `styles/MarinePolicy/vale.ini.example` (see [critique](critique.md#example-vale-styles)) |
-| `[critique].vale_min_alert_level` | `suggestion` | Lowest Vale level to keep: `suggestion`, `warning`, or `error` |
-| `[critique].vale_timeout_s` | `60` | Subprocess timeout for one Vale run |
-| `[critique].forensics` | `false` | Optional PaperGuard subprocess. `--forensics` turns it on for one run (no `--no-forensics`). Needs `paperguard` on PATH; missing extra records `paperguard_unavailable`. Not a PyPI dependency |
-| `[critique].forensics_timeout_s` | `300` | Subprocess timeout for one PaperGuard scan |
-| `[critique].glossary` | `true` | Fuzzy house-list acronym expansions from `state/glossary/*.json`. No findings when the directory is empty. `paperful glossary validate` / `export-vale` |
-| `[critique].glossary_dir` | `glossary` | Directory under `state_dir` (absolute paths allowed) |
-| `[critique].glossary_similarity_min` | `0.88` | Minimum `difflib` ratio to flag a near-miss expansion or phrase |
-| `[critique].advanced` | `false` | Shim for lane `marg` when `[critique].lanes` is empty (`--advanced` / `--no-advanced`). Caps below apply to lane `marg` |
-| `[critique].advanced_max_rounds` | `4` | Leader turns per aspect group |
-| `[critique].advanced_max_workers` | `4` | Paper chunks (worker agents) |
-| `[critique].advanced_max_comments` | `12` | Cap after the refine pass |
-| `[critique].advanced_refine` | `true` | Extra pass to drop or split comments |
-| `[critique].advanced_timeout_s` | `0` | Wall clock for the MARG-S pass (`0` → `max([llm].timeout_s, 600)`). Duplicate leader broadcasts abort (`loop`); overrun records `timeout` |
-| `[critique].advanced_aspects` | `[]` | MARG aspect ids. Empty → `experiments`, `clarity`, `impact`. Allowed: those plus `theory`, `policy`, `evidence-base`. Do not enable all six by default |
-| `[critique].claims_max` | `8` | Cap on extracted claims for the `claims` lane |
-| `[critique].claims_max_comments` | `16` | Cap on `claim_thin` / `claim_unsupported_in_text` / cited-source findings |
-| `[critique].claims_timeout_s` | `0` | Wall clock for the `claims` lane (`0` → `[llm].timeout_s`) |
-| `[critique].claims_cite_max_sources` | `3` | Max held cited works scored per claim (`state/rag/text`; no web fetch) |
-| `[critique].verify_timeout_s` | `0` | Wall clock for the `verify` lane (`0` → `max([llm].timeout_s, 600)`) |
-| `[critique].verify_max_comments` | `16` | Cap on suggested comments from `verify` |
-| `[critique].verify_max_segments` | `8` | Max logical segments in the `verify` swarm |
-| `[critique].context_timeout_s` | `0` | Wall clock for `context` / `context-web` (`0` → `max([llm].timeout_s, 600)`) |
-| `[critique].context_max_comments` | `12` | Cap on suggested comments from the context pipeline |
-| `[critique].context_max_hits` | `8` | Cap per retrieve round (and novelty-answer search) for local RAG hits and OpenAlex / SearXNG rows |
-| `[critique].adversary_max_comments` | `12` | Cap on suggested comments from the `adversary` validity red-team lane |
-| `[critique].outline_max_comments` | `12` | Cap on suggested comments from the `outline` plan-review lane |
-| `[[critique.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file, then shipped `prompts/` in the install), optional `max_tokens` (default `2048`, Ollama `num_predict`; `0` omits the cap). Each reviewer call uses `[llm].timeout_s` as both wall clock and stream idle gap, with progress lines every ~30s. Builtin JSON prompts send `format=json` / `think=false` and retry once on an unusable reply. `--reviewer ID` selects a subset. Unused by `marg` / `adversary` / `outline` / `claims` / `verify` / `context*` |
+| `[peer_review].llm` | `false` | Shim for lane `reviewers` when `[peer_review].lanes` is empty (`--llm` / `--no-llm` add or remove that lane) |
+| `[peer_review].lanes` | `[]` | Suggested review lanes to run together: `reviewers`, `marg`, `adversary`, `outline`, `claims`, `verify`, `context`, `context-web`. Empty → use `llm` / `advanced` shims. When non-empty those bools are ignored. `--lane` selects for one run |
+| `[peer_review].tag` | `paperful-peer-review` | Child note tag for `peer-review --apply` |
+| `[peer_review].ai_model` | `false` | Optional Binoculars extra (`uv pip install "binoculars @ git+https://github.com/ahans30/Binoculars.git"`). `--ai-model` turns it on for one run (no `--no-ai-model`). Missing extra records `ai_model_unavailable`. `paperful doctor` ambers only when this is on and the extra is missing |
+| `[peer_review].vale` | `false` | Optional Vale house-style pass. `--vale` turns it on for one run (no `--no-vale`). Needs `vale` on PATH and a `.vale.ini`; missing extra records `vale_unavailable` / `vale_no_config` / `vale_failed`. Not in the Compose image |
+| `[peer_review].vale_config` | unset | Path to your `.vale.ini`. Relative paths resolve from the config file. If unset, `.vale.ini` next to the paperful config is used when present. Example inis: `styles/JMLC/vale.ini.example`, `styles/JCP/vale.ini.example`, `styles/MarinePolicy/vale.ini.example` (see [peer_review](peer-review.md#example-vale-styles)) |
+| `[peer_review].vale_min_alert_level` | `suggestion` | Lowest Vale level to keep: `suggestion`, `warning`, or `error` |
+| `[peer_review].vale_timeout_s` | `60` | Subprocess timeout for one Vale run |
+| `[peer_review].forensics` | `false` | Optional PaperGuard subprocess. `--forensics` turns it on for one run (no `--no-forensics`). Needs `paperguard` on PATH; missing extra records `paperguard_unavailable`. Not a PyPI dependency |
+| `[peer_review].forensics_timeout_s` | `300` | Subprocess timeout for one PaperGuard scan |
+| `[peer_review].glossary` | `true` | Fuzzy house-list acronym expansions from `state/glossary/*.json`. No findings when the directory is empty. `paperful glossary validate` / `export-vale` |
+| `[peer_review].glossary_dir` | `glossary` | Directory under `state_dir` (absolute paths allowed) |
+| `[peer_review].glossary_similarity_min` | `0.88` | Minimum `difflib` ratio to flag a near-miss expansion or phrase |
+| `[peer_review].advanced` | `false` | Shim for lane `marg` when `[peer_review].lanes` is empty (`--advanced` / `--no-advanced`). Caps below apply to lane `marg` |
+| `[peer_review].advanced_max_rounds` | `4` | Leader turns per aspect group |
+| `[peer_review].advanced_max_workers` | `4` | Paper chunks (worker agents) |
+| `[peer_review].advanced_max_comments` | `12` | Cap after the refine pass |
+| `[peer_review].advanced_refine` | `true` | Extra pass to drop or split comments |
+| `[peer_review].advanced_timeout_s` | `0` | Wall clock for the MARG-S pass (`0` → `max([llm].timeout_s, 600)`). Duplicate leader broadcasts abort (`loop`); overrun records `timeout` |
+| `[peer_review].advanced_aspects` | `[]` | MARG aspect ids. Empty → `experiments`, `clarity`, `impact`. Allowed: those plus `theory`, `policy`, `evidence-base`. Do not enable all six by default |
+| `[peer_review].claims_max` | `8` | Cap on extracted claims for the `claims` lane |
+| `[peer_review].claims_max_comments` | `16` | Cap on `claim_thin` / `claim_unsupported_in_text` / cited-source findings |
+| `[peer_review].claims_timeout_s` | `0` | Wall clock for the `claims` lane (`0` → `[llm].timeout_s`) |
+| `[peer_review].claims_cite_max_sources` | `3` | Max held cited works scored per claim (`state/rag/text`; no web fetch) |
+| `[peer_review].verify_timeout_s` | `0` | Wall clock for the `verify` lane (`0` → `max([llm].timeout_s, 600)`) |
+| `[peer_review].verify_max_comments` | `16` | Cap on suggested comments from `verify` |
+| `[peer_review].verify_max_segments` | `8` | Max logical segments in the `verify` swarm |
+| `[peer_review].context_timeout_s` | `0` | Wall clock for `context` / `context-web` (`0` → `max([llm].timeout_s, 600)`) |
+| `[peer_review].context_max_comments` | `12` | Cap on suggested comments from the context pipeline |
+| `[peer_review].context_max_hits` | `8` | Cap per retrieve round (and novelty-answer search) for local RAG hits and OpenAlex / SearXNG rows |
+| `[peer_review].adversary_max_comments` | `12` | Cap on suggested comments from the `adversary` validity red-team lane |
+| `[peer_review].outline_max_comments` | `12` | Cap on suggested comments from the `outline` plan-review lane |
+| `[[peer_review.reviewers]]` | one implicit reviewer | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path relative to the config file, then shipped `prompts/` in the install), optional `max_tokens` (default `2048`, Ollama `num_predict`; `0` omits the cap). Each reviewer call uses `[llm].timeout_s` as both wall clock and stream idle gap, with progress lines every ~30s. Builtin JSON prompts send `format=json` / `think=false` and retry once on an unusable reply. `--reviewer ID` selects a subset. Unused by `marg` / `adversary` / `outline` / `claims` / `verify` / `context*` |
 | `[rewrite].areas` | `["style"]` | Enabled rewrite specialists: `style`, `cites`, `structure`, `comments`, or `all`. `--area` overlays |
 | `[rewrite].outputs` | `["edits", "tracked"]` | `edits` (always implied), `sidecar`, `tracked` (source-matching office file), `odt`, `pdf`. `--output` overlays |
 | `[rewrite].comments` | `off` | `off` / `substantive` / `all` — reviewer notes as Word comments |
@@ -303,11 +303,11 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[rewrite].openxml_audit` | `false` | After writing `tracked.docx` / `.pptx` / `.odt`, run [openxml-audit](https://pypi.org/project/openxml-audit/) (`uv sync --extra openxml`). Diffs vs the source draft; pre-existing SDK / ODF errors are ignored. `paperful doctor` ambers only when this is on and the extra is missing |
 | `[rewrite].openxml_audit_policy` | `warn` | `warn` (print, exit 0) or `fail` (exit 1 when rewrite introduced an issue) |
 | `[[rewrite.specialists]]` | builtin per enabled area | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path). Separate key from `areas` (TOML) |
-| `[critique].overlap_top_k` | `40` | Distinctive n-grams ranked for library text overlap |
-| `[critique].overlap_n_min` / `overlap_n_max` | `6` / `12` | Word n-gram window |
-| `[critique].overlap_df_max` | `0` | Drop grams in this many other docs (`0` = auto from corpus size) |
-| `[critique].cite_age_years` | `10` | `info` when that share of bibliography years is this old |
-| `[critique].max_context_chars` | `24000` | LLM excerpt budget |
+| `[peer_review].overlap_top_k` | `40` | Distinctive n-grams ranked for library text overlap |
+| `[peer_review].overlap_n_min` / `overlap_n_max` | `6` / `12` | Word n-gram window |
+| `[peer_review].overlap_df_max` | `0` | Drop grams in this many other docs (`0` = auto from corpus size) |
+| `[peer_review].cite_age_years` | `10` | `info` when that share of bibliography years is this old |
+| `[peer_review].max_context_chars` | `24000` | LLM excerpt budget |
 | `[summarize].dest` | `both` | `disk` (`state/summaries/`), `zotero` (child note), or `both`. `--to` overrides |
 | `[summarize].order` | `library` | Summarize queue order before `--limit`: `library` (manager order), `newest`, or `oldest`. `--order` overrides. Undated items stay last under `newest` / `oldest`. Type stays a filter (`-T`) |
 | `[summarize].style` | `plain` | Summary writing style: `plain` (default) or `ste` (ASD-STE100 Simplified Technical English constraints in the prompt + post-check) |

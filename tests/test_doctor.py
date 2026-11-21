@@ -121,22 +121,22 @@ def test_openxml_audit_check(cfg, monkeypatch):
 def test_binoculars_check(cfg, monkeypatch):
     from paperful.doctor import _binoculars_check, remediation_text
 
-    cfg.critique_ai_model = False
+    cfg.peer_review_ai_model = False
     assert _binoculars_check(cfg) is None
-    cfg.critique_ai_model = True
-    monkeypatch.setattr("paperful.critique_ai_model.extra_available", lambda: False)
+    cfg.peer_review_ai_model = True
+    monkeypatch.setattr("paperful.peer_review_ai_model.extra_available", lambda: False)
     check = _binoculars_check(cfg)
     assert check is not None and check.status == "amber"
     text = remediation_text(check, cfg)
     assert text and "ahans30/Binoculars" in text
-    monkeypatch.setattr("paperful.critique_ai_model.extra_available", lambda: True)
+    monkeypatch.setattr("paperful.peer_review_ai_model.extra_available", lambda: True)
     ok = _binoculars_check(cfg)
     assert ok is not None and ok.status == "green"
 
 
 def test_remediation_vale(cfg):
     text = remediation_text(
-        Check("vale", "amber", "missing — optional for critique house style"),
+        Check("vale", "amber", "missing — optional for peer-review house style"),
         cfg,
     )
     assert text and "vale.sh" in text
@@ -149,7 +149,7 @@ def test_remediation_paperguard(cfg):
         Check(
             "paperguard",
             "amber",
-            "missing — optional for critique --forensics",
+            "missing — optional for peer-review --forensics",
         ),
         cfg,
     )

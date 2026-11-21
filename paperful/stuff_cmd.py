@@ -32,7 +32,7 @@ def run_stuff(
 ) -> None:
     from . import cli_runtime as cli_mod
     from .agent_json import envelope
-    from .critique_extract import SUPPORTED, ExtractError, extract_path
+    from .peer_review_extract import SUPPORTED, ExtractError, extract_path
     from .llm import LLMClientError
     from .lint import resolve_pdf_path
     from .rag.retrieve import scope_keys

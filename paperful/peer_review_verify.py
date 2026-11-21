@@ -16,10 +16,10 @@ from pathlib import Path
 from typing import Any
 
 from .config import Config
-from .critique import Finding, make_finding
-from .critique_extract import ExtractedDoc
-from .critique_llm import findings_from_comments, parse_llm_json
-from .critique_units import LIGHT_FAMILIES, Unit, family_of, paper_units
+from .peer_review import Finding, make_finding
+from .peer_review_extract import ExtractedDoc
+from .peer_review_llm import findings_from_comments, parse_llm_json
+from .peer_review_units import LIGHT_FAMILIES, Unit, family_of, paper_units
 from .grounding import budget_slice
 from .zot import Item
 
@@ -83,7 +83,7 @@ class Segment:
 
 
 def verify_timeout_s(cfg: Config) -> float:
-    raw = float(getattr(cfg, "critique_verify_timeout_s", 0) or 0)
+    raw = float(getattr(cfg, "peer_review_verify_timeout_s", 0) or 0)
     if raw > 0:
         return raw
     return max(float(cfg.llm_timeout_s or 120), 600.0)
@@ -237,9 +237,9 @@ def _chat(
     messages: list[dict[str, str]],
     timeout: float,
 ) -> str:
-    from .critique_llm import chat_with_json_retry, critique_chat_request
+    from .peer_review_llm import chat_with_json_retry, peer_review_chat_request
 
-    request = critique_chat_request(
+    request = peer_review_chat_request(
         model=model,
         messages=messages,
         timeout_seconds=max(5.0, float(timeout)),
@@ -266,8 +266,8 @@ def suggested_from_verify(
     model = cfg.llm_model
     timeout = verify_timeout_s(cfg)
     deadline = time.monotonic() + timeout
-    cap = max(1, int(getattr(cfg, "critique_verify_max_comments", 16) or 16))
-    max_segments = max(1, int(getattr(cfg, "critique_verify_max_segments", 8) or 8))
+    cap = max(1, int(getattr(cfg, "peer_review_verify_max_comments", 16) or 16))
+    max_segments = max(1, int(getattr(cfg, "peer_review_verify_max_segments", 8) or 8))
     item_key = item.key if item is not None else ""
     units, unit_meta = paper_units(
         cfg,
@@ -277,7 +277,7 @@ def suggested_from_verify(
         item_key=item_key,
     )
     segments = merge_segments(units, max_segments=max_segments, cfg=cfg)
-    excerpt = budget_slice(doc.text, cfg.critique_max_context_chars)
+    excerpt = budget_slice(doc.text, cfg.peer_review_max_context_chars)
     body_hay = (hay or excerpt.lower() or "") + "\n" + excerpt.lower()
     biblio_hay = _biblio_hay(doc)
     meta: dict[str, Any] = {

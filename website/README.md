@@ -17,7 +17,7 @@ voice here; operator depth lives in `./guide/`.
   Build the image on your computer with `docker compose build`. `.env.example` sets
   `PAPERFUL_IMAGE_MODE=heavy`; CI builds **light**. `uv` is the contributor path.
   Guide: `./guide/docker.html` (light vs heavy packs).
-- Docs CTAs point at the **Sphinx HTML guide** published beside this landing (`./guide/`), rebuilt from `docs/` on every qualifying `main` push. Walkthroughs start at `./guide/walkthroughs.html`; the fill pipeline is `./guide/how-it-works.html`; Ask / CLI claim-check is `./guide/rag.html`; Advanced critique is `./guide/critique.html`.
+- Docs CTAs point at the **Sphinx HTML guide** published beside this landing (`./guide/`), rebuilt from `docs/` on every qualifying `main` push. Walkthroughs start at `./guide/walkthroughs.html`; the fill pipeline is `./guide/how-it-works.html`; Ask / CLI claim-check is `./guide/rag.html`; Advanced peer-review is `./guide/peer-review.html`.
 - Workbench screenshots live in `images/workbench-*.png` (copied from `docs/_static/workflows/` by `scripts/docs/capture_workbench.py`). Workflow GIFs stay under `docs/_static/workflows/*.gif` (`scripts/docs/record_workflows.py`); the landing page does not embed them.
 - The sticky header nav is shared with `/guide/` via `website/chrome/` (Sphinx injects the same chrome).
 - Cleaning Service offer: `cleaning-service.html` (nav item on landing + guide). `paperful.cloud` should redirect there once DNS/SSL is sorted.

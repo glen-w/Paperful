@@ -769,7 +769,7 @@ def notes_delete(
     note_type: list[str] = typer.Option(
         [],
         "--type",
-        help="summary, review, attach, duplicate, linked, snowball, briefing (repeatable).",
+        help="summary, review, attach, duplicate, linked, snowball, briefing, screen, capture, peer-review (repeatable).",
     ),
     model: str = typer.Option("", "--model", help="Only notes from this LLM id."),
     except_model: str = typer.Option(

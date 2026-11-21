@@ -28,7 +28,7 @@ PAGES = [
     "/mirror",
     "/index",
     "/briefs",
-    "/critique",
+    "/peer-review",
     "/rewrite",
     "/stuff",
     "/review",

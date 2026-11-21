@@ -277,18 +277,18 @@ def test_ingest_preview_upload_stays_under_uploads(
         "x" * 300 + ".md",
     ],
 )
-def test_critique_upload_stays_under_uploads(
+def test_peer_review_upload_stays_under_uploads(
     ui_client, cfg, tmp_path, monkeypatch, filename
 ):
     monkeypatch.setattr("paperful.ui.commands.enqueue", lambda *a, **k: "cmd")
     before = _snapshot(tmp_path)
     body = b"Hello paragraph with enough letters to pass the extract minimum.\n" * 4
     ui_client.post(
-        "/critique",
+        "/peer-review",
         files={"file": (filename, body, "text/markdown")},
         follow_redirects=False,
     )
-    uploads = (cfg.state_dir / "critiques" / "uploads").resolve()
+    uploads = (cfg.state_dir / "peer-reviews" / "uploads").resolve()
     for path in _snapshot(tmp_path) - before:
         if path.is_file():
             path.resolve().relative_to(uploads)

@@ -1,4 +1,4 @@
-"""Heading units for critique lanes. Shared by MARG, claims, and verify."""
+"""Heading units for peer-review lanes. Shared by MARG, claims, and verify."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .config import Config
-from .critique_extract import ExtractedDoc
+from .peer_review_extract import ExtractedDoc
 from .sections.headings import canonical_for_heading
 
 _HEADING_LINE = re.compile(r"^(?:#{1,6}\s+)?([A-Z][A-Za-z][A-Za-z0-9 ,:/-]{2,80})$")
@@ -108,7 +108,7 @@ def paper_units(
     skip = ""
     units: list[Unit] = []
     if use_grobid and pdf_path is not None and pdf_path.suffix.lower() == ".pdf":
-        from .critique_marg import grobid_markdown
+        from .peer_review_marg import grobid_markdown
 
         pages, skip = grobid_markdown(cfg, pdf_path, item_key=item_key)
         if pages:

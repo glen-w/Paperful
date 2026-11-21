@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from paperful.config import Config
-from paperful.critique_extract import ExtractedDoc
-from paperful.critique_units import Unit
-from paperful.critique_verify import (
+from paperful.peer_review_extract import ExtractedDoc
+from paperful.peer_review_units import Unit
+from paperful.peer_review_verify import (
     density_budget,
     invents_citation,
     merge_segments,

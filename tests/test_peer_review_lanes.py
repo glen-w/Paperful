@@ -1,65 +1,65 @@
-"""Composable critique review-lane resolution."""
+"""Composable peer-review review-lane resolution."""
 
 from __future__ import annotations
 
 import pytest
 
 from paperful.config import Config
-from paperful.critique_lanes import (
+from paperful.peer_review_lanes import (
     mode_for_lanes,
-    parse_critique_lanes,
-    resolve_critique_lanes,
+    parse_peer_review_lanes,
+    resolve_peer_review_lanes,
 )
-from paperful.critique_marg import parse_marg_aspects, resolve_marg_aspects
+from paperful.peer_review_marg import parse_marg_aspects, resolve_marg_aspects
 
 
 def test_parse_and_order():
-    assert parse_critique_lanes(["marg", "reviewers", "marg"]) == (
+    assert parse_peer_review_lanes(["marg", "reviewers", "marg"]) == (
         "reviewers",
         "marg",
     )
-    assert parse_critique_lanes("context-web, context") == ("context", "context-web")
-    assert parse_critique_lanes(["adversary", "marg"]) == ("marg", "adversary")
-    assert parse_critique_lanes(["verify", "claims", "marg"]) == (
+    assert parse_peer_review_lanes("context-web, context") == ("context", "context-web")
+    assert parse_peer_review_lanes(["adversary", "marg"]) == ("marg", "adversary")
+    assert parse_peer_review_lanes(["verify", "claims", "marg"]) == (
         "marg",
         "claims",
         "verify",
     )
-    assert parse_critique_lanes(["outline", "adversary"]) == ("adversary", "outline")
-    assert parse_critique_lanes([]) == ()
+    assert parse_peer_review_lanes(["outline", "adversary"]) == ("adversary", "outline")
+    assert parse_peer_review_lanes([]) == ()
     with pytest.raises(ValueError, match="unknown"):
-        parse_critique_lanes(["nope"])
+        parse_peer_review_lanes(["nope"])
 
 
 def test_shims_when_lanes_empty():
-    cfg = Config(critique_llm=True, critique_advanced=True)
-    assert resolve_critique_lanes(cfg) == ("reviewers", "marg")
-    cfg.critique_advanced = False
-    assert resolve_critique_lanes(cfg) == ("reviewers",)
-    assert resolve_critique_lanes(cfg, llm=False) == ()
-    assert resolve_critique_lanes(cfg, advanced=True) == ("reviewers", "marg")
+    cfg = Config(peer_review_llm=True, peer_review_advanced=True)
+    assert resolve_peer_review_lanes(cfg) == ("reviewers", "marg")
+    cfg.peer_review_advanced = False
+    assert resolve_peer_review_lanes(cfg) == ("reviewers",)
+    assert resolve_peer_review_lanes(cfg, llm=False) == ()
+    assert resolve_peer_review_lanes(cfg, advanced=True) == ("reviewers", "marg")
 
 
 def test_config_lanes_ignore_bools_then_cli_overlay():
     cfg = Config(
-        critique_llm=True,
-        critique_advanced=True,
-        critique_lanes=("marg",),
+        peer_review_llm=True,
+        peer_review_advanced=True,
+        peer_review_lanes=("marg",),
     )
-    assert resolve_critique_lanes(cfg) == ("marg",)
-    assert resolve_critique_lanes(cfg, llm=True) == ("reviewers", "marg")
-    assert resolve_critique_lanes(cfg, advanced=False) == ()
+    assert resolve_peer_review_lanes(cfg) == ("marg",)
+    assert resolve_peer_review_lanes(cfg, llm=True) == ("reviewers", "marg")
+    assert resolve_peer_review_lanes(cfg, advanced=False) == ()
 
 
 def test_cli_lane_flags_win_as_base():
-    cfg = Config(critique_llm=True, critique_lanes=("marg",))
-    assert resolve_critique_lanes(cfg, lane_flags=["context"]) == ("context",)
-    assert resolve_critique_lanes(
+    cfg = Config(peer_review_llm=True, peer_review_lanes=("marg",))
+    assert resolve_peer_review_lanes(cfg, lane_flags=["context"]) == ("context",)
+    assert resolve_peer_review_lanes(
         cfg, lane_flags=["context"], llm=True, advanced=True
     ) == ("reviewers", "marg", "context")
-    assert resolve_critique_lanes(cfg, lane_flags=["adversary"]) == ("adversary",)
-    assert resolve_critique_lanes(cfg, lane_flags=["outline"]) == ("outline",)
-    assert resolve_critique_lanes(cfg, lane_flags=["claims", "verify"]) == (
+    assert resolve_peer_review_lanes(cfg, lane_flags=["adversary"]) == ("adversary",)
+    assert resolve_peer_review_lanes(cfg, lane_flags=["outline"]) == ("outline",)
+    assert resolve_peer_review_lanes(cfg, lane_flags=["claims", "verify"]) == (
         "claims",
         "verify",
     )
@@ -85,25 +85,25 @@ def test_parse_marg_aspects_string_and_default():
         parse_marg_aspects(12)
     cfg = Config()
     assert resolve_marg_aspects(cfg) == ("experiments", "clarity", "impact")
-    cfg.critique_advanced_aspects = ("policy",)
+    cfg.peer_review_advanced_aspects = ("policy",)
     assert resolve_marg_aspects(cfg) == ("policy",)
 
 
 def test_suggested_from_llm_dispatches_lane_helpers():
     import inspect
 
-    from paperful import critique_llm
+    from paperful import peer_review_llm
 
-    src = inspect.getsource(critique_llm.suggested_from_llm)
+    src = inspect.getsource(peer_review_llm.suggested_from_llm)
     for name in ("_run_reviewers", "_run_optional_lane"):
-        assert callable(getattr(critique_llm, name))
+        assert callable(getattr(peer_review_llm, name))
         assert f"{name}(" in src
         assert f"def {name}(" not in src
 
 
 def test_lane_state_absorb_skips_empty_claims_without_ledger():
-    from paperful.critique import make_finding
-    from paperful.critique_llm import _LaneState
+    from paperful.peer_review import make_finding
+    from paperful.peer_review_llm import _LaneState
 
     state = _LaneState()
     extra = [make_finding(code="x", severity="info", lane="suggested")]

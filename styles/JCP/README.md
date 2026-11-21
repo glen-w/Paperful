@@ -51,14 +51,14 @@ cp styles/JCP/vale.ini.example .vale.ini
 vale --config=.vale.ini path/to/manuscript.txt
 ```
 
-With Paperful critique:
+With Paperful peer-review:
 
 ```toml
-[critique]
+[peer_review]
 vale = true
 vale_config = ".vale.ini"
 ```
 
 ```bash
-uv run paperful critique --file manuscript.docx --vale
+uv run paperful peer-review --file manuscript.docx --vale
 ```

@@ -1,9 +1,9 @@
-; Marine Policy — Vale config for Paperful critique
-; Copy to your project root as .vale.ini (or set [critique].vale_config).
+; Marine Policy — Vale config for Paperful peer-review
+; Copy to your project root as .vale.ini (or set [peer_review].vale_config).
 ;
 ;   cp styles/MarinePolicy/vale.ini.example .vale.ini
 ;   vale --config=.vale.ini path/to/manuscript.txt
-;   uv run paperful critique --file manuscript.docx --vale
+;   uv run paperful peer-review --file manuscript.docx --vale
 ;
 ; Do not mix with JCP (citation styles conflict).
 

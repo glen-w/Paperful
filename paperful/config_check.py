@@ -84,7 +84,7 @@ KNOWN_SECTIONS = frozenset(
         "screen",
         "summarize",
         "synthesize",
-        "critique",
+        "peer_review",
         "rewrite",
         "stuff",
         "precedent",
@@ -131,7 +131,7 @@ def check_config(path: Path | None = None) -> list[str]:
     issues: list[str] = []
     for key, val in raw.items():
         if isinstance(val, list) and val and all(isinstance(v, dict) for v in val):
-            # Array of tables, e.g. [[exclude]] or [[critique.reviewers]].
+            # Array of tables, e.g. [[exclude]] or [[peer_review.reviewers]].
             if key not in KNOWN_SECTIONS:
                 issues.append(f"unknown section {key!r}")
             continue

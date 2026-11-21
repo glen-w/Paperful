@@ -317,20 +317,20 @@ openalex_store_app = typer.Typer(
     ),
 )
 app.add_typer(openalex_store_app, name="openalex-store")
-critique_app = typer.Typer(
+peer_review_app = typer.Typer(
     add_completion=False,
     invoke_without_command=True,
     help=(
-        "Local manuscript critique pack: checked deterministic findings, "
+        "Local manuscript peer-review pack: checked deterministic findings, "
         "optional LLM suggestions. --item KEY or --file PATH. Not a grade."
     ),
 )
-app.add_typer(critique_app, name="critique")
+app.add_typer(peer_review_app, name="peer-review")
 glossary_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     help=(
-        "House glossary for critique acronym expansions. "
+        "House glossary for peer-review acronym expansions. "
         "JSON files in state/glossary/; optional Vale swap export."
     ),
 )
@@ -380,7 +380,7 @@ JOBS: dict[str, tuple[str, ...]] = {
     "completeness": (
         "lint",
         "screen",
-        "critique",
+        "peer-review",
         "rewrite",
         "fix-metadata",
         "dedupe",

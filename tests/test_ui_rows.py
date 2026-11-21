@@ -381,7 +381,7 @@ def test_job_view_normalizes_command_record():
     running = job_view(
         {
             "id": "c1",
-            "verb": "critique",
+            "verb": "peer-review",
             "status": "running",
             "detail": "Reviewer 2/5 reviewer-2 · mistral-small:latest",
         }

@@ -1,4 +1,4 @@
-"""Post-edit Vale / glossary / cite-vs-bibliography checks. Not a second critique."""
+"""Post-edit Vale / glossary / cite-vs-bibliography checks. Not a second peer-review."""
 
 from __future__ import annotations
 
@@ -15,15 +15,15 @@ def _glossary_regressed(cfg: Config, source: str, target: str) -> bool:
     entries, _issues = load_glossary(cfg)
     if not entries:
         return False
-    sim = float(getattr(cfg, "critique_glossary_similarity_min", 0.88) or 0.88)
+    sim = float(getattr(cfg, "peer_review_glossary_similarity_min", 0.88) or 0.88)
     before = scan_glossary(source or "", entries, similarity_min=sim)
     after = scan_glossary(target or "", entries, similarity_min=sim)
     return len(after) > len(before)
 
 
 def _vale_regressed(cfg: Config, source: str, target: str) -> bool:
-    from .critique_extract import ExtractedDoc
-    from .critique_vale import resolve_vale_ini, run_vale
+    from .peer_review_extract import ExtractedDoc
+    from .peer_review_vale import resolve_vale_ini, run_vale
 
     if resolve_vale_ini(cfg) is None:
         return False

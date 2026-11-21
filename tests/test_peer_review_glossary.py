@@ -7,9 +7,9 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from paperful.critique import build_critique
-from paperful.critique_checks import _glossary_acronyms
-from paperful.critique_extract import ExtractedDoc
+from paperful.peer_review import build_peer_review
+from paperful.peer_review_checks import _glossary_acronyms
+from paperful.peer_review_extract import ExtractedDoc
 from paperful.glossary import (
     SCHEMA,
     GlossaryEntry,
@@ -154,7 +154,7 @@ def test_disabled_glossary_skips_files(cfg):
             }
         ],
     )
-    cfg.critique_glossary = False
+    cfg.peer_review_glossary = False
     doc = ExtractedDoc(
         text="Maritime Area beyond national jurisdictions is the usual phrase.",
         format="md",
@@ -183,7 +183,7 @@ def test_pack_includes_glossary_codes(cfg, tmp_path: Path, monkeypatch):
         "Related work is thin.\n",
         encoding="utf-8",
     )
-    pack = build_critique(cfg, file_path=src, offline=True, dry_run=True)
+    pack = build_peer_review(cfg, file_path=src, offline=True, dry_run=True)
     codes = {f["code"] for f in pack["findings"]}
     assert "acronym_expansion_mismatch" in codes
     row = next(f for f in pack["findings"] if f["code"] == "acronym_expansion_mismatch")

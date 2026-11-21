@@ -6,7 +6,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from paperful.critique_forensics import (
+from paperful.peer_review_forensics import (
     MAX_FORENSICS_FINDINGS,
     paperguard_code,
     resolve_forensics_files,
@@ -89,7 +89,7 @@ def test_resolve_forensics_files_missing_src():
 
 
 def test_unavailable_when_not_on_path(cfg, monkeypatch):
-    monkeypatch.setattr("paperful.critique_forensics.shutil.which", lambda _: None)
+    monkeypatch.setattr("paperful.peer_review_forensics.shutil.which", lambda _: None)
     findings, meta, raw = run_forensics(cfg, files=[])
     assert meta == {"skipped": "unavailable"}
     assert raw is None
@@ -102,7 +102,7 @@ def test_unavailable_when_not_on_path(cfg, monkeypatch):
 
 def test_no_input_when_binary_present(cfg, monkeypatch):
     monkeypatch.setattr(
-        "paperful.critique_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
+        "paperful.peer_review_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
     )
     findings, meta, raw = run_forensics(cfg, files=[])
     assert meta == {"skipped": "no_input"}
@@ -123,9 +123,9 @@ def test_maps_findings_and_omits_integrity_score(cfg, tmp_path, monkeypatch):
         return _fake_run(_report())(cmd)
 
     monkeypatch.setattr(
-        "paperful.critique_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
+        "paperful.peer_review_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
     )
-    monkeypatch.setattr("paperful.critique_forensics.subprocess.run", fake_run)
+    monkeypatch.setattr("paperful.peer_review_forensics.subprocess.run", fake_run)
     findings, meta, raw = run_forensics(
         cfg, files=[src], doi="10.1000/test.doi", offline=False
     )
@@ -170,9 +170,9 @@ def test_offline_omits_doi_flag(cfg, tmp_path, monkeypatch):
         return _fake_run(_report())(cmd)
 
     monkeypatch.setattr(
-        "paperful.critique_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
+        "paperful.peer_review_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
     )
-    monkeypatch.setattr("paperful.critique_forensics.subprocess.run", fake_run)
+    monkeypatch.setattr("paperful.peer_review_forensics.subprocess.run", fake_run)
     run_forensics(cfg, files=[src], doi="10.1000/test.doi", offline=True)
     assert "--doi" not in seen[0]
 
@@ -180,15 +180,15 @@ def test_offline_omits_doi_flag(cfg, tmp_path, monkeypatch):
 def test_timeout_maps_to_failed(cfg, tmp_path, monkeypatch):
     src = tmp_path / "draft.pdf"
     src.write_bytes(b"%PDF")
-    cfg.critique_forensics_timeout_s = 2.0
+    cfg.peer_review_forensics_timeout_s = 2.0
 
     def fake_run(*_a, **_k):
         raise subprocess.TimeoutExpired(cmd="paperguard", timeout=2)
 
     monkeypatch.setattr(
-        "paperful.critique_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
+        "paperful.peer_review_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
     )
-    monkeypatch.setattr("paperful.critique_forensics.subprocess.run", fake_run)
+    monkeypatch.setattr("paperful.peer_review_forensics.subprocess.run", fake_run)
     findings, meta, raw = run_forensics(cfg, files=[src])
     assert meta == {"skipped": "failed"}
     assert raw is None
@@ -207,9 +207,9 @@ def test_unparseable_json_maps_to_failed(cfg, tmp_path, monkeypatch):
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(
-        "paperful.critique_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
+        "paperful.peer_review_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
     )
-    monkeypatch.setattr("paperful.critique_forensics.subprocess.run", fake_run)
+    monkeypatch.setattr("paperful.peer_review_forensics.subprocess.run", fake_run)
     findings, meta, _raw = run_forensics(cfg, files=[src])
     assert meta == {"skipped": "failed"}
     assert findings[0].code == "paperguard_failed"
@@ -228,10 +228,10 @@ def test_truncates_after_cap(cfg, tmp_path, monkeypatch):
         for i in range(MAX_FORENSICS_FINDINGS + 3)
     ]
     monkeypatch.setattr(
-        "paperful.critique_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
+        "paperful.peer_review_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
     )
     monkeypatch.setattr(
-        "paperful.critique_forensics.subprocess.run",
+        "paperful.peer_review_forensics.subprocess.run",
         _fake_run(_report(all_findings=hits, integrity_score=None)),
     )
     findings, meta, _raw = run_forensics(cfg, files=[src])
@@ -268,9 +268,9 @@ def test_string_severity_labels_map(cfg, tmp_path, monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        "paperful.critique_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
+        "paperful.peer_review_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
     )
-    monkeypatch.setattr("paperful.critique_forensics.subprocess.run", _fake_run(report))
+    monkeypatch.setattr("paperful.peer_review_forensics.subprocess.run", _fake_run(report))
     findings, meta, _raw = run_forensics(cfg, files=[src])
     by_code = {f.code: f for f in findings}
     assert by_code["paperguard_a1"].severity == "info"
@@ -300,9 +300,9 @@ def test_detector_results_fallback_when_all_findings_empty(cfg, tmp_path, monkey
         ],
     }
     monkeypatch.setattr(
-        "paperful.critique_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
+        "paperful.peer_review_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
     )
-    monkeypatch.setattr("paperful.critique_forensics.subprocess.run", _fake_run(report))
+    monkeypatch.setattr("paperful.peer_review_forensics.subprocess.run", _fake_run(report))
     findings, meta, _raw = run_forensics(cfg, files=[src])
     assert any(f.code == "paperguard_a1" for f in findings)
     assert meta["finding_count"] == 1
@@ -316,9 +316,9 @@ def test_nonzero_exit_without_json_is_failed(cfg, tmp_path, monkeypatch):
         return subprocess.CompletedProcess(cmd, 2, stdout="", stderr="boom")
 
     monkeypatch.setattr(
-        "paperful.critique_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
+        "paperful.peer_review_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
     )
-    monkeypatch.setattr("paperful.critique_forensics.subprocess.run", fake_run)
+    monkeypatch.setattr("paperful.peer_review_forensics.subprocess.run", fake_run)
     findings, meta, raw = run_forensics(cfg, files=[src])
     assert meta == {"skipped": "failed"}
     assert raw is None
@@ -337,9 +337,9 @@ def test_item_mode_passes_sibling_tables_as_minus_f(cfg, tmp_path, monkeypatch):
         return _fake_run(_report())(cmd)
 
     monkeypatch.setattr(
-        "paperful.critique_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
+        "paperful.peer_review_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
     )
-    monkeypatch.setattr("paperful.critique_forensics.subprocess.run", fake_run)
+    monkeypatch.setattr("paperful.peer_review_forensics.subprocess.run", fake_run)
     files = resolve_forensics_files(pdf, item_mode=True)
     run_forensics(cfg, files=files)
     cmd = seen[0]

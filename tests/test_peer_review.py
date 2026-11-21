@@ -1,4 +1,4 @@
-"""Local manuscript critique packs (offline)."""
+"""Local manuscript peer-review packs (offline)."""
 
 from __future__ import annotations
 
@@ -13,22 +13,22 @@ import pytest
 from rich.console import Console
 from typer.testing import CliRunner
 
-from paperful.config import CritiqueReviewer
-from paperful.critique import (
-    CRITIQUE_PACK_KEYS,
+from paperful.config import PeerReviewer
+from paperful.peer_review import (
+    PEER_REVIEW_PACK_KEYS,
     SCHEMA,
     _incomplete_lane_rows,
     _is_hygiene_finding,
-    build_critique,
+    build_peer_review,
     dismiss_finding,
     load_dismissed,
     make_finding,
     note_html,
     render_markdown,
 )
-from paperful.critique_extract import extract_path, stage_file
-from paperful.critique_overlap import collapse_nested_hits, match_phrases, rank_phrases
-from paperful.critique_stats import grim_possible, scan_stats
+from paperful.peer_review_extract import extract_path, stage_file
+from paperful.peer_review_overlap import collapse_nested_hits, match_phrases, rank_phrases
+from paperful.peer_review_stats import grim_possible, scan_stats
 from tests.conftest import make_item
 
 runner = CliRunner()
@@ -37,7 +37,7 @@ runner = CliRunner()
 @pytest.fixture(autouse=True)
 def _no_live_binoculars(monkeypatch):
     """Keep the default suite offline even if the optional extra is installed."""
-    monkeypatch.setattr("paperful.critique_ai_model.run_ai_model", lambda _t: None)
+    monkeypatch.setattr("paperful.peer_review_ai_model.run_ai_model", lambda _t: None)
 
 
 MANUSCRIPT = """
@@ -151,18 +151,18 @@ def test_stage_file_sanitizes_name(cfg, tmp_path: Path):
         "Hello paragraph with enough letters to pass the extract minimum." * 2
     )
     dest = stage_file(cfg, src, name="../escape.md")
-    uploads = (cfg.state_dir / "critiques" / "uploads").resolve()
+    uploads = (cfg.state_dir / "peer-reviews" / "uploads").resolve()
     dest.resolve().relative_to(uploads)
     assert ".." not in dest.name
     assert dest.name.endswith(".md")
 
 
-def test_build_critique_emits_status(cfg, tmp_path: Path, monkeypatch):
+def test_build_peer_review_emits_status(cfg, tmp_path: Path, monkeypatch):
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
     src = tmp_path / "draft.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
     seen: list[str] = []
-    pack = build_critique(cfg, file_path=src, offline=True, on_status=seen.append)
+    pack = build_peer_review(cfg, file_path=src, offline=True, on_status=seen.append)
     joined = "\n".join(seen)
     assert "Extracting" in joined
     assert "Extracted" in joined
@@ -175,15 +175,15 @@ def test_pack_keys_and_lanes_offline(cfg, tmp_path: Path, monkeypatch):
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
     src = tmp_path / "draft.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(cfg, file_path=src, offline=True, dry_run=False)
+    pack = build_peer_review(cfg, file_path=src, offline=True, dry_run=False)
     assert pack["schema"] == SCHEMA
-    assert CRITIQUE_PACK_KEYS <= set(pack)
+    assert PEER_REVIEW_PACK_KEYS <= set(pack)
     assert pack["input"]["kind"] == "file"
     assert pack["input"].get("hash")
     assert len(str(pack["input"]["hash"])) == 64
     folder = Path(pack["pack_dir"])
     on_disk = json.loads((folder / "pack.json").read_text(encoding="utf-8"))
-    assert CRITIQUE_PACK_KEYS <= set(on_disk)
+    assert PEER_REVIEW_PACK_KEYS <= set(on_disk)
     assert set(on_disk) & {"_findings", "_doc"} == set()
     md = (folder / "pack.md").read_text(encoding="utf-8")
     assert "## Critical path" in md
@@ -217,14 +217,14 @@ def test_pack_keys_and_lanes_offline(cfg, tmp_path: Path, monkeypatch):
 def test_dismiss_persists_and_hides_from_markdown(cfg, tmp_path: Path):
     src = tmp_path / "draft.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(cfg, file_path=src, offline=True)
-    cid = pack["critique_id"]
+    pack = build_peer_review(cfg, file_path=src, offline=True)
+    cid = pack["peer_review_id"]
     assert cid == "file-draft"
     fid = pack["findings"][0]["id"]
     dismiss_finding(cfg, cid, fid)
     assert fid in load_dismissed(cfg, cid)
-    pack2 = build_critique(cfg, file_path=src, offline=True)
-    assert pack2["critique_id"] == cid
+    pack2 = build_peer_review(cfg, file_path=src, offline=True)
+    assert pack2["peer_review_id"] == cid
     dismissed = [f for f in pack2["findings"] if f["id"] == fid]
     assert dismissed and dismissed[0]["dismissed"] is True
     md = Path(pack2["pack_dir"], "pack.md").read_text(encoding="utf-8")
@@ -339,7 +339,7 @@ def test_incomplete_lane_rows_top_level_when_no_reviewer_skips():
     ) == [("marg-clarity", "timeout")]
 
 
-def test_apply_note_uses_critique_tag(cfg):
+def test_apply_note_uses_peer_review_tag(cfg):
     pack = {
         "counts": {"findings": 1, "by_lane": {"checked": 1, "suggested": 0}},
         "findings": [
@@ -354,9 +354,9 @@ def test_apply_note_uses_critique_tag(cfg):
         ],
     }
     html = note_html(pack)
-    assert "Critique" in html
+    assert "Peer review" in html
     assert "paperful.note.v1" in html
-    assert '"type": "critique"' in html or '"type":"critique"' in html.replace(" ", "")
+    assert '"type": "peer-review"' in html or '"type":"peer-review"' in html.replace(" ", "")
 
 
 def test_ngram_overlap_true_and_false_positive(cfg):
@@ -404,7 +404,7 @@ def test_overlap_checker_against_rag_text_cache(cfg, tmp_path: Path):
         encoding="utf-8",
     )
     other = make_item(key="OTHER", title="Other paper")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -435,7 +435,7 @@ def test_overlap_uses_rag_text_without_scope_items(cfg, tmp_path: Path):
         f"Methods. {distinctive}. Enough extra words here so extract is not empty.\n",
         encoding="utf-8",
     )
-    pack = build_critique(cfg, file_path=src, offline=True)
+    pack = build_peer_review(cfg, file_path=src, offline=True)
     codes = {f["code"] for f in pack["findings"]}
     assert "text_overlap" in codes
     assert "overlap_skipped_no_text" not in codes
@@ -470,9 +470,9 @@ def test_llm_suggested_lane_drops_ungrounded_and_scores(cfg, tmp_path, monkeypat
     def fake_chat(_client, _request, **_kw):
         return json.dumps(payload)
 
-    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", fake_chat)
+    monkeypatch.setattr("paperful.peer_review_llm.chat_reviewer_stream", fake_chat)
     client = type("C", (), {"provider": "stub"})()
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -494,8 +494,8 @@ def test_llm_suggested_lane_drops_ungrounded_and_scores(cfg, tmp_path, monkeypat
 
 
 def test_llm_refuses_identity_mismatch_without_force(cfg, tmp_path):
-    from paperful.critique_extract import ExtractedDoc
-    from paperful.critique_llm import suggested_from_llm
+    from paperful.peer_review_extract import ExtractedDoc
+    from paperful.peer_review_llm import suggested_from_llm
 
     doc = ExtractedDoc(text=MANUSCRIPT, format="md")
     findings = [
@@ -529,7 +529,7 @@ def test_cli_file_xor_and_json(cfg, tmp_path, monkeypatch):
     both = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--item",
             "ABCD1234",
             "--file",
@@ -539,17 +539,17 @@ def test_cli_file_xor_and_json(cfg, tmp_path, monkeypatch):
         ],
     )
     assert both.exit_code == 1
-    none = runner.invoke(app, ["critique", "--config", str(cfg_path)])
+    none = runner.invoke(app, ["peer-review", "--config", str(cfg_path)])
     assert none.exit_code == 1
     bad = runner.invoke(
         app,
-        ["critique", "--file", str(src), "--apply", "--config", str(cfg_path)],
+        ["peer-review", "--file", str(src), "--apply", "--config", str(cfg_path)],
     )
     assert bad.exit_code == 1
     ok = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             "--config",
@@ -561,14 +561,14 @@ def test_cli_file_xor_and_json(cfg, tmp_path, monkeypatch):
     assert ok.exit_code == 0, ok.output
     assert "Extracting" not in ok.stdout
     body = json.loads(ok.stdout)
-    assert body["command"] == "critique"
+    assert body["command"] == "peer-review"
     assert body["summary"]["findings"] >= 1
     fid = body["items"][0]["id"]
-    cid = body["summary"]["critique_id"]
+    cid = body["summary"]["peer_review_id"]
     assert cid == "file-draft"
     dismissed = runner.invoke(
         app,
-        ["critique", "dismiss", fid, "--config", str(cfg_path), "--format", "json"],
+        ["peer-review", "dismiss", fid, "--config", str(cfg_path), "--format", "json"],
     )
     assert dismissed.exit_code == 0, dismissed.output
     dbody = json.loads(dismissed.stdout)
@@ -576,7 +576,7 @@ def test_cli_file_xor_and_json(cfg, tmp_path, monkeypatch):
     again = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             "--config",
@@ -587,7 +587,7 @@ def test_cli_file_xor_and_json(cfg, tmp_path, monkeypatch):
     )
     assert again.exit_code == 0, again.output
     body2 = json.loads(again.stdout)
-    assert body2["summary"]["critique_id"] == cid
+    assert body2["summary"]["peer_review_id"] == cid
     hid = [i for i in body2["items"] if i["id"] == fid]
     assert hid and hid[0]["dismissed"] is True
 
@@ -595,7 +595,7 @@ def test_cli_file_xor_and_json(cfg, tmp_path, monkeypatch):
 def test_cli_ai_model_flag_writes_unavailable(cfg, tmp_path, monkeypatch):
     from paperful.cli import app
 
-    monkeypatch.setattr("paperful.critique_ai_model.run_ai_model", lambda _t: None)
+    monkeypatch.setattr("paperful.peer_review_ai_model.run_ai_model", lambda _t: None)
     cfg_path = tmp_path / "config.toml"
     cfg_path.write_text(
         f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
@@ -606,7 +606,7 @@ def test_cli_ai_model_flag_writes_unavailable(cfg, tmp_path, monkeypatch):
     ok = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             "--ai-model",
@@ -627,18 +627,18 @@ def test_cli_ai_model_flag_writes_unavailable(cfg, tmp_path, monkeypatch):
 def test_cli_config_ai_model_ors_without_flag(cfg, tmp_path, monkeypatch):
     from paperful.cli import app
 
-    monkeypatch.setattr("paperful.critique_ai_model.run_ai_model", lambda _t: None)
+    monkeypatch.setattr("paperful.peer_review_ai_model.run_ai_model", lambda _t: None)
     cfg_path = tmp_path / "config.toml"
     cfg_path.write_text(
         f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
-        "[critique]\nai_model = true\n"
+        "[peer_review]\nai_model = true\n"
     )
     src = tmp_path / "draft.md"
     src.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
     ok = runner.invoke(
         app,
-        ["critique", "--file", str(src), "--config", str(cfg_path), "--format", "json"],
+        ["peer-review", "--file", str(src), "--config", str(cfg_path), "--format", "json"],
     )
     assert ok.exit_code == 0, ok.output
     body = json.loads(ok.stdout)
@@ -652,7 +652,7 @@ def test_cli_unknown_reviewer_skips_llm_lane(cfg, tmp_path, monkeypatch):
     cfg_path.write_text(
         f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
         '[llm]\nenabled = true\nmodel = "stub"\n'
-        '[[critique.reviewers]]\nid = "general"\n'
+        '[[peer_review.reviewers]]\nid = "general"\n'
     )
     src = tmp_path / "draft.md"
     src.write_text(
@@ -671,12 +671,12 @@ def test_cli_unknown_reviewer_skips_llm_lane(cfg, tmp_path, monkeypatch):
     def boom(*_a, **_k):
         raise AssertionError("unknown --reviewer must not call the model")
 
-    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", boom)
+    monkeypatch.setattr("paperful.peer_review_llm.chat_reviewer_stream", boom)
     monkeypatch.setattr("paperful.llm.client.chat", boom)
     ok = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             "--llm",
@@ -706,15 +706,15 @@ def test_cli_unsupported_binary(tmp_path, monkeypatch):
     blob.write_bytes(b"\x00\x01")
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
     res = runner.invoke(
-        app, ["critique", "--file", str(blob), "--config", str(cfg_path)]
+        app, ["peer-review", "--file", str(blob), "--config", str(cfg_path)]
     )
     assert res.exit_code == 1
 
 
-def test_run_critique_prints_phase_lines(cfg, tmp_path, monkeypatch):
+def test_run_peer_review_prints_phase_lines(cfg, tmp_path, monkeypatch):
     from contextlib import contextmanager
 
-    from paperful.critique_cmd import run_critique
+    from paperful.peer_review_cmd import run_peer_review
 
     src = tmp_path / "draft.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
@@ -729,7 +729,7 @@ def test_run_critique_prints_phase_lines(cfg, tmp_path, monkeypatch):
 
     monkeypatch.setattr("paperful.cli_runtime._spinner", fake_spinner)
     c = _console()
-    run_critique(
+    run_peer_review(
         c,
         item=[],
         file_path=src,
@@ -749,10 +749,46 @@ def test_run_critique_prints_phase_lines(cfg, tmp_path, monkeypatch):
     assert "Library overlap" in text
 
 
-def test_run_critique_apply_item_note(cfg, tmp_path, monkeypatch):
+def test_run_peer_review_unknown_collection_exits(cfg, tmp_path, monkeypatch):
+    import typer
+
+    from paperful.peer_review_cmd import run_peer_review
+
+    src = tmp_path / "draft.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr("paperful.cli_runtime._cfg", lambda _p: cfg)
+    monkeypatch.setattr("paperful.cli_runtime._agent_json", lambda fmt: False)
+    monkeypatch.setattr("paperful.cli_runtime._offline", lambda: True)
+    monkeypatch.setattr("paperful.cli_runtime._require_manager", lambda _cfg: None)
+    monkeypatch.setattr("paperful.cli_runtime._connect", lambda *_a, **_k: object())
+
+    def boom(*_a, **_k):
+        raise typer.Exit(1)
+
+    monkeypatch.setattr("paperful.cli_runtime._load_scope", boom)
+    with pytest.raises(typer.Exit) as ei:
+        run_peer_review(
+            _console(),
+            item=[],
+            file_path=src,
+            collection=["BBNJ/secretariat"],
+            library=False,
+            dry_run=True,
+            apply=False,
+            llm=False,
+            force=False,
+            show_dismissed=False,
+            config=None,
+            fmt="text",
+        )
+    assert ei.value.exit_code == 1
+
+
+def test_run_peer_review_apply_item_note(cfg, tmp_path, monkeypatch):
     from contextlib import contextmanager
 
-    from paperful.critique_cmd import run_critique
+    from paperful.peer_review_cmd import run_peer_review
     from paperful.scope import ItemScope
 
     src = tmp_path / "paper.pdf"
@@ -784,9 +820,9 @@ def test_run_critique_apply_item_note(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.cli_runtime._flush", lambda _b: None)
     monkeypatch.setattr("paperful.lint.resolve_pdf_path", lambda *a, **k: src)
     monkeypatch.setattr(
-        "paperful.critique.extract_path",
+        "paperful.peer_review.extract_path",
         lambda _p: __import__(
-            "paperful.critique_extract", fromlist=["ExtractedDoc"]
+            "paperful.peer_review_extract", fromlist=["ExtractedDoc"]
         ).ExtractedDoc(text=MANUSCRIPT, format="pdf", finding="ok", pages=[MANUSCRIPT]),
     )
 
@@ -795,7 +831,7 @@ def test_run_critique_apply_item_note(cfg, tmp_path, monkeypatch):
         yield lambda _msg: None
 
     monkeypatch.setattr("paperful.cli_runtime._spinner", fake_spinner)
-    run_critique(
+    run_peer_review(
         _console(),
         item=["ITEM0001"],
         file_path=None,
@@ -810,8 +846,8 @@ def test_run_critique_apply_item_note(cfg, tmp_path, monkeypatch):
         fmt="text",
     )
     assert notes and notes[0][0] == "ITEM0001"
-    assert notes[0][2] == "paperful-critique"
-    assert "Critique" in notes[0][1]
+    assert notes[0][2] == "paperful-peer-review"
+    assert "Peer review" in notes[0][1]
 
 
 def test_finding_id_stable():
@@ -839,7 +875,7 @@ _PAD = (
 
 
 def test_readability_and_lexical_metrics_on_known_text():
-    from paperful.critique_metrics import (
+    from paperful.peer_review_metrics import (
         MIN_MTLD_TOKENS,
         compute_lexical_diversity,
         compute_readability,
@@ -862,8 +898,8 @@ def test_readability_and_lexical_metrics_on_known_text():
 
 
 def test_short_text_omits_mtld_and_abstains_ai_tells():
-    from paperful.critique_ai_tells import MIN_AI_TELL_WORDS, compute_ai_tells
-    from paperful.critique_metrics import MIN_MTLD_TOKENS, compute_lexical_diversity
+    from paperful.peer_review_ai_tells import MIN_AI_TELL_WORDS, compute_ai_tells
+    from paperful.peer_review_metrics import MIN_MTLD_TOKENS, compute_lexical_diversity
 
     text = "word " * 45
     lex = compute_lexical_diversity(text)
@@ -878,7 +914,7 @@ def test_short_text_omits_mtld_and_abstains_ai_tells():
 def test_pack_metrics_contract_keys(cfg, tmp_path: Path):
     path = tmp_path / "keys.txt"
     path.write_text(_PAD * 8, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True)
     read = pack["metrics"]["readability"]
     for key in (
         "flesch_reading_ease",
@@ -905,7 +941,7 @@ def test_pack_metrics_contract_keys(cfg, tmp_path: Path):
     assert "sentence_length" not in {f["code"] for f in pack["findings"]}
 
 
-def test_critique_offline_pps_tortured_from_cache(cfg, tmp_path: Path):
+def test_peer_review_offline_pps_tortured_from_cache(cfg, tmp_path: Path):
     cfg.screen_detectors = ("tortured",)
     cache = cfg.state_dir / "pps" / "fingerprints" / "tortured.json"
     cache.parent.mkdir(parents=True, exist_ok=True)
@@ -916,11 +952,11 @@ def test_critique_offline_pps_tortured_from_cache(cfg, tmp_path: Path):
     pad = "Methods and results are described below. " * 30
     path = tmp_path / "mill.txt"
     path.write_text("We improved sign to clamor ratio. " + pad, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True)
     assert "pps_tortured" in {f["code"] for f in pack["findings"]}
 
 
-def test_critique_file_pps_tortured_phrases(cfg, tmp_path: Path):
+def test_peer_review_file_pps_tortured_phrases(cfg, tmp_path: Path):
     cfg.screen_detectors = ("tortured",)
     cache = cfg.state_dir / "pps" / "fingerprints" / "tortured.json"
     cache.parent.mkdir(parents=True, exist_ok=True)
@@ -937,7 +973,7 @@ def test_critique_file_pps_tortured_phrases(cfg, tmp_path: Path):
     import httpx
 
     with httpx.Client() as client:
-        pack = build_critique(cfg, file_path=path, offline=False, client=client)
+        pack = build_peer_review(cfg, file_path=path, offline=False, client=client)
     codes = {f["code"] for f in pack["findings"]}
     assert "pps_tortured" in codes
     row = next(f for f in pack["findings"] if f["code"] == "pps_tortured")
@@ -957,7 +993,7 @@ def test_ai_tell_phrases_are_suggested_info(cfg, tmp_path: Path):
     )
     path = tmp_path / "tells.txt"
     path.write_text((tells + pad) * 6, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True)
     tells_metrics = pack["metrics"]["ai_tells"]
     assert tells_metrics["abstain"] is False
     assert tells_metrics["tell_phrase_total"] >= 2
@@ -976,17 +1012,17 @@ def test_short_file_ai_tells_abstain(cfg, tmp_path: Path):
     path.write_text(
         "Limitations and funding are discussed. " + ("word " * 40), encoding="utf-8"
     )
-    pack = build_critique(cfg, file_path=path, offline=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True)
     assert pack["metrics"]["ai_tells"]["abstain"] is True
     assert pack["metrics"]["lexical_diversity"]["mtld"] is None
     assert "ai_tells_abstain" in {f["code"] for f in pack["findings"]}
 
 
 def test_ai_model_flag_records_unavailable(cfg, tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("paperful.critique_ai_model.run_ai_model", lambda _t: None)
+    monkeypatch.setattr("paperful.peer_review_ai_model.run_ai_model", lambda _t: None)
     path = tmp_path / "model.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True, use_ai_model=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True, use_ai_model=True)
     codes = {f["code"] for f in pack["findings"]}
     assert "ai_model_unavailable" in codes
     assert pack.get("ai_model") == {"skipped": "unavailable"}
@@ -994,15 +1030,15 @@ def test_ai_model_flag_records_unavailable(cfg, tmp_path: Path, monkeypatch):
     assert row["lane"] == "suggested"
 
 
-def test_default_critique_does_not_run_forensics(cfg, tmp_path: Path, monkeypatch):
+def test_default_peer_review_does_not_run_forensics(cfg, tmp_path: Path, monkeypatch):
     def boom(*_a, **_k):
         raise AssertionError("paperguard must not run")
 
-    monkeypatch.setattr("paperful.critique_forensics.shutil.which", boom)
-    monkeypatch.setattr("paperful.critique_forensics.subprocess.run", boom)
+    monkeypatch.setattr("paperful.peer_review_forensics.shutil.which", boom)
+    monkeypatch.setattr("paperful.peer_review_forensics.subprocess.run", boom)
     path = tmp_path / "plain.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True)
     assert "forensics" not in pack
     assert not any(
         str(f.get("code") or "").startswith("paperguard_") for f in pack["findings"]
@@ -1010,10 +1046,10 @@ def test_default_critique_does_not_run_forensics(cfg, tmp_path: Path, monkeypatc
 
 
 def test_forensics_unavailable_when_not_on_path(cfg, tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("paperful.critique_forensics.shutil.which", lambda _name: None)
+    monkeypatch.setattr("paperful.peer_review_forensics.shutil.which", lambda _name: None)
     path = tmp_path / "scan.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True, use_forensics=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True, use_forensics=True)
     codes = {f["code"] for f in pack["findings"]}
     assert "paperguard_unavailable" in codes
     assert pack.get("forensics") == {"skipped": "unavailable"}
@@ -1048,12 +1084,12 @@ def test_forensics_maps_report_into_pack(cfg, tmp_path: Path, monkeypatch):
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(
-        "paperful.critique_forensics.shutil.which", lambda _name: "/usr/bin/paperguard"
+        "paperful.peer_review_forensics.shutil.which", lambda _name: "/usr/bin/paperguard"
     )
-    monkeypatch.setattr("paperful.critique_forensics.subprocess.run", fake_run)
+    monkeypatch.setattr("paperful.peer_review_forensics.subprocess.run", fake_run)
     path = tmp_path / "draft.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True, use_forensics=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True, use_forensics=True)
     rows = [f for f in pack["findings"] if f.get("source") == "paperguard"]
     assert any(f["code"] == "paperguard_a1" for f in rows)
     a1 = next(f for f in rows if f["code"] == "paperguard_a1")
@@ -1080,11 +1116,11 @@ def test_cli_forensics_flag_writes_unavailable(cfg, tmp_path, monkeypatch):
     src = tmp_path / "draft.md"
     src.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
-    monkeypatch.setattr("paperful.critique_forensics.shutil.which", lambda _name: None)
+    monkeypatch.setattr("paperful.peer_review_forensics.shutil.which", lambda _name: None)
     ok = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             "--forensics",
@@ -1114,12 +1150,12 @@ def test_cli_forensics_accepts_csv_and_xlsx(cfg, tmp_path, monkeypatch):
     xlsx_path = tmp_path / "means.xlsx"
     xlsx_path.write_bytes(b"PK")
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
-    monkeypatch.setattr("paperful.critique_forensics.shutil.which", lambda _name: None)
+    monkeypatch.setattr("paperful.peer_review_forensics.shutil.which", lambda _name: None)
     for src in (csv_path, xlsx_path):
         ok = runner.invoke(
             app,
             [
-                "critique",
+                "peer-review",
                 "--file",
                 str(src),
                 "--forensics",
@@ -1140,30 +1176,30 @@ def test_cli_config_forensics_ors_without_flag(cfg, tmp_path, monkeypatch):
     cfg_path = tmp_path / "config.toml"
     cfg_path.write_text(
         f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
-        "[critique]\nforensics = true\n"
+        "[peer_review]\nforensics = true\n"
     )
     src = tmp_path / "draft.md"
     src.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
-    monkeypatch.setattr("paperful.critique_forensics.shutil.which", lambda _name: None)
+    monkeypatch.setattr("paperful.peer_review_forensics.shutil.which", lambda _name: None)
     ok = runner.invoke(
         app,
-        ["critique", "--file", str(src), "--config", str(cfg_path), "--format", "json"],
+        ["peer-review", "--file", str(src), "--config", str(cfg_path), "--format", "json"],
     )
     assert ok.exit_code == 0, ok.output
     body = json.loads(ok.stdout)
     assert any(i["code"] == "paperguard_unavailable" for i in body["items"])
 
 
-def test_default_critique_does_not_run_vale(cfg, tmp_path: Path, monkeypatch):
+def test_default_peer_review_does_not_run_vale(cfg, tmp_path: Path, monkeypatch):
     def boom(*_a, **_k):
         raise AssertionError("vale must not run")
 
-    monkeypatch.setattr("paperful.critique_vale.shutil.which", boom)
-    monkeypatch.setattr("paperful.critique_vale.subprocess.run", boom)
+    monkeypatch.setattr("paperful.peer_review_vale.shutil.which", boom)
+    monkeypatch.setattr("paperful.peer_review_vale.subprocess.run", boom)
     path = tmp_path / "plain.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True)
     assert "vale" not in pack
     assert not any(
         str(f.get("code") or "").startswith("vale_") for f in pack["findings"]
@@ -1171,10 +1207,10 @@ def test_default_critique_does_not_run_vale(cfg, tmp_path: Path, monkeypatch):
 
 
 def test_vale_unavailable_when_not_on_path(cfg, tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("paperful.critique_vale.shutil.which", lambda _name: None)
+    monkeypatch.setattr("paperful.peer_review_vale.shutil.which", lambda _name: None)
     path = tmp_path / "vale.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True, use_vale=True)
     codes = {f["code"] for f in pack["findings"]}
     assert "vale_unavailable" in codes
     assert pack.get("vale") == {"skipped": "unavailable"}
@@ -1186,12 +1222,12 @@ def test_vale_unavailable_when_not_on_path(cfg, tmp_path: Path, monkeypatch):
 
 def test_vale_no_config_when_ini_missing(cfg, tmp_path: Path, monkeypatch):
     monkeypatch.setattr(
-        "paperful.critique_vale.shutil.which", lambda _name: "/usr/bin/vale"
+        "paperful.peer_review_vale.shutil.which", lambda _name: "/usr/bin/vale"
     )
     cfg.config_path = tmp_path / "config.toml"
     path = tmp_path / "vale.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True, use_vale=True)
     assert pack.get("vale") == {"skipped": "no_config"}
     row = next(f for f in pack["findings"] if f["code"] == "vale_no_config")
     assert row["lane"] == "checked"
@@ -1201,7 +1237,7 @@ def test_vale_no_config_when_ini_missing(cfg, tmp_path: Path, monkeypatch):
 def test_vale_maps_alerts_to_findings(cfg, tmp_path: Path, monkeypatch):
     ini = tmp_path / ".vale.ini"
     ini.write_text("MinAlertLevel = suggestion\n", encoding="utf-8")
-    cfg.critique_vale_config = ini
+    cfg.peer_review_vale_config = ini
     alerts = [
         {
             "Check": "House.Terms",
@@ -1233,15 +1269,15 @@ def test_vale_maps_alerts_to_findings(cfg, tmp_path: Path, monkeypatch):
         return subprocess.CompletedProcess(cmd, 0, stdout=payload, stderr="")
 
     monkeypatch.setattr(
-        "paperful.critique_vale.shutil.which", lambda _name: "/usr/bin/vale"
+        "paperful.peer_review_vale.shutil.which", lambda _name: "/usr/bin/vale"
     )
-    monkeypatch.setattr("paperful.critique_vale.subprocess.run", fake_run)
+    monkeypatch.setattr("paperful.peer_review_vale.subprocess.run", fake_run)
     path = tmp_path / "vale.txt"
     path.write_text(
         "Please utilize this very protocol in the methods section.\n",
         encoding="utf-8",
     )
-    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True, use_vale=True)
     rows = [f for f in pack["findings"] if f.get("source") == "vale"]
     codes = {f["code"] for f in rows}
     assert "vale_house_terms" in codes
@@ -1257,11 +1293,11 @@ def test_vale_maps_alerts_to_findings(cfg, tmp_path: Path, monkeypatch):
 
 
 def test_vale_truncates_after_cap(cfg, tmp_path: Path, monkeypatch):
-    from paperful.critique_vale import MAX_VALE_FINDINGS
+    from paperful.peer_review_vale import MAX_VALE_FINDINGS
 
     ini = tmp_path / ".vale.ini"
     ini.write_text("MinAlertLevel = suggestion\n", encoding="utf-8")
-    cfg.critique_vale_config = ini
+    cfg.peer_review_vale_config = ini
     alerts = [
         {
             "Check": "House.Terms",
@@ -1275,10 +1311,10 @@ def test_vale_truncates_after_cap(cfg, tmp_path: Path, monkeypatch):
     ]
     payload = json.dumps({"manuscript.txt": alerts})
     monkeypatch.setattr(
-        "paperful.critique_vale.shutil.which", lambda _name: "/usr/bin/vale"
+        "paperful.peer_review_vale.shutil.which", lambda _name: "/usr/bin/vale"
     )
     monkeypatch.setattr(
-        "paperful.critique_vale.subprocess.run",
+        "paperful.peer_review_vale.subprocess.run",
         lambda cmd, **_k: subprocess.CompletedProcess(
             cmd, 0, stdout=payload, stderr=""
         ),
@@ -1287,7 +1323,7 @@ def test_vale_truncates_after_cap(cfg, tmp_path: Path, monkeypatch):
     path.write_text(
         "Please utilize this protocol in the methods section.\n", encoding="utf-8"
     )
-    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True, use_vale=True)
     vale_rows = [f for f in pack["findings"] if f.get("source") == "vale"]
     assert (
         sum(1 for f in vale_rows if f["code"] == "vale_house_terms")
@@ -1307,11 +1343,11 @@ def test_cli_vale_flag_writes_unavailable(cfg, tmp_path, monkeypatch):
     src = tmp_path / "draft.md"
     src.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
-    monkeypatch.setattr("paperful.critique_vale.shutil.which", lambda _name: None)
+    monkeypatch.setattr("paperful.peer_review_vale.shutil.which", lambda _name: None)
     ok = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             "--vale",
@@ -1335,15 +1371,15 @@ def test_cli_config_vale_ors_without_flag(cfg, tmp_path, monkeypatch):
     cfg_path = tmp_path / "config.toml"
     cfg_path.write_text(
         f'email = "t@example.org"\nout_dir = "{cfg.out_dir}"\nstate_dir = "{cfg.state_dir}"\n'
-        "[critique]\nvale = true\n"
+        "[peer_review]\nvale = true\n"
     )
     src = tmp_path / "draft.md"
     src.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
-    monkeypatch.setattr("paperful.critique_vale.shutil.which", lambda _name: None)
+    monkeypatch.setattr("paperful.peer_review_vale.shutil.which", lambda _name: None)
     ok = runner.invoke(
         app,
-        ["critique", "--file", str(src), "--config", str(cfg_path), "--format", "json"],
+        ["peer-review", "--file", str(src), "--config", str(cfg_path), "--format", "json"],
     )
     assert ok.exit_code == 0, ok.output
     body = json.loads(ok.stdout)
@@ -1355,7 +1391,7 @@ def test_vale_sibling_ini_and_min_alert_level(cfg, tmp_path: Path, monkeypatch):
     (tmp_path / ".vale.ini").write_text(
         "MinAlertLevel = suggestion\n", encoding="utf-8"
     )
-    cfg.critique_vale_min_alert_level = "warning"
+    cfg.peer_review_vale_min_alert_level = "warning"
     seen: list[list[str]] = []
 
     def fake_run(cmd, **_kwargs):
@@ -1363,12 +1399,12 @@ def test_vale_sibling_ini_and_min_alert_level(cfg, tmp_path: Path, monkeypatch):
         return subprocess.CompletedProcess(cmd, 0, stdout="{}", stderr="")
 
     monkeypatch.setattr(
-        "paperful.critique_vale.shutil.which", lambda _name: "/usr/bin/vale"
+        "paperful.peer_review_vale.shutil.which", lambda _name: "/usr/bin/vale"
     )
-    monkeypatch.setattr("paperful.critique_vale.subprocess.run", fake_run)
+    monkeypatch.setattr("paperful.peer_review_vale.subprocess.run", fake_run)
     path = tmp_path / "vale.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True, use_vale=True)
     assert pack.get("vale", {}).get("alert_count") == 0
     assert seen and "--minAlertLevel=warning" in seen[0]
     assert any(str(a).endswith(".vale.ini") or ".vale.ini" in str(a) for a in seen[0])
@@ -1378,19 +1414,19 @@ def test_vale_sibling_ini_and_min_alert_level(cfg, tmp_path: Path, monkeypatch):
 def test_vale_failed_on_bad_exit(cfg, tmp_path: Path, monkeypatch):
     ini = tmp_path / ".vale.ini"
     ini.write_text("MinAlertLevel = suggestion\n", encoding="utf-8")
-    cfg.critique_vale_config = ini
+    cfg.peer_review_vale_config = ini
     monkeypatch.setattr(
-        "paperful.critique_vale.shutil.which", lambda _name: "/usr/bin/vale"
+        "paperful.peer_review_vale.shutil.which", lambda _name: "/usr/bin/vale"
     )
     monkeypatch.setattr(
-        "paperful.critique_vale.subprocess.run",
+        "paperful.peer_review_vale.subprocess.run",
         lambda cmd, **_k: subprocess.CompletedProcess(
             cmd, 2, stdout="", stderr="StylesPath does not exist"
         ),
     )
     path = tmp_path / "vale.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True, use_vale=True)
     assert pack.get("vale") == {"skipped": "failed"}
     row = next(f for f in pack["findings"] if f["code"] == "vale_failed")
     assert row["lane"] == "checked"
@@ -1400,7 +1436,7 @@ def test_vale_failed_on_bad_exit(cfg, tmp_path: Path, monkeypatch):
 def test_vale_warning_maps_to_warn(cfg, tmp_path: Path, monkeypatch):
     ini = tmp_path / ".vale.ini"
     ini.write_text("MinAlertLevel = suggestion\n", encoding="utf-8")
-    cfg.critique_vale_config = ini
+    cfg.peer_review_vale_config = ini
     payload = json.dumps(
         {
             "manuscript.txt": [
@@ -1416,17 +1452,17 @@ def test_vale_warning_maps_to_warn(cfg, tmp_path: Path, monkeypatch):
         }
     )
     monkeypatch.setattr(
-        "paperful.critique_vale.shutil.which", lambda _name: "/usr/bin/vale"
+        "paperful.peer_review_vale.shutil.which", lambda _name: "/usr/bin/vale"
     )
     monkeypatch.setattr(
-        "paperful.critique_vale.subprocess.run",
+        "paperful.peer_review_vale.subprocess.run",
         lambda cmd, **_k: subprocess.CompletedProcess(
             cmd, 0, stdout=payload, stderr=""
         ),
     )
     path = tmp_path / "vale.txt"
     path.write_text("It was written clearly.\n", encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True, use_vale=True)
     row = next(f for f in pack["findings"] if f["code"] == "vale_house_passive")
     assert row["severity"] == "warn"
     assert row["lane"] == "checked"
@@ -1435,11 +1471,11 @@ def test_vale_warning_maps_to_warn(cfg, tmp_path: Path, monkeypatch):
     }
 
 
-def test_default_critique_does_not_import_torch(cfg, tmp_path: Path):
+def test_default_peer_review_does_not_import_torch(cfg, tmp_path: Path):
     before = {name for name in ("torch", "binoculars") if name in sys.modules}
     path = tmp_path / "plain.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
-    build_critique(cfg, file_path=path, offline=True)
+    build_peer_review(cfg, file_path=path, offline=True)
     after = {name for name in ("torch", "binoculars") if name in sys.modules}
     assert after == before
 
@@ -1448,7 +1484,7 @@ def test_extreme_sentence_is_info_not_ste_warn(cfg, tmp_path: Path):
     long_sent = " ".join(["word"] * 65) + "."
     path = tmp_path / "long.txt"
     path.write_text(long_sent + " Short one. " * 8, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True)
     codes = {f["code"] for f in pack["findings"]}
     assert "long_sentence" in codes
     assert "sentence_length" not in codes
@@ -1460,7 +1496,7 @@ def test_extreme_sentence_is_info_not_ste_warn(cfg, tmp_path: Path):
 def test_unicode_zero_width_is_suggested_tell(cfg, tmp_path: Path):
     path = tmp_path / "zw.txt"
     path.write_text("Hidden\u200bjoin in the draft. " + _PAD * 8, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True)
     flags = pack["metrics"]["ai_tells"]["unicode_flags"]
     assert any(str(f).startswith("zero_width:") for f in flags)
     rows = [
@@ -1473,7 +1509,7 @@ def test_unicode_zero_width_is_suggested_tell(cfg, tmp_path: Path):
 
 
 def test_discourse_not_merely_flag():
-    from paperful.critique_ai_tells import compute_ai_tells
+    from paperful.peer_review_ai_tells import compute_ai_tells
 
     text = "This is not merely a treaty but rather a framework. " + _PAD * 8
     tells = compute_ai_tells(text)
@@ -1486,9 +1522,9 @@ def test_two_reviewers_write_separate_notes(cfg, tmp_path: Path, monkeypatch):
     prompt_b = tmp_path / "b.md"
     prompt_a.write_text("You are reviewer A. No accept/reject.\n", encoding="utf-8")
     prompt_b.write_text("You are reviewer B. No accept/reject.\n", encoding="utf-8")
-    cfg.critique_reviewers = (
-        CritiqueReviewer(id="general", model="model-a", prompt=str(prompt_a)),
-        CritiqueReviewer(id="methods", model="model-b", prompt=str(prompt_b)),
+    cfg.peer_review_reviewers = (
+        PeerReviewer(id="general", model="model-a", prompt=str(prompt_a)),
+        PeerReviewer(id="methods", model="model-b", prompt=str(prompt_b)),
     )
     seen: list[str] = []
 
@@ -1496,10 +1532,10 @@ def test_two_reviewers_write_separate_notes(cfg, tmp_path: Path, monkeypatch):
         seen.append(request.model)
         return f"Opinion from {request.model}."
 
-    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", fake_chat)
+    monkeypatch.setattr("paperful.peer_review_llm.chat_reviewer_stream", fake_chat)
     path = tmp_path / "multi.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=path,
         offline=True,
@@ -1523,9 +1559,9 @@ def test_reviewer_prompt_file_and_id_filter(cfg, tmp_path: Path, monkeypatch):
     prompt.write_text(
         "You are a methods reviewer. No accept/reject.\n", encoding="utf-8"
     )
-    cfg.critique_reviewers = (
-        CritiqueReviewer(id="general", model="", prompt="default"),
-        CritiqueReviewer(id="methods", model="", prompt=str(prompt)),
+    cfg.peer_review_reviewers = (
+        PeerReviewer(id="general", model="", prompt="default"),
+        PeerReviewer(id="methods", model="", prompt=str(prompt)),
     )
     captured: list[str] = []
 
@@ -1533,10 +1569,10 @@ def test_reviewer_prompt_file_and_id_filter(cfg, tmp_path: Path, monkeypatch):
         captured.append(request.messages[0]["content"])
         return "Methods-only note."
 
-    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", fake_chat)
+    monkeypatch.setattr("paperful.peer_review_llm.chat_reviewer_stream", fake_chat)
     path = tmp_path / "filter.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=path,
         offline=True,
@@ -1554,7 +1590,7 @@ def test_reviewer_prompt_file_and_id_filter(cfg, tmp_path: Path, monkeypatch):
 
 
 def test_parse_llm_json_repairs_think_tags_and_trailing_commas():
-    from paperful.critique_llm import parse_llm_json
+    from paperful.peer_review_llm import parse_llm_json
 
     assert parse_llm_json('<think>plan</think>{"summary":"ok"}')["summary"] == "ok"
     assert parse_llm_json('{"summary":"ok",}')["summary"] == "ok"
@@ -1565,10 +1601,10 @@ def test_parse_llm_json_repairs_think_tags_and_trailing_commas():
     assert parse_llm_json('{"summary":"ok"} trailing')["summary"] == "ok"
 
 
-def test_critique_chat_request_pins_think_off():
-    from paperful.critique_llm import critique_chat_request
+def test_peer_review_chat_request_pins_think_off():
+    from paperful.peer_review_llm import peer_review_chat_request
 
-    req = critique_chat_request(
+    req = peer_review_chat_request(
         model="m",
         messages=[{"role": "user", "content": "hi"}],
         timeout_seconds=12.0,
@@ -1582,7 +1618,7 @@ def test_critique_chat_request_pins_think_off():
 
 
 def test_chat_with_json_retry_returns_good_then_repairs(monkeypatch):
-    from paperful.critique_llm import JSON_REPAIR_USER, chat_with_json_retry
+    from paperful.peer_review_llm import JSON_REPAIR_USER, chat_with_json_retry
     from paperful.llm.client import ChatRequest
 
     calls: list[ChatRequest] = []
@@ -1648,10 +1684,10 @@ def test_json_reviewer_retries_unusable_reply(cfg, tmp_path: Path, monkeypatch):
         assert request.think is False
         return good
 
-    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", fake_chat)
+    monkeypatch.setattr("paperful.peer_review_llm.chat_reviewer_stream", fake_chat)
     src = tmp_path / "retry.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -1664,10 +1700,10 @@ def test_json_reviewer_retries_unusable_reply(cfg, tmp_path: Path, monkeypatch):
 
 
 def test_marg_force_final_after_empty_leader_turns(cfg, monkeypatch):
-    from paperful.critique_llm import JSON_REPAIR_USER
-    from paperful.critique_marg import Chunk, _run_group
+    from paperful.peer_review_llm import JSON_REPAIR_USER
+    from paperful.peer_review_marg import Chunk, _run_group
 
-    cfg.critique_advanced_max_rounds = 1
+    cfg.peer_review_advanced_max_rounds = 1
     hay = "abc protocol sample size methods"
     chunks = [
         Chunk(
@@ -1715,7 +1751,7 @@ def test_marg_force_final_after_empty_leader_turns(cfg, monkeypatch):
 
 def test_chat_reviewer_stream_wall_clock_and_heartbeat(monkeypatch):
     """Heartbeat before wall abort — fake clock so real sleep overshoot cannot flake."""
-    from paperful.critique_llm import chat_reviewer_stream
+    from paperful.peer_review_llm import chat_reviewer_stream
     from paperful.llm.client import ChatRequest, LLMClientError
 
     clock = {"t": 1000.0}
@@ -1752,8 +1788,8 @@ def test_chat_reviewer_stream_wall_clock_and_heartbeat(monkeypatch):
 def test_reviewer_passes_max_tokens(cfg, tmp_path: Path, monkeypatch):
     prompt = tmp_path / "note.md"
     prompt.write_text("You are a note writer. No accept/reject.\n", encoding="utf-8")
-    cfg.critique_reviewers = (
-        CritiqueReviewer(
+    cfg.peer_review_reviewers = (
+        PeerReviewer(
             id="capped", model="model-a", prompt=str(prompt), max_tokens=512
         ),
     )
@@ -1763,10 +1799,10 @@ def test_reviewer_passes_max_tokens(cfg, tmp_path: Path, monkeypatch):
         seen.append(request)
         return "Short note."
 
-    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", fake_chat)
+    monkeypatch.setattr("paperful.peer_review_llm.chat_reviewer_stream", fake_chat)
     path = tmp_path / "cap.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
-    build_critique(
+    build_peer_review(
         cfg,
         file_path=path,
         offline=True,
@@ -1777,17 +1813,17 @@ def test_reviewer_passes_max_tokens(cfg, tmp_path: Path, monkeypatch):
 
 
 def test_missing_reviewer_prompt_skips(cfg, tmp_path: Path, monkeypatch):
-    cfg.critique_reviewers = (
-        CritiqueReviewer(id="ghost", model="", prompt=str(tmp_path / "missing.md")),
+    cfg.peer_review_reviewers = (
+        PeerReviewer(id="ghost", model="", prompt=str(tmp_path / "missing.md")),
     )
 
     def boom(*_a, **_k):
         raise AssertionError("missing prompt must not call the model")
 
-    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", boom)
+    monkeypatch.setattr("paperful.peer_review_llm.chat_reviewer_stream", boom)
     path = tmp_path / "ghost.txt"
     path.write_text(_PAD * 4, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=path,
         offline=True,
@@ -1802,12 +1838,12 @@ def test_missing_reviewer_prompt_skips(cfg, tmp_path: Path, monkeypatch):
 
 
 def test_unknown_reviewer_id_skips(cfg, tmp_path: Path):
-    cfg.critique_reviewers = (
-        CritiqueReviewer(id="general", model="", prompt="default"),
+    cfg.peer_review_reviewers = (
+        PeerReviewer(id="general", model="", prompt="default"),
     )
     path = tmp_path / "noid.txt"
     path.write_text(_PAD * 4, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=path,
         offline=True,
@@ -1826,7 +1862,7 @@ def test_cited_withdrawn_and_eoc_are_warn(cfg, tmp_path: Path, monkeypatch):
         cfg, "10.1000/e", {"codes": ["expression_of_concern"], "fetched_at": 1.0}
     )
     monkeypatch.setattr(
-        "paperful.critique_checks.biblio._crossref_work",
+        "paperful.peer_review_checks.biblio._crossref_work",
         lambda *_a, **_k: (None, set(), False),
     )
     path = tmp_path / "status.md"
@@ -1839,7 +1875,7 @@ def test_cited_withdrawn_and_eoc_are_warn(cfg, tmp_path: Path, monkeypatch):
         encoding="utf-8",
     )
     seen: list[str] = []
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=path,
         offline=False,
@@ -1903,9 +1939,9 @@ def test_default_llm_does_not_call_marg(cfg, tmp_path, monkeypatch):
     def boom(*_a, **_k):
         raise AssertionError("default reviewers must not call MARG")
 
-    monkeypatch.setattr("paperful.critique_marg.suggested_from_marg", boom)
+    monkeypatch.setattr("paperful.peer_review_marg.suggested_from_marg", boom)
     monkeypatch.setattr(
-        "paperful.critique_llm.chat_reviewer_stream",
+        "paperful.peer_review_llm.chat_reviewer_stream",
         lambda _c, _r, **_k: json.dumps(
             {
                 "summary": "We report a 47.2 percent increase in yield.",
@@ -1916,7 +1952,7 @@ def test_default_llm_does_not_call_marg(cfg, tmp_path, monkeypatch):
     )
     src = tmp_path / "draft.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -1929,7 +1965,7 @@ def test_default_llm_does_not_call_marg(cfg, tmp_path, monkeypatch):
 
 def test_llm_status_reports_each_reviewer(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr(
-        "paperful.critique_llm.chat_reviewer_stream",
+        "paperful.peer_review_llm.chat_reviewer_stream",
         lambda _c, _r, **_k: json.dumps(
             {
                 "summary": "We report a 47.2 percent increase in yield.",
@@ -1941,7 +1977,7 @@ def test_llm_status_reports_each_reviewer(cfg, tmp_path, monkeypatch):
     src = tmp_path / "draft.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
     seen: list[str] = []
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -1957,12 +1993,12 @@ def test_llm_status_reports_each_reviewer(cfg, tmp_path, monkeypatch):
 
 
 def test_vale_and_ai_model_status_lines(cfg, tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("paperful.critique_vale.shutil.which", lambda _n: None)
-    monkeypatch.setattr("paperful.critique_ai_model.run_ai_model", lambda _t: None)
+    monkeypatch.setattr("paperful.peer_review_vale.shutil.which", lambda _n: None)
+    monkeypatch.setattr("paperful.peer_review_ai_model.run_ai_model", lambda _t: None)
     src = tmp_path / "draft.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
     seen: list[str] = []
-    build_critique(
+    build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -1985,7 +2021,7 @@ def test_advanced_only_skips_independent_reviewers(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
     src = tmp_path / "adv.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -2009,10 +2045,10 @@ def test_advanced_only_skips_independent_reviewers(cfg, tmp_path, monkeypatch):
 def test_both_lanes_concatenate_reviewers_and_marg(cfg, tmp_path, monkeypatch):
     prompt = tmp_path / "general.md"
     prompt.write_text("You are reviewer A. No accept/reject.\n", encoding="utf-8")
-    cfg.critique_reviewers = (
-        CritiqueReviewer(id="general", model="model-a", prompt=str(prompt)),
+    cfg.peer_review_reviewers = (
+        PeerReviewer(id="general", model="model-a", prompt=str(prompt)),
     )
-    cfg.critique_advanced_refine = False
+    cfg.peer_review_advanced_refine = False
 
     def fake_reviewer(_client, request, **_kw):
         return "Opinion from model-a about the ABC protocol and Figure 2."
@@ -2020,11 +2056,11 @@ def test_both_lanes_concatenate_reviewers_and_marg(cfg, tmp_path, monkeypatch):
     def fake_chat(_client, request):
         return _marg_chat(_client, request)
 
-    monkeypatch.setattr("paperful.critique_llm.chat_reviewer_stream", fake_reviewer)
+    monkeypatch.setattr("paperful.peer_review_llm.chat_reviewer_stream", fake_reviewer)
     monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
     src = tmp_path / "both.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -2042,8 +2078,8 @@ def test_both_lanes_concatenate_reviewers_and_marg(cfg, tmp_path, monkeypatch):
 
 
 def test_advanced_identity_mismatch_refuses_without_force(cfg, tmp_path):
-    from paperful.critique_extract import ExtractedDoc
-    from paperful.critique_llm import suggested_from_llm
+    from paperful.peer_review_extract import ExtractedDoc
+    from paperful.peer_review_llm import suggested_from_llm
 
     doc = ExtractedDoc(text=MANUSCRIPT, format="md")
     findings = [
@@ -2064,9 +2100,9 @@ def test_advanced_identity_mismatch_refuses_without_force(cfg, tmp_path):
 
 
 def test_advanced_drops_scoreish_and_respects_max_rounds(cfg, tmp_path, monkeypatch):
-    cfg.critique_advanced_max_rounds = 1
-    cfg.critique_advanced_refine = False
-    cfg.critique_advanced_max_comments = 4
+    cfg.peer_review_advanced_max_rounds = 1
+    cfg.peer_review_advanced_refine = False
+    cfg.peer_review_advanced_max_comments = 4
     calls = {"n": 0}
 
     def fake_chat(_client, request):
@@ -2094,7 +2130,7 @@ def test_advanced_drops_scoreish_and_respects_max_rounds(cfg, tmp_path, monkeypa
     monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
     src = tmp_path / "rounds.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -2114,8 +2150,8 @@ def test_advanced_drops_scoreish_and_respects_max_rounds(cfg, tmp_path, monkeypa
 
 
 def test_advanced_grobid_chunks_then_extract_fallback(cfg, tmp_path, monkeypatch):
-    from paperful.critique_extract import ExtractedDoc
-    from paperful.critique_marg import paper_chunks
+    from paperful.peer_review_extract import ExtractedDoc
+    from paperful.peer_review_marg import paper_chunks
 
     pdf = tmp_path / "draft.pdf"
     pdf.write_bytes(b"%PDF-1.4\n")
@@ -2130,14 +2166,14 @@ def test_advanced_grobid_chunks_then_extract_fallback(cfg, tmp_path, monkeypatch
             "# Methods\n\nSee Figure 2 under the ABC protocol.\n\n# Results\n\nYield rose 47.2 percent."
         ], ""
 
-    monkeypatch.setattr("paperful.critique_marg.grobid_markdown", fake_md)
+    monkeypatch.setattr("paperful.peer_review_marg.grobid_markdown", fake_md)
     chunks, meta = paper_chunks(cfg, doc, use_grobid=True, pdf_path=pdf, item_key="")
     assert meta["parser"] == "grobid"
     assert chunks
     assert any("Methods" in c.text or c.heading == "Methods" for c in chunks)
 
     monkeypatch.setattr(
-        "paperful.critique_marg.grobid_markdown", lambda *_a, **_k: (None, "scan")
+        "paperful.peer_review_marg.grobid_markdown", lambda *_a, **_k: (None, "scan")
     )
     chunks2, meta2 = paper_chunks(cfg, doc, use_grobid=True, pdf_path=pdf, item_key="")
     assert meta2["parser"] == "extract"
@@ -2167,7 +2203,7 @@ def test_cli_advanced_flag_runs_marg(cfg, tmp_path, monkeypatch):
     ok = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             "--advanced",
@@ -2187,8 +2223,8 @@ def test_cli_advanced_flag_runs_marg(cfg, tmp_path, monkeypatch):
 
 
 def test_advanced_duplicate_broadcast_hard_stop(cfg, tmp_path, monkeypatch):
-    cfg.critique_advanced_max_rounds = 4
-    cfg.critique_advanced_refine = False
+    cfg.peer_review_advanced_max_rounds = 4
+    cfg.peer_review_advanced_refine = False
     calls = {"n": 0}
 
     def fake_chat(_client, request):
@@ -2212,7 +2248,7 @@ def test_advanced_duplicate_broadcast_hard_stop(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
     src = tmp_path / "dup.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -2225,10 +2261,10 @@ def test_advanced_duplicate_broadcast_hard_stop(cfg, tmp_path, monkeypatch):
 
 
 def test_advanced_timeout_aborts_later_groups(cfg, tmp_path, monkeypatch):
-    cfg.critique_advanced_timeout_s = 0.01
-    cfg.critique_advanced_refine = False
+    cfg.peer_review_advanced_timeout_s = 0.01
+    cfg.peer_review_advanced_refine = False
     clock = {"t": 1_000.0}
-    monkeypatch.setattr("paperful.critique_marg.time.monotonic", lambda: clock["t"])
+    monkeypatch.setattr("paperful.peer_review_marg.time.monotonic", lambda: clock["t"])
 
     def fake_chat(_client, request):
         clock["t"] += 10.0
@@ -2250,7 +2286,7 @@ def test_advanced_timeout_aborts_later_groups(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.llm.client.chat", fake_chat)
     src = tmp_path / "timeout.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -2261,7 +2297,7 @@ def test_advanced_timeout_aborts_later_groups(cfg, tmp_path, monkeypatch):
     assert any(r.get("skipped") == "timeout" for r in reviewers)
 
 
-def _cli_critique_pdf(tmp_path, cfg, monkeypatch, *flags):
+def _cli_peer_review_pdf(tmp_path, cfg, monkeypatch, *flags):
     from paperful.cli import app
 
     cfg_path = tmp_path / "config.toml"
@@ -2289,11 +2325,11 @@ def _cli_critique_pdf(tmp_path, cfg, monkeypatch, *flags):
         lambda _cfg: type("C", (), {"provider": "stub"})(),
     )
     monkeypatch.setattr("paperful.llm.client.chat", _marg_chat)
-    monkeypatch.setattr("paperful.critique_marg.grobid_markdown", fake_md)
+    monkeypatch.setattr("paperful.peer_review_marg.grobid_markdown", fake_md)
     ok = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             *flags,
@@ -2307,7 +2343,7 @@ def _cli_critique_pdf(tmp_path, cfg, monkeypatch, *flags):
 
 
 def test_cli_grobid_flag_attempts_sidecar_without_enabled(cfg, tmp_path, monkeypatch):
-    ok, hits = _cli_critique_pdf(
+    ok, hits = _cli_peer_review_pdf(
         tmp_path, cfg, monkeypatch, "--advanced", "--no-llm", "--grobid"
     )
     assert ok.exit_code == 0, ok.output
@@ -2319,7 +2355,7 @@ def test_cli_grobid_flag_attempts_sidecar_without_enabled(cfg, tmp_path, monkeyp
 
 
 def test_cli_grobid_without_advanced_is_ignored(cfg, tmp_path, monkeypatch):
-    ok, hits = _cli_critique_pdf(tmp_path, cfg, monkeypatch, "--no-llm", "--grobid")
+    ok, hits = _cli_peer_review_pdf(tmp_path, cfg, monkeypatch, "--no-llm", "--grobid")
     assert ok.exit_code == 0, ok.output
     assert hits["n"] == 0
 
@@ -2443,7 +2479,7 @@ def test_cli_lane_flag_runs_marg(cfg, tmp_path, monkeypatch):
     ok = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             "--lane",
@@ -2475,7 +2511,7 @@ def test_cli_unknown_lane_exits(cfg, tmp_path):
     ok = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             "--lane",
@@ -2485,7 +2521,7 @@ def test_cli_unknown_lane_exits(cfg, tmp_path):
         ],
     )
     assert ok.exit_code == 1
-    assert "unknown critique lane" in ok.output
+    assert "unknown peer-review lane" in ok.output
 
 
 def _context_library_passages(_cfg, query, *, keys, k):
@@ -2523,15 +2559,15 @@ def test_context_lane_writes_suggested_comments(cfg, tmp_path, monkeypatch):
         return _context_library_passages(_cfg, query, keys=keys, k=k)
 
     monkeypatch.setattr("paperful.llm.client.chat", _context_chat)
-    monkeypatch.setattr("paperful.critique_context.library_passages", fake_lib)
+    monkeypatch.setattr("paperful.peer_review_context.library_passages", fake_lib)
 
     def boom_oa(*_a, **_k):
         raise AssertionError("context lane must not call OpenAlex")
 
-    monkeypatch.setattr("paperful.critique_context._openalex_works", boom_oa)
+    monkeypatch.setattr("paperful.peer_review_context._openalex_works", boom_oa)
     src = tmp_path / "ctx.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -2554,7 +2590,7 @@ def test_context_lane_writes_suggested_comments(cfg, tmp_path, monkeypatch):
     sidecar = pack_dir / "context.json"
     assert sidecar.is_file()
     log = json.loads(sidecar.read_text(encoding="utf-8"))
-    assert log["schema"] == "paperful.critique.context.v1"
+    assert log["schema"] == "paperful.peer_review.context.v1"
     assert pack["llm"]["context"]["log"] == "context.json"
     assert '"text"' not in json.dumps(log)
     on_disk = json.loads((pack_dir / "pack.json").read_text(encoding="utf-8"))
@@ -2572,7 +2608,7 @@ def test_context_web_offline_skips_search(cfg, tmp_path, monkeypatch):
         return [], "IndexMissing"
 
     monkeypatch.setattr("paperful.llm.client.chat", _context_chat)
-    monkeypatch.setattr("paperful.critique_context.library_passages", fake_lib)
+    monkeypatch.setattr("paperful.peer_review_context.library_passages", fake_lib)
 
     def boom_oa(*_a, **_k):
         raise AssertionError("offline context-web must not call OpenAlex")
@@ -2580,11 +2616,11 @@ def test_context_web_offline_skips_search(cfg, tmp_path, monkeypatch):
     def boom_sx(*_a, **_k):
         raise AssertionError("offline context-web must not call SearXNG")
 
-    monkeypatch.setattr("paperful.critique_context._openalex_works", boom_oa)
-    monkeypatch.setattr("paperful.critique_context._searxng_hits", boom_sx)
+    monkeypatch.setattr("paperful.peer_review_context._openalex_works", boom_oa)
+    monkeypatch.setattr("paperful.peer_review_context._searxng_hits", boom_sx)
     src = tmp_path / "web.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -2633,12 +2669,12 @@ def test_context_web_online_retrieves_rounds_and_novelty(cfg, tmp_path, monkeypa
         )
 
     monkeypatch.setattr("paperful.llm.client.chat", _context_chat)
-    monkeypatch.setattr("paperful.critique_context.library_passages", fake_lib)
-    monkeypatch.setattr("paperful.critique_context._openalex_works", fake_oa)
-    monkeypatch.setattr("paperful.critique_context._searxng_hits", fake_sx)
+    monkeypatch.setattr("paperful.peer_review_context.library_passages", fake_lib)
+    monkeypatch.setattr("paperful.peer_review_context._openalex_works", fake_oa)
+    monkeypatch.setattr("paperful.peer_review_context._searxng_hits", fake_sx)
     src = tmp_path / "web-on.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=False,
@@ -2684,7 +2720,7 @@ def test_context_novelty_drops_invented_titles(cfg, tmp_path, monkeypatch):
 
     monkeypatch.setattr("paperful.llm.client.chat", chat)
     monkeypatch.setattr(
-        "paperful.critique_context.library_passages",
+        "paperful.peer_review_context.library_passages",
         lambda *_a, **_k: (
             [
                 {
@@ -2698,14 +2734,14 @@ def test_context_novelty_drops_invented_titles(cfg, tmp_path, monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        "paperful.critique_context._openalex_works",
+        "paperful.peer_review_context._openalex_works",
         lambda *_a, **_k: (_ for _ in ()).throw(
             AssertionError("context lane must not call OpenAlex")
         ),
     )
     src = tmp_path / "ctx-invent.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -2721,7 +2757,7 @@ def test_adversary_lane_writes_suggested_comments(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.llm.client.chat", _adversary_chat)
     src = tmp_path / "advr.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -2767,7 +2803,7 @@ def test_cli_lane_flag_runs_adversary(cfg, tmp_path, monkeypatch):
     ok = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             "--lane",
@@ -2843,7 +2879,7 @@ def _outline_chat(_client, request):
 
 
 def test_outline_merges_duplicate_headings_from_toc():
-    from paperful.critique_outline import merge_duplicate_headings, outline_ledger
+    from paperful.peer_review_outline import merge_duplicate_headings, outline_ledger
 
     slices = [
         ("1. Introduction", "The compliance problem. Suggested length 800."),
@@ -2865,7 +2901,7 @@ def test_outline_merges_duplicate_headings_from_toc():
 
 
 def test_pack_outline_excerpt_keeps_middle_section():
-    from paperful.critique_outline import outline_slices, pack_outline_excerpt
+    from paperful.peer_review_outline import outline_slices, pack_outline_excerpt
 
     chunks = ["Preamble about the paper plan.\n"]
     for i, token in enumerate(
@@ -2886,7 +2922,7 @@ def test_outline_lane_writes_suggested_comments(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.llm.client.chat", _outline_chat)
     src = tmp_path / "outline.md"
     src.write_text(OUTLINE_MS, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -2943,7 +2979,7 @@ def test_cli_lane_flag_runs_outline(cfg, tmp_path, monkeypatch):
     ok = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             "--lane",
@@ -2970,8 +3006,8 @@ def test_incomplete_lane_rows_outline_skip():
 
 
 def test_outline_ledger_survives_llm_error(cfg, monkeypatch):
-    from paperful.critique_extract import ExtractedDoc
-    from paperful.critique_outline import suggested_from_outline
+    from paperful.peer_review_extract import ExtractedDoc
+    from paperful.peer_review_outline import suggested_from_outline
 
     def boom(_client, _request):
         raise RuntimeError("stub down")
@@ -2995,8 +3031,8 @@ def test_outline_ledger_survives_llm_error(cfg, monkeypatch):
 
 
 def test_outline_empty_extract_skips(cfg):
-    from paperful.critique_extract import ExtractedDoc
-    from paperful.critique_outline import suggested_from_outline
+    from paperful.peer_review_extract import ExtractedDoc
+    from paperful.peer_review_outline import suggested_from_outline
 
     extra, meta = suggested_from_outline(
         cfg,
@@ -3013,8 +3049,8 @@ def test_outline_empty_extract_skips(cfg):
 
 
 def test_outline_empty_reply_skips_when_sections_are_planned(cfg, monkeypatch):
-    from paperful.critique_extract import ExtractedDoc
-    from paperful.critique_outline import suggested_from_outline
+    from paperful.peer_review_extract import ExtractedDoc
+    from paperful.peer_review_outline import suggested_from_outline
 
     monkeypatch.setattr("paperful.llm.client.chat", lambda *_a, **_k: "{}")
     text = """
@@ -3041,7 +3077,7 @@ What an SoK is and why it suits a policy question better than a literature revie
 
 
 def test_pack_outline_excerpt_without_headings_falls_back():
-    from paperful.critique_outline import pack_outline_excerpt
+    from paperful.peer_review_outline import pack_outline_excerpt
 
     text = "plain prose without numbered headings. " * 40
     packed = pack_outline_excerpt(text, [], 120)
@@ -3093,7 +3129,7 @@ def test_outline_docx_numbered_headings(cfg, tmp_path, monkeypatch):
             "What an SoK is and why it suits a policy question better than a review.",
         ],
     )
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -3200,7 +3236,7 @@ def test_claims_lane_writes_ledger_and_gaps(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.llm.client.chat", _claims_chat)
     src = tmp_path / "claims.md"
     src.write_text(CLAIMS_MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -3264,7 +3300,7 @@ def test_claims_lane_cited_source_locators(cfg, tmp_path, monkeypatch):
         year=2001,
         first_author="Ada",
     )
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -3315,7 +3351,7 @@ def test_cli_lane_flag_runs_claims(cfg, tmp_path, monkeypatch):
     ok = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             "--lane",
@@ -3339,7 +3375,7 @@ def test_verify_lane_drops_invented_citations(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.llm.client.chat", _verify_chat)
     src = tmp_path / "verify.md"
     src.write_text(CLAIMS_MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -3359,18 +3395,18 @@ def test_verify_lane_drops_invented_citations(cfg, tmp_path, monkeypatch):
 
 
 def test_verify_timeout_records_incomplete_segments(cfg, tmp_path, monkeypatch):
-    cfg.critique_verify_timeout_s = 1.0
+    cfg.peer_review_verify_timeout_s = 1.0
     n = {"i": 0}
 
     def fake_mono():
         n["i"] += 1
         return 0.0 if n["i"] == 1 else 5.0
 
-    monkeypatch.setattr("paperful.critique_verify.time.monotonic", fake_mono)
+    monkeypatch.setattr("paperful.peer_review_verify.time.monotonic", fake_mono)
     monkeypatch.setattr("paperful.llm.client.chat", _verify_chat)
     src = tmp_path / "to.md"
     src.write_text(CLAIMS_MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -3413,7 +3449,7 @@ def test_verify_doi_status_cache_without_http(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.llm.client.chat", chat)
     src = tmp_path / "doi.md"
     src.write_text(CLAIMS_MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,
@@ -3451,7 +3487,7 @@ def test_cli_lane_flag_runs_verify(cfg, tmp_path, monkeypatch):
     ok = runner.invoke(
         app,
         [
-            "critique",
+            "peer-review",
             "--file",
             str(src),
             "--lane",
@@ -3470,12 +3506,12 @@ def test_cli_lane_flag_runs_verify(cfg, tmp_path, monkeypatch):
 
 
 def test_marg_config_aspects_run_theory_only(cfg, tmp_path, monkeypatch):
-    cfg.critique_advanced_refine = False
-    cfg.critique_advanced_aspects = ("theory",)
+    cfg.peer_review_advanced_refine = False
+    cfg.peer_review_advanced_aspects = ("theory",)
     monkeypatch.setattr("paperful.llm.client.chat", _marg_chat)
     src = tmp_path / "theory.md"
     src.write_text(MANUSCRIPT, encoding="utf-8")
-    pack = build_critique(
+    pack = build_peer_review(
         cfg,
         file_path=src,
         offline=True,

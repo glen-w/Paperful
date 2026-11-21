@@ -4,9 +4,9 @@ Everything here is **off by default**. Paperful’s PDF loop (`run` / `attach` /
 `lint` / `fix-metadata` / `dedupe`) never needs a model. Turn the LLM on only
 for the LLM-backed verbs below, and only after `paperful doctor` shows the
 `LLM` row green. `extract-sections` (optional GROBID then optional LLM),
-`rag questions`, `critique`, and style-only `rewrite` run
+`rag questions`, `peer-review`, and style-only `rewrite` run
 deterministic rules without a model; their `--llm` lanes (and
-critique `--lane` / `--advanced`, rewrite areas other than style) need `[llm].enabled`.
+peer-review `--lane` / `--advanced`, rewrite areas other than style) need `[llm].enabled`.
 
 **Feasibility first.** Trying one summary is not the same job as summarizing
 or synthesizing ~1.5k PDFs. Hardware bands, overnight local runs, OpenRouter /
@@ -52,7 +52,7 @@ No Python extra is needed for Ollama: Paperful talks HTTP to the daemon.
 
 | Verb | Works well with | Notes |
 | --- | --- | --- |
-| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm`, `critique --lane` / `--llm` / `--advanced`, `rewrite` (non-style), `ask` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx`. Critique JSON turns set Ollama `format=json` and `think=false` (thinking models otherwise burn the idle timeout on a hidden chain, then often fail JSON parse → `empty_reply`). `critique` comments are suggested-lane only. `--lane marg` is many more completions per paper (aspect groups plus refine; default experiments/clarity/impact); `--lane adversary` is one validity red-team turn; `--lane outline` is one plan-review turn; `--lane claims` is claim extract plus an optional downgrade turn; `--lane verify` is one or two turns per segment plus refine; `--lane context` adds summary / 3-round retrieve / historian / scout / novelty Q then A / soundness turns. `rewrite` is one JSON call per enabled area that still has findings after glossary/Vale swaps; an optional `[[rewrite.specialists]]` model may be an [XtraGPT](https://huggingface.co/collections/Xtra-Computing/xtragpt) Ollama tag (ICLR/ReviseQA-shaped — do not assume it fits ocean/policy drafts). `ask` default is **simple** (one completion); **advanced** adds about `evidence_k` summary calls — [rag.md](rag.md#ask-modes) |
+| `fix-metadata` titles, `lint` identity, `summarize`, `synthesize`, `extract-sections --llm`, `rag questions --llm`, `peer-review --lane` / `--llm` / `--advanced`, `rewrite` (non-style), `ask` | 7B–12B instruct models (`qwen2.5:7b`, `gemma3:12b`, `llama3.1:8b`) | JSON-capable instruct tags. `summarize` and `synthesize` set Ollama `num_ctx` from the prompt, capped by `[llm].max_num_ctx`. Peer review JSON turns set Ollama `format=json` and `think=false` (thinking models otherwise burn the idle timeout on a hidden chain, then often fail JSON parse → `empty_reply`). `peer-review` comments are suggested-lane only. `--lane marg` is many more completions per paper (aspect groups plus refine; default experiments/clarity/impact); `--lane adversary` is one validity red-team turn; `--lane outline` is one plan-review turn; `--lane claims` is claim extract plus an optional downgrade turn; `--lane verify` is one or two turns per segment plus refine; `--lane context` adds summary / 3-round retrieve / historian / scout / novelty Q then A / soundness turns. `rewrite` is one JSON call per enabled area that still has findings after glossary/Vale swaps; an optional `[[rewrite.specialists]]` model may be an [XtraGPT](https://huggingface.co/collections/Xtra-Computing/xtragpt) Ollama tag (ICLR/ReviseQA-shaped — do not assume it fits ocean/policy drafts). `ask` default is **simple** (one completion); **advanced** adds about `evidence_k` summary calls — [rag.md](rag.md#ask-modes) |
 | `recover` | 14B+ (`qwen2.5:14b`, `qwen3:14b`, larger); 32B / VL on 24 GB+ | Small models loop on cookie banners and publisher menus; `doctor` warns under ~10B by tag name. Full guidance: [browser-agent-models.md](browser-agent-models.md) |
 
 ### LiteLLM (paid / OpenAI-compatible APIs)
@@ -109,17 +109,17 @@ llm_title = false                   # verb B: grounded title proposals
 llm_pdf_match = false               # verb C: pdf_identity_mismatch finding
 llm_pdf_match_min_confidence = 0.6
 
-[critique]                          # verb C2: suggested comments only
+[peer_review]                          # verb C2: suggested comments only
 llm = false
-# lanes = []                       # reviewers, marg, adversary, outline, claims, verify, context, context-web (see critique.md)
+# lanes = []                       # reviewers, marg, adversary, outline, claims, verify, context, context-web (see peer-review.md)
 # advanced = false                 # shim → marg when lanes is empty
 # vale = false                     # house-style pass; needs vale on PATH (not an LLM)
 # glossary = true                  # fuzzy house expansions from state/glossary/
-# [[critique.reviewers]]            # omit the table for one builtin JSON reviewer
+# [[peer_review.reviewers]]            # omit the table for one builtin JSON reviewer
 # id = "line-editor"
-# prompt = "prompts/critique-line-editor.md"
+# prompt = "prompts/peer-review-line-editor.md"
 
-[rewrite]                           # verb C2.5: apply a critique pack
+[rewrite]                           # verb C2.5: apply a peer-review pack
 areas = ["style"]                   # style-only glossary/Vale swaps need no model
 # outputs = ["edits", "tracked"]   # also odt, pdf
 # comments = "off"
@@ -258,24 +258,24 @@ two pages match the record (title, author surnames, year, DOI). A `false`, or a
 Nothing is deleted or re-attached; you decide. Model or extraction failure is
 silent (no finding).
 
-### C2. `critique --lane` — suggested review lanes only
+### C2. `peer-review --lane` — suggested review lanes only
 
 ```sh
-uv run paperful critique --file ./draft.pdf --lane reviewers
-uv run paperful critique --file ./draft.pdf --llm --reviewer line-editor
-uv run paperful critique --file ./draft.pdf --llm --reviewer openreview
-uv run paperful critique --file ./draft.pdf --lane marg
-uv run paperful critique --file ./draft.pdf --lane adversary
-uv run paperful critique --file ./draft.pdf --lane outline
-uv run paperful critique --file ./draft.pdf --lane claims
-uv run paperful critique --file ./draft.pdf --lane verify
-uv run paperful critique --file ./draft.pdf --lane reviewers --lane marg --grobid
-uv run paperful critique --file ./draft.pdf --lane context
-uv run paperful critique --item ABCD1234 --llm --force
+uv run paperful peer-review --file ./draft.pdf --lane reviewers
+uv run paperful peer-review --file ./draft.pdf --llm --reviewer line-editor
+uv run paperful peer-review --file ./draft.pdf --llm --reviewer openreview
+uv run paperful peer-review --file ./draft.pdf --lane marg
+uv run paperful peer-review --file ./draft.pdf --lane adversary
+uv run paperful peer-review --file ./draft.pdf --lane outline
+uv run paperful peer-review --file ./draft.pdf --lane claims
+uv run paperful peer-review --file ./draft.pdf --lane verify
+uv run paperful peer-review --file ./draft.pdf --lane reviewers --lane marg --grobid
+uv run paperful peer-review --file ./draft.pdf --lane context
+uv run paperful peer-review --item ABCD1234 --llm --force
 ```
 
 Additive. The default pack is checkers, metrics, and heuristic AI-tells with
-no model. `--lane reviewers` (or `--llm` / `[critique].llm`) asks for a
+no model. `--lane reviewers` (or `--llm` / `[peer_review].llm`) asks for a
 contribution summary, up to eight comments tied to a finding code or a quoted
 span, and author questions. `--lane marg` (or `--advanced`) adds a MARG-S-style
 multi-agent pass. `--lane adversary` adds a structured validity red-team.
@@ -291,21 +291,21 @@ notice; skipped offline). Lanes run together. `--grobid` /
 `[grobid].enabled` changes MARG-S / claims / verify PDF chunks. Every row is
 `lane=suggested`. Ungrounded spans are dropped. No overall score. Identity
 mismatch refuses review lanes unless `--force`. Optional
-`[[critique.reviewers]]` run one call each (per-id model and prompt) and do
+`[[peer_review.reviewers]]` run one call each (per-id model and prompt) and do
 not replace `marg`, `adversary`, `outline`, `claims`, `verify`, or `context`. A Markdown prompt file becomes a **Reviewer**
 note** in `pack.md`; the builtin prompt still returns JSON comments. Optional
 `--vale` house-style lint is a separate **checked** pass (no model). See
-[critique.md](critique.md).
+[peer_review.md](peer-review.md).
 
-### C2.5. `rewrite` — apply a critique pack
+### C2.5. `rewrite` — apply a peer-review pack
 
 ```sh
 uv run paperful rewrite --file ./draft.docx
-uv run paperful rewrite --pack state/critiques/file-draft/20261027T... --area cites --comments substantive
+uv run paperful rewrite --pack state/peer-reviews/file-draft/20261027T... --area cites --comments substantive
 uv run paperful rewrite --pack PATH --output edits --dry-run
 ```
 
-Pack required. Never re-runs critique. Default area is **style** (glossary
+Pack required. Never re-runs peer-review. Default area is **style** (glossary
 `suggested` and obvious Vale swaps are deterministic and run with `[llm]`
 off). Other areas (`cites`, `structure`, `comments`) need a model for
 findings without a deterministic replacement. Body edits must not invent
@@ -519,7 +519,7 @@ allow_remote = true
   `simple` (default) and `advanced` (`--ask-mode` / `[rag].ask_mode`).
 - [config.md](config.md#llm-optional-local-first) — key reference
 - [commands.md](commands.md) — `recover` / `summarize` / `synthesize` / `extract-sections` / `rewrite` flags and exit codes
-- [rewrite.md](rewrite.md) — apply a critique pack (style-only without a model)
+- [rewrite.md](rewrite.md) — apply a peer-review pack (style-only without a model)
 - [architecture.md](architecture.md#llm-layer-optional-local-first) — layer, gates, note write path
 - [camofox.md](camofox.md) — opt-in scripted Camoufox lane before `browser_agent`
 - [sessions.md](sessions.md) — vault profile ownership during `recover`

@@ -297,7 +297,7 @@ def skip_reason_for(finding: dict[str, Any], *, hay: str) -> str | None:
         return "not_actionable"
     quote = str(finding.get("quote") or "").strip()
     if quote:
-        from .critique_direct_quotes import snippet_in_direct_quote
+        from .peer_review_direct_quotes import snippet_in_direct_quote
 
         if snippet_in_direct_quote(hay, quote):
             return "quote"

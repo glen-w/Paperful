@@ -1,4 +1,4 @@
-"""Local text extract for ``paperful critique``. No new PyPI deps."""
+"""Local text extract for ``paperful peer-review``. No new PyPI deps."""
 
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ def safe_filename(name: str) -> str:
 
 
 def stage_file(cfg: object, src: Path, *, name: str | None = None) -> Path:
-    """Copy ``src`` under ``state/critiques/uploads/<stamp>-<safe>/``."""
+    """Copy ``src`` under ``state/peer-reviews/uploads/<stamp>-<safe>/``."""
     from datetime import datetime, timezone
 
     from .config import Config
@@ -75,7 +75,7 @@ def stage_file(cfg: object, src: Path, *, name: str | None = None) -> Path:
     assert isinstance(cfg, Config)
     stamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     safe = safe_filename(name or src.name)
-    dest_dir = cfg.state_dir / "critiques" / "uploads" / f"{stamp}-{Path(safe).stem}"
+    dest_dir = cfg.state_dir / "peer-reviews" / "uploads" / f"{stamp}-{Path(safe).stem}"
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / safe
     data = src.read_bytes()
@@ -95,7 +95,7 @@ def stage_bytes(cfg: object, data: bytes, name: str) -> Path:
     assert isinstance(cfg, Config)
     stamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     safe = safe_filename(name)
-    dest_dir = cfg.state_dir / "critiques" / "uploads" / f"{stamp}-{Path(safe).stem}"
+    dest_dir = cfg.state_dir / "peer-reviews" / "uploads" / f"{stamp}-{Path(safe).stem}"
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / safe
     if len(data) > MAX_UPLOAD_BYTES:

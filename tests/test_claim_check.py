@@ -16,7 +16,7 @@ from paperful.claim_check import (
     pack_payload,
     write_pack,
 )
-from paperful.critique_extract import ExtractedDoc
+from paperful.peer_review_extract import ExtractedDoc
 
 
 LONG = (

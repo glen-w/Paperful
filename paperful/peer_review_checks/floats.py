@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from ..config import Config
-from ..critique import Finding, make_finding
-from ..critique_direct_quotes import span_in_direct_quote
-from ..critique_extract import ExtractedDoc, loc_for, loc_of_span
+from ..peer_review import Finding, make_finding
+from ..peer_review_direct_quotes import span_in_direct_quote
+from ..peer_review_extract import ExtractedDoc, loc_for, loc_of_span
 from ._common import (
     _ACRONYM,
     _EXPANSION,
@@ -108,7 +108,7 @@ def _acronyms(doc: ExtractedDoc) -> list[Finding]:
 
 
 def _glossary_acronyms(cfg: Config, doc: ExtractedDoc) -> list[Finding]:
-    if not cfg.critique_glossary:
+    if not cfg.peer_review_glossary:
         return []
     from ..glossary import MAX_HITS_PER_CODE, load_glossary, scan_glossary
 
@@ -117,7 +117,7 @@ def _glossary_acronyms(cfg: Config, doc: ExtractedDoc) -> list[Finding]:
         return []
     body, _biblio = _split_body_biblio(doc.text)
     hits = scan_glossary(
-        body, entries, similarity_min=cfg.critique_glossary_similarity_min
+        body, entries, similarity_min=cfg.peer_review_glossary_similarity_min
     )
     out: list[Finding] = []
     counts = {"acronym_expansion_mismatch": 0, "acronym_phrase_mismatch": 0}

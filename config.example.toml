@@ -184,11 +184,11 @@ mirror_failures_before_skip = 3
 # fingerprint_max_age_days = 14
 # fingerprint_dir = "pps-fingerprints"  # optional local CSV/JSON copies (offline / air-gap)
 # tag = "paperful-pps"
-# [critique]
-# # Local manuscript pack (see docs/critique.md). Not a grade.
+# [peer_review]
+# # Local manuscript pack (see docs/peer-review.md). Not a grade.
 # llm = false                      # shim → reviewers when lanes is empty
 # lanes = []                       # reviewers, marg, adversary, outline, claims, verify, context, context-web (empty → llm/advanced shims)
-# tag = "paperful-critique"
+# tag = "paperful-peer-review"
 # ai_model = false                 # optional Binoculars extra (uv pip install git+https://github.com/ahans30/Binoculars.git); --ai-model turns on (no CLI off)
 # vale = false                     # optional Vale house style; --vale turns on (no CLI off)
 # vale_config = ".vale.ini"        # your house .vale.ini (relative to this file)
@@ -222,7 +222,7 @@ mirror_failures_before_skip = 3
 # adversary_max_comments = 12      # validity red-team lane cap
 # outline_max_comments = 12        # plan-review lane cap
 # # lanes = ["reviewers", "marg"]  # when set, llm/advanced bools are ignored
-# # With llm = true and advanced = true (and lanes empty), every critique runs reviewers + MARG.
+# # With llm = true and advanced = true (and lanes empty), every peer-review runs reviewers + MARG.
 # # Advanced PDF chunks reuse [grobid] when enabled (see docs/grobid.md).
 # overlap_top_k = 40
 # overlap_n_min = 6
@@ -231,25 +231,25 @@ mirror_failures_before_skip = 3
 # cite_age_years = 10
 # max_context_chars = 24000
 # # Optional. Omit the table for one reviewer ([llm].model + builtin JSON prompt).
-# [[critique.reviewers]]
+# [[peer_review.reviewers]]
 # id = "general"
 # model = ""                       # empty → [llm].model
 # prompt = "default"
-# [[critique.reviewers]]
+# [[peer_review.reviewers]]
 # id = "line-editor"
 # model = "qwen2.5:14b"
-# prompt = "prompts/critique-line-editor.md"
-# [[critique.reviewers]]
+# prompt = "prompts/peer-review-line-editor.md"
+# [[peer_review.reviewers]]
 # id = "foundations"
 # model = ""
-# prompt = "prompts/critique-foundations.md"
-# [[critique.reviewers]]
+# prompt = "prompts/peer-review-foundations.md"
+# [[peer_review.reviewers]]
 # id = "openreview"
 # model = "llama-openreviewer-8b"
-# prompt = "prompts/critique-openreview.md"
+# prompt = "prompts/peer-review-openreview.md"
 # max_tokens = 2048                # Ollama num_predict; 0 = uncapped (not recommended)
 # [rewrite]
-# # Apply a critique pack to a draft (see docs/rewrite.md). Never overwrites the source.
+# # Apply a peer-review pack to a draft (see docs/rewrite.md). Never overwrites the source.
 # areas = ["style"]                # style | cites | structure | comments | all
 # outputs = ["edits", "tracked"]   # edits | sidecar | tracked | odt | pdf
 # comments = "off"                 # off | substantive | all
@@ -300,7 +300,7 @@ mirror_failures_before_skip = 3
 # # Optional bearer: env CAMOFOX_ACCESS_KEY when the server sets CAMOFOX_ACCESS_KEY
 # # See docs/camofox.md — not a Cloudflare-bypass product; no vault SSO cookies
 # [grobid]
-# enabled = false                # opt-in GROBID sidecar for extract-sections / rag parser / critique --advanced
+# enabled = false                # opt-in GROBID sidecar for extract-sections / rag parser / peer-review --advanced
 # base_url = "http://127.0.0.1:8070"  # operator-owned GROBID (Docker); Paperful does not start it
 # timeout_s = 120
 # allow_remote = false           # PDF bytes leave the machine if the host is not local

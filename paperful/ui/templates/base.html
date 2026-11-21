@@ -56,8 +56,8 @@ Health: System health from the last check. Green is ready. Amber is a warning. R
     <a href="/repair" {% if active == 'repair' %}class="active" aria-current="page"{% endif %} title="Fix metadata, duplicates, attachments, and OCR">Repair</a>
     <a href="/mirror" {% if active == 'mirror' %}class="active" aria-current="page"{% endif %} title="Copy the library to disk and restore missing items">Mirror</a>
     <a href="/index" {% if active == 'index' or active == 'briefs' %}class="active" aria-current="page"{% endif %} title="Build and search the local PDF index; summarize and synthesize">Index</a>
-    <a href="/critique" {% if active == 'critique' %}class="active" aria-current="page"{% endif %} title="Local manuscript critique pack (checked findings, optional suggested comments)">Critique</a>
-    <a href="/rewrite" {% if active == 'rewrite' %}class="active" aria-current="page"{% endif %} title="Turn a critique pack into tracked changes in a copy (Word, OpenDocument, or PDF)">Suggest edits</a>
+    <a href="/peer-review" {% if active == 'peer-review' %}class="active" aria-current="page"{% endif %} title="Local manuscript peer-review pack (checked findings, optional suggested comments)">Peer review</a>
+    <a href="/rewrite" {% if active == 'rewrite' %}class="active" aria-current="page"{% endif %} title="Turn a peer-review pack into tracked changes in a copy (Word, OpenDocument, or PDF)">Suggest edits</a>
     <a href="/stuff" {% if active == 'stuff' %}class="active" aria-current="page"{% endif %} title="Extra library cites per sentence or outline section">Stuff</a>
     <a href="/settings" {% if active == 'settings' %}class="active" aria-current="page"{% endif %} title="Unpaywall email, output folder, and campus vs open-access preset">Settings</a>
     {% endif %}

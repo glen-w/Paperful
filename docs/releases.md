@@ -33,7 +33,7 @@ be added. Required `paperful.run_report.v1` keys and imported-file attach
 (typed `attach_failed`, provenance note) are the contract. **1.1.1** shipped
 Wanted stop-ship hygiene (Grab scope, Attach at zero, copy). Everything after
 that is a buffet by area (Wanted excellence foundation shipped; residual polish).
-**1.9.7** adds hop-0 `--prioritize` (`recency` / `popular` / `historical`) on snowball keyword and hybrid search (OpenAlex `sort=` plus queue score; MCP, profiles, Discover Advanced). **1.9.6** adds cited-source locators on `--lane claims` and CLI `ask --claim-check` (no LLM; not on `/ask`). **1.9.5** deepens Advanced critique `context` / `context-web` (three-round retrieve, `context.json` sidecar, split novelty Q then A; still not a grade). **1.9.4** gives `refs gap` a memory (new, still missing, cite count up, now owned), adds a [first 10 minutes](first-10-minutes.md) page, and puts lint and the full suite back on GitHub CI. **1.9.3** adds [`paperful since`](since.md), a read-only report of what changed since the last `run` (retractions, versions of record, dead URLs, upgradable snapshots, healed misses), fixes the Crossref field the retraction check reads, and hardens workbench forms and error pages. **1.9.2** hardens `paperful rewrite` (drift hashes, grounding freeze, fail-closed Word, reproducible LLM calls, post-edit checkers, whole-paragraph returns). **1.9.1** pins critique JSON turns (`format=json`, `think=false`, one repair)
+**1.9.7** adds hop-0 `--prioritize` (`recency` / `popular` / `historical`) on snowball keyword and hybrid search (OpenAlex `sort=` plus queue score; MCP, profiles, Discover Advanced). **1.9.6** adds cited-source locators on `--lane claims` and CLI `ask --claim-check` (no LLM; not on `/ask`). **1.9.5** deepens Advanced peer-review `context` / `context-web` (three-round retrieve, `context.json` sidecar, split novelty Q then A; still not a grade). **1.9.4** gives `refs gap` a memory (new, still missing, cite count up, now owned), adds a [first 10 minutes](first-10-minutes.md) page, and puts lint and the full suite back on GitHub CI. **1.9.3** adds [`paperful since`](since.md), a read-only report of what changed since the last `run` (retractions, versions of record, dead URLs, upgradable snapshots, healed misses), fixes the Crossref field the retraction check reads, and hardens workbench forms and error pages. **1.9.2** hardens `paperful rewrite` (drift hashes, grounding freeze, fail-closed Word, reproducible LLM calls, post-edit checkers, whole-paragraph returns). **1.9.1** pins peer-review JSON turns (`format=json`, `think=false`, one repair)
 and ships example Vale packs (`JMLC`, `JCP`, `MarinePolicy`). **1.9.0** cuts GitHub CI to one Ubuntu smoke job (`pytest -m smoke`); the
 OS/Python matrix, lint, audit, socket, fresh-install, browser, and docker
 jobs stay local until each is green on its own. **1.8.0** adds crash-safe ledger appends, one HTTP client, systematic-review
@@ -47,24 +47,24 @@ additive PRISMA counts and snowball watch drift hashes, `paperful search watch`
 **1.6.4** thins snowball execute/apply, splits Discover routes and doctor
 checks, shares skip-host lists, and moves `try_download` beside
 `commit_download` (OA-then-serial fetch unchanged). It also ships OpenAlex
-trusted journal lists, `paperful stuff`, critique `outline`, `paperful network`,
+trusted journal lists, `paperful stuff`, peer-review `outline`, `paperful network`,
 and SearXNG `paperful search`.
 **1.6.3** makes the OpenAlex parquet snapshot API-first (live API first;
 store is a budget fallback with a 120s timeout and a three-strike skip) and
 ships rewrite PDF comment markers plus sticky notes.
 **1.6.2** adds `paperful precedent` (held vs public-metadata-only; never a
 novelty claim), rewrite tracked PowerPoint/ODT/PDF plus an optional
-`[openxml]` extra, and a Binoculars overlay for critique `--ai-model`.
-**1.6.1** adds critique `claims` and `verify` lanes (intra-doc ledger and
+`[openxml]` extra, and a Binoculars overlay for peer-review `--ai-model`.
+**1.6.1** adds peer-review `claims` and `verify` lanes (intra-doc ledger and
 local section swarm; no Deep Review upload) plus config-selected MARG aspects
-(`theory`, `policy`, `evidence-base`). **1.6.0** adds `paperful rewrite`: apply an existing critique pack as an
+(`theory`, `policy`, `evidence-base`). **1.6.0** adds `paperful rewrite`: apply an existing peer-review pack as an
 edit plan, optional sidecar, and tracked-changes Word (pack required; never
-re-runs critique; never overwrites the source). **1.5.1** adds composable
-critique review lanes (`--lane`) and optional
+re-runs peer-review; never overwrites the source). **1.5.1** adds composable
+peer-review review lanes (`--lane`) and optional
 PaperGuard `--forensics`. **1.5.0** finishes the 1.4 module split: remaining workbench desks use
 module-level `handle_*`, snowball resume/`_execute` are extracted without
-behavior change, critique checkers are a package, and `acronyms` is a
-`*_cmd` module. **1.4.0** ships the local manuscript critique pack (optional Vale / GROBID /
+behavior change, peer-review checkers are a package, and `acronyms` is a
+`*_cmd` module. **1.4.0** ships the local manuscript peer-review pack (optional Vale / GROBID /
 glossary), Ask `simple`/`advanced` modes, and a CLI/workbench module split
 (`*_cmd.py`, desk row builders, Discover `handle_*` routes). **1.3.1** hardens local-trust boundaries (PDF fetch SSRF checks, review-token
 sanitization, non-loopback `serve` gate, redacted witness digests; see

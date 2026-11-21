@@ -32,7 +32,7 @@ rag_answered_fn: Callable[..., dict[str, Any]] | None = None
 extract_sections_fn: Callable[..., dict[str, Any]] | None = None
 summarize_fn: Callable[..., dict[str, Any]] | None = None
 synthesize_fn: Callable[..., dict[str, Any]] | None = None
-critique_fn: Callable[..., dict[str, Any]] | None = None
+peer_review_fn: Callable[..., dict[str, Any]] | None = None
 rewrite_fn: Callable[..., dict[str, Any]] | None = None
 stuff_fn: Callable[..., dict[str, Any]] | None = None
 noop_sleep: float = 0.05
@@ -521,7 +521,7 @@ def snowball_run(
         raise
 
 
-def critique(
+def peer_review(
     cfg: Config,
     cmd_id: str,
     *,
@@ -539,8 +539,8 @@ def critique(
     force: bool = False,
     show_dismissed: bool = False,
 ) -> None:
-    if critique_fn is not None:
-        result = critique_fn(
+    if peer_review_fn is not None:
+        result = peer_review_fn(
             cfg,
             cmd_id,
             item_key=item_key,
@@ -562,8 +562,8 @@ def critique(
         return
     import os
 
-    from ..critique import build_critique, note_html
-    from ..critique_extract import ExtractError
+    from ..peer_review import build_peer_review, note_html
+    from ..peer_review_extract import ExtractError
     from ..llm import get_client
     from ..llm.preflight import validate_llm_for_verb
     from ..llm.validate import LlmConfigError
@@ -622,7 +622,7 @@ def critique(
         rec["error"] = "item not in the mirror / scope"
         commands.write_command(cfg, rec)
         return
-    from ..critique_lanes import lanes_need_llm, ordered_lanes
+    from ..peer_review_lanes import lanes_need_llm, ordered_lanes
 
     llm_client = None
     resolved = ordered_lanes(lanes or ())
@@ -654,7 +654,7 @@ def critique(
         commands.write_command(cfg, rec)
 
     try:
-        pack = build_critique(
+        pack = build_peer_review(
             cfg,
             item=target,
             file_path=staged_path,
@@ -663,8 +663,8 @@ def critique(
             dry_run=False,
             use_llm=use_llm,
             use_ai_model=bool(ai_model),
-            use_vale=bool(vale) or cfg.critique_vale,
-            use_forensics=bool(forensics) or cfg.critique_forensics,
+            use_vale=bool(vale) or cfg.peer_review_vale,
+            use_forensics=bool(forensics) or cfg.peer_review_forensics,
             use_advanced=use_advanced,
             lanes=resolved,
             use_grobid=use_grobid,
@@ -695,7 +695,7 @@ def critique(
         and backend.supports_write()
     ):
         html = note_html(pack)
-        tag = (cfg.critique_tag or "paperful-critique").strip()
+        tag = (cfg.peer_review_tag or "paperful-peer-review").strip()
         backend.create_or_update_note(target.key, html, tag)
         applied = 1
     counts = pack.get("counts") or {}
@@ -704,7 +704,7 @@ def critique(
         cmd_id,
         {
             "pack_dir": pack.get("pack_dir") or "",
-            "critique_id": pack.get("critique_id") or "",
+            "peer_review_id": pack.get("peer_review_id") or "",
             "counts": counts,
             "applied": applied,
             "findings": counts.get("findings", 0),
@@ -737,7 +737,7 @@ def rewrite(
         return
     from pathlib import Path
 
-    from ..critique import load_pack
+    from ..peer_review import load_pack
     from ..llm import get_client
     from ..llm.preflight import validate_llm_for_verb
     from ..llm.validate import LlmConfigError
@@ -754,11 +754,11 @@ def rewrite(
     pack = load_pack(folder) if folder is not None else None
     if not pack:
         rec["status"] = "failed"
-        rec["error"] = "No critique pack.json."
+        rec["error"] = "No peer-review pack.json."
         commands.write_command(cfg, rec)
         return
     pack["pack_dir"] = str(folder)
-    pack["critique_id"] = pack.get("critique_id") or (
+    pack["peer_review_id"] = pack.get("peer_review_id") or (
         folder.parent.name if folder is not None else ""
     )
     staged = Path(file_path) if file_path else None
@@ -804,7 +804,7 @@ def rewrite(
         cmd_id,
         {
             "pack_dir": result.get("pack_dir") or "",
-            "critique_id": result.get("critique_id") or "",
+            "peer_review_id": result.get("peer_review_id") or "",
             "counts": counts,
             "edits": counts.get("edits", 0),
             "skips": counts.get("skips", 0),
@@ -837,7 +837,7 @@ def stuff(
         return
     from pathlib import Path
 
-    from ..critique_extract import ExtractError, extract_path
+    from ..peer_review_extract import ExtractError, extract_path
     from ..lint import resolve_pdf_path
     from ..llm.validate import LlmConfigError
     from ..rag.index import (

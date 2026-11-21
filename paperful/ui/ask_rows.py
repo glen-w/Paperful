@@ -1,4 +1,4 @@
-"""Ask / Briefs / critique row builders (no HTML)."""
+"""Ask / Briefs / peer-review row builders (no HTML)."""
 
 from __future__ import annotations
 
@@ -112,8 +112,8 @@ def ask_page_flags(cfg: Config) -> dict[str, Any]:
     }
 
 
-def list_recent_critiques(cfg: Config, limit: int = 12) -> list[dict[str, Any]]:
-    root = cfg.state_dir / "critiques"
+def list_recent_peer_reviews(cfg: Config, limit: int = 12) -> list[dict[str, Any]]:
+    root = cfg.state_dir / "peer-reviews"
     if not root.is_dir():
         return []
     packs: list[tuple[float, dict[str, Any]]] = []
@@ -132,12 +132,14 @@ def list_recent_critiques(cfg: Config, limit: int = 12) -> list[dict[str, Any]]:
                     body = raw
             except (OSError, ValueError):
                 body = {}
+            if body.get("schema") != "paperful.peer_review.pack.v1":
+                continue
             counts = body.get("counts") or {}
             packs.append(
                 (
                     stamp.stat().st_mtime,
                     {
-                        "critique_id": cid_dir.name,
+                        "peer_review_id": cid_dir.name,
                         "stamp": stamp.name,
                         "title": (body.get("input") or {}).get("title") or cid_dir.name,
                         "findings": counts.get("findings", 0),
@@ -203,10 +205,10 @@ def stuff_pack_markdown(cfg: Config, pack_dir: str) -> str:
         return ""
 
 
-def critique_pack_markdown(cfg: Config, pack_dir: str) -> str:
+def peer_review_pack_markdown(cfg: Config, pack_dir: str) -> str:
     folder = Path(pack_dir)
     try:
-        folder.resolve().relative_to((cfg.state_dir / "critiques").resolve())
+        folder.resolve().relative_to((cfg.state_dir / "peer-reviews").resolve())
     except (ValueError, OSError):
         return ""
     md = folder / "pack.md"

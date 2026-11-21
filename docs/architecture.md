@@ -17,7 +17,7 @@ concern each (`*_cmd.py` is the body of a CLI verb after flag parsing; the
 module it names does the work). Subpackages: `sources/` (fetch lanes),
 `resolve/` (identifiers), `snowball/` (crawl, watches, citation graph),
 `search/` (SearXNG grey search), `network/` (co-author SNA), `rag/` (index,
-Ask), `sections/` (IMRaD extract), `critique_checks/` (deterministic
+Ask), `sections/` (IMRaD extract), `peer_review_checks/` (deterministic
 manuscript checks), `llm/` (providers), `interop/` (RIS / BibTeX / EndNote
 XML), `sr/` (systematic-review protocol and screening ledger), `ui/` (the
 workbench), `data/` (shipped grey-lit packs). The module-by-module map is in
@@ -158,11 +158,11 @@ never leave a half-written `record.json` or run report.
 | `state/rag/evidence/` | Advanced Ask passage summaries (chunk + question + model cache). Rebuildable |
 | `state/rag/questions/<key>.json` | `rag questions` / Index extract RQs (`paperful.rag.questions.v1`, provenance `rule`\|`llm`) |
 | `state/sections/<key>.json` | `extract-sections` IMRaD fields (`paperful.sections.v1`, provenance `rule`\|`grobid`\|`llm`; optional `engine`; optional `state/section-headings.toml` synonyms) |
-| `state/grobid/<sha256>.tei.xml` | GROBID TEI cache (`paperful.grobid.tei.v1` sidecar JSON). Reused by `extract-sections`, `[rag].parser = "grobid"`, and `critique --lane marg` PDF chunks |
+| `state/grobid/<sha256>.tei.xml` | GROBID TEI cache (`paperful.grobid.tei.v1` sidecar JSON). Reused by `extract-sections`, `[rag].parser = "grobid"`, and `peer-review --lane marg` PDF chunks |
 | `state/rq-answered/<stamp>/` | `rag answered` / Index already-answered pack (`paperful.rq_answered.v1`, `pack.md`) |
 | `state/prompts/` | Operator-saved Ask system prompts from the Index form (“Save as…”); listed in the custom-prompt select |
 | `state/gui/uploads/` | Workbench uploads (Discover import, Index prompt/questions files); basename only |
-| `state/critiques/<id>/<stamp>/` | `critique` pack (`paperful.critique.pack.v1`, `pack.md`: findings, metrics, optional reviewer notes). Context / context-web also write `context.json` (`paperful.critique.context.v1`). `<id>` is a library item key or `file-<filename-stem>` for uploads. Dismissals: `state/critiques/<id>/dismissed.jsonl`. Uploads: `state/critiques/uploads/` |
+| `state/peer-reviews/<id>/<stamp>/` | `peer-review` pack (`paperful.peer_review.pack.v1`, `pack.md`: findings, metrics, optional reviewer notes). Context / context-web also write `context.json` (`paperful.peer_review.context.v1`). `<id>` is a library item key or `file-<filename-stem>` for uploads. Dismissals: `state/peer-reviews/<id>/dismissed.jsonl`. Uploads: `state/peer-reviews/uploads/` |
 | `state/rewrites/<id>/<stamp>/` | `rewrite` pack (`paperful.rewrite.pack.v1`, `plan.json` `paperful.rewrite.plan.v1`, optional sidecar / `tracked.docx` / `.pptx` / `.odt` / `.pdf`). Never overwrites the source manuscript |
 | `state/stuff/<id>/<stamp>/` | `stuff` pack (`paperful.stuff.pack.v1`, `pack.md`). Extra library cites per claim. No manager writes |
 | `state/reports/<slug>.html` | `synthesize` literature review; sibling `<slug>.json` records source hashes |
@@ -175,7 +175,7 @@ never leave a half-written `record.json` or run report.
 | `state/fetch-wins.jsonl` | One line per vault or browser-agent PDF (host and path; query string dropped). Agent rows may include a `steps` trace and promotable `click:` / `rewrite` wins. Input to `paperful playbooks propose` |
 | `state/playbooks-proposed.toml` | Draft learned pack from `playbooks propose`. Not loaded until `playbooks promote` |
 | `state/last-run.json` | Latest `run` or `recover` report (`paperful.run_report.v1`). Other verbs do not replace it |
-| `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `reachout`, `lint`, `screen`, `critique`, `rewrite`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, `extract-sections`, `ask`, and `snapshot` |
+| `state/runs/<stamp>-<command>.json` | One report per `run`, `recover`, `gaps`, `reachout`, `lint`, `screen`, `peer-review`, `rewrite`, `fix-metadata` (dry-run and `--apply`), `attachments` (dry-run and `--apply`), `summarize`, `synthesize`, `extract-sections`, `ask`, and `snapshot` |
 | `state/packs/<id>.json` | Parent witness (`paperful.pack.v1`) listing those reports for one `pack open` … `pack close` sequence. `state/packs/current` names the open id |
 | `state/mendeley-oauth.json` | Mendeley tokens after `session login mendeley` (mode `0600`) |
 | `state/sr/<slug>/` | `sr` protocol (`protocol.json`), screening ledger (`screening.jsonl`), and `prisma.json` / `prisma.svg` from `sr status`. Local; no scheduler |
@@ -207,8 +207,8 @@ below.
 | `extract-sections` | rules always; optional GROBID sidecar; optional `[extract_sections].llm` + `llm.enabled` | `state/sections/<key>.json` | none (disk only) |
 | `ask` | `llm.enabled` + `rag.enabled` | `state/runs/<stamp>-ask.json`; advanced summaries under `state/rag/evidence/` | none unless batch `--apply` |
 | `rag questions` | rules always; optional `[rag].extract_questions_llm` + `llm.enabled` | `state/rag/questions/<key>.json` | none |
-| `critique` | checkers, metrics, heuristic AI-tells always (house glossary expansions when `state/glossary/` has entries); optional `--lane` / `[critique].lanes` suggested review lanes (`reviewers`, `marg`, `adversary`, `outline`, `claims`, `verify`, `context`, `context-web`; `--llm` / `--advanced` aliases; optional GROBID TEI chunks for `marg` / `claims` / `verify`); `context` / `context-web` use three-round retrieve and may write `context.json`; optional `--ai-model` Binoculars extra; optional `--vale` / `[critique].vale` house-style pass | `state/critiques/<id>/<stamp>/` | child note with `--apply` on `--item` only |
-| `rewrite` | apply an existing critique pack (never re-runs critique). Default area `style` (glossary/Vale swaps without a model). Other areas need `[llm].enabled`. Stdlib tracked-changes OOXML | `state/rewrites/<id>/<stamp>/` | none (never overwrites the source) |
+| `peer-review` | checkers, metrics, heuristic AI-tells always (house glossary expansions when `state/glossary/` has entries); optional `--lane` / `[peer_review].lanes` suggested review lanes (`reviewers`, `marg`, `adversary`, `outline`, `claims`, `verify`, `context`, `context-web`; `--llm` / `--advanced` aliases; optional GROBID TEI chunks for `marg` / `claims` / `verify`); `context` / `context-web` use three-round retrieve and may write `context.json`; optional `--ai-model` Binoculars extra; optional `--vale` / `[peer_review].vale` house-style pass | `state/peer-reviews/<id>/<stamp>/` | child note with `--apply` on `--item` only |
+| `rewrite` | apply an existing peer-review pack (never re-runs peer-review). Default area `style` (glossary/Vale swaps without a model). Other areas need `[llm].enabled`. Stdlib tracked-changes OOXML | `state/rewrites/<id>/<stamp>/` | none (never overwrites the source) |
 
 Opt-in **`camofox`** is a registered **serial** source (never in `DEFAULT_SOURCES`) that talks to an external [camofox-browser](https://github.com/jo-inc/camofox-browser) REST server for a scripted DOI→PDF grab. `run` injects it when `[camofox].enabled` and `[camofox].during_run` (default on); `--camofox` / `--no-camofox` override one invocation. Policy order places it after vault lanes and before `browser_agent`. It does not reuse the vault Chromium SSO profile (see [Camofox](camofox.md)).
 
@@ -289,7 +289,7 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
   See [sr-mode](sr-mode.md).
 - `paperful doctor` — preflight. Colours: **green** = ready; **amber** = usable with
   a degraded path (empty email, missing session, expired session when `--probe`,
-  no `pdftotext`, missing `vale` (optional critique house style), rewrite areas
+  no `pdftotext`, missing `vale` (optional peer-review house style), rewrite areas
   other than style when `[llm]` is off, Playwright /
   Chromium not ready, Zotero 7–9 write API,
   incomplete grey-lit pack); **red** on `Zotero :23119` / `out_dir` / `state_dir`
@@ -300,12 +300,12 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
 - `paperful run --dry-run` — no downloads. Per item: **Would-hit** is the
   routed source list in order (full `sources` when `--try-all`).
 - `paperful lint` / `paperful fix-metadata` — identifier hygiene; apply is explicit.
-- `paperful critique` — local manuscript pack (`state/critiques/`). Checkers,
+- `paperful peer-review` — local manuscript pack (`state/peer-reviews/`). Checkers,
   metrics, and heuristic AI-tells without an LLM; optional `--lane` suggested
   comments (`--llm` / `--advanced` aliases), including ScholarPeer-inspired
   `context` / `context-web` (three-round retrieve; `context.json` sidecar),
   Binoculars extra, and Vale house-style pass. Not a grade and not in `all`.
-- `paperful rewrite` — apply a critique pack (`state/rewrites/`). Default
+- `paperful rewrite` — apply a peer-review pack (`state/rewrites/`). Default
   area is style. Never overwrites the source. Not a generated paper and not
   in `all`.
 - `paperful dedupe` / `paperful gaps` / `paperful reachout` / `paperful refs gap` / `paperful coverage` — duplicate packs, PDF/DOI counts, contact-only missing-PDF CSV (never fetches, never sends mail), cited-in-PDF missing-from-library packs, and briefing/note/file vs `-C` coverage. `refs gap` and `coverage` are always dry-run (`state/refs-gaps/`, `state/coverage/`). `ingest-dois` creates parents from those packs or a DOI file only with `--apply`.
@@ -382,7 +382,7 @@ and `--pdfs`. Prefer `… --format json`
 from a shell. `paperful serve` (`paperful[serve]`) binds localhost HTTP: JSON
 capability routes (health, doctor, collections, last-run, dry-run `refs-gap` /
 `ask`) plus the server-rendered workbench (`paperful.ui` — Wanted, Discover,
-Ask, Library, Activity, System; Advanced Repair / Mirror / Index / Briefs / Critique /
+Ask, Library, Activity, System; Advanced Repair / Mirror / Index / Briefs / Peer review /
 Suggest edits / Stuff / Settings). An origin guard (`ui/origin_guard.py`) refuses
 cross-origin non-GET requests with 403 before any route runs; there is still no login.
 `mount_ui` registers HTML/form routes from `*_routes.py` modules; shared helpers stay in `app.py`.
@@ -398,7 +398,7 @@ and the library can write. Apply writes the catalogue too. See [gui.md](gui.md).
 TTY-only paths (a GUI must not claim them): `session login`, `doctor --guide`,
 mid-run EZProxy re-login, and snowball `approve-each`.
 
-Child notes from summarize / synthesize / remarks / snowball / briefing / critique `--apply` start
+Child notes from summarize / synthesize / remarks / snowball / briefing / peer-review `--apply` start
 with a scannable line and a `<!-- paperful.note.v1 {…} -->` comment (`type`,
 `verb`, `model`, `run_id`, `prompt_sha`).
 
@@ -410,7 +410,7 @@ follow-up may cite only this turn’s excerpts.
 
 Manifest `counts` keys match ledger statuses (`ok`, `attached`, `not_found`, …).
 
-`gaps`, `lint`, `screen`, `critique`, `rewrite`, `summarize`, and `fix-metadata` (dry-run and `--apply`) write the same schema under `state/runs/` and do not replace `last-run.json`. Their `summary` adds command-specific keys (`no_stored_pdf`, `findings` / `findings_by_code`, `edits` / `skips`, `summarized` / `failed`, `patches_proposed`). A dry-run `fix-metadata` report omits `patches_applied`.
+`gaps`, `lint`, `screen`, `peer-review`, `rewrite`, `summarize`, and `fix-metadata` (dry-run and `--apply`) write the same schema under `state/runs/` and do not replace `last-run.json`. Their `summary` adds command-specific keys (`no_stored_pdf`, `findings` / `findings_by_code`, `edits` / `skips`, `summarized` / `failed`, `patches_proposed`). A dry-run `fix-metadata` report omits `patches_applied`.
 
 (pack-v1)=
 ## Run packs (`paperful.pack.v1`)

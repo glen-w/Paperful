@@ -1,4 +1,4 @@
-"""Apply-from-critique rewrite packs (offline)."""
+"""Apply-from-peer-review rewrite packs (offline)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from paperful.critique import make_finding
+from paperful.peer_review import make_finding
 from paperful.rewrite import build_rewrite
 from paperful.rewrite_align import align_finding
 from paperful.rewrite_areas import (
@@ -44,8 +44,8 @@ See Smith (2020) for background.
 
 def _pack(findings: list[dict], *, cid: str = "file-draft", path: str = "") -> dict:
     return {
-        "schema": "paperful.critique.pack.v1",
-        "critique_id": cid,
+        "schema": "paperful.peer_review.pack.v1",
+        "peer_review_id": cid,
         "input": {"kind": "file", "title": "draft.md", "path": path},
         "findings": findings,
         "llm": None,
@@ -288,7 +288,7 @@ def test_cli_requires_pack(cfg, tmp_path: Path):
     src.write_text(DRAFT, encoding="utf-8")
     res = runner.invoke(app, ["rewrite", "--file", str(src), "--config", str(cfg_path)])
     assert res.exit_code == 1
-    assert "critique pack" in (res.output or "").lower()
+    assert "peer-review pack" in (res.output or "").lower()
 
 
 def test_cli_pack_and_dry_run(cfg, tmp_path: Path):
@@ -296,7 +296,7 @@ def test_cli_pack_and_dry_run(cfg, tmp_path: Path):
 
     src = tmp_path / "draft.md"
     src.write_text(DRAFT, encoding="utf-8")
-    pack_dir = cfg.state_dir / "critiques" / "file-draft" / "20261027T000000Z"
+    pack_dir = cfg.state_dir / "peer-reviews" / "file-draft" / "20261027T000000Z"
     pack_dir.mkdir(parents=True)
     payload = _pack([_finding()], path=str(src))
     (pack_dir / "pack.json").write_text(json.dumps(payload), encoding="utf-8")
@@ -333,7 +333,7 @@ def test_cli_pack_and_dry_run(cfg, tmp_path: Path):
     )
 
 
-def test_cli_requires_pack_names_critique_command(cfg, tmp_path: Path):
+def test_cli_requires_pack_names_peer_review_command(cfg, tmp_path: Path):
     from paperful.cli import app
 
     cfg_path = tmp_path / "config.toml"
@@ -344,7 +344,7 @@ def test_cli_requires_pack_names_critique_command(cfg, tmp_path: Path):
     src.write_text(DRAFT, encoding="utf-8")
     res = runner.invoke(app, ["rewrite", "--file", str(src), "--config", str(cfg_path)])
     assert res.exit_code == 1
-    assert "paperful critique --file" in (res.output or "")
+    assert "paperful peer-review --file" in (res.output or "")
 
 
 def test_cli_all_skip_dry_run_exits_partial(cfg, tmp_path: Path):
@@ -352,7 +352,7 @@ def test_cli_all_skip_dry_run_exits_partial(cfg, tmp_path: Path):
 
     src = tmp_path / "draft.md"
     src.write_text(DRAFT, encoding="utf-8")
-    pack_dir = cfg.state_dir / "critiques" / "file-draft" / "20261027T000001Z"
+    pack_dir = cfg.state_dir / "peer-reviews" / "file-draft" / "20261027T000001Z"
     pack_dir.mkdir(parents=True)
     payload = _pack(
         [_finding(quote="this quote is not in the draft at all")], path=str(src)
@@ -398,7 +398,7 @@ def test_cli_drifted_file_records_drift(cfg, tmp_path: Path):
         "The BBNJ Agreement covers Areas Beyond National Jurisdiction.\n",
         encoding="utf-8",
     )
-    pack_dir = cfg.state_dir / "critiques" / "file-draft" / "20261027T000002Z"
+    pack_dir = cfg.state_dir / "peer-reviews" / "file-draft" / "20261027T000002Z"
     pack_dir.mkdir(parents=True)
     payload = _pack([_finding()], path=str(original))
     payload["input"]["hash"] = file_sha256(original)
@@ -785,11 +785,11 @@ def test_worklog_lists_needs_author(cfg, tmp_path: Path):
     assert any("needs_author" in s for s in skipped)
 
 
-def test_cli_never_imports_build_critique():
+def test_cli_never_imports_build_peer_review():
     from paperful import rewrite_cmd
 
     src = Path(rewrite_cmd.__file__).read_text(encoding="utf-8")
-    assert "build_critique" not in src
+    assert "build_peer_review" not in src
 
 
 def test_leakage_and_promise_are_ungrounded():

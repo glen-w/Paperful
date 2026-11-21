@@ -10,8 +10,8 @@ from urllib.parse import quote
 import httpx
 
 from ..config import Config
-from ..critique import Finding, make_finding
-from ..critique_extract import ExtractedDoc, loc_of_span
+from ..peer_review import Finding, make_finding
+from ..peer_review_extract import ExtractedDoc, loc_of_span
 from ..identity import LibraryFingerprint
 from ..refs_gap import aggregate_citations
 from ..resolve import DOI_RE, normalize_doi
@@ -76,7 +76,7 @@ def _bibliography_and_cites(
     years = [e.get("year") for e in entries if isinstance(e.get("year"), int)]
     item_year = getattr(item, "year", None) if item is not None else None
     if years and item_year:
-        age_cut = cfg.critique_cite_age_years
+        age_cut = cfg.peer_review_cite_age_years
         old = [y for y in years if item_year - int(y) >= age_cut]
         newest = max(years)
         if old:

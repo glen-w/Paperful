@@ -258,7 +258,7 @@ def run_stuff(
     from pathlib import Path
 
     from .catalogue import open_library
-    from .critique_extract import ExtractError, extract_path
+    from .peer_review_extract import ExtractError, extract_path
     from .lint import resolve_pdf_path
     from .llm import LLMClientError
     from .llm.validate import LlmConfigError

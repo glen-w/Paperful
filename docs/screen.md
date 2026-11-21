@@ -26,7 +26,7 @@ Scope flags (`--library`, `--year-from` / `--year-to`, `-T`, `--limit` /
 (`--json` is the legacy findings array). Reports land in
 `state/runs/<stamp>-screen.json`. Status lookups are cached under `state/pps/status/`; fingerprint CSVs under `state/pps/fingerprints/`.
 
-Matching is **fully local** once lists are on disk. Run `paperful screen --refresh` (or any online screen/critique that fetches CSVs) to populate the cache; copy the four families from PPS into `[screen].fingerprint_dir` as `tortured.csv`, `scigen.csv`, `mathgen.csv`, and `suspect.csv` if you want an air-gapped source of truth. Offline critique and screen use cache or `fingerprint_dir` and do not call IRIT.
+Matching is **fully local** once lists are on disk. Run `paperful screen --refresh` (or any online screen/peer-review that fetches CSVs) to populate the cache; copy the four families from PPS into `[screen].fingerprint_dir` as `tortured.csv`, `scigen.csv`, `mathgen.csv`, and `suspect.csv` if you want an air-gapped source of truth. Offline peer-review and screen use cache or `fingerprint_dir` and do not call IRIT.
 
 ## Write-back (`--apply`)
 
@@ -35,9 +35,9 @@ Matching is **fully local** once lists are on disk. Run `paperful screen --refre
 
 Bibliographic fields are never changed.
 
-`paperful critique` reuses the same Crossref / OpenAlex status cache for
+`paperful peer-review` reuses the same Crossref / OpenAlex status cache for
 **cited** works in a manuscript bibliography (`cited_retracted`,
-`cited_withdrawn`, `cited_expression_of_concern`). See [critique](critique.md).
+`cited_withdrawn`, `cited_expression_of_concern`). See [peer_review](peer-review.md).
 
 ## Config
 

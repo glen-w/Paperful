@@ -14,9 +14,9 @@ from hashlib import sha256
 from typing import Any
 
 from .config import Config
-from .critique import Finding, make_finding
-from .critique_extract import ExtractedDoc, loc_of_span
-from .critique_llm import findings_from_comments, grounded, parse_llm_json
+from .peer_review import Finding, make_finding
+from .peer_review_extract import ExtractedDoc, loc_of_span
+from .peer_review_llm import findings_from_comments, grounded, parse_llm_json
 from .grounding import budget_slice
 from .zot import Item
 
@@ -184,10 +184,10 @@ def suggested_from_outline(
     ledger = outline_ledger(slices, cfg)
     thin = _thin_findings(doc, slices)
     excerpt = pack_outline_excerpt(
-        doc.text, slices, int(cfg.critique_max_context_chars or 24_000)
+        doc.text, slices, int(cfg.peer_review_max_context_chars or 24_000)
     )
     packed_hay = excerpt.lower() or (hay or "")
-    cap = max(1, int(getattr(cfg, "critique_outline_max_comments", 12) or 12))
+    cap = max(1, int(getattr(cfg, "peer_review_outline_max_comments", 12) or 12))
     timeout_s = float(cfg.llm_timeout_s or 120)
     meta: dict[str, Any] = {
         "id": "outline",
@@ -229,9 +229,9 @@ def suggested_from_outline(
     prompt_sha = sha256((_SYSTEM + user[:2000]).encode("utf-8")).hexdigest()[:12]
     meta["prompt_sha"] = prompt_sha
     say("Outline lane…")
-    from .critique_llm import chat_with_json_retry, critique_chat_request
+    from .peer_review_llm import chat_with_json_retry, peer_review_chat_request
 
-    request = critique_chat_request(
+    request = peer_review_chat_request(
         model=model,
         messages=(
             {"role": "system", "content": _SYSTEM},

@@ -39,7 +39,7 @@ Putting that check back on CI is step 5 of the
 - EndNote `.enl` / `.Data` (desktop library on the host; Paperful never writes SQLite —
   see [EndNote](endnote.md))
 - Any scripts that read `out/` / `state/` as files
-- Optional `vale` for `critique --vale` (not in the image; `doctor` ambers if missing)
+- Optional `vale` for `peer-review --vale` (not in the image; `doctor` ambers if missing)
 
 The container talks to host Zotero over the local API (`:23119`). Session
 vaults and the write key must be the **same** `state/` tree the container
@@ -161,7 +161,7 @@ and point `[grobid].base_url` at it (for example
 `http://host.docker.internal:8070` from a container, or `http://grobid:8070`
 on the Compose network). Keep loopback in `config.toml`; Paperful rewrites it
 via `PAPERFUL_GROBID_HOST`. Plan for several GB of RAM. Scans need
-`paperful ocr` first. `critique --lane marg` reuses the same TEI cache for
+`paperful ocr` first. `peer-review --lane marg` reuses the same TEI cache for
 PDF chunks.
 
 ### Optional Camofox sidecar
@@ -292,7 +292,7 @@ instead of `uv run paperful`. Headed `session login` is still host-only.
 - Poppler (`pdftotext`), OCRmyPDF, Tesseract (`eng`)
 - `[serve]` always; **heavy** also `[llm]` `[rag]` `[browser-agent]`
 - Vale is **not** in the image. `doctor` ambers when `vale` is missing; install
-  it on the host (or a custom image) if you want `critique --vale`
+  it on the host (or a custom image) if you want `peer-review --vale`
 - Non-root user `paperful` (uid 1000)
 
 If bind-mounted `out/` / `state/` are not writable, fix ownership on the host

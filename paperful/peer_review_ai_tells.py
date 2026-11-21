@@ -1,4 +1,4 @@
-"""Heuristic LLM-style prose signals for critique (not proof of AI authorship).
+"""Heuristic LLM-style prose signals for peer-review (not proof of AI authorship).
 
 Zero-dependency stylometry inspired by ADAFAI (MIT): burstiness, stock phrases,
 discourse scaffolds, unicode forensics. Abstains below 150 words.
@@ -11,8 +11,8 @@ import re
 import statistics
 from typing import Any
 
-from .critique_direct_quotes import elide_direct_quotes
-from .critique_metrics import split_sentences, tokenize
+from .peer_review_direct_quotes import elide_direct_quotes
+from .peer_review_metrics import split_sentences, tokenize
 
 MIN_AI_TELL_WORDS = 150
 MAX_PHRASE_FINDINGS = 5

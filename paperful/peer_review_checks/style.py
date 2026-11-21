@@ -6,10 +6,10 @@ import re
 from typing import Any
 from urllib.parse import urlparse
 
-from ..critique import Finding, make_finding
-from ..critique_direct_quotes import offset_in_direct_quote, snippet_in_direct_quote
-from ..critique_extract import ExtractedDoc, loc_of_span
-from ..critique_stats import scan_stats
+from ..peer_review import Finding, make_finding
+from ..peer_review_direct_quotes import offset_in_direct_quote, snippet_in_direct_quote
+from ..peer_review_extract import ExtractedDoc, loc_of_span
+from ..peer_review_stats import scan_stats
 from ..zot import Item
 from ._common import (
     _CONSORT_HINT,
@@ -180,12 +180,12 @@ def _fmt_metric(value: Any, digits: int = 1) -> str:
 
 def _style_metrics(doc: ExtractedDoc) -> list[Finding]:
     """Readability / lexical summaries plus suggested AI-prose tells."""
-    from ..critique_ai_tells import (
+    from ..peer_review_ai_tells import (
         MAX_PHRASE_FINDINGS,
         MIN_AI_TELL_WORDS,
         compute_ai_tells,
     )
-    from ..critique_metrics import compute_style_metrics
+    from ..peer_review_metrics import compute_style_metrics
 
     text = doc.text or ""
     metrics = compute_style_metrics(text)

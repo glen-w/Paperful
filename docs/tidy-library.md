@@ -29,7 +29,7 @@ second copy of the same paper.
 ## Walkthrough
 
 1. Set the collection chip. Toggle **Advanced** in the header. Extra nav
-   appears: Repair, Mirror, Index, Briefs, Critique, Suggest edits, Stuff,
+   appears: Repair, Mirror, Index, Briefs, Peer review, Suggest edits, Stuff,
    Settings. The toggle is a cookie; it reveals pages and fields, it does
    not enable Scholar, Sci-Hub, or a model.
 

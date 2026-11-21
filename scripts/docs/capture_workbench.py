@@ -371,9 +371,9 @@ def main() -> None:
         _shot(page, "briefs.png")
 
         # Manuscript aids (Advanced). Forms only; nothing is submitted.
-        page.goto(f"{BASE}/critique", wait_until="domcontentloaded")
+        page.goto(f"{BASE}/peer-review", wait_until="domcontentloaded")
         _ready(page)
-        _shot(page, "critique.png")
+        _shot(page, "peer-review.png")
 
         page.goto(f"{BASE}/rewrite", wait_until="domcontentloaded")
         _ready(page)

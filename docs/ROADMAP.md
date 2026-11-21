@@ -30,12 +30,12 @@ everything.” `paperful ocr` is the optional text layer for scans. **1.0.0 and
 tree). **1.2.0** adds snowball stopping rules, off by default. **1.7.0**
 (2026-11-02) is the hardening and platform cut. **1.8.0** hardened the
 workbench and ledgers, **1.9.0** cut GitHub CI back to smoke, **1.9.1** and
-**1.9.2** are the critique and rewrite trust waves, and **1.9.3**
+**1.9.2** are the peer-review and rewrite trust waves, and **1.9.3**
 (2026-11-16) ships [`paperful since`](since.md), the first item on the live
 order. **1.9.4** ships the second, `refs gap` memory, and restores lint
-and the full suite on CI. **1.9.5** (2026-11-18) ships critique
+and the full suite on CI. **1.9.5** (2026-11-18) ships peer-review
 `context` / `context-web` three-round retrieve, a `context.json` sidecar, and
-split novelty Q then A ([critique.md](critique.md)). **1.9.6** (2026-11-19)
+split novelty Q then A ([peer_review.md](peer-review.md)). **1.9.6** (2026-11-19)
 ships cited-source locators on `--lane claims` and CLI `ask --claim-check`
 ([rag.md](rag.md#claim-check)). **1.9.7** (2026-11-20) ships hop-0
 `--prioritize` (`recency` / `popular` / `historical`) on keyword and hybrid
@@ -290,7 +290,7 @@ snowball queue itself — then delete the join and keep the queue.
 
 **Status:** stage 1 shipped (`paperful ask --claim-check --file` / `--item`;
 `paperful.claim_check.v1` under `state/ask-claims/`). Later stages stay
-parked. Cited-source locators on `critique --lane claims` are separate
+parked. Cited-source locators on `peer-review --lane claims` are separate
 (held `state/rag/text` for works you already cited).
 
 Ask can cite a passage. It can also write a smooth paragraph that
@@ -585,7 +585,7 @@ install.
 | --- | --- | --- |
 | Ocean / BBNJ | [bbnj-author-lanes](bbnj-author-lanes.md), grey packs, `author_site`, `authorwatch` | `since` and the topic gap map on `ocean/BBNJ` |
 | Policy grey | `search` / `search watch`, RFMO and UN-doc playbooks | Playbook health on learned rows, or `siblings` if the holdings actually link out |
-| Journal desk | Shipped example packs `styles/JMLC`, `styles/JCP`, `styles/MarinePolicy`; `critique` | Claim-check on one manuscript extract. Not a new style product |
+| Journal desk | Shipped example packs `styles/JMLC`, `styles/JCP`, `styles/MarinePolicy`; `peer-review` | Claim-check on one manuscript extract. Not a new style product |
 
 Do not open a fourth desk to justify a feature.
 
@@ -945,7 +945,7 @@ on files you point at.
 investigate**, never misconduct verdicts. PaperGuard reports severity tiers,
 BH–FDR across findings, and mandatory `innocent_explanations` per hit; it
 refuses “fraud” vocabulary in reports. Paperful uses the same copy pattern on
-[`screen`](screen.md) and [`critique`](critique.md) (`pps_*`, overlap,
+[`screen`](screen.md) and [`peer-review`](peer-review.md) (`pps_*`, overlap,
 `cited_retracted`). Do not merge the tools into one “integrity score.”
 
 **What PaperGuard ships that Paperful does not (and should not re-vendor).**
@@ -953,16 +953,16 @@ refuses “fraud” vocabulary in reports. Paperful uses the same copy pattern o
 | Area | PaperGuard (indicative) | Paperful today |
 | --- | --- | --- |
 | **Spreadsheet / table fabrication** | Terminal-digit tests (Mosimann; Geng 0/5 preference), Benford, constant-diff/ratio columns, decimal consistency, implausible sentinels | No — manuscripts are prose/PDF, not lab notebooks |
-| **Stats recomputation** | Full **statcheck** (t/F/χ²/r/z/Q; one- and two-tailed); **GRIM / GRIMMER / SPRITE**; **TIVA**; **P-curve**; decision-reversal flags | [`critique`](critique.md): stdlib **subset** (`statcheck_p_mismatch`, `grim_impossible_mean`, `p_without_n`) — no scipy/R, not a statcheck port |
-| **RCT / trials** | Carlisle baseline imbalance; ClinicalTrials.gov outcome consistency (T2); trial-ID extraction (NCT, ISRCTN, …) | Critique **checklist mentions** only (`checklist_prisma` / `consort`) |
+| **Stats recomputation** | Full **statcheck** (t/F/χ²/r/z/Q; one- and two-tailed); **GRIM / GRIMMER / SPRITE**; **TIVA**; **P-curve**; decision-reversal flags | [`peer-review`](peer-review.md): stdlib **subset** (`statcheck_p_mismatch`, `grim_impossible_mean`, `p_without_n`) — no scipy/R, not a statcheck port |
+| **RCT / trials** | Carlisle baseline imbalance; ClinicalTrials.gov outcome consistency (T2); trial-ID extraction (NCT, ISRCTN, …) | Peer review **checklist mentions** only (`checklist_prisma` / `consort`) |
 | **Image forensics** | Cross-image pHash (F1), intra-image ORB+RANSAC (F2), splice/copy-move (F3/F6), persistent cross-paper pHash store (F4), EXIF timelines (G1) | No — optional figure **pullouts** in briefs are captions + pages, not forensics |
-| **Text / mill signals** | Corpus similarity (T1), 150+ tortured phrases (T4), stylometry (T5), AI-text stack (T6–T9, opt-in `--ml-check`), paper-mill **citation-graph** fingerprints (M1) | [`screen`](screen.md): PPS CSV fingerprints + retraction/PubPeer; critique repeats tortured phrases on the **draft extract** |
-| **Cross-corpus checks** | Retraction Watch + CrossRef, PubPeer, ORI CSV, OpenAlex DOI metadata | Same **retraction / EoC** cache for `screen` and **cited** works in critique |
-| **Operator surface** | `paperguard scan`, batch, HTML/JSON, plugin detectors, optional multi-tenant Web UI, LLM `explain` | `screen` / `critique` on collection or `--file`; mirror paths under `out/` |
+| **Text / mill signals** | Corpus similarity (T1), 150+ tortured phrases (T4), stylometry (T5), AI-text stack (T6–T9, opt-in `--ml-check`), paper-mill **citation-graph** fingerprints (M1) | [`screen`](screen.md): PPS CSV fingerprints + retraction/PubPeer; peer-review repeats tortured phrases on the **draft extract** |
+| **Cross-corpus checks** | Retraction Watch + CrossRef, PubPeer, ORI CSV, OpenAlex DOI metadata | Same **retraction / EoC** cache for `screen` and **cited** works in peer-review |
+| **Operator surface** | `paperguard scan`, batch, HTML/JSON, plugin detectors, optional multi-tenant Web UI, LLM `explain` | `screen` / `peer-review` on collection or `--file`; mirror paths under `out/` |
 
 **What Paperful already covers without PaperGuard.** Collection-wide **PPS +
 retraction** on holdings (`screen`); **pre-submission reading packs**
-(`critique`: structure, refs, floats, ethics mentions, library overlap, optional
+(`peer-review`: structure, refs, floats, ethics mentions, library overlap, optional
 Vale and composable review lanes — reviewers, MARG-S, ScholarPeer-inspired
 `context` / `context-web` with three-round retrieve and a compact investigation
 log; not vendored, not venue scores). That is “does this draft hang together and cite retracted
@@ -972,14 +972,14 @@ works?” — not “are these CSV means GRIM-impossible?”
 
 1. **Docs + comparison routing (now).** Short-answer row in
    [comparison.md](comparison.md); vendor notes in
-   [comparison reference](comparison-reference.md#paperguard). Critique
+   [comparison reference](comparison-reference.md#paperguard). Peer review
    `statcheck_p_mismatch` footer should point heavy stats/table jobs at
    PaperGuard, not promise parity.
 2. **Mirror hand-off (test).** For a mirrored item, document a stable recipe:
    export supplementary CSV/XLSX from `out/…/attachments/` (or operator path)
    → `paperguard scan -f …` → keep JSON beside the item folder. No PyPI
    dependency until a tester asks for one-command glue.
-3. **`paperful critique --forensics` (shipped).** Optional subprocess wrapper:
+3. **`paperful peer-review --forensics` (shipped).** Optional subprocess wrapper:
    run PaperGuard on `--file` or on the item PDF plus sibling csv/xlsx/xls;
    ingest findings as a **separate pack section** (`suggested` lane, external
    tool attribution). Fail closed if `paperguard` is not on `PATH`. Never fold
@@ -990,7 +990,7 @@ works?” — not “are these CSV means GRIM-impossible?”
    `state/runs/<stamp>-forensics.json` (schema TBD). Still no auto-tag of
    misconduct — optional `--apply` might only add a child note “forensics pack
    available” with a path, same honesty as `screen --apply`.
-5. **Workbench (roadmap).** Advanced Critique panel: “Open forensics report”
+5. **Workbench (roadmap).** Advanced Peer review panel: “Open forensics report”
    when a sidecar JSON exists; link out to PaperGuard HTML export. Not on the
    default nav.
 6. **MCP (roadmap).** Read-only `forensics_status` for agents: “last
@@ -1005,23 +1005,23 @@ ML western-blot classifier, Redis-backed Web UI cache) stay **their** bets.
 **Borrow only where cheap and honest.**
 
 - **Convergence framing** — when multiple independent checker families fire,
-  critique pack prose can say “multiple clusters — investigate” (PaperGuard’s
+  peer-review pack prose can say “multiple clusters — investigate” (PaperGuard’s
   combiner pattern), without importing their severity math.
 - **Recall discipline** — PaperGuard documents cohort mismatch (e.g. OA PDF
   text vs inline NHST; vector figures vs raster supplements). Mirror the same
-  honesty in critique overlap and screen copy (“supplementary CSV only”, “PDF
+  honesty in peer-review overlap and screen copy (“supplementary CSV only”, “PDF
   text layer required”).
 - **Keeping-up hook** — when `keepup` or `screen` surfaces a new retraction,
   optional footnote: “re-run file forensics if you relied on supplementary
   tables from this item” (operator checklist, not automated).
-- **Binoculars Falcon load (critique `--ai-model`, housekeeping).** Upstream
+- **Binoculars Falcon load (peer-review `--ai-model`, housekeeping).** Upstream
   `binoculars` still loads `tiiuae/falcon-7b` / `falcon-7b-instruct` with
   `trust_remote_code=True`, which prints Hugging Face’s legacy-Falcon warning
   (“fully ported into transformers … load without trust_remote_code”). Fix when
   convenient: pin a transformers release with native Falcon and load without
   remote code (prefer an upstream Binoculars PR; thin Paperful wrapper only if
   upstream stalls). Keep scoring Hugging Face-offline; never treat the score as
-  authorship proof. See [critique.md](critique.md) (optional AI-text extra).
+  authorship proof. See [peer_review.md](peer-review.md) (optional AI-text extra).
 
 Factory-stage context: PaperGuard strengthens **screen / audit** on **files**;
 Paperful 1.x **screen** is **metadata + PPS on PDFs you hold**. See
@@ -1325,7 +1325,7 @@ until Wanted is honest. Do not grow 1.x into a second product.
 | Borrow | Stage | Honesty bar | Home |
 | --- | --- | --- | --- |
 | PaperQA2 loop: held PDFs → chunk → retrieve → **cited answer with page pointers**; no answer if the PDF is missing. **Shipped** as Ask `simple` plus `--ask-mode advanced` (score then answer on the local index; no vendored `paper-qa`) | Extract / synthesize | `[rag]` off by default; never call the manager from Ask | [Zotero-RAG](#zotero-rag-integration-later-question-centric-layer) |
-| Refuse the sentence if you cannot click the passage (`has_successful_answer`) | Synthesize / critique | Copy test, not a world-model store | Edison borrow #4 above |
+| Refuse the sentence if you cannot click the passage (`has_successful_answer`) | Synthesize / peer-review | Copy test, not a world-model store | Edison borrow #4 above |
 | Split **novelty pack** from **synthesis** before any outline | Novelty vs synthesize | Stamp `held` vs `public-metadata-only`; never “nobody has done this” | Wave 4 (shipped: `paperful precedent`) |
 | Continuation / cheap vs high-effort as a **user-visible** Ask control | Synthesize | Local model; do not claim LABBench wins | [Ask](#after-110-briefs-ask) |
 | Conflicting-evidence `synthesize` (question → methods → findings → limits) over **your** PDFs. **Shipped** as `--layout conflict` / `review` | Synthesize | Held full text only | [Briefs](#after-110-briefs-ask) |
@@ -1335,10 +1335,10 @@ until Wanted is honest. Do not grow 1.x into a second product.
 | Official PRISMA flow from **exact counts**, not AI-illustrated diagrams | Screen / export | Methods figure | [SR mode](#after-110-bigger-bets) |
 | Point at Better BibTeX + Quarto (do not vendor CSL) | Write / export | Parked until testers ask | [Parked](#after-110-parked) |
 | ASReview-class ranking only as optional local embeddings | Screen | Not dual review | [Embeddings](#after-110-embeddings) |
-| Post-hoc Crossref / retraction check after a draft | Critique | Existence ≠ claim support | [critique.md](critique.md) |
-| ScholarPeer historian / scout / novelty Q&A (three-round retrieve, investigation log; no venue scores) | Critique | Suggested lane only; local RAG or opt-in OpenAlex/SearXNG; not OSP | [critique.md](critique.md) (shipped 1.9.5) |
-| Main-body-first reading of LLM critique (appendix bias literacy; optional prompt/pack slices later) | Critique | Suggested lanes only; no scores; see arXiv:2611.17811 | [critique.md](critique.md#reading-llm-lanes-main-text-vs-appendix), [ROADMAP](#critique-llm-literacy) |
-| Apply a critique pack as locatable edits / tracked changes (worklog, align-then-generate, selected-span prompts; no vendor) | Write | Pack required; never overwrite the source; no invented numbers/cites | [rewrite.md](rewrite.md) (shipped) |
+| Post-hoc Crossref / retraction check after a draft | Peer review | Existence ≠ claim support | [peer_review.md](peer-review.md) |
+| ScholarPeer historian / scout / novelty Q&A (three-round retrieve, investigation log; no venue scores) | Peer review | Suggested lane only; local RAG or opt-in OpenAlex/SearXNG; not OSP | [peer_review.md](peer-review.md) (shipped 1.9.5) |
+| Main-body-first reading of LLM peer-review (appendix bias literacy; optional prompt/pack slices later) | Peer review | Suggested lanes only; no scores; see arXiv:2611.17811 | [peer_review.md](peer-review.md#reading-llm-lanes-main-text-vs-appendix), [ROADMAP](#peer-review-llm-literacy) |
+| Apply a peer-review pack as locatable edits / tracked changes (worklog, align-then-generate, selected-span prompts; no vendor) | Write | Pack required; never overwrite the source; no invented numbers/cites | [rewrite.md](rewrite.md) (shipped) |
 | Deepen `rewrite` from PaperOrchestra **patterns** (allowed-facts worklog, citation checklist, fail-closed critic). Do **not** vendor the pipeline | Write | Still pack-required; critic may only reject or comment; local `[llm]`; no web search from rewrite | [Rewrite deepen](#rewrite-deepen-paperorchestra-patterns) (later) |
 | Deep forensics on supplementary tables / stats / figures (external tool) | Screen / audit | No merged score; subprocess or hand-off | [PaperGuard](#research-integrity-forensics-paperguard) |
 | Named MCP read jobs (`ask` vs precedent vs `refs_gap`); writes stay `--apply` | Agent | Table stakes without a hosted corpus | [Literature-discovery](#literature-discovery-complement-waves) |
@@ -1462,7 +1462,7 @@ Do not start these until testers ask, or until the main lane is boring.
   molecular design) — [Hosted AI scientists](#after-110-edison-scientific).
 - **Auto manuscript / related-work generator** (Jenni/STORM/Sakana/
   PaperOrchestra job). `stuff` may queue extra cites into Zotero; it does
-  not write the paper. [`rewrite`](rewrite.md) is apply-from-critique
+  not write the paper. [`rewrite`](rewrite.md) is apply-from-peer-review
   (hygiene default, pack required), not this parked generator. A later
   **pattern** borrow (worklog / checklist / critic, still not a writer) is
   [Rewrite deepen](#rewrite-deepen-paperorchestra-patterns).
@@ -2218,12 +2218,12 @@ paragraph, no claim rewrite.
 **Job:** for each phrase/claim in a manuscript (or a paper you already
 hold), suggest **X** additional citations from the local index. Implementation
 is the boring loop: split the document into sentences (reuse
-`critique_metrics.split_sentences`) or outline sections (`--lane outline`),
+`peer_review_metrics.split_sentences`) or outline sections (`--lane outline`),
 run each unit through the same retriever as `paperful rag search`
 (`-k` = X), and return the sources (item key, title, pages, score, passage
 snippet). Narrative summary stays off — this is not `ask`.
 
-Same input shape as [`critique`](critique.md): `--item ITEMKEY` (mirror PDF)
+Same input shape as [`peer-review`](peer-review.md): `--item ITEMKEY` (mirror PDF)
 or `--file` (draft path). Search scope is `-C` / year / type, same as
 `rag search`. Exclude the source item from hits. Skip bibliography /
 reference-list blocks and tiny fragments so the pack is not a self-cite
@@ -2238,7 +2238,7 @@ of the reference section.
    quote, locator, up to `k` hits. Fail closed when the index is missing
    or empty. Zero manager writes. `--format json` → `paperful.agent.json.v1`.
    Read-only MCP tool `stuff`.
-2. **Workbench** — **Shipped.** Advanced sibling of Critique: pick item or
+2. **Workbench** — **Shipped.** Advanced sibling of Peer review: pick item or
    upload, background job, download pack.md. Not on the default nav.
 3. **Later (parked until the pack is boring)** — optional `--apply` child
    note on the item; stance labels (supports / contrasts / mentions);
@@ -2273,18 +2273,18 @@ claim verification (“this sentence is true”); stuffing from outside the
 corpus; nightly batch over the whole library; treating heuristic
 similarity as proof the source supports the claim.
 
-Complements `critique` (checkers on the same document), `rag search`
+Complements `peer-review` (checkers on the same document), `rag search`
 (one query), and `ask` (one narrative answer). Distinct from
 [`refs gap`](#bibliography-gap-scan-later-not-gaps) (works named in the
 PDF that you do not own). Buffet context:
 [Summaries, briefs, and Ask](#after-110-briefs-ask).
 
-(critique-llm-literacy)=
-### Critique LLM literacy (appendix bias; later)
+(peer-review-llm-literacy)=
+### Peer review LLM literacy (appendix bias; later)
 
 **Status:** operator copy shipped in
-[critique.md — Reading LLM lanes](critique.md#reading-llm-lanes-main-text-vs-appendix).
-No code change required to use critique; these slices are optional if long
+[peer_review.md — Reading LLM lanes](peer-review.md#reading-llm-lanes-main-text-vs-appendix).
+No code change required to use peer-review; these slices are optional if long
 appendix drafts flood Suggested with noise.
 
 **Context:** Ghosh, Saim, and Jiang
@@ -2314,7 +2314,7 @@ Critical path).
 **Status:** not started. Not on the [live order](#after-17-order). Public
 routing vs the product:
 [comparison reference](comparison-reference.md#paperorchestra). Shipped
-`rewrite` stays apply-from-critique ([rewrite.md](rewrite.md), 1.9.2 trust
+`rewrite` stays apply-from-peer-review ([rewrite.md](rewrite.md), 1.9.2 trust
 wave). This row is a **pattern** borrow from
 [PaperOrchestra](https://github.com/google-research/paper-orchestra)
 (Google Cloud AI Research; idea+log → conference LaTeX; Gemini/OpenAI only).
@@ -2328,7 +2328,7 @@ the source; local `[llm]` (Ollama / LiteLLM). Those *are* the worklog /
 ARIES align-then-generate / selected-span prompts already credited in docs.
 
 **Job if testers ask:** make applying an existing pack safer and more
-consistent, without growing new prose. **Critique** remains where
+consistent, without growing new prose. **Peer review** remains where
 Orchestra-like review quality belongs (`claims`, `adversary`, outline).
 **Rewrite** must not start authoring sections the pack never asked for.
 

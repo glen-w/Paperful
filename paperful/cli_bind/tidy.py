@@ -1,4 +1,4 @@
-"""Signatures: lint, screen, critique, rewrite, glossary, and the repair verbs."""
+"""Signatures: lint, screen, peer-review, rewrite, glossary, and the repair verbs."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import typer
 from paperful.cli import (
     app,
     console,
-    critique_app,
+    peer_review_app,
     glossary_app,
 )
 from paperful.cli_bind._shared import (
@@ -112,8 +112,8 @@ def screen(
     )
 
 
-@critique_app.callback(invoke_without_command=True)
-def critique(
+@peer_review_app.callback(invoke_without_command=True)
+def peer_review(
     ctx: typer.Context,
     item: list[str] = typer.Option(
         [], "--item", help="Library item key already in the mirror."
@@ -131,7 +131,7 @@ def critique(
     ),
     library: bool | None = LibraryOpt,
     dry_run: bool = typer.Option(
-        False, "--dry-run", help="Print findings; do not write state/critiques/."
+        False, "--dry-run", help="Print findings; do not write state/peer-reviews/."
     ),
     apply: bool = typer.Option(
         False, "--apply", help="Write a child note. Needs --item (not --file)."
@@ -174,7 +174,7 @@ def critique(
     reviewer: list[str] = typer.Option(
         [],
         "--reviewer",
-        help="Run a subset of critique.reviewers ids (repeatable). Default: all.",
+        help="Run a subset of peer_review.reviewers ids (repeatable). Default: all.",
     ),
     force: bool = typer.Option(
         False,
@@ -189,12 +189,12 @@ def critique(
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    """Local manuscript critique pack. Checked findings always; suggested review lanes optional. Not a grade."""
+    """Local manuscript peer-review pack. Checked findings always; suggested review lanes optional. Not a grade."""
     if ctx.invoked_subcommand is not None:
         return
-    from paperful.critique_cmd import run_critique
+    from paperful.peer_review_cmd import run_peer_review
 
-    run_critique(
+    run_peer_review(
         console,
         item=item,
         file_path=file_path,
@@ -217,26 +217,26 @@ def critique(
     )
 
 
-@critique_app.command("dismiss")
-def critique_dismiss(
+@peer_review_app.command("dismiss")
+def peer_review_dismiss(
     finding_id: str = typer.Argument(
-        ..., help="Finding id from pack.json / the critique table."
+        ..., help="Finding id from pack.json / the peer-review table."
     ),
-    critique_id: str | None = typer.Option(
+    peer_review_id: str | None = typer.Option(
         None,
-        "--critique-id",
+        "--peer-review-id",
         help="Pack folder name (item key or file-<stem>). Default: newest.",
     ),
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
     """Omit a finding from later pack.md (id stays in JSON). Re-runs keep the dismissal."""
-    from paperful.critique_cmd import run_dismiss
+    from paperful.peer_review_cmd import run_dismiss
 
     run_dismiss(
         console,
         finding_id=finding_id,
-        critique_id=critique_id,
+        peer_review_id=peer_review_id,
         config=config,
         fmt=fmt,
     )
@@ -247,13 +247,13 @@ def rewrite(
     pack_path: Path | None = typer.Option(
         None,
         "--pack",
-        help="Existing critique pack.json or its folder. Never re-runs critique.",
+        help="Existing peer-review pack.json or its folder. Never re-runs peer-review.",
         exists=True,
     ),
     item: list[str] = typer.Option(
         [],
         "--item",
-        help="Library item key; uses the latest critique pack for that id.",
+        help="Library item key; uses the latest peer-review pack for that id.",
     ),
     file_path: Path | None = typer.Option(
         None,
@@ -284,7 +284,7 @@ def rewrite(
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
-    """Apply a critique pack to a draft. Writes an edit plan and optional sidecar / Word / OpenDocument / PDF. Never overwrites the source."""
+    """Apply a peer-review pack to a draft. Writes an edit plan and optional sidecar / Word / OpenDocument / PDF. Never overwrites the source."""
     from paperful.rewrite_cmd import run_rewrite
 
     run_rewrite(

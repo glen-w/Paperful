@@ -59,7 +59,7 @@ These are **research-assistant / idea / hypothesis** systems, not interchangeabl
 - **Factory stages:** **discover / read (abstracts+graph) / (light) review of ideas**. No analyze/write/submit.
 
 #### SciAgents (materials hypothesis; open notebooks)
-- Multi-agent **ontological knowledge-graph** reasoning + LLMs + retrieval; applied to **bio-inspired materials**. Agents: Ontologist, Scientists, Critic. Generates/refines hypotheses, retrieves research, critiques. Published **Advanced Materials** 2025 (DOI 10.1002/adma.202413523); preprint [arXiv:2409.05556](https://arxiv.org/abs/2409.05556).
+- Multi-agent **ontological knowledge-graph** reasoning + LLMs + retrieval; applied to **bio-inspired materials**. Agents: Ontologist, Scientists, Critic. Generates/refines hypotheses, retrieves research, peer-reviews. Published **Advanced Materials** 2025 (DOI 10.1002/adma.202413523); preprint [arXiv:2409.05556](https://arxiv.org/abs/2409.05556).
 - Code: [lamm-mit/SciAgentsDiscovery](https://github.com/lamm-mit/SciAgentsDiscovery) (AG2/AutoGen automated + non-automated notebooks) and [lamm-mit/GraphReasoning](https://github.com/lamm-mit/GraphReasoning). PMC abstract states a case of a **new biocomposite** with enhanced mechanical properties / energy-efficient production — that is a **lab materials claim**, not a paper mill. — [PMC12138853](https://pmc.ncbi.nlm.nih.gov/articles/PMC12138853/)
 - **Open notebooks, not a hosted product.** Stages: **discover / read (KG+retrieval) / hypothesize**. No end-to-end manuscript factory.
 
@@ -82,7 +82,7 @@ These are **research-assistant / idea / hypothesis** systems, not interchangeabl
 ## Google Co-Scientist / AI co-scientist (public status)
 
 ### Takeaway
-Google’s **Co-Scientist** is a **Gemini multi-agent hypothesis engine** (generate–critique–tournament–evolve), validated in **biomedicine** (AML drug-repurposing in vitro, etc.). It is **not open source**. As of **19 May 2026** Google began rolling a **Labs experimental tool “Hypothesis Generation”** with registration at **labs.google/science** — a **waitlisted hosted product**, not a paper writer.
+Google’s **Co-Scientist** is a **Gemini multi-agent hypothesis engine** (generate–peer-review–tournament–evolve), validated in **biomedicine** (AML drug-repurposing in vitro, etc.). It is **not open source**. As of **19 May 2026** Google began rolling a **Labs experimental tool “Hypothesis Generation”** with registration at **labs.google/science** — a **waitlisted hosted product**, not a paper writer.
 
 ### Cited Findings
 - Feb 19, 2025 Google Research blog: “AI co-scientist” on **Gemini 2.0**; agents **Generation, Reflection, Ranking, Evolution, Proximity, Meta-review**; input = scientist’s natural-language goal; output = **novel hypotheses, research overview, experimental protocols** — explicitly **beyond** literature review / “deep research.” — [research.google blog](https://research.google/blog/accelerating-scientific-breakthroughs-with-an-ai-co-scientist/)

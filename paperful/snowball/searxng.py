@@ -60,7 +60,7 @@ def search_query(
     if not base or not q:
         return []
     folder = (
-        cache_dir if cache_dir is not None else cfg.state_dir / "critique" / "searxng"
+        cache_dir if cache_dir is not None else cfg.state_dir / "peer-review" / "searxng"
     )
     want = max(1, int(limit))
     max_pages = max(1, int(pages or max(1, (want + 19) // 20)))

@@ -1,8 +1,8 @@
-"""Edge cases for critique readability / lexical metrics."""
+"""Edge cases for peer-review readability / lexical metrics."""
 
 from __future__ import annotations
 
-from paperful.critique_metrics import (
+from paperful.peer_review_metrics import (
     MAX_LONG_SENTENCES,
     _finite,
     compute_readability,

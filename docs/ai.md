@@ -3,9 +3,9 @@
 Paperful’s PDF loop (`run` / `attach` / `lint` / `fix-metadata` / `dedupe`)
 never needs a model. Optional AI covers grounded notes (`summarize`), a
 collection review (`synthesize`), Ask / RAG, title and identity helpers, the
-browser agent, suggested `critique --llm` / `--advanced` comments, and
-`rewrite` (apply a critique pack). Heuristic AI-prose
-tells and the optional Binoculars extra on `critique` are **not** authorship
+browser agent, suggested `peer-review --llm` / `--advanced` comments, and
+`rewrite` (apply a peer-review pack). Heuristic AI-prose
+tells and the optional Binoculars extra on `peer-review` are **not** authorship
 proof. Optional `--vale` is house-style lint, not a model. This page is the
 **feasibility and scale** guide: what works on
 ordinary academic hardware, what is a “try it” experiment, and what a large
@@ -52,15 +52,15 @@ unusable for a 1,500-PDF collection overnight.
 | `synthesize` over ~10³ summaries | One review from notes already written | Local: can take hours and many map-reduce chunks; hosted: far fewer tokens than summarizing every PDF again | Run `synthesize --dry-run` for the chunk plan first |
 | Browser agent (`recover`) | Per stubborn landing | Needs ~14B+ local or a capable hosted tool-calling model | Not a free-tier hobby lane |
 | Ask / RAG | After `rag ingest` | Embeddings dominate first ingest; chat is per question | **simple** (default): one completion. **advanced**: about `evidence_k` extra summary calls, cached under `state/rag/evidence/`. Local `nomic-embed-text` or hosted `embed_provider = "litellm"` |
-| `critique --lane reviewers` | One manuscript | Yes (same 7B–12B band as summarize) | One completion per `[[critique.reviewers]]` row (`--llm` alias) |
-| `critique --lane marg` | One manuscript | Yes locally; slower than reviewers | Three aspect groups (leader + chunk workers + expert) then refine. Caps in `[critique]`. Optional GROBID for PDF chunks (`--advanced` alias) |
-| `critique --lane adversary` | One manuscript | Yes (same band as reviewers) | One JSON validity red-team turn (alt explanations, validity, falsifiers) |
-| `critique --lane outline` | One outline / plan | Yes (same band as reviewers) | One JSON plan-review turn plus a section skeleton. Not a finished-paper verdict |
-| `critique --lane claims` | One manuscript | Yes (same band as reviewers) | Claim extract + optional downgrade; intra-doc labels are deterministic overlap; cited-source locators use `state/rag/text` (no extra model) |
+| `peer-review --lane reviewers` | One manuscript | Yes (same 7B–12B band as summarize) | One completion per `[[peer_review.reviewers]]` row (`--llm` alias) |
+| `peer-review --lane marg` | One manuscript | Yes locally; slower than reviewers | Three aspect groups (leader + chunk workers + expert) then refine. Caps in `[peer_review]`. Optional GROBID for PDF chunks (`--advanced` alias) |
+| `peer-review --lane adversary` | One manuscript | Yes (same band as reviewers) | One JSON validity red-team turn (alt explanations, validity, falsifiers) |
+| `peer-review --lane outline` | One outline / plan | Yes (same band as reviewers) | One JSON plan-review turn plus a section skeleton. Not a finished-paper verdict |
+| `peer-review --lane claims` | One manuscript | Yes (same band as reviewers) | Claim extract + optional downgrade; intra-doc labels are deterministic overlap; cited-source locators use `state/rag/text` (no extra model) |
 | `ask --claim-check` | One manuscript | **No model** | Per-sentence retrieve + overlap labels vs the local index |
-| `critique --lane verify` | One manuscript | Yes locally; slower (per-segment) | Density-budgeted section swarm + local synthesis. Not Deep Review |
-| `critique --lane context` | One manuscript | Yes locally; several extra turns | Summary, 3-round retrieve, historian, scout, novelty Q then A, soundness. Local RAG; `context-web` may call OpenAlex / SearXNG |
-| `rewrite` | One critique pack | Style-only: no model. Other areas: yes (same 7B–12B band) | One JSON call per area still lacking a glossary/Vale swap. Optional XtraGPT Ollama tag. Not a generated paper |
+| `peer-review --lane verify` | One manuscript | Yes locally; slower (per-segment) | Density-budgeted section swarm + local synthesis. Not Deep Review |
+| `peer-review --lane context` | One manuscript | Yes locally; several extra turns | Summary, 3-round retrieve, historian, scout, novelty Q then A, soundness. Local RAG; `context-web` may call OpenAlex / SearXNG |
+| `rewrite` | One peer-review pack | Style-only: no model. Other areas: yes (same 7B–12B band) | One JSON call per area still lacking a glossary/Vale swap. Optional XtraGPT Ollama tag. Not a generated paper |
 
 **Try it out** means: one item, five papers, or a free hosted model while you
 watch for timeouts and bad grounding. **Library scale** means: hundreds or

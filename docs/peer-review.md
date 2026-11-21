@@ -1,6 +1,6 @@
-# Critique (local manuscript pack)
+# Peer review (local manuscript pack)
 
-`paperful critique` writes an evidence-backed Markdown pack for a manuscript
+`paperful peer-review` writes an evidence-backed Markdown pack for a manuscript
 you already have: a mirrored library `--item`, or a `--file` / workbench
 upload. Deterministic checkers always run. Optional review lanes are a
 separate **suggested** extra and can run together. There is **no score, grade,
@@ -10,7 +10,7 @@ This is a **pre-submission / reading-aid pack**, not a referee and not Google
 Deep Review. It does not upload the manuscript and does not call a similarity
 API. Overlap is against **your library text already on disk**. Suggested
 review lanes default to that extract (and optional local RAG). The
-`context-web` lane is the only critique path that may query OpenAlex /
+`context-web` lane is the only peer-review path that may query OpenAlex /
 SearXNG, and only when you opt in.
 
 ## What it checks
@@ -49,7 +49,7 @@ Offline (`PAPERFUL_OFFLINE=1` or no HTTP client): skip Crossref/OpenAlex rows an
 emit `doi_status_skipped_offline` / `identity_skipped_offline`. PPS fingerprints
 still run when `state/pps/fingerprints/` or `[screen].fingerprint_dir` has CSV/JSON
 (see [screen](screen.md)); warm the cache once with `paperful screen --refresh`.
-When online, tortured-phrase and other PPS fingerprints run on the **critique
+When online, tortured-phrase and other PPS fingerprints run on the **peer-review
 extract** for both `--item` and `--file` (same `[screen].detectors` and
 `tortured_min` as screen).
 
@@ -64,62 +64,62 @@ for the whole library) is the corpus for the overlap and context lanes. `--file`
 wrapper (`xlsx`/`xls` have no text extract; checkers see an empty document).
 
 ```bash
-uv run paperful critique --item KEY -C "My Collection"
-uv run paperful critique --file ./draft.docx -C "My Collection"
-uv run paperful critique --file ./draft.pdf --lane reviewers
-uv run paperful critique --file ./draft.pdf --llm
-uv run paperful critique --file ./draft.pdf --llm --reviewer line-editor
-uv run paperful critique --file ./draft.pdf --lane marg
-uv run paperful critique --file ./draft.pdf --lane adversary
-uv run paperful critique --file ./draft.pdf --lane outline
-uv run paperful critique --file ./draft.pdf --lane claims
-uv run paperful critique --file ./draft.pdf --lane verify
-uv run paperful critique --file ./draft.pdf --lane reviewers --lane marg --grobid
-uv run paperful critique --file ./draft.pdf --lane context
-uv run paperful critique --file ./draft.pdf --lane context-web
-uv run paperful critique --file ./draft.pdf --no-llm --no-advanced
-uv run paperful critique --file ./draft.pdf --no-llm   # drop reviewers (alias)
-uv run paperful critique --file ./draft.pdf --ai-model
-uv run paperful critique --file ./draft.pdf --vale
-uv run paperful critique --file ./draft.pdf --forensics
-uv run paperful critique --item KEY --llm --force      # LLM despite identity lint
-uv run paperful critique --item KEY --apply            # child note; needs --item
-uv run paperful critique --item KEY --show-dismissed
-uv run paperful critique dismiss FINDING_ID
-uv run paperful critique dismiss FINDING_ID --critique-id KEY
+uv run paperful peer-review --item KEY -C "My Collection"
+uv run paperful peer-review --file ./draft.docx -C "My Collection"
+uv run paperful peer-review --file ./draft.pdf --lane reviewers
+uv run paperful peer-review --file ./draft.pdf --llm
+uv run paperful peer-review --file ./draft.pdf --llm --reviewer line-editor
+uv run paperful peer-review --file ./draft.pdf --lane marg
+uv run paperful peer-review --file ./draft.pdf --lane adversary
+uv run paperful peer-review --file ./draft.pdf --lane outline
+uv run paperful peer-review --file ./draft.pdf --lane claims
+uv run paperful peer-review --file ./draft.pdf --lane verify
+uv run paperful peer-review --file ./draft.pdf --lane reviewers --lane marg --grobid
+uv run paperful peer-review --file ./draft.pdf --lane context
+uv run paperful peer-review --file ./draft.pdf --lane context-web
+uv run paperful peer-review --file ./draft.pdf --no-llm --no-advanced
+uv run paperful peer-review --file ./draft.pdf --no-llm   # drop reviewers (alias)
+uv run paperful peer-review --file ./draft.pdf --ai-model
+uv run paperful peer-review --file ./draft.pdf --vale
+uv run paperful peer-review --file ./draft.pdf --forensics
+uv run paperful peer-review --item KEY --llm --force      # LLM despite identity lint
+uv run paperful peer-review --item KEY --apply            # child note; needs --item
+uv run paperful peer-review --item KEY --show-dismissed
+uv run paperful peer-review dismiss FINDING_ID
+uv run paperful peer-review dismiss FINDING_ID --peer-review-id KEY
 ```
 
-`--dry-run` prints findings and does not write `state/critiques/`. `--apply`
+`--dry-run` prints findings and does not write `state/peer-reviews/`. `--apply`
 posts a tagged child note only for a library `--item`. Uploads stay disk-only.
 `--lane NAME` (repeatable: `reviewers`, `marg`, `adversary`, `outline`, `claims`, `verify`,
 `context`, `context-web`)
-selects suggested review lanes for this run. `[critique].lanes` is the config
-list; when it is empty, `[critique].llm` / `[critique].advanced` still map to
+selects suggested review lanes for this run. `[peer_review].lanes` is the config
+list; when it is empty, `[peer_review].llm` / `[peer_review].advanced` still map to
 `reviewers` / `marg`. `--llm` / `--no-llm` and `--advanced` / `--no-advanced`
 are aliases that add or remove those two ids. `--grobid` / `--no-grobid`
 override `[grobid].enabled` and affect MARG-S / claims / verify PDF chunks
 (`--grobid` still attempts the sidecar even when `[grobid].enabled` is false,
 same as `extract-sections`). `--ai-model` turns the
 Binoculars extra on for this run (git overlay; there is no
-`--no-ai-model`; set `[critique].ai_model = false` in config). `--vale` turns the Vale house-style
-pass on for this run (there is no `--no-vale`; set `[critique].vale = false`).
+`--no-ai-model`; set `[peer_review].ai_model = false` in config). `--vale` turns the Vale house-style
+pass on for this run (there is no `--no-vale`; set `[peer_review].vale = false`).
 `--forensics` turns the PaperGuard subprocess on for this run (there is no
-`--no-forensics`; set `[critique].forensics = false`).
+`--no-forensics`; set `[peer_review].forensics = false`).
 `-C` is the overlap / “cited but not in library” corpus. `paperful jobs` lists
-`critique` under completeness.
+`peer-review` under completeness.
 Not in `paperful all`.
 
-Packs land in `state/critiques/<id>/<stamp>/` as `pack.json`
-(`paperful.critique.pack.v1`) and `pack.md`. `<id>` is the library item key
+Packs land in `state/peer-reviews/<id>/<stamp>/` as `pack.json`
+(`paperful.peer_review.pack.v1`) and `pack.md`. `<id>` is the library item key
 or `file-<filename-stem>` for `--file` / uploads, so re-running the same draft
-keeps dismissals. Dismissals are `state/critiques/<id>/dismissed.jsonl`.
+keeps dismissals. Dismissals are `state/peer-reviews/<id>/dismissed.jsonl`.
 Dismissed rows stay in JSON and are omitted from `pack.md` unless
 `--show-dismissed`.
 
 Human CLI prints elapsed phase lines (extract, checkers, cited-work DOI
 counts, overlap, each reviewer, extras) so a long run is not silent until
 the pack. `--format json` keeps stdout as the envelope only; a spinner still
-goes to stderr on a TTY. Run report: `state/runs/<stamp>-critique.json`.
+goes to stderr on a TTY. Run report: `state/runs/<stamp>-peer-review.json`.
 
 `pack.json` always has `findings`, `overlap`, `metrics`, and `llm`. `metrics`
 holds readability, lexical diversity, and the AI-tell summary (also rendered
@@ -165,11 +165,11 @@ Unknown binaries are refused. Nothing is sent to Google Docs or Word. If
 extract yields too little text, `needs_ocr` / `empty_extract` and checkers that
 need body text stop.
 
-Workbench uploads are copied under `state/critiques/uploads/<stamp>-<safe>/`
+Workbench uploads are copied under `state/peer-reviews/uploads/<stamp>-<safe>/`
 (same basename hardening as other GUI uploads; 40 MB cap). They never write
 `out/` or Zotero unless you later attach the file yourself.
 
-## Review lanes (`--lane` / `[critique].lanes`)
+## Review lanes (`--lane` / `[peer_review].lanes`)
 
 Suggested extras. Checkers always run. Lanes are **additive** and may be
 combined. Identity mismatch refuses **all** review lanes unless `--force`.
@@ -180,7 +180,7 @@ Each lane needs `[llm].enabled`; otherwise the pack records
 
 | Id | Alias | What it does |
 | --- | --- | --- |
-| `reviewers` | `--llm` | Independent `[[critique.reviewers]]` JSON/Markdown calls |
+| `reviewers` | `--llm` | Independent `[[peer_review.reviewers]]` JSON/Markdown calls |
 | `marg` | `--advanced` | MARG-S-style multi-agent (experiments / clarity / impact) |
 | `adversary` | — | Validity red-team (alternative explanations, validity, degrees of freedom, falsifiers, missing negatives) |
 | `outline` | — | Plan review: section skeleton, claim/warrant/scope/evidence pressure. Not a finished-manuscript verdict |
@@ -190,14 +190,14 @@ Each lane needs `[llm].enabled`; otherwise the pack records
 | `context-web` | — | Same pipeline; retrieve rounds and novelty answers may query OpenAlex / optional SearXNG |
 
 ```toml
-[critique]
+[peer_review]
 lanes = ["reviewers", "marg", "claims"]
 ```
 
-When `lanes` is non-empty, `[critique].llm` and `[critique].advanced` are
+When `lanes` is non-empty, `[peer_review].llm` and `[peer_review].advanced` are
 ignored. When it is empty, those bools still map to `reviewers` / `marg`.
 `--no-llm --no-advanced` with no `--lane` is checkers only.
-`--reviewer ID` still subsets only `[[critique.reviewers]]`. Orthogonal extras
+`--reviewer ID` still subsets only `[[peer_review.reviewers]]`. Orthogonal extras
 (`--vale`, `--ai-model`, `--grobid`, `--forensics`) are not lanes.
 
 ## Reading LLM lanes (main text vs appendix)
@@ -229,7 +229,7 @@ lanes before submission.
   ranked verdict on contribution.
 - Long PDFs: `reviewers`, `adversary`, `context`, and `verify` synthesis see a
   **head + headings + tail** excerpt when the extract exceeds
-  `[critique].max_context_chars` (default 24 000). The **tail** is often
+  `[peer_review].max_context_chars` (default 24 000). The **tail** is often
   appendix-heavy—another reason not to overweight Suggested comments without
   reading locators.
 
@@ -238,7 +238,7 @@ evidence; detailed supplements remain good for reproducibility. When a model
 fills Suggested with appendix nits, use **`claims`** and Critical path to see
 whether the **main narrative** is thin, then fix or dismiss noise. Optional
 prompt guardrails and appendix-share metrics in the pack are **not** shipped
-yet; see [ROADMAP](ROADMAP.md#critique-llm-literacy) if you track follow-ups.
+yet; see [ROADMAP](ROADMAP.md#peer-review-llm-literacy) if you track follow-ups.
 
 ## Optional reviewers (`--lane reviewers` / `--llm`)
 
@@ -246,14 +246,14 @@ Follows [llm.md](llm.md): local Ollama by default, egress notice, grounded in
 the extracted text already on disk plus the checked finding list. No web
 search. Comments are `lane=suggested` only. Ungrounded spans are dropped.
 Direct quotations are not rewritten; comments on quoted spans are dropped.
-Never emits scores. JSON critique turns send Ollama `format=json` and
+Never emits scores. JSON peer-review turns send Ollama `format=json` and
 `think=false` so a thinking model does not spend the wall clock on a
 `<think>` block and then return prose. Builtin JSON reviewers get one
 repair turn when the first reply is not a usable object (`empty_reply` in
 **Incomplete lanes** is after that retry).
 
 Default is **one** reviewer (`[llm].model` + builtin JSON prompt). Add more
-with `[[critique.reviewers]]` — each row has `id`, optional `model` (empty
+with `[[peer_review.reviewers]]` — each row has `id`, optional `model` (empty
 inherits `[llm].model`), and `prompt` (`default` or a path relative to the
 config file; if that file is missing, shipped prompts under the Paperful
 install/repo `prompts/` directory are used). `--reviewer ID` (repeatable) runs
@@ -264,13 +264,13 @@ One LLM call per reviewer. Shipped Markdown personas (ids are suggestions):
 | id | prompt file | role |
 | --- | --- | --- |
 | `general` | `default` | JSON comments + questions (builtin) |
-| `line-editor` | `prompts/critique-line-editor.md` | Prose, voice, and line craft |
-| `foundations` | `prompts/critique-foundations.md` | Argument and foundational pressure |
-| `openreview` | `prompts/critique-openreview.md` | OpenReviewer-style general review (local `llama-openreviewer-8b` works well) with scores and Accept/Reject stripped — under 700 words; pre-submission stress-test, not a grade |
+| `line-editor` | `prompts/peer-review-line-editor.md` | Prose, voice, and line craft |
+| `foundations` | `prompts/peer-review-foundations.md` | Argument and foundational pressure |
+| `openreview` | `prompts/peer-review-openreview.md` | OpenReviewer-style general review (local `llama-openreviewer-8b` works well) with scores and Accept/Reject stripped — under 700 words; pre-submission stress-test, not a grade |
 
-Legacy paths `prompts/critique-reviewer-{2,3,5}.md` still resolve to the same
-files. The theatrical `critique-reviewer-4.md` persona was removed; if you
-copied it into paperful-data, drop that `[[critique.reviewers]]` row (use
+Legacy paths `prompts/peer-review-reviewer-{2,3,5}.md` still resolve to the same
+files. The theatrical `peer-review-reviewer-4.md` persona was removed; if you
+copied it into paperful-data, drop that `[[peer_review.reviewers]]` row (use
 `--lane adversary` instead).
 
 No-LLM users still get the pack (checkers, metrics, heuristic tells).
@@ -302,7 +302,7 @@ with `line-editor`, `openreview`, or `marg` still reviews the extract as if it
 were a paper.
 
 ```bash
-uv run paperful critique --file ./outline.docx --lane outline -C "My Collection"
+uv run paperful peer-review --file ./outline.docx --lane outline -C "My Collection"
 ```
 
 (optional-claims)=
@@ -362,7 +362,7 @@ Additive suggested lane inspired by MARG-S
 Paperful does not vendor that repo. Python orchestrates JSON turns with a
 leader, chunk workers, and one expert per aspect group, then a refine pass.
 Default aspects are experiments, clarity, and impact. Set
-`[critique].advanced_aspects` to a subset or to add `theory` (proof/lemma
+`[peer_review].advanced_aspects` to a subset or to add `theory` (proof/lemma
 gaps), `policy` (legal warrant / instrument fit), or `evidence-base`
 (survey/doctrinal coverage). Do not enable all six by default — they share
 `advanced_timeout_s`. Same grounding and no-score rules as reviewers.
@@ -404,11 +404,11 @@ novelty answers. A yellow egress notice prints.
 Venue filters are not hard-coded to ML conferences. Caps:
 `context_timeout_s`, `context_max_comments`, `context_max_hits` (per retrieve).
 
-A compact investigation log (`paperful.critique.context.v1`) is
+A compact investigation log (`paperful.peer_review.context.v1`) is
 `context.json` next to `pack.json`. `pack.md` has a **Context investigation**
 section (queries, hit titles, Q&A). Passages are not copied into `pack.json`.
 
-## Optional AI-text extra (`--ai-model` / `[critique].ai_model`)
+## Optional AI-text extra (`--ai-model` / `[peer_review].ai_model`)
 
 Requests a Binoculars-style score
 ([Hans et al., ICML 2024](https://github.com/ahans30/Binoculars)). Install
@@ -423,8 +423,8 @@ must already be in the cache. Never treated as proof of authorship.
 
 Canonical acronym expansions live in `state/glossary/<slug>.json`
 (`paperful.glossary.v1`), not in the Title Case allowlist from
-`paperful acronyms`. Critique reads every JSON file in that directory when
-`[critique].glossary` is true (the default). Empty or missing files add no
+`paperful acronyms`. Peer review reads every JSON file in that directory when
+`[peer_review].glossary` is true (the default). Empty or missing files add no
 findings.
 
 ```json
@@ -447,7 +447,7 @@ findings.
 `acronym_expansion_mismatch` (`warn`) fires when a parenthetical expansion for
 a listed token is close to the canonical form or an alias but not the
 canonical text. `acronym_phrase_mismatch` (`info`) slides a window over the
-body (stdlib `difflib`, default `[critique].glossary_similarity_min = 0.88`)
+body (stdlib `difflib`, default `[peer_review].glossary_similarity_min = 0.88`)
 and flags near-misses of the long form even without the acronym. Exact
 canonical wording is silent. Direct quotations are skipped. Findings suggest
 the canonical string; they do not rewrite the manuscript.
@@ -457,10 +457,10 @@ prints (or `--out` writes) a Vale Substitution fragment from **exact**
 aliases. Vale cannot fuzzy-match; keep the glossary for similarity, and merge
 the export into your `.vale.ini` styles if you also run `--vale`.
 
-Set `[critique].glossary = false` to skip the checker. `[critique].glossary_dir`
+Set `[peer_review].glossary = false` to skip the checker. `[peer_review].glossary_dir`
 is a directory under `state_dir` (default `glossary`).
 
-## Optional Vale (`--vale` / `[critique].vale`)
+## Optional Vale (`--vale` / `[peer_review].vale`)
 
 House-style lint via [Vale](https://vale.sh) on the **already extracted**
 manuscript text (not the original `.docx` / PDF markup). Paperful does not
@@ -469,10 +469,10 @@ install Vale, does not put it in the Compose image, and does not run
 opt in. `paperful doctor` reports whether `vale` is on PATH (amber if missing;
 not fatal).
 
-Set `[critique].vale_config` to that ini (path relative to the paperful
+Set `[peer_review].vale_config` to that ini (path relative to the paperful
 config). If unset, Paperful looks for `.vale.ini` next to the paperful config
 file only — not `$HOME` and not Vale’s global config (`--no-global`).
-`[critique].vale_min_alert_level` (`suggestion` / `warning` / `error`) and
+`[peer_review].vale_min_alert_level` (`suggestion` / `warning` / `error`) and
 `vale_timeout_s` (default 60) apply to that subprocess. Missing binary, missing
 config, or a Vale crash records `vale_unavailable` / `vale_no_config` /
 `vale_failed` (`checked` / `info`) and the rest of the pack still runs. Alerts
@@ -498,7 +498,7 @@ Other directories under `styles/` are local house tints and are gitignored.
 Keep them beside the examples so `StylesPath = styles` still finds them, and
 point `vale_config` at a sibling ini that enables only that pack.
 
-## Optional forensics (`--forensics` / `[critique].forensics`)
+## Optional forensics (`--forensics` / `[peer_review].forensics`)
 
 Subprocess wrapper around sibling [PaperGuard](https://github.com/exergyleizhou-ux/PaperGuard)
 (`paperguard scan`). Paperful does not install PaperGuard and does not vendor
@@ -519,18 +519,18 @@ More than 100 hits yields `paperguard_truncated`. PaperGuard’s `integrity_scor
 is **not** copied into the pack. `pack.md` has a **Forensics (PaperGuard)**
 section (anomalies to investigate, not a verdict); the same rows also appear
 under Suggested. A copy of the raw report is `paperguard.json` next to
-`pack.json`. Timeout: `[critique].forensics_timeout_s` (default 300).
+`pack.json`. Timeout: `[peer_review].forensics_timeout_s` (default 300).
 The wrapper passes `--lang en` (and `PAPERGUARD_LANG=en`); some detector
 summaries may still arrive in PaperGuard’s bundled language.
 
 ## Workbench
 
-![Critique in the workbench: Library item form, Upload a draft form, Recent packs](_static/workflows/critique.png)
+![Peer review in the workbench: Library item form, Upload a draft form, Recent packs](_static/workflows/peer-review.png)
 
-Advanced **Critique** (not on the default Wanted/Discover/Ask nav): pick an
+Advanced **Peer review** (not on the default Wanted/Discover/Ask nav): pick an
 item from the collection chip **or** drop a file. Same checkers as the CLI.
 When `[llm]` is on, review-lane checkboxes are labeled by what they return
-and can be combined (pre-checked from `[critique].lanes`, or the llm/advanced
+and can be combined (pre-checked from `[peer_review].lanes`, or the llm/advanced
 shims when `lanes` is empty). Visible labels: **Get independent reviewer
 notes**, **Review experiments, clarity, and impact**, **Argue against my
 conclusions**, **Review this as an outline**, **Show which claims this text supports** (held cited-PDF locators when the collection chip is set and `rag ingest` has filled `state/rag/text`), **Find gaps section
@@ -542,7 +542,7 @@ by section**, **Compare with this library** (three retrieve rounds), **Compare w
 (pre-checked from `[grobid].enabled`).
 Library item form also has force-LLM past identity lint. **Write child note** is `--apply` (item
 only). **Show dismissed** is `--show-dismissed`. **AI model** is `--ai-model`.
-**Vale** is `--vale`. The Vale checkbox is not pre-checked; `[critique].vale =
+**Vale** is `--vale`. The Vale checkbox is not pre-checked; `[peer_review].vale =
 true` still runs the pass even if the box is empty. **Forensics (PaperGuard)**
 is `--forensics` (same on-switch pattern). Uploads have no apply /
 force / dismissed controls. To turn a pack into tracked changes in a copy of
@@ -551,9 +551,9 @@ CLI `paperful rewrite`).
 
 ## Config
 
-See `[critique]` in [config.md](config.md) and `config.example.toml`.
+See `[peer_review]` in [config.md](config.md) and `config.example.toml`.
 
 To turn findings into locatable edits (tracked-changes Word, OpenDocument, PDF, a pptx/odt copy,
 sidecar, or an edit list), use [`rewrite`](rewrite.md) (workbench **Suggest
 edits**).
-`rewrite` never re-runs critique.
+`rewrite` never re-runs peer-review.

@@ -5,8 +5,8 @@
 {% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Suggest edits</h1>
-<p class="page-lede">Turn a critique pack into tracked changes in a copy of the draft (Word, OpenDocument, or PDF; edit plan, optional sidecar). Default area is hygiene/style. Writes <code>state/rewrites/</code>. Never overwrites the source. Not a generated paper. There is no accept/reject screen here — accept or reject the tracked changes in Word.</p>
-{% if error == 'target' %}<div class="error-banner">Pick a critique pack. Optionally upload a replacement draft if the original file moved.</div>{% endif %}
+<p class="page-lede">Turn a peer-review pack into tracked changes in a copy of the draft (Word, OpenDocument, or PDF; edit plan, optional sidecar). Default area is hygiene/style. Writes <code>state/rewrites/</code>. Never overwrites the source. Not a generated paper. There is no accept/reject screen here — accept or reject the tracked changes in Word.</p>
+{% if error == 'target' %}<div class="error-banner">Pick a peer-review pack. Optionally upload a replacement draft if the original file moved.</div>{% endif %}
 {% if error == 'format' %}<div class="error-banner">That file type is not supported.</div>{% endif %}
 {% if error == 'size' %}<div class="error-banner">The upload is larger than 40 MB.</div>{% endif %}
 {% if error and error not in ('target', 'format', 'size') %}<div class="error-banner">{{ error }}</div>{% endif %}
@@ -14,7 +14,7 @@
 {{ job_status(run_rec, 'Suggest edits') }}
 
 <section class="panel">
-  <h2>From a critique pack</h2>
+  <h2>From a peer-review pack</h2>
   {% if recent %}
   <p class="section-lede">Dismissed findings are skipped. The source file and Zotero stay unchanged.</p>
   <form method="post" action="/rewrite" class="toolbar" enctype="multipart/form-data">
@@ -22,7 +22,7 @@
       <select name="pack_dir">
         <option value="">Choose a pack</option>
         {% for row in recent %}
-        <option value="{{ row.pack_dir }}">{{ row.title }} — {{ row.critique_id }} / {{ row.stamp }} ({{ row.findings }} findings)</option>
+        <option value="{{ row.pack_dir }}">{{ row.title }} — {{ row.peer_review_id }} / {{ row.stamp }} ({{ row.findings }} findings)</option>
         {% endfor %}
       </select>
     </label>
@@ -55,11 +55,11 @@
     <p class="section-lede">[llm] is off. Style glossary/Vale substitutions still run. Other areas skip to needs_author.</p>
     {% endif %}
     <button type="submit">Suggest edits</button>
-    {{ info("Writes state/rewrites/<critique-id>/<stamp>/. Does not change the original file or Zotero. CLI verb is rewrite.") }}
+    {{ info("Writes state/rewrites/<peer-review-id>/<stamp>/. Does not change the original file or Zotero. CLI verb is rewrite.") }}
   </form>
   {% else %}
-  <p class="section-lede">Run Critique first. This page turns that pack into tracked changes in a copy of the draft (Word, OpenDocument, or PDF).</p>
-  <p><a href="/critique">Open Critique</a></p>
+  <p class="section-lede">Run Peer review first. This page turns that pack into tracked changes in a copy of the draft (Word, OpenDocument, or PDF).</p>
+  <p><a href="/peer-review">Open Peer review</a></p>
   {% endif %}
 </section>
 
@@ -68,7 +68,7 @@
   <h2>This pack</h2>
   <p>Edits: {{ result.edits or result.counts.edits or 0 }}
     · skips: {{ result.skips or result.counts.skips or 0 }}
-    {% if result.critique_id %}· id <code>{{ result.critique_id }}</code>{% endif %}
+    {% if result.peer_review_id %}· id <code>{{ result.peer_review_id }}</code>{% endif %}
   </p>
   {% if downloads %}
   <p>

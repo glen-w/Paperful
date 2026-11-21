@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 
 from paperful.cli import app
 from paperful.config import Config, load_config
-from paperful.critique_extract import ExtractedDoc
+from paperful.peer_review_extract import ExtractedDoc
 from paperful.stuff import (
     HONESTY_BANNER,
     STUFF_PACK_KEYS,

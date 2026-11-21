@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from .config import Config
-from .critique_extract import ExtractedDoc, loc_of_span
-from .critique_metrics import split_sentences
-from .critique_overlap import _BIBLIO_HEAD, _drop_biblio
+from .peer_review_extract import ExtractedDoc, loc_of_span
+from .peer_review_metrics import split_sentences
+from .peer_review_overlap import _BIBLIO_HEAD, _drop_biblio
 from .store import write_json
 
 SCHEMA = "paperful.stuff.pack.v1"
@@ -91,10 +91,10 @@ def resolve_k(cfg: Config, k: int | None) -> int:
 
 
 def stuff_id(*, kind: str, item_key: str = "", original_name: str = "") -> str:
-    """Stable id: item key, or ``file-<stem>`` like critiques."""
-    from .critique import critique_id
+    """Stable id: item key, or ``file-<stem>`` like peer-reviews."""
+    from .peer_review import peer_review_id
 
-    return critique_id(kind=kind, item_key=item_key, original_name=original_name)
+    return peer_review_id(kind=kind, item_key=item_key, original_name=original_name)
 
 
 def truncate_passage(text: str, limit: int = PASSAGE_MAX) -> str:
@@ -208,7 +208,7 @@ def outline_units(
     min_query_words: int,
 ) -> tuple[list[StuffRow], list[StuffSkip], list[dict[str, Any]]]:
     """One unit per outline section. Thin headings still search."""
-    from .critique_outline import outline_ledger, outline_slices
+    from .peer_review_outline import outline_ledger, outline_slices
     from .sections.headings import canonical_for_heading
 
     slices = outline_slices(doc.text or "", cfg)

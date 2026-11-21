@@ -405,7 +405,7 @@ def run_claim_check(
         resolve_claim_check_k,
         write_pack,
     )
-    from .critique_extract import SUPPORTED, ExtractError, extract_path
+    from .peer_review_extract import SUPPORTED, ExtractError, extract_path
     from .lint import resolve_pdf_path
     from .rag.retrieve import scope_keys
     from .store import Manifest

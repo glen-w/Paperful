@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import Config
-from .critique_llm import is_scoreish, parse_llm_json
+from .peer_review_llm import is_scoreish, parse_llm_json
 from .grounding import budget_slice
 from .rewrite_align import Alignment, unique_span
 from .rewrite_areas import RewriteArea
@@ -25,7 +25,7 @@ from .rewrite_grounding import (
 from .rewrite_plan import RewriteEdit
 
 _LEAK = re.compile(
-    r"\b(paperful|critique pack|the reviewer|this pack|llm reviewer)\b", re.I
+    r"\b(paperful|peer-review pack|the reviewer|this pack|llm reviewer)\b", re.I
 )
 _PROMISE = re.compile(
     r"\b(future work|see (the )?appendix|we will (add|run|include)|placeholder)\b",
@@ -54,7 +54,7 @@ Rules:
 - Do not add numbers, experiments, URLs, or citation keys that are not already in PAPER_CONTENT or the finding.
 - Copy every «PF…» placeholder unchanged.
 - Do not promise future work or point at an appendix you did not edit.
-- Do not mention Paperful, the critique pack, or "the reviewer" in replacement text.
+- Do not mention Paperful, the peer-review pack, or "the reviewer" in replacement text.
 - Do not hide limitations. Do not invent results.
 - Prefer kind=comment when the finding is a question, indirect criticism, or needs the author's judgement.
 - needs_author true when you cannot ground a body edit.
@@ -358,4 +358,4 @@ def proposed_from_area(
 
 
 def budget_excerpt(cfg: Config, text: str) -> str:
-    return budget_slice(text, int(getattr(cfg, "critique_max_context_chars", 24000)))
+    return budget_slice(text, int(getattr(cfg, "peer_review_max_context_chars", 24000)))

@@ -1,4 +1,4 @@
-"""Shared regexes and helpers for critique checkers."""
+"""Shared regexes and helpers for peer-review checkers."""
 
 from __future__ import annotations
 

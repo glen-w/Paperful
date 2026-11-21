@@ -4,7 +4,7 @@ import os
 import sys
 import types
 
-from paperful.critique_ai_model import extra_available, run_ai_model
+from paperful.peer_review_ai_model import extra_available, run_ai_model
 
 
 def test_run_ai_model_stays_offline_when_weights_missing(monkeypatch):
@@ -115,11 +115,11 @@ def test_run_ai_model_timeout_terminates_child(monkeypatch):
             return FakeProc(**kwargs)
 
     monkeypatch.setattr(
-        "paperful.critique_ai_model.multiprocessing.get_context",
+        "paperful.peer_review_ai_model.multiprocessing.get_context",
         lambda _name: FakeCtx(),
     )
     monkeypatch.setattr(
-        "paperful.critique_ai_model.importlib.util.find_spec",
+        "paperful.peer_review_ai_model.importlib.util.find_spec",
         lambda _name: object(),
     )
     assert run_ai_model("hello", timeout_s=0.05) is None
@@ -173,11 +173,11 @@ def test_run_ai_model_recv_score_and_eof(monkeypatch):
                 return Proc(**kwargs)
 
         monkeypatch.setattr(
-            "paperful.critique_ai_model.multiprocessing.get_context",
+            "paperful.peer_review_ai_model.multiprocessing.get_context",
             lambda _name: Ctx(),
         )
         monkeypatch.setattr(
-            "paperful.critique_ai_model.importlib.util.find_spec",
+            "paperful.peer_review_ai_model.importlib.util.find_spec",
             lambda _name: object(),
         )
 
@@ -193,7 +193,7 @@ def test_run_ai_model_recv_score_and_eof(monkeypatch):
 def test_run_ai_model_missing_spec_is_none(monkeypatch):
     monkeypatch.delitem(sys.modules, "binoculars", raising=False)
     monkeypatch.setattr(
-        "paperful.critique_ai_model.importlib.util.find_spec", lambda _n: None
+        "paperful.peer_review_ai_model.importlib.util.find_spec", lambda _n: None
     )
     assert extra_available() is False
     assert run_ai_model("hello", timeout_s=5) is None

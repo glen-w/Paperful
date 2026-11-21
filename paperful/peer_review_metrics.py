@@ -1,4 +1,4 @@
-"""Readability and lexical-diversity metrics for critique packs.
+"""Readability and lexical-diversity metrics for peer-review packs.
 
 Lexical diversity (tokenizer, TTR, hapax, bidirectional MTLD) follows
 TranscriptX ``core/utils/lexical_diversity.py`` (copied, not imported).

@@ -20,10 +20,10 @@ from pathlib import Path
 from typing import Any
 
 from .config import Config
-from .critique import Finding, make_finding
-from .critique_extract import ExtractedDoc
-from .critique_llm import grounded, parse_llm_json
-from .critique_units import (
+from .peer_review import Finding, make_finding
+from .peer_review_extract import ExtractedDoc
+from .peer_review_llm import grounded, parse_llm_json
+from .peer_review_units import (
     SOURCE_FAMILIES,
     SUPPORT_FAMILIES,
     Unit,
@@ -113,7 +113,7 @@ Rules:
 
 
 def claims_timeout_s(cfg: Config) -> float:
-    raw = float(getattr(cfg, "critique_claims_timeout_s", 0) or 0)
+    raw = float(getattr(cfg, "peer_review_claims_timeout_s", 0) or 0)
     if raw > 0:
         return raw
     return float(cfg.llm_timeout_s or 120)
@@ -228,13 +228,13 @@ def numbered_bibliography(text: str) -> dict[int, dict[str, Any]]:
 
 
 def _split_body_biblio_safe(text: str) -> tuple[str, str]:
-    from .critique_checks._common import _split_body_biblio
+    from .peer_review_checks._common import _split_body_biblio
 
     return _split_body_biblio(text)
 
 
 def cites_in_window(window: str) -> list[dict[str, Any]]:
-    from .critique_checks._common import _AUTHOR_YEAR, _NUM_CITE
+    from .peer_review_checks._common import _AUTHOR_YEAR, _NUM_CITE
 
     found: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -339,12 +339,12 @@ def attach_claim_sources(
         return "no_scope"
     from .identity import LibraryFingerprint
     from .snowball.bibliography import parse_bibliography_entries
-    from .critique_overlap import load_library_pages
+    from .peer_review_overlap import load_library_pages
 
     fingerprint = LibraryFingerprint.from_items(scope_items)
     entries = parse_bibliography_entries(doc.text or "")
     by_num = numbered_bibliography(doc.text or "")
-    max_sources = max(1, int(getattr(cfg, "critique_claims_cite_max_sources", 3) or 3))
+    max_sources = max(1, int(getattr(cfg, "peer_review_claims_cite_max_sources", 3) or 3))
     pages_by_key = load_library_pages(cfg, exclude_key=exclude_key)
     for row in ledger:
         window = claim_window(doc.text or "", str(row.get("text") or ""))
@@ -499,8 +499,8 @@ def suggested_from_claims(
     """Extract claims and bind them to intra-doc support spans."""
     say = on_status or (lambda _msg: None)
     model = cfg.llm_model
-    cap = max(1, int(getattr(cfg, "critique_claims_max", 8) or 8))
-    comment_cap = max(1, int(getattr(cfg, "critique_claims_max_comments", 16) or 16))
+    cap = max(1, int(getattr(cfg, "peer_review_claims_max", 8) or 8))
+    comment_cap = max(1, int(getattr(cfg, "peer_review_claims_max_comments", 16) or 16))
     timeout_s = claims_timeout_s(cfg)
     item_key = item.key if item is not None else ""
     units, unit_meta = paper_units(
@@ -512,9 +512,9 @@ def suggested_from_claims(
     )
     source = units_for_families(units, SOURCE_FAMILIES, cfg)
     support = units_for_families(units, SUPPORT_FAMILIES, cfg)
-    excerpt = _join_units(source, limit=int(cfg.critique_max_context_chars or 24_000))
+    excerpt = _join_units(source, limit=int(cfg.peer_review_max_context_chars or 24_000))
     if not excerpt.strip():
-        excerpt = budget_slice(doc.text, cfg.critique_max_context_chars)
+        excerpt = budget_slice(doc.text, cfg.peer_review_max_context_chars)
     if not support:
         support = [
             u
@@ -558,9 +558,9 @@ def suggested_from_claims(
     ]
     meta["prompt_sha"] = prompt_sha
     say("Claims lane…")
-    from .critique_llm import chat_with_json_retry, critique_chat_request
+    from .peer_review_llm import chat_with_json_retry, peer_review_chat_request
 
-    request = critique_chat_request(
+    request = peer_review_chat_request(
         model=model,
         messages=(
             {"role": "system", "content": _EXTRACT_SYSTEM},
@@ -629,7 +629,7 @@ def suggested_from_claims(
         adj_user = f"Excerpt:\n{excerpt[:6000]}\n\nClaims:\n" + json.dumps(
             ledger, ensure_ascii=False
         )
-        adj_req = critique_chat_request(
+        adj_req = peer_review_chat_request(
             model=model,
             messages=(
                 {"role": "system", "content": _DOWNGRADE_SYSTEM},

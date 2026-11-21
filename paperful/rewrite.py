@@ -1,4 +1,4 @@
-"""``paperful.rewrite.plan.v1``: consume a critique pack, write an edit plan."""
+"""``paperful.rewrite.plan.v1``: consume a peer-review pack, write an edit plan."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from .config import Config
-from .critique import critique_id, latest_pack_dir, load_pack
-from .critique_extract import extract_path
+from .peer_review import peer_review_id, latest_pack_dir, load_pack
+from .peer_review_extract import extract_path
 from .fsio import file_sha256
 from .rewrite_align import Alignment, align_finding, unique_span
 from .rewrite_check import filter_broken_edits
@@ -54,7 +54,7 @@ def latest_rewrite_dir(cfg: Config, cid: str) -> Path | None:
 
 
 def resolve_pack_dir(cfg: Config, raw: Path) -> Path | None:
-    """Accept a pack.json path or a stamp/critique folder that contains one."""
+    """Accept a pack.json path or a stamp/peer-review folder that contains one."""
     path = raw.expanduser()
     if path.is_file() and path.name == "pack.json":
         return path.parent
@@ -64,7 +64,7 @@ def resolve_pack_dir(cfg: Config, raw: Path) -> Path | None:
         nested = latest_pack_dir(cfg, path.name)
         if nested is not None:
             return nested
-        # stamp folder under critiques/<id>/<stamp>
+        # stamp folder under peer-reviews/<id>/<stamp>
         if path.parent.is_dir() and (path / "pack.json").is_file():
             return path
     return None
@@ -76,7 +76,7 @@ def resolve_latest_pack(
     if item_key:
         return latest_pack_dir(cfg, item_key)
     if file_path is not None:
-        cid = critique_id(kind="file", original_name=file_path.name)
+        cid = peer_review_id(kind="file", original_name=file_path.name)
         return latest_pack_dir(cfg, cid)
     return None
 
@@ -96,7 +96,7 @@ def _manuscript_path(pack: dict[str, Any], file_path: Path | None) -> Path | Non
 
 
 def manuscript_drift(pack: dict[str, Any], manuscript: Path) -> dict[str, Any]:
-    """Compare the current file to the critique pack's source hash."""
+    """Compare the current file to the peer-review pack's source hash."""
     file_hash = file_sha256(manuscript) or ""
     inp = pack.get("input") if isinstance(pack.get("input"), dict) else {}
     stored = str(inp.get("hash") or "").strip()
@@ -332,10 +332,10 @@ def build_rewrite(
         comments if comments is not None else cfg.rewrite_comments
     )
     specialists = rewrite_areas_for(cfg, list(area_ids))
-    cid = str(pack.get("critique_id") or "")
+    cid = str(pack.get("peer_review_id") or "")
     if not cid:
         inp = pack.get("input") or {}
-        cid = critique_id(
+        cid = peer_review_id(
             kind=str(inp.get("kind") or "file"),
             item_key=str(inp.get("item_key") or ""),
             original_name=Path(str(inp.get("title") or manuscript.name)).name,
@@ -493,12 +493,12 @@ def build_rewrite(
 
     payload: dict[str, Any] = {
         "schema": SCHEMA,
-        "critique_id": cid,
+        "peer_review_id": cid,
         "created_at": datetime.now(tz=timezone.utc).isoformat(),
         "input": {
             "path": str(manuscript),
             "format": doc.format,
-            "critique_pack": str(pack.get("pack_dir") or ""),
+            "peer_review_pack": str(pack.get("pack_dir") or ""),
             "file_hash": drift["file_hash"],
             "pack_hash": drift["pack_hash"],
             "drift": drift["drift"],

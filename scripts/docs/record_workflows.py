@@ -301,7 +301,7 @@ def flow_advanced_nav(browser, workdir: Path) -> None:
     rec.click(toggle, hold_before=0.5, navigates=True)
     rec.frame(1.4)
     rec.click(
-        page.locator("nav.wb-nav a[href='/critique']"), hold_before=0.5, navigates=True
+        page.locator("nav.wb-nav a[href='/peer-review']"), hold_before=0.5, navigates=True
     )
     rec.frame(2.2)
     rec.write_gif(OUT / "advanced-nav.gif")

@@ -252,7 +252,7 @@ Items that still miss can go to a handoff list (`gaps --handoff` or
 `reachout`) so you email an author or open a page yourself. Those commands
 do not download. [Workflows](workflows.md).
 
-### Notes, a collection review, Ask, and Critique
+### Notes, a collection review, Ask, and Peer review
 
 A model is optional. **Local AI (default path):** [Ollama](https://ollama.com)
 on your computer when you have enough RAM/VRAM for the job — 7B-class for
@@ -274,7 +274,7 @@ Three reading jobs, in order:
 | Summary of those summaries | `synthesize`             | One collection review (themes, agreements, gaps) from the notes `summarize` already wrote. It does not open the PDFs again. Not in the default `all` chain — run it after |
 | Cited answers              | `rag ingest`, then `ask` | An index of `out/`, then answers that name the papers and pages. **Ask** on the workbench. Needs `[rag].enabled`                                                          |
 | Sentence support           | `ask --claim-check --file` | Each sentence vs the local index (`supported` / `mixed` / `unsupported`). No chat model. CLI pack under `state/ask-claims/`. [Ask](rag.md#claim-check)                    |
-| Pre-submission pack        | `critique`               | Checkers always. Optional `--lane claims` (intra-doc plus held cited-PDF locators when `-C` and `rag ingest` ran), `--lane context` / `context-web`. Not a grade. [Critique](critique.md) |
+| Pre-submission pack        | `peer-review`               | Checkers always. Optional `--lane claims` (intra-doc plus held cited-PDF locators when `-C` and `rag ingest` ran), `--lane context` / `context-web`. Not a grade. [Peer review](peer-review.md) |
 
 
 `fix-metadata` (title and identifier patches; `--apply` writes the catalogue)
@@ -319,7 +319,7 @@ agent wants 14B or larger on Ollama, or a capable hosted tag on LiteLLM.
 The heavy Docker image includes the RAG and LiteLLM extras; the light image
 does not. A full collection summarize is a multi-night or hosted-budget job —
 not a laptop afternoon. [AI](ai.md) · [LLM](llm.md) · [Ask your library](rag.md)
-· [Critique](critique.md).
+· [Peer review](peer-review.md).
 
 ### What you run on a schedule you own
 

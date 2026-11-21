@@ -4,7 +4,7 @@ Internal-only notes from `/Users/89298/Documents/paperful` docs and CLI. No web.
 
 Legend for stages: **S** shipped · **P** partial (adjacent verb, opt-in, or lighter than a factory stage) · **R** roadmap / buffet · **X** explicit non-goal.
 
-## What factory stages exist today (discover, acquire PDF, metadata, screen, extract, synthesize, critique, write, keep current, export)?
+## What factory stages exist today (discover, acquire PDF, metadata, screen, extract, synthesize, peer-review, write, keep current, export)?
 
 ### Takeaway
 Paperful is a **disk-first library helper** whose 1.x product is Wanted (missing PDFs) plus Discover (grow the catalogue) plus optional Ask over **held** PDFs — not an end-to-end paper factory. Most factory stages have a **shipped slice** with dry-run / `--apply` / fail-closed bars; **write** (citation stuffing, manuscript generation, CSL/Quarto) and **systematic screening** are the largest holes.
@@ -15,7 +15,7 @@ Paperful is a **disk-first library helper** whose 1.x product is Wanted (missing
 
 **1.0 vs post-1.0.** 1.0 is trust checklist, locked `paperful.item.v1` / `paperful.run_report.v1`, Zotero-proven fetch/mirror, workbench Wanted + Discover + Ask. Still not a full-text reading index, not a WebDAV client, not “AI fetch everything.” Wanted is the recommended main lane after 1.1.1. — [docs/ROADMAP.md — Product split: 1.0 vs post-1.0](file:///Users/89298/Documents/paperful/docs/ROADMAP.md); [docs/ROADMAP.md — Wanted (main lane)](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
 
-**Workbench nav maps to CLI, not a second stack.** Default nav: Wanted = `gaps` / `run` / `attach`; Discover = `snowball` / `authorwatch` / watches; Ask = `ask`. Advanced: Repair, Mirror, Index, Briefs, Critique. Grab fetches to `out/`; Attach writes the library. No built-in scheduler. TTY, Sci-Hub, `collections add` stay CLI. Not Zotero’s reader (no embedded PDF viewer). — [docs/gui.md — Product framing](file:///Users/89298/Documents/paperful/docs/gui.md); [docs/ROADMAP.md — GUI](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
+**Workbench nav maps to CLI, not a second stack.** Default nav: Wanted = `gaps` / `run` / `attach`; Discover = `snowball` / `authorwatch` / watches; Ask = `ask`. Advanced: Repair, Mirror, Index, Briefs, Peer review. Grab fetches to `out/`; Attach writes the library. No built-in scheduler. TTY, Sci-Hub, `collections add` stay CLI. Not Zotero’s reader (no embedded PDF viewer). — [docs/gui.md — Product framing](file:///Users/89298/Documents/paperful/docs/gui.md); [docs/ROADMAP.md — GUI](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
 
 | Factory stage | Status | What exists in repo (verbs / surfaces) | What is not this stage |
 | --- | --- | --- | --- |
@@ -25,14 +25,14 @@ Paperful is a **disk-first library helper** whose 1.x product is Wanted (missing
 | **Screen** | **P** | `screen`: retractions/EoC/withdrawal (Crossref+OpenAlex), optional PubPeer, PPS fingerprints on PDF text; report default; `--apply` tag + note; **not** in `paperful all` — [docs/screen.md](file:///Users/89298/Documents/paperful/docs/screen.md). Discover Keep/Skip is hop triage, not SR screening | ASReview-style learned screening is buffet — [docs/ROADMAP.md — Local embeddings](file:///Users/89298/Documents/paperful/docs/ROADMAP.md). Systematic-review screening **parked** — [docs/ROADMAP.md — Parked (snowball lane)](file:///Users/89298/Documents/paperful/docs/ROADMAP.md) |
 | **Extract** | **S** (structured + index) | `ocr`; `extract-sections` → `state/sections/<key>.json` (`paperful.sections.v1`; rules always; `--llm` fill); `rag ingest` / `rag search` / `rag questions` (mirror-only; never calls the manager) — [docs/rag.md — Structured sections](file:///Users/89298/Documents/paperful/docs/rag.md); [docs/commands.md — Command table](file:///Users/89298/Documents/paperful/docs/commands.md) | Annotation mirror **R** — [docs/ROADMAP.md — Annotation mirror](file:///Users/89298/Documents/paperful/docs/ROADMAP.md). Two-up split stays zotero-agent |
 | **Synthesize** | **P** | Opt-in `[llm]`: `summarize` (grounded HTML + child note), `synthesize` (review from **existing summary notes**), `ask` (cited Q&A from LanceDB index), `--focus` default\|questions\|gaps\|methods\|answered, `rag answered` | Conflicting-evidence / review-shaped briefs / figure pullouts / evidence tables / living starred briefing: **R** buffet — [docs/ROADMAP.md — Summaries, briefs, and Ask](file:///Users/89298/Documents/paperful/docs/ROADMAP.md) |
-| **Critique** | **S** (pre-submission pack) | `critique`: `--item` or `--file`; deterministic checkers always; no score/grade/accept-reject; overlap vs **library text on disk**; optional `--llm` suggested lane; not Deep Review; not in `paperful all` — [docs/critique.md](file:///Users/89298/Documents/paperful/docs/critique.md) | Not a referee; no web search; no similarity API |
+| **Peer review** | **S** (pre-submission pack) | `peer-review`: `--item` or `--file`; deterministic checkers always; no score/grade/accept-reject; overlap vs **library text on disk**; optional `--llm` suggested lane; not Deep Review; not in `paperful all` — [docs/peer-review.md](file:///Users/89298/Documents/paperful/docs/peer-review.md) | Not a referee; no web search; no similarity API |
 | **Write** | **R** / **P** (export only) | `stuff` is **roadmap only** (no CLI verb in `commands.md`) — [docs/ROADMAP.md — stuff](file:///Users/89298/Documents/paperful/docs/ROADMAP.md). `export` RIS/BibTeX/EndNote XML; `export-proposals` | No manuscript generation; no auto-insert citations; CSL/Quarto **parked** (point to Better BibTeX) |
 | **Keep current** | **S** (you cron) | `keepup` (watch + authorwatch + `--source cites`); `snowball watch`; `authorwatch run`. No email, no built-in scheduler — [docs/keepup.md](file:///Users/89298/Documents/paperful/docs/keepup.md) | Nightly embedding queries of OpenAlex, living-review re-run, Discover keepup UX: buffet — [docs/ROADMAP.md — Keeping up](file:///Users/89298/Documents/paperful/docs/ROADMAP.md) |
 | **Export / handoff** | **S** (mirror + bib) | `snapshot` / `restore --apply` (missing items only, never overwrite fields); copy `out/` yourself; Firefox add-on writes `out/` only; MCP `export` / `proposal_export` | Quiet mirror is not a citation manager — [docs/why.md — Mirror](file:///Users/89298/Documents/paperful/docs/why.md) |
 
 **Research-pack spine (operator factory, not one verb).** Sequence: `refs gap` → `ingest-dois --dry-run` → `--apply` → `run` / handoff / inbox → `dedupe` → optional watch/digest → `summarize` / `ask` after ledger is honest. Not `paperful all`. PDFs never come from ingest. — [docs/research-pack.md — Sequence](file:///Users/89298/Documents/paperful/docs/research-pack.md)
 
-**`paperful all` is fill+tidy+summarize, not a factory.** Chain: `gaps` → `run --try-all --retry-failed --upgrade-linked` → `lint` → `fix-metadata --apply` → `summarize --apply`. No snowball, no critique, no rag ingest, no keepup. — [docs/commands.md — `all`](file:///Users/89298/Documents/paperful/docs/commands.md)
+**`paperful all` is fill+tidy+summarize, not a factory.** Chain: `gaps` → `run --try-all --retry-failed --upgrade-linked` → `lint` → `fix-metadata --apply` → `summarize --apply`. No snowball, no peer-review, no rag ingest, no keepup. — [docs/commands.md — `all`](file:///Users/89298/Documents/paperful/docs/commands.md)
 
 **Ask / RAG honesty.** `[rag].enabled` off by default. Reads `out_dir` only. Coverage depends on `[mirror].pdfs`; manager-only PDFs need `snapshot --pdfs all` first. `ask` needs a built index + `[llm]`. Local 7B can over-claim; check cited pages. — [docs/rag.md](file:///Users/89298/Documents/paperful/docs/rag.md)
 
@@ -73,7 +73,7 @@ v1 (1.0/1.1 trust + Wanted promise) is **local, Zotero-proven, disk-first fill**
 
 **Zotero-RAG non-goals:** replacing Zotero’s reader; cloud-default RAG; answers without citations; auto-mutating parent metadata from Q&A; scheduling nightly “ask everything”; Edison Literature over a vendor corpus as the Ask path. — [docs/ROADMAP.md — Zotero-RAG integration](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
 
-**Critique non-goals:** not a referee, not Google Deep Review; does not upload the manuscript, search the web, or call a similarity API. — [docs/critique.md](file:///Users/89298/Documents/paperful/docs/critique.md)
+**Peer review non-goals:** not a referee, not Google Deep Review; does not upload the manuscript, search the web, or call a similarity API. — [docs/peer-review.md](file:///Users/89298/Documents/paperful/docs/peer-review.md)
 
 **Authorwatch non-goals:** live social scrape; auto-friending; cloud “who to follow”; social HTML as a `run` PDF source. — [docs/ROADMAP.md — Author watch lists](file:///Users/89298/Documents/paperful/docs/ROADMAP.md)
 
@@ -156,7 +156,7 @@ Docs already mark **borrow shapes, do not vendor**. Fit bar: local or operator-c
 | Figure/table pullouts from local PDFs (caption + page + stem); no diagram generation | Extract / synthesize | Files already on disk | **R** — same section |
 | Study-design / work type in Ask ranking (OpenAlex fields already on citation map); **no** journal-quality score | Synthesize | Fail closed if field missing | **R** — Edison borrow #5 |
 | Patents / trial registries as **thin DOI/registry ingest** after counting Wanted misses | Discover / acquire | Test before build; not a second PaperQA corpus | **R** test-first — [Discovery and sources](file:///Users/89298/Documents/paperful/docs/ROADMAP.md) |
-| Audit-trail copy test: if we cannot click through, we do not write the sentence | Synthesize / critique | Kosmos bar as **copy test**, not world-model store | Stance — Edison borrow #4 |
+| Audit-trail copy test: if we cannot click through, we do not write the sentence | Synthesize / peer-review | Kosmos bar as **copy test**, not world-model store | Stance — Edison borrow #4 |
 | SnowBallSLR: response-hash cache + drift classification for watches | Keep current | Distinguishes new paper vs reassigned OpenAlex ID | **R** — [Snowballing and review methods](file:///Users/89298/Documents/paperful/docs/ROADMAP.md) |
 | SnowBallSLR: PRISMA-style counts in run report (identified/screened/kept/added) | Screen / export | Counts only; no fake recall % | **R** |
 | SnowBallSLR interop: export Discover queue as seeds/labels; import `included.csv` / RIS into Wanted | Discover ↔ screen | Reviewers chase there; Paperful does PDFs | **R** interoperate, do not vendor |
@@ -202,7 +202,7 @@ v2 can thicken factory stages **on disk** without becoming Edison or a citation-
 | Jeffersonian transcription / qualitative coding | Explicit out | [ROADMAP Explicitly out](file:///Users/89298/Documents/paperful/docs/ROADMAP.md); [comparison.md](file:///Users/89298/Documents/paperful/docs/comparison.md) |
 | Auto Sci-Hub / “AI fetch everything” / CAPTCHA bypass product | 1.0 trust; CAPTCHA open: do not ship a bypass | [ROADMAP 0.1→1.0](file:///Users/89298/Documents/paperful/docs/ROADMAP.md); [ROADMAP CAPTCHA](file:///Users/89298/Documents/paperful/docs/ROADMAP.md) |
 | Valency Hub–style publishing | Out of library/mirror jobs | [comparison-reference Valency](file:///Users/89298/Documents/paperful/docs/comparison-reference.md); [Literature-discovery non-goals](file:///Users/89298/Documents/paperful/docs/ROADMAP.md) |
-| Critique as referee with scores | No score/grade/accept-reject | [critique.md](file:///Users/89298/Documents/paperful/docs/critique.md) |
+| Peer review as referee with scores | No score/grade/accept-reject | [peer_review.md](file:///Users/89298/Documents/paperful/docs/peer-review.md) |
 | Built-in email scheduler as a hosted alert product | keepup: you cron; no email | [keepup.md](file:///Users/89298/Documents/paperful/docs/keepup.md) |
 | Catalogue unification (all managers equal) without tester evidence | Parked; Mendeley/EndNote seeking testers; not 1.0 blockers | [ROADMAP Parked](file:///Users/89298/Documents/paperful/docs/ROADMAP.md); [why.md](file:///Users/89298/Documents/paperful/docs/why.md) |
 
@@ -241,13 +241,13 @@ Safe **1.x** (unchanged): “Find missing PDFs in Zotero. Preview, grab to disk,
 Safe **v2 subtitle / buffet framing** (does not replace 1.x):
 
 - “After the Wanted list is honest: grow the collection, keep it current, and ask **your** PDFs.”
-- “A local literature workbench: same CLI honesty (dry-run, `--apply`, fail closed) across discover → fill → extract → brief → optional critique.”
+- “A local literature workbench: same CLI honesty (dry-run, `--apply`, fail closed) across discover → fill → extract → brief → optional peer-review.”
 - “Not a hosted AI scientist. Complementary to Edison/Valency: they search the public record; Paperful fills and reasons over the library on this machine.”
 - “Factory means a **playbook of gated verbs**, not an overnight PhD.”
 
 Avoid in v1 or v2 public copy:
 
-- “AI fetch everything,” “stealth,” Sci-Hub, “has nobody done this,” “replaces Zotero,” “Kosmos/autonomous scientist,” “we found ~85% of the literature,” scores/grades on critique, “hosted multi-user.”
+- “AI fetch everything,” “stealth,” Sci-Hub, “has nobody done this,” “replaces Zotero,” “Kosmos/autonomous scientist,” “we found ~85% of the literature,” scores/grades on peer-review, “hosted multi-user.”
 
 Versioning suggestion consistent with docs: **1.x = Wanted + mirror contract**; **buffet / v2 = named packs** (precedent, stuff, conflicting-evidence synthesize, SR mode or grey watchers — pick at most one big bet a year) that stay off until `[llm]`/`[rag]`/gates.
 

@@ -25,18 +25,18 @@ else:  # pragma: no cover
     import tomli as tomllib
 
 
-# Default Ollama ``num_predict`` for critique Markdown / JSON reviewers (~700 words).
-CRITIQUE_REVIEWER_MAX_TOKENS = 2048
+# Default Ollama ``num_predict`` for peer-review Markdown / JSON reviewers (~700 words).
+PEER_REVIEW_REVIEWER_MAX_TOKENS = 2048
 
 
 @dataclass(frozen=True)
-class CritiqueReviewer:
-    """One LLM reviewer for ``paperful critique --llm``."""
+class PeerReviewer:
+    """One LLM reviewer for ``paperful peer-review --llm``."""
 
     id: str
     model: str = ""  # empty → [llm].model
     prompt: str = "default"  # default builtin JSON prompt, or a path
-    max_tokens: int = CRITIQUE_REVIEWER_MAX_TOKENS  # Ollama num_predict; 0 → omit
+    max_tokens: int = PEER_REVIEW_REVIEWER_MAX_TOKENS  # Ollama num_predict; 0 → omit
 
 
 # Sci-Hub is opt-in (legal grey zone in some jurisdictions). Add "scihub" to
@@ -229,45 +229,45 @@ class Config:
     screen_fingerprint_max_age_days: int = 14
     screen_fingerprint_dir: Path | None = None
     screen_tag: str = "paperful-pps"
-    critique_llm: bool = False
-    critique_lanes: tuple[str, ...] = ()
-    critique_tag: str = "paperful-critique"
-    critique_overlap_top_k: int = 40
-    critique_overlap_n_min: int = 6
-    critique_overlap_n_max: int = 12
-    critique_overlap_df_max: int = 0  # 0 → auto from corpus size
-    critique_cite_age_years: int = 10
-    critique_max_context_chars: int = 24_000
-    critique_ai_model: bool = False
-    critique_vale: bool = False
-    critique_vale_config: Path | None = None
-    critique_vale_min_alert_level: str = "suggestion"
-    critique_vale_timeout_s: float = 60.0
-    critique_forensics: bool = False
-    critique_forensics_timeout_s: float = 300.0
-    critique_glossary: bool = True
-    critique_glossary_dir: Path | None = None  # None → state_dir / "glossary"
-    critique_glossary_similarity_min: float = 0.88
-    critique_advanced: bool = False
-    critique_advanced_max_rounds: int = 4
-    critique_advanced_max_workers: int = 4
-    critique_advanced_max_comments: int = 12
-    critique_advanced_refine: bool = True
-    critique_advanced_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 600)
-    critique_context_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 600)
-    critique_context_max_comments: int = 12
-    critique_context_max_hits: int = 8
-    critique_adversary_max_comments: int = 12
-    critique_outline_max_comments: int = 12
-    critique_claims_max: int = 8
-    critique_claims_max_comments: int = 16
-    critique_claims_timeout_s: float = 0.0  # 0 → [llm].timeout_s
-    critique_claims_cite_max_sources: int = 3
-    critique_verify_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 600)
-    critique_verify_max_comments: int = 16
-    critique_verify_max_segments: int = 8
-    critique_advanced_aspects: tuple[str, ...] = ()
-    critique_reviewers: tuple[CritiqueReviewer, ...] = ()
+    peer_review_llm: bool = False
+    peer_review_lanes: tuple[str, ...] = ()
+    peer_review_tag: str = "paperful-peer-review"
+    peer_review_overlap_top_k: int = 40
+    peer_review_overlap_n_min: int = 6
+    peer_review_overlap_n_max: int = 12
+    peer_review_overlap_df_max: int = 0  # 0 → auto from corpus size
+    peer_review_cite_age_years: int = 10
+    peer_review_max_context_chars: int = 24_000
+    peer_review_ai_model: bool = False
+    peer_review_vale: bool = False
+    peer_review_vale_config: Path | None = None
+    peer_review_vale_min_alert_level: str = "suggestion"
+    peer_review_vale_timeout_s: float = 60.0
+    peer_review_forensics: bool = False
+    peer_review_forensics_timeout_s: float = 300.0
+    peer_review_glossary: bool = True
+    peer_review_glossary_dir: Path | None = None  # None → state_dir / "glossary"
+    peer_review_glossary_similarity_min: float = 0.88
+    peer_review_advanced: bool = False
+    peer_review_advanced_max_rounds: int = 4
+    peer_review_advanced_max_workers: int = 4
+    peer_review_advanced_max_comments: int = 12
+    peer_review_advanced_refine: bool = True
+    peer_review_advanced_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 600)
+    peer_review_context_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 600)
+    peer_review_context_max_comments: int = 12
+    peer_review_context_max_hits: int = 8
+    peer_review_adversary_max_comments: int = 12
+    peer_review_outline_max_comments: int = 12
+    peer_review_claims_max: int = 8
+    peer_review_claims_max_comments: int = 16
+    peer_review_claims_timeout_s: float = 0.0  # 0 → [llm].timeout_s
+    peer_review_claims_cite_max_sources: int = 3
+    peer_review_verify_timeout_s: float = 0.0  # 0 → max(llm.timeout_s, 600)
+    peer_review_verify_max_comments: int = 16
+    peer_review_verify_max_segments: int = 8
+    peer_review_advanced_aspects: tuple[str, ...] = ()
+    peer_review_reviewers: tuple[PeerReviewer, ...] = ()
     rewrite_areas: tuple[str, ...] = ("style",)
     rewrite_outputs: tuple[str, ...] = ("edits", "tracked")
     rewrite_comments: str = "off"
@@ -567,8 +567,8 @@ class Config:
         return self.state_dir / "sections"
 
     @property
-    def critiques_dir(self) -> Path:
-        return self.state_dir / "critiques"
+    def peer_reviews_dir(self) -> Path:
+        return self.state_dir / "peer-reviews"
 
     @property
     def rewrites_dir(self) -> Path:
@@ -576,7 +576,7 @@ class Config:
 
     @property
     def glossary_dir(self) -> Path:
-        raw = self.critique_glossary_dir
+        raw = self.peer_review_glossary_dir
         if raw is None:
             return self.state_dir / "glossary"
         if raw.is_absolute():
@@ -1156,7 +1156,7 @@ def parse_ste_violation_policy(value: str, *, key: str = "ste_violation_policy")
 
 
 def parse_vale_min_alert_level(
-    value: str, *, key: str = "[critique].vale_min_alert_level"
+    value: str, *, key: str = "[peer_review].vale_min_alert_level"
 ) -> str:
     """Normalise Vale MinAlertLevel. Blank means suggestion."""
     level = str(value).strip().lower()
@@ -1182,13 +1182,6 @@ def package_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-_LEGACY_SHIPPED_PROMPT_PATHS: dict[str, str] = {
-    "prompts/critique-reviewer-2.md": "prompts/critique-line-editor.md",
-    "prompts/critique-reviewer-3.md": "prompts/critique-foundations.md",
-    "prompts/critique-reviewer-5.md": "prompts/critique-openreview.md",
-}
-
-
 def _resolve_prompt_path(value: str, source: Path) -> str:
     if not value or value == "default":
         return "default"
@@ -1196,7 +1189,6 @@ def _resolve_prompt_path(value: str, source: Path) -> str:
     if raw.is_absolute():
         return str(raw)
     rel = raw.as_posix()
-    rel = _LEGACY_SHIPPED_PROMPT_PATHS.get(rel, rel)
     path = Path(rel)
     beside_config = (source.parent / path).resolve()
     if beside_config.is_file():
@@ -1207,42 +1199,42 @@ def _resolve_prompt_path(value: str, source: Path) -> str:
     return str(beside_config)
 
 
-def parse_critique_reviewers(raw: Any) -> tuple[CritiqueReviewer, ...]:
-    """Parse ``[[critique.reviewers]]`` tables."""
+def parse_peer_review_reviewers(raw: Any) -> tuple[PeerReviewer, ...]:
+    """Parse ``[[peer_review.reviewers]]`` tables."""
     if raw is None:
         return ()
     if not isinstance(raw, list):
         raise ValueError(
-            "[critique].reviewers must be an array of tables ([[critique.reviewers]])"
+            "[peer_review].reviewers must be an array of tables ([[peer_review.reviewers]])"
         )
-    out: list[CritiqueReviewer] = []
+    out: list[PeerReviewer] = []
     seen: set[str] = set()
     for i, row in enumerate(raw, start=1):
         if not isinstance(row, dict):
-            raise ValueError(f"[critique.reviewers] entry {i} must be a table")
+            raise ValueError(f"[peer_review.reviewers] entry {i} must be a table")
         default_id = "reviewer" if len(raw) == 1 else f"reviewer-{i}"
         rid = str(row.get("id") or "").strip() or default_id
         if rid in seen:
-            raise ValueError(f"[critique.reviewers] duplicate id {rid!r}")
+            raise ValueError(f"[peer_review.reviewers] duplicate id {rid!r}")
         seen.add(rid)
         model = str(row.get("model") or "").strip()
         prompt = str(row.get("prompt") or "default").strip() or "default"
-        max_tokens = CRITIQUE_REVIEWER_MAX_TOKENS
+        max_tokens = PEER_REVIEW_REVIEWER_MAX_TOKENS
         if "max_tokens" in row and row.get("max_tokens") is not None:
             max_tokens = max(0, int(row.get("max_tokens")))
         out.append(
-            CritiqueReviewer(id=rid, model=model, prompt=prompt, max_tokens=max_tokens)
+            PeerReviewer(id=rid, model=model, prompt=prompt, max_tokens=max_tokens)
         )
     return tuple(out)
 
 
-def critique_reviewers_for(
+def peer_review_reviewers_for(
     cfg: Config, wanted: list[str] | None = None
-) -> tuple[CritiqueReviewer, ...]:
+) -> tuple[PeerReviewer, ...]:
     """Configured reviewers, or one implicit default reviewer."""
-    rows = cfg.critique_reviewers
+    rows = cfg.peer_review_reviewers
     if not rows:
-        rows = (CritiqueReviewer(id="reviewer", model="", prompt="default"),)
+        rows = (PeerReviewer(id="reviewer", model="", prompt="default"),)
     if wanted:
         want = {w.strip() for w in wanted if str(w).strip()}
         if want:

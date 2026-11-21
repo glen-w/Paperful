@@ -13,9 +13,9 @@ from hashlib import sha256
 from typing import Any
 
 from .config import Config
-from .critique import Finding, make_finding
-from .critique_extract import ExtractedDoc
-from .critique_llm import findings_from_comments, grounded, parse_llm_json
+from .peer_review import Finding, make_finding
+from .peer_review_extract import ExtractedDoc
+from .peer_review_llm import findings_from_comments, grounded, parse_llm_json
 from .grounding import budget_slice
 from .zot import Item
 
@@ -56,8 +56,8 @@ def suggested_from_adversary(
     """One JSON validity-attack turn. Suggested lane only."""
     say = on_status or (lambda _msg: None)
     model = cfg.llm_model
-    excerpt = budget_slice(doc.text, cfg.critique_max_context_chars)
-    cap = max(1, int(getattr(cfg, "critique_adversary_max_comments", 12) or 12))
+    excerpt = budget_slice(doc.text, cfg.peer_review_max_context_chars)
+    cap = max(1, int(getattr(cfg, "peer_review_adversary_max_comments", 12) or 12))
     timeout_s = float(cfg.llm_timeout_s or 120)
     meta: dict[str, Any] = {
         "id": "adversary",
@@ -89,9 +89,9 @@ def suggested_from_adversary(
     prompt_sha = sha256((_SYSTEM + user[:2000]).encode("utf-8")).hexdigest()[:12]
     meta["prompt_sha"] = prompt_sha
     say("Adversary lane…")
-    from .critique_llm import chat_with_json_retry, critique_chat_request
+    from .peer_review_llm import chat_with_json_retry, peer_review_chat_request
 
-    request = critique_chat_request(
+    request = peer_review_chat_request(
         model=model,
         messages=(
             {"role": "system", "content": _SYSTEM},

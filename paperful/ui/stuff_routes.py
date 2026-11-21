@@ -20,7 +20,7 @@ from .pages import (
     stuff_pack_markdown,
 )
 from .prefs import prefs_from_request
-from ..critique_extract import (
+from ..peer_review_extract import (
     ACCEPT,
     MAX_UPLOAD_BYTES,
     SUPPORTED,
@@ -139,7 +139,7 @@ async def handle_stuff_run(ui: UiContext, request: Request) -> RedirectResponse:
             return RedirectResponse(url="/stuff?error=format", status_code=303)
         try:
             staged.resolve().relative_to(
-                (ui.cfg.state_dir / "critiques" / "uploads").resolve()
+                (ui.cfg.state_dir / "peer-reviews" / "uploads").resolve()
             )
         except ValueError:
             return RedirectResponse(url="/stuff?error=format", status_code=303)

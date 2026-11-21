@@ -29,8 +29,8 @@ def run_rewrite(
 ) -> None:
     from . import cli_runtime as cli_mod
     from .agent_json import EXIT_OK, EXIT_PARTIAL, envelope
-    from .critique import load_pack
-    from .critique_extract import ExtractError
+    from .peer_review import load_pack
+    from .peer_review_extract import ExtractError
     from .llm import get_client
     from .llm.preflight import validate_llm_for_verb
     from .llm.validate import LlmConfigError
@@ -74,12 +74,12 @@ def run_rewrite(
         )
         if folder is None:
             hint = (
-                f"paperful critique --file {file_path}"
+                f"paperful peer-review --file {file_path}"
                 if file_path is not None
-                else "paperful critique --file PATH"
+                else "paperful peer-review --file PATH"
             )
             console.print(
-                f"[red]No critique pack on disk. Run {hint} or pass --pack.[/]"
+                f"[red]No peer-review pack on disk. Run {hint} or pass --pack.[/]"
             )
             raise typer.Exit(1)
 
@@ -88,7 +88,7 @@ def run_rewrite(
         console.print(f"[red]Could not read pack.json in {folder}.[/]")
         raise typer.Exit(1)
     pack["pack_dir"] = str(folder)
-    pack["critique_id"] = pack.get("critique_id") or folder.parent.name
+    pack["peer_review_id"] = pack.get("peer_review_id") or folder.parent.name
 
     manuscript = _manuscript_path(pack, file_path)
     if manuscript is None or not manuscript.is_file():
@@ -152,7 +152,7 @@ def run_rewrite(
     skips_n = int(counts.get("skips", 0) or 0)
     if drifted:
         msg = (
-            "Manuscript hash differs from the critique pack "
+            "Manuscript hash differs from the peer-review pack "
             f"(file={inp.get('file_hash') or '?'} pack={inp.get('pack_hash') or 'missing'})."
         )
         if json_out_flag:
@@ -165,7 +165,7 @@ def run_rewrite(
     write_command_report(
         cfg,
         command="rewrite",
-        scope=str(result.get("critique_id") or ""),
+        scope=str(result.get("peer_review_id") or ""),
         summary={
             "edits": edits_n,
             "skips": skips_n,
@@ -187,7 +187,7 @@ def run_rewrite(
             "edits": edits_n,
             "skips": skips_n,
             "pack_dir": result.get("pack_dir") or "",
-            "critique_id": result.get("critique_id") or "",
+            "peer_review_id": result.get("peer_review_id") or "",
             "drift": drifted,
             "file_hash": inp.get("file_hash") or "",
             "pack_hash": inp.get("pack_hash") or "missing",

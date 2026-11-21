@@ -58,26 +58,26 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert "Start Zotero" in wanted.text or "Pick a collection" in wanted.text
     assert 'formaction="/wanted/attach"' in wanted.text
     assert "/repair" not in wanted.text
-    assert "/critique" not in wanted.text
+    assert "/peer-review" not in wanted.text
     assert "/rewrite" not in wanted.text
     assert "/stuff" not in wanted.text
     assert 'href="/index"' not in wanted.text
     client.cookies.set("pf_advanced", "1")
     res = client.get("/wanted")
     assert "/repair" in res.text
-    assert "/critique" in res.text
+    assert "/peer-review" in res.text
     assert "/rewrite" in res.text
     assert "/stuff" in res.text
     assert "/v1/ask" not in res.text
     assert client.get("/repair").status_code == 200
-    critique = client.get("/critique")
-    assert critique.status_code == 200
+    peer_review = client.get("/peer-review")
+    assert peer_review.status_code == 200
     rewrite = client.get("/rewrite")
     assert rewrite.status_code == 200
     assert "Suggest edits" in rewrite.text
     assert "accept or reject the tracked changes in Word" in rewrite.text
-    assert "Run Critique first" in rewrite.text
-    assert 'href="/critique"' in rewrite.text
+    assert "Run Peer review first" in rewrite.text
+    assert 'href="/peer-review"' in rewrite.text
     stuff = client.get("/stuff")
     assert stuff.status_code == 200
     assert "Extra citations you already hold" in stuff.text
@@ -88,12 +88,12 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert 'name="pack_dir"' not in rewrite.text
     assert ">Rewrite</a>" not in res.text
     assert ">Suggest edits</a>" in res.text
-    assert "drop-zone" in critique.text
-    assert 'name="item_key"' in critique.text
-    assert 'name="file"' in critique.text
-    assert 'name="ai_model"' in critique.text
-    assert 'name="vale"' in critique.text
-    assert 'name="forensics"' in critique.text
+    assert "drop-zone" in peer_review.text
+    assert 'name="item_key"' in peer_review.text
+    assert 'name="file"' in peer_review.text
+    assert 'name="ai_model"' in peer_review.text
+    assert 'name="vale"' in peer_review.text
+    assert 'name="forensics"' in peer_review.text
     assert client.get("/mirror").status_code == 200
     assert client.get("/index").status_code == 200
     assert client.get("/briefs").status_code == 200
@@ -517,20 +517,20 @@ def test_pages_include_beginner_help(tmp_path, monkeypatch):
     settings = client.get("/settings")
     assert "Unpaywall needs a real email" in settings.text
 
-    critique = client.get("/critique")
-    assert critique.status_code == 200
-    assert "Get independent reviewer notes" in critique.text
-    assert "Argue against my conclusions" in critique.text
-    assert "Compare with published work (goes online)" in critique.text
-    assert "Find gaps section by section" in critique.text
-    assert "> MARG-S multi-agent" not in critique.text
-    assert "> Verify (section swarm)" not in critique.text
-    assert "> Claims (intra-doc ledger)" not in critique.text
+    peer_review = client.get("/peer-review")
+    assert peer_review.status_code == 200
+    assert "Get independent reviewer notes" in peer_review.text
+    assert "Argue against my conclusions" in peer_review.text
+    assert "Compare with published work (goes online)" in peer_review.text
+    assert "Find gaps section by section" in peer_review.text
+    assert "> MARG-S multi-agent" not in peer_review.text
+    assert "> Verify (section swarm)" not in peer_review.text
+    assert "> Claims (intra-doc ledger)" not in peer_review.text
 
     rewrite = client.get("/rewrite")
     assert rewrite.status_code == 200
-    assert "Run Critique first" in rewrite.text
-    assert "Turn a critique pack into tracked changes" in rewrite.text
+    assert "Run Peer review first" in rewrite.text
+    assert "Turn a peer-review pack into tracked changes" in rewrite.text
 
     stuff = client.get("/stuff")
     assert stuff.status_code == 200
@@ -539,7 +539,7 @@ def test_pages_include_beginner_help(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
-def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
+def test_peer_review_workbench_llm_checkboxes(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
     import paperful.agent_ops as ops
@@ -548,8 +548,8 @@ def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)
     cfg.llm_enabled = True
-    cfg.critique_llm = True
-    cfg.critique_advanced = True
+    cfg.peer_review_llm = True
+    cfg.peer_review_advanced = True
     cfg.grobid_enabled = True
     monkeypatch.setattr(ops, "doctor_payload", lambda _cfg, probe=False: [])
     monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
@@ -564,11 +564,11 @@ def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
         seen.append(kw)
         return {"ok": True, "pack_dir": str(tmp_path / "pack")}
 
-    jobs.critique_fn = fake
+    jobs.peer_review_fn = fake
     try:
         client = TestClient(create_app(cfg))
         client.cookies.set("pf_advanced", "1")
-        page = client.get("/critique")
+        page = client.get("/peer-review")
         assert page.status_code == 200
         assert 'name="lane"' in page.text
         assert 'value="reviewers"' in page.text
@@ -591,7 +591,7 @@ def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
         assert "> Verify (section swarm)" not in page.text
         assert page.text.count("checked") >= 3
         res = client.post(
-            "/critique",
+            "/peer-review",
             data={"lane": "reviewers", "grobid": "1", "llm": "1", "advanced": "1"},
             files={
                 "file": (
@@ -620,7 +620,7 @@ def test_critique_workbench_llm_checkboxes(tmp_path, monkeypatch):
         assert seen[0]["advanced"] is True
         assert seen[0]["grobid"] is True
     finally:
-        jobs.critique_fn = None
+        jobs.peer_review_fn = None
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
@@ -718,15 +718,21 @@ def test_stuff_workbench_item_or_file(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
-def test_rewrite_form_after_critique_pack(tmp_path, monkeypatch):
+def test_rewrite_form_after_peer_review_pack(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)
-    pack = cfg.state_dir / "critiques" / "file-draft" / "20261027T000000Z"
+    pack = cfg.state_dir / "peer-reviews" / "file-draft" / "20261027T000000Z"
     pack.mkdir(parents=True)
     (pack / "pack.json").write_text(
-        json.dumps({"input": {"title": "Draft"}, "counts": {"findings": 3}}),
+        json.dumps(
+            {
+                "schema": "paperful.peer_review.pack.v1",
+                "input": {"title": "Draft"},
+                "counts": {"findings": 3},
+            }
+        ),
         encoding="utf-8",
     )
     monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
@@ -740,7 +746,7 @@ def test_rewrite_form_after_critique_pack(tmp_path, monkeypatch):
     assert page.status_code == 200
     assert 'name="pack_dir"' in page.text
     assert "Suggest edits" in page.text
-    assert "Run Critique first" not in page.text
+    assert "Run Peer review first" not in page.text
     assert ">Rewrite</a>" not in page.text
 
 

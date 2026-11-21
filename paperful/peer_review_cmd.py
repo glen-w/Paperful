@@ -1,4 +1,4 @@
-"""``paperful critique`` implementation (CLI parses flags only)."""
+"""``paperful peer-review`` implementation (CLI parses flags only)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from rich.table import Table
 from .runreport import write_command_report
 
 
-def run_critique(
+def run_peer_review(
     console: Console,
     *,
     item: list[str],
@@ -38,9 +38,9 @@ def run_critique(
 ) -> None:
     from . import cli_runtime as cli_mod
     from .agent_json import envelope
-    from .critique import build_critique, note_html
-    from .critique_extract import SUPPORTED, ExtractError
-    from .critique_forensics import SIBLING_TABLE_SUFFIXES
+    from .peer_review import build_peer_review, note_html
+    from .peer_review_extract import SUPPORTED, ExtractError
+    from .peer_review_forensics import SIBLING_TABLE_SUFFIXES
     from .library import LibraryError
     from .llm import get_client
     from .llm.preflight import validate_llm_for_verb
@@ -70,19 +70,19 @@ def run_critique(
         )
         raise typer.Exit(1)
 
-    from .critique_lanes import lanes_need_llm, resolve_critique_lanes
+    from .peer_review_lanes import lanes_need_llm, resolve_peer_review_lanes
 
     try:
-        lanes = resolve_critique_lanes(
+        lanes = resolve_peer_review_lanes(
             cfg, lane_flags=lane or [], llm=llm, advanced=advanced
         )
     except ValueError as exc:
         console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from exc
     use_llm = "reviewers" in lanes
-    use_ai_model = bool(ai_model) or cfg.critique_ai_model
-    use_vale = bool(vale) or cfg.critique_vale
-    use_forensics = bool(forensics) or cfg.critique_forensics
+    use_ai_model = bool(ai_model) or cfg.peer_review_ai_model
+    use_vale = bool(vale) or cfg.peer_review_vale
+    use_forensics = bool(forensics) or cfg.peer_review_forensics
     use_advanced = "marg" in lanes
     use_grobid = cfg.grobid_enabled if grobid is None else grobid
     grobid_lanes = bool({"marg", "claims", "verify"} & set(lanes))
@@ -160,11 +160,13 @@ def run_critique(
                 item_type=[],
             )
             scope_items = loaded.items
+        except typer.Exit:
+            raise
         except Exception:
             scope_items = []
 
     if apply and backend is not None and not backend.supports_write():
-        raise LibraryError("critique --apply needs write access to the library")
+        raise LibraryError("peer-review --apply needs write access to the library")
 
     if scope_items and not json_out:
         console.print(f"[dim]Scope: {len(scope_items)} item(s)[/]")
@@ -178,14 +180,14 @@ def run_critique(
         console.print(f"[dim]{elapsed:5.0f}s[/] {escape(msg)}")
 
     try:
-        with cli_mod._spinner("Critique", json_out=json_out) as spin:
+        with cli_mod._spinner("Peer review", json_out=json_out) as spin:
 
             def on_status(msg: str) -> None:
                 spin(msg)
                 if not json_out:
                     _on_status(msg)
 
-            pack = build_critique(
+            pack = build_peer_review(
                 cfg,
                 item=target,
                 file_path=file_path,
@@ -219,7 +221,7 @@ def run_critique(
     applied = 0
     if apply and target is not None and backend is not None:
         html = note_html(pack)
-        tag = (cfg.critique_tag or "paperful-critique").strip()
+        tag = (cfg.peer_review_tag or "paperful-peer-review").strip()
         backend.create_or_update_note(target.key, html, tag)
         applied = 1
         cli_mod._flush(backend)
@@ -228,7 +230,7 @@ def run_critique(
     findings = pack.get("findings") or []
     write_command_report(
         cfg,
-        command="critique",
+        command="peer-review",
         scope=str(pack.get("scope") or ""),
         summary={
             "findings": counts.get("findings", 0),
@@ -238,7 +240,7 @@ def run_critique(
         },
         items=[
             {
-                "itemKey": pack.get("critique_id") or "",
+                "itemKey": pack.get("peer_review_id") or "",
                 "title": (pack.get("input") or {}).get("title") or "",
                 "status": f.get("code") or "",
                 "reason": f.get("detail") or "",
@@ -261,13 +263,13 @@ def run_critique(
         started=started,
     )
     payload = envelope(
-        command="critique",
+        command="peer-review",
         summary={
             "findings": counts.get("findings", 0),
             "by_code": counts.get("by_code") or {},
             "by_lane": counts.get("by_lane") or {},
             "pack_dir": pack.get("pack_dir") or "",
-            "critique_id": pack.get("critique_id") or "",
+            "peer_review_id": pack.get("peer_review_id") or "",
             "applied": applied,
         },
         items=[
@@ -306,7 +308,7 @@ def run_critique(
         if not visible:
             console.print("[green]No findings.[/]")
             return
-        table = Table(title="Critique")
+        table = Table(title="Peer review")
         table.add_column("Lane")
         table.add_column("Sev")
         table.add_column("Code")
@@ -336,13 +338,13 @@ def run_dismiss(
     console: Console,
     *,
     finding_id: str,
-    critique_id: str | None,
+    peer_review_id: str | None,
     config: Path | None,
     fmt: str,
 ) -> None:
     from . import cli_runtime as cli_mod
     from .agent_json import envelope
-    from .critique import dismiss_finding, latest_pack_dir, load_pack
+    from .peer_review import dismiss_finding, latest_pack_dir, load_pack
 
     cfg = cli_mod._cfg(config)
     json_out = cli_mod._agent_json(fmt)
@@ -350,13 +352,13 @@ def run_dismiss(
     if not fid:
         console.print("[red]Pass a finding id.[/]")
         raise typer.Exit(1)
-    cid = (critique_id or "").strip()
+    cid = (peer_review_id or "").strip()
     if not cid:
-        root = cfg.state_dir / "critiques"
+        root = cfg.state_dir / "peer-reviews"
         if not root.is_dir():
-            console.print("[red]No critique packs on disk; pass --critique-id.[/]")
+            console.print("[red]No peer-review packs on disk; pass --peer-review-id.[/]")
             raise typer.Exit(1)
-        # Newest critique folder with a pack.
+        # Newest peer-review folder with a pack.
         newest = None
         newest_mtime = 0.0
         for child in root.iterdir():
@@ -371,7 +373,7 @@ def run_dismiss(
                 newest = child.name
         cid = newest or ""
     if not cid:
-        console.print("[red]Could not infer critique id; pass --critique-id.[/]")
+        console.print("[red]Could not infer peer-review id; pass --peer-review-id.[/]")
         raise typer.Exit(1)
     pack_dir = latest_pack_dir(cfg, cid)
     pack = load_pack(pack_dir) if pack_dir else None
@@ -381,9 +383,9 @@ def run_dismiss(
         raise typer.Exit(1)
     path = dismiss_finding(cfg, cid, fid)
     payload = envelope(
-        command="critique dismiss",
-        summary={"critique_id": cid, "id": fid, "path": str(path)},
-        items=[{"id": fid, "critique_id": cid}],
+        command="peer-review dismiss",
+        summary={"peer_review_id": cid, "id": fid, "path": str(path)},
+        items=[{"id": fid, "peer_review_id": cid}],
         flags={},
         exit_code=0,
     )

@@ -1,16 +1,16 @@
-"""Crossref helper used by critique bibliography checks (mocked HTTP)."""
+"""Crossref helper used by peer-review bibliography checks (mocked HTTP)."""
 
 from __future__ import annotations
 
 import httpx
 
-from paperful.critique_checks import _crossref_work, _float_kind, run_checks
-from paperful.critique_checks.biblio import _crossref_work as _biblio_crossref
-from paperful.critique_checks.floats import _float_kind as _floats_kind
-from paperful.critique_checks.run import run_checks as _run_checks
+from paperful.peer_review_checks import _crossref_work, _float_kind, run_checks
+from paperful.peer_review_checks.biblio import _crossref_work as _biblio_crossref
+from paperful.peer_review_checks.floats import _float_kind as _floats_kind
+from paperful.peer_review_checks.run import run_checks as _run_checks
 
 
-def test_critique_checks_package_reexports():
+def test_peer_review_checks_package_reexports():
     assert run_checks is _run_checks
     assert _crossref_work is _biblio_crossref
     assert _float_kind is _floats_kind

@@ -1,4 +1,4 @@
-"""Orchestrate deterministic critique checkers."""
+"""Orchestrate deterministic peer-review checkers."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from typing import Any
 import httpx
 
 from ..config import Config
-from ..critique import Finding
-from ..critique_extract import ExtractedDoc
+from ..peer_review import Finding
+from ..peer_review_extract import ExtractedDoc
 from ..zot import Item
 from .biblio import _bibliography_and_cites
 from .floats import _acronyms, _floats, _glossary_acronyms

@@ -270,7 +270,7 @@ the search scope (`--item` is the manuscript, not a scope key). Labels:
 Fail closed when `[rag]` is off or the index is empty. Writes
 `state/ask-claims/<stamp>/` (`paperful.claim_check.v1` + `pack.md`).
 `--apply` and `--from-file` are not valid here. Cited works only, on a
-critique pack: `--lane claims` with `-C` — [Critique](critique.md#optional-claims).
+peer-review pack: `--lane claims` with `-C` — [Peer review](peer-review.md#optional-claims).
 
 The marker in the text, the paper, the pages the passages came from, and the
 item key. When the model cites nothing, the retrieved papers are listed as

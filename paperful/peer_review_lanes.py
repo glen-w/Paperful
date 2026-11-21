@@ -1,4 +1,4 @@
-"""Composable critique review lanes. Suggested extras only; checkers always run.
+"""Composable peer-review review lanes. Suggested extras only; checkers always run.
 
 Paperful owns orchestration. Do not vendor allenai/marg-reviewer or ScholarPeer.
 ``--llm`` / ``--advanced`` remain aliases for ``reviewers`` / ``marg``.
@@ -30,13 +30,13 @@ def canonical_lane(name: str) -> str:
     raw = LANE_ALIASES.get(raw, raw)
     if raw not in KNOWN_LANES:
         raise ValueError(
-            f"unknown critique lane {name!r} (want {', '.join(KNOWN_LANES)})"
+            f"unknown peer-review lane {name!r} (want {', '.join(KNOWN_LANES)})"
         )
     return raw
 
 
-def parse_critique_lanes(raw: Any) -> tuple[str, ...]:
-    """Parse ``[critique].lanes`` (list or comma-separated). Empty is valid."""
+def parse_peer_review_lanes(raw: Any) -> tuple[str, ...]:
+    """Parse ``[peer_review].lanes`` (list or comma-separated). Empty is valid."""
     if raw is None or raw == "":
         return ()
     if isinstance(raw, str):
@@ -44,7 +44,7 @@ def parse_critique_lanes(raw: Any) -> tuple[str, ...]:
     elif isinstance(raw, list):
         parts = [str(part).strip() for part in raw if str(part).strip()]
     else:
-        raise ValueError("[critique].lanes must be an array of lane ids")
+        raise ValueError("[peer_review].lanes must be an array of lane ids")
     return ordered_lanes(canonical_lane(p) for p in parts)
 
 
@@ -83,7 +83,7 @@ def lanes_need_llm(lanes: Iterable[str]) -> bool:
     return bool(ordered_lanes(lanes))
 
 
-def resolve_critique_lanes(
+def resolve_peer_review_lanes(
     cfg: Any,
     *,
     lane_flags: list[str] | None = None,
@@ -92,13 +92,13 @@ def resolve_critique_lanes(
 ) -> tuple[str, ...]:
     """Resolve one-run lanes from ``--lane`` plus config / bool shims.
 
-    Base set: CLI ``--lane`` if any; else ``[critique].lanes`` when non-empty
+    Base set: CLI ``--lane`` if any; else ``[peer_review].lanes`` when non-empty
     (config ``llm`` / ``advanced`` ignored); else map those bools (CLI overlay
     of config). Then ``--llm`` / ``--no-llm`` and ``--advanced`` /
     ``--no-advanced`` add or remove ``reviewers`` / ``marg``.
     """
     flags = [canonical_lane(x) for x in (lane_flags or []) if str(x).strip()]
-    config_lanes = ordered_lanes(getattr(cfg, "critique_lanes", ()) or ())
+    config_lanes = ordered_lanes(getattr(cfg, "peer_review_lanes", ()) or ())
     if flags:
         base = list(dict.fromkeys(flags))
         overlay = True
@@ -106,8 +106,8 @@ def resolve_critique_lanes(
         base = list(config_lanes)
         overlay = True
     else:
-        want_r = cfg.critique_llm if llm is None else bool(llm)
-        want_m = cfg.critique_advanced if advanced is None else bool(advanced)
+        want_r = cfg.peer_review_llm if llm is None else bool(llm)
+        want_m = cfg.peer_review_advanced if advanced is None else bool(advanced)
         base = []
         if want_r:
             base.append("reviewers")

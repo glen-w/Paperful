@@ -48,8 +48,8 @@ def test_identify_v1_and_tag_only():
     cfg = Config()
     html = wrap("<p>body</p>", note_type="summary", verb="summarize", model="qwen")
     assert identify(html, ("paperful-summary",), cfg)[0] == "summary"
-    critique = wrap("<p>body</p>", note_type="critique", verb="critique")
-    assert identify(critique, ("paperful-critique",), cfg)[0] == "critique"
+    note = wrap("<p>body</p>", note_type="peer-review", verb="peer-review")
+    assert identify(note, ("paperful-peer-review",), cfg)[0] == "peer-review"
     assert identify("<p>human</p>", ("paperful-found",), cfg)[0] == "attach"
     assert identify("<p>my thoughts</p>", ("todo",), cfg) is None
 

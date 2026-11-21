@@ -1,4 +1,4 @@
-"""``paperful.critique.pack.v1``: findings, markdown, dismiss, orchestrator."""
+"""``paperful.peer_review.pack.v1``: findings, markdown, dismiss, orchestrator."""
 
 from __future__ import annotations
 
@@ -12,14 +12,14 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .config import Config
-from .critique_extract import ExtractedDoc, extract_path, loc_of_span, stage_file
+from .peer_review_extract import ExtractedDoc, extract_path, loc_of_span, stage_file
 from .dedupe import scope_slug
 from .fsio import file_sha256
 from .store import write_json
 from .zot import Item
 
-SCHEMA = "paperful.critique.pack.v1"
-CRITIQUE_PACK_KEYS = frozenset(
+SCHEMA = "paperful.peer_review.pack.v1"
+PEER_REVIEW_PACK_KEYS = frozenset(
     {
         "schema",
         "input",
@@ -115,18 +115,18 @@ def make_finding(
     )
 
 
-def critique_id(*, kind: str, item_key: str = "", original_name: str = "") -> str:
+def peer_review_id(*, kind: str, item_key: str = "", original_name: str = "") -> str:
     """Stable id: item key, or ``file-<stem>`` so re-runs keep dismissals."""
     if kind == "item" and item_key:
         return item_key
-    from .critique_extract import safe_filename
+    from .peer_review_extract import safe_filename
 
     stem = Path(safe_filename(original_name or "file")).stem.strip(".-") or "file"
     return f"file-{stem[:60]}"
 
 
 def dismissed_path(cfg: Config, cid: str) -> Path:
-    return cfg.state_dir / "critiques" / cid / "dismissed.jsonl"
+    return cfg.state_dir / "peer-reviews" / cid / "dismissed.jsonl"
 
 
 def load_dismissed(cfg: Config, cid: str) -> set[str]:
@@ -203,7 +203,7 @@ def _fmt_metric(value: Any, digits: int = 1) -> str:
 
 
 def _render_metrics_md(metrics: dict[str, Any]) -> list[str]:
-    from .critique_ai_tells import MIN_AI_TELL_WORDS
+    from .peer_review_ai_tells import MIN_AI_TELL_WORDS
 
     lines = ["## Metrics", ""]
     lines.append(
@@ -548,7 +548,7 @@ def render_markdown(pack: dict[str, Any], *, show_dismissed: bool = False) -> st
     inp = pack.get("input") or {}
     title = inp.get("title") or inp.get("item_key") or inp.get("path") or "manuscript"
     lines = [
-        f"# Critique: {title}",
+        f"# Peer review: {title}",
         "",
     ]
     llm = pack.get("llm") or {}
@@ -660,7 +660,7 @@ def write_pack(
     show_dismissed: bool = False,
 ) -> Path:
     stamp = stamp or datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    folder = cfg.state_dir / "critiques" / cid / stamp
+    folder = cfg.state_dir / "peer-reviews" / cid / stamp
     folder.mkdir(parents=True, exist_ok=True)
     payload.setdefault("schema", SCHEMA)
     payload["created_at"] = (
@@ -674,7 +674,7 @@ def write_pack(
 
 
 def latest_pack_dir(cfg: Config, cid: str) -> Path | None:
-    root = cfg.state_dir / "critiques" / cid
+    root = cfg.state_dir / "peer-reviews" / cid
     if not root.is_dir():
         return None
     dirs = sorted(
@@ -691,10 +691,14 @@ def load_pack(folder: Path) -> dict[str, Any] | None:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return data if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        return None
+    if data.get("schema") != SCHEMA:
+        return None
+    return data
 
 
-def build_critique(
+def build_peer_review(
     cfg: Config,
     *,
     item: Item | None = None,
@@ -721,9 +725,9 @@ def build_critique(
     on_status: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """Run checkers and write a pack (unless ``dry_run``)."""
-    from .critique_checks import run_checks
-    from .critique_lanes import lanes_need_llm, ordered_lanes
-    from .critique_llm import suggested_from_llm
+    from .peer_review_checks import run_checks
+    from .peer_review_lanes import lanes_need_llm, ordered_lanes
+    from .peer_review_llm import suggested_from_llm
     from .lint import resolve_pdf_path
     from .store import Manifest
 
@@ -776,7 +780,7 @@ def build_critique(
 
     words = len((doc.text or "").split())
     say(f"Extracted {words:,} words ({fmt or doc.format or 'unknown'})")
-    cid = critique_id(
+    cid = peer_review_id(
         kind=kind,
         item_key=item_key,
         original_name=file_path.name if file_path is not None else "",
@@ -795,15 +799,15 @@ def build_critique(
         force=force,
         on_status=on_status,
     )
-    from .critique_ai_model import run_ai_model
-    from .critique_ai_tells import compute_ai_tells
-    from .critique_forensics import (
+    from .peer_review_ai_model import run_ai_model
+    from .peer_review_ai_tells import compute_ai_tells
+    from .peer_review_forensics import (
         persist_forensics_report,
         resolve_forensics_files,
         run_forensics,
     )
-    from .critique_metrics import compute_style_metrics
-    from .critique_vale import run_vale
+    from .peer_review_metrics import compute_style_metrics
+    from .peer_review_vale import run_vale
 
     say("Metrics and heuristic AI-prose tells…")
     metrics = compute_style_metrics(doc.text or "")
@@ -944,7 +948,7 @@ def build_critique(
             ctx_meta = llm_meta["context"]
         inv = ctx_meta.get("investigation") if ctx_meta else None
         if isinstance(inv, dict) and inv:
-            from .critique_context import persist_context_log
+            from .peer_review_context import persist_context_log
 
             dest = persist_context_log(folder, inv)
             ctx_meta["log"] = dest.name
@@ -952,7 +956,7 @@ def build_critique(
             payload["llm"] = llm_meta
             write_json(folder / "pack.json", payload)
         payload["pack_dir"] = str(folder)
-    payload["critique_id"] = cid
+    payload["peer_review_id"] = cid
     payload["_findings"] = findings
     payload["_doc"] = doc
     return payload
@@ -979,7 +983,7 @@ def note_html(pack: dict[str, Any]) -> str:
     visible = [f for f in pack.get("findings") or [] if not f.get("dismissed")]
     checked = [f for f in visible if f.get("lane") != "suggested"]
     lines = [
-        "<p>Critique pack from <code>paperful critique</code>.</p>",
+        "<p>Peer review pack from <code>paperful peer-review</code>.</p>",
         f"<p>Findings: {counts.get('findings', 0)} "
         f"(checked {(counts.get('by_lane') or {}).get('checked', 0)}, "
         f"suggested {(counts.get('by_lane') or {}).get('suggested', 0)}).</p>",
@@ -993,4 +997,4 @@ def note_html(pack: dict[str, Any]) -> str:
         lines.append(f"<li><strong>{code}</strong>{loc_bit}: {detail}</li>")
     lines.append("</ul>")
     extra = f"{counts.get('findings', 0)} findings"
-    return wrap("\n".join(lines), note_type="critique", verb="critique", extra=extra)
+    return wrap("\n".join(lines), note_type="peer-review", verb="peer-review", extra=extra)

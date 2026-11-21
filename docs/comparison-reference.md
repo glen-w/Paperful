@@ -146,12 +146,12 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
   Batch CLI, HTML/JSON reports, optional Web UI and LLM `explain`. MIT license.
 - **Epistemic line:** flags **statistical anomalies**, mandatory innocent
   explanations, no “fraud” wording in reports — aligned with Paperful
-  [`screen`](screen.md) / [`critique`](critique.md) copy.
+  [`screen`](screen.md) / [`peer-review`](peer-review.md) copy.
 - **With Paperful:** Paperful owns **Zotero mirror, fetch, and light manuscript
   packs**; PaperGuard owns **deep forensics on files** (especially supplementary
   CSV/XLSX and raster figures). Overlap is narrow: retraction/PubPeer/tortured
-  phrases — Paperful `screen` + critique `pps_*` on PDF text; PaperGuard adds
-  full statcheck, table digit tests, and image duplication. `paperful critique
+  phrases — Paperful `screen` + peer-review `pps_*` on PDF text; PaperGuard adds
+  full statcheck, table digit tests, and image duplication. `paperful peer-review
   --forensics` subprocesses `paperguard` when it is on PATH. Collection batch
   and workbench HTML deep-links remain
   [roadmap](ROADMAP.md#research-integrity-forensics-paperguard).
@@ -160,13 +160,13 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 
 | Capability | Paperful | PaperGuard |
 | --- | --- | --- |
-| Retraction / EoC on **library items** | Yes (`screen`, critique cited works) | Yes (DOI cross-check) |
-| PPS tortured phrases on PDF text | Yes (`screen`, critique extract) | Yes (T4 dictionary + M1 graph) |
-| GRIM / statcheck on **manuscript** inline stats | Partial (stdlib subset in critique) | Yes (full statcheck + GRIMMER/SPRITE) |
+| Retraction / EoC on **library items** | Yes (`screen`, peer-review cited works) | Yes (DOI cross-check) |
+| PPS tortured phrases on PDF text | Yes (`screen`, peer-review extract) | Yes (T4 dictionary + M1 graph) |
+| GRIM / statcheck on **manuscript** inline stats | Partial (stdlib subset in peer-review) | Yes (full statcheck + GRIMMER/SPRITE) |
 | Spreadsheet / table fabrication tests | No | Yes (A1/A3/A5, Benford, …) |
 | Image duplication / splice forensics | No | Yes (F1–F6; raster supplements) |
 | TIVA / P-curve / Carlisle | No | Yes |
-| Pre-submission structure / refs / overlap pack | Yes (`critique`) | No |
+| Pre-submission structure / refs / overlap pack | Yes (`peer-review`) | No |
 | Zotero write-back / mirror restore | Yes | No |
 
 ## Complementary: Zotero plugins and built-ins
@@ -283,7 +283,7 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 
 - **Sites:** [GitHub](https://github.com/google-research/paper-orchestra) · [project page](https://yiwen-song.github.io/paper_orchestra/) · [arXiv:2604.05018](https://arxiv.org/abs/2604.05018)
 - **Fit:** Open multi-agent **paper writer**, not a library helper. Input is unconstrained pre-writing material (idea summary + experimental log) plus a conference LaTeX template. Agents: outline, literature review, section writing, content refinement, optional plotting. The literature agent searches the web, enriches candidates on **Semantic Scholar**, writes `references.bib` + a citation map, then fills Introduction and Related Work from that checklist only (cutoff-date concurrent-work rule; do not claim SOTA unless the log evaluated that paper). Authors report a 50–68% win-margin vs single-agent and AI Scientist-v2 on literature-review quality in an 11-researcher side-by-side, with a remaining gap to human ground truth. **PaperWritingBench** (200 reverse-engineered CVPR/ICLR 2025 packets) is **not** in the code repo. README disclaimer: not an officially supported Google product. You supply LLM keys (Gemini / Vertex / OpenAI) and a Semantic Scholar key.
-- **With Paperful:** PaperOrchestra when the job is “turn this idea and these numbers into conference LaTeX.” Paperful when the job is fill, fix, mirror, and Ask **this** library. Cites it puts in the manuscript are not in Zotero until you ingest them (`ingest-dois` / snowball) and `run`. [`rewrite`](rewrite.md) borrows the **worklog / align-then-generate / selected-span** patterns; it does **not** vendor the pipeline and will not emit a paper from a lab notebook. Typical stack: Paperful for PDFs you own → human draft or PaperOrchestra for a first LaTeX pass → Paperful `critique` / `rewrite` on a file you already have.
+- **With Paperful:** PaperOrchestra when the job is “turn this idea and these numbers into conference LaTeX.” Paperful when the job is fill, fix, mirror, and Ask **this** library. Cites it puts in the manuscript are not in Zotero until you ingest them (`ingest-dois` / snowball) and `run`. [`rewrite`](rewrite.md) borrows the **worklog / align-then-generate / selected-span** patterns; it does **not** vendor the pipeline and will not emit a paper from a lab notebook. Typical stack: Paperful for PDFs you own → human draft or PaperOrchestra for a first LaTeX pass → Paperful `peer-review` / `rewrite` on a file you already have.
 - **Not a substitute for:** missing-PDF fetch, EZProxy / grey playbooks, `snapshot` / `restore`, collection-scoped RAG, or unattended attach. Not Sakana (no experiment loop) and not Edison Literature (no 175M hosted corpus).
 
 | Capability | Paperful | PaperOrchestra |
@@ -292,7 +292,7 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 | Plots / conceptual diagrams from the log | No | Yes (optional plotting agent) |
 | Related work from **web search + Semantic Scholar** | No (OpenAlex hops grow **your** collection) | Yes (abstracts; citation checklist) |
 | Related work / Q&A from **held PDFs** | Yes (`synthesize` / `ask`; text layer) | No |
-| Pre-submission hygiene as tracked changes | Yes (`critique` → `rewrite`) | No (refinement agent rewrites the draft) |
+| Pre-submission hygiene as tracked changes | Yes (`peer-review` → `rewrite`) | No (refinement agent rewrites the draft) |
 | Bulk missing-PDF fetch / EZProxy / grey playbooks | Yes | No |
 | Disk mirror + restore ledger | Yes | No |
 | Zotero write-back | Yes | No |

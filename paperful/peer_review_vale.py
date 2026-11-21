@@ -1,4 +1,4 @@
-"""Optional Vale house-style pass for critique.
+"""Optional Vale house-style pass for peer-review.
 
 Not a core dependency. Requires ``vale`` on PATH and a ``.vale.ini``. Missing
 binary or config returns a skip so the pack can record ``vale_unavailable`` /
@@ -16,12 +16,12 @@ from pathlib import Path
 from typing import Any
 
 from .config import Config
-from .critique import Finding, make_finding
-from .critique_direct_quotes import (
+from .peer_review import Finding, make_finding
+from .peer_review_direct_quotes import (
     line_column_span_in_direct_quote,
     snippet_in_direct_quote,
 )
-from .critique_extract import ExtractedDoc, loc_of_span
+from .peer_review_extract import ExtractedDoc, loc_of_span
 
 MAX_VALE_FINDINGS = 100
 _CHECK_SAFE = re.compile(r"[^a-z0-9]+")
@@ -31,7 +31,7 @@ _SKIP_DETAIL = {
         "Alerts were not run."
     ),
     "no_config": (
-        "Optional Vale pass needs [critique].vale_config "
+        "Optional Vale pass needs [peer_review].vale_config "
         "(or .vale.ini next to the paperful config). Alerts were not run."
     ),
 }
@@ -39,7 +39,7 @@ _SKIP_DETAIL = {
 
 def resolve_vale_ini(cfg: Config) -> Path | None:
     """Explicit ``vale_config``, else ``.vale.ini`` beside the paperful config."""
-    path = cfg.critique_vale_config
+    path = cfg.peer_review_vale_config
     if path is not None:
         candidate = Path(path)
         return candidate if candidate.is_file() else None
@@ -65,8 +65,8 @@ def run_vale(cfg: Config, doc: ExtractedDoc) -> tuple[list[Finding], dict[str, A
     if ini is None:
         return _skip("no_config")
     text = doc.text or ""
-    level = cfg.critique_vale_min_alert_level or "suggestion"
-    timeout_s = float(cfg.critique_vale_timeout_s or 60.0)
+    level = cfg.peer_review_vale_min_alert_level or "suggestion"
+    timeout_s = float(cfg.peer_review_vale_timeout_s or 60.0)
     try:
         with tempfile.TemporaryDirectory(prefix="paperful-vale-") as tmp:
             src = Path(tmp) / "manuscript.txt"

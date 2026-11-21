@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .config import Config
-from .critique_extract import ExtractedDoc
+from .peer_review_extract import ExtractedDoc
 
 _TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9'-]*")
 _STOP = frozenset(
@@ -236,12 +236,12 @@ def overlap_findings(
     ranked = rank_phrases(
         doc.text,
         corpus,
-        n_min=cfg.critique_overlap_n_min,
-        n_max=cfg.critique_overlap_n_max,
-        top_k=cfg.critique_overlap_top_k,
-        df_max=cfg.critique_overlap_df_max or None,
+        n_min=cfg.peer_review_overlap_n_min,
+        n_max=cfg.peer_review_overlap_n_max,
+        top_k=cfg.peer_review_overlap_top_k,
+        df_max=cfg.peer_review_overlap_df_max or None,
     )
-    hits = match_phrases(ranked, corpus, n_min=cfg.critique_overlap_n_min)
+    hits = match_phrases(ranked, corpus, n_min=cfg.peer_review_overlap_n_min)
     extra = rag_hybrid_boost(
         cfg,
         ranked,

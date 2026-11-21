@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from ..config import Config
-from ..critique import Finding, make_finding
-from ..critique_extract import ExtractedDoc, loc_of_span
-from ..critique_overlap import OverlapHit, overlap_findings
+from ..peer_review import Finding, make_finding
+from ..peer_review_extract import ExtractedDoc, loc_of_span
+from ..peer_review_overlap import OverlapHit, overlap_findings
 from ..zot import Item
 
 

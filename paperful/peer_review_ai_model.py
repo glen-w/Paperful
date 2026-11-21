@@ -1,4 +1,4 @@
-"""Optional model-backed AI-text score for critique.
+"""Optional model-backed AI-text score for peer-review.
 
 Not a core dependency. Tries Binoculars (Hans et al., ICML 2024) if
 installed (git overlay, not a locked extra); otherwise returns None so the
@@ -76,7 +76,7 @@ def run_ai_model(
     """Return ``{backend, score}`` or None if the extra is missing / fails.
 
     Loads Binoculars in a child process and kills it if it exceeds
-    ``timeout_s`` so a weight download cannot stall the critique pack.
+    ``timeout_s`` so a weight download cannot stall the peer-review pack.
     ``timeout_s <= 0`` runs in-process (tests).
     """
     if not extra_available():

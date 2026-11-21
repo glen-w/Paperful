@@ -29,7 +29,7 @@ PREFIX = {
     "briefing": "Briefing",
     "screen": "Screen",
     "capture": "Capture",
-    "critique": "Critique",
+    "peer-review": "Peer review",
 }
 
 

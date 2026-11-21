@@ -21,7 +21,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_fix_metadata(raw, cfg)
     apply_lint(raw, cfg)
     apply_screen(raw, cfg, source)
-    apply_critique(raw, cfg)
+    apply_peer_review(raw, cfg)
     apply_rewrite(raw, cfg)
     apply_summarize(raw, cfg)
     apply_synthesize(raw, cfg)
@@ -162,159 +162,159 @@ def apply_screen(raw: dict[str, Any], cfg: "Config", source: Path) -> None:
         cfg.screen_detectors = C._snowball_strs(section["detectors"])
 
 
-def apply_critique(raw: dict[str, Any], cfg: "Config") -> None:
+def apply_peer_review(raw: dict[str, Any], cfg: "Config") -> None:
     C = _mod()
-    table = raw.get("critique")
+    table = raw.get("peer_review")
     if not isinstance(table, dict):
         return
     C._apply_config_table(
         table,
         cfg,
         [
-            ("llm", "critique_llm", bool),
-            ("tag", "critique_tag", lambda v: str(v).strip() or "paperful-critique"),
-            ("overlap_top_k", "critique_overlap_top_k", lambda v: max(1, int(v))),
-            ("overlap_n_min", "critique_overlap_n_min", lambda v: max(2, int(v))),
-            ("overlap_n_max", "critique_overlap_n_max", lambda v: max(2, int(v))),
-            ("overlap_df_max", "critique_overlap_df_max", lambda v: max(0, int(v))),
-            ("cite_age_years", "critique_cite_age_years", lambda v: max(1, int(v))),
+            ("llm", "peer_review_llm", bool),
+            ("tag", "peer_review_tag", lambda v: str(v).strip() or "paperful-peer-review"),
+            ("overlap_top_k", "peer_review_overlap_top_k", lambda v: max(1, int(v))),
+            ("overlap_n_min", "peer_review_overlap_n_min", lambda v: max(2, int(v))),
+            ("overlap_n_max", "peer_review_overlap_n_max", lambda v: max(2, int(v))),
+            ("overlap_df_max", "peer_review_overlap_df_max", lambda v: max(0, int(v))),
+            ("cite_age_years", "peer_review_cite_age_years", lambda v: max(1, int(v))),
             (
                 "max_context_chars",
-                "critique_max_context_chars",
+                "peer_review_max_context_chars",
                 lambda v: max(1000, int(v)),
             ),
-            ("ai_model", "critique_ai_model", bool),
-            ("vale", "critique_vale", bool),
-            ("forensics", "critique_forensics", bool),
-            ("glossary", "critique_glossary", bool),
+            ("ai_model", "peer_review_ai_model", bool),
+            ("vale", "peer_review_vale", bool),
+            ("forensics", "peer_review_forensics", bool),
+            ("glossary", "peer_review_glossary", bool),
             (
                 "glossary_dir",
-                "critique_glossary_dir",
+                "peer_review_glossary_dir",
                 lambda v: Path(str(v).strip()).expanduser() if str(v).strip() else None,
             ),
             (
                 "glossary_similarity_min",
-                "critique_glossary_similarity_min",
+                "peer_review_glossary_similarity_min",
                 lambda v: min(1.0, max(0.5, float(v))),
             ),
             (
                 "vale_config",
-                "critique_vale_config",
+                "peer_review_vale_config",
                 lambda v: Path(v).expanduser() if v else None,
             ),
             (
                 "vale_timeout_s",
-                "critique_vale_timeout_s",
+                "peer_review_vale_timeout_s",
                 lambda v: max(1.0, float(v)),
             ),
             (
                 "forensics_timeout_s",
-                "critique_forensics_timeout_s",
+                "peer_review_forensics_timeout_s",
                 lambda v: max(1.0, float(v)),
             ),
-            ("advanced", "critique_advanced", bool),
+            ("advanced", "peer_review_advanced", bool),
             (
                 "advanced_max_rounds",
-                "critique_advanced_max_rounds",
+                "peer_review_advanced_max_rounds",
                 lambda v: max(1, int(v)),
             ),
             (
                 "advanced_max_workers",
-                "critique_advanced_max_workers",
+                "peer_review_advanced_max_workers",
                 lambda v: max(1, int(v)),
             ),
             (
                 "advanced_max_comments",
-                "critique_advanced_max_comments",
+                "peer_review_advanced_max_comments",
                 lambda v: max(1, int(v)),
             ),
-            ("advanced_refine", "critique_advanced_refine", bool),
+            ("advanced_refine", "peer_review_advanced_refine", bool),
             (
                 "advanced_timeout_s",
-                "critique_advanced_timeout_s",
+                "peer_review_advanced_timeout_s",
                 lambda v: max(0.0, float(v)),
             ),
             (
                 "context_timeout_s",
-                "critique_context_timeout_s",
+                "peer_review_context_timeout_s",
                 lambda v: max(0.0, float(v)),
             ),
             (
                 "context_max_comments",
-                "critique_context_max_comments",
+                "peer_review_context_max_comments",
                 lambda v: max(1, int(v)),
             ),
             (
                 "context_max_hits",
-                "critique_context_max_hits",
+                "peer_review_context_max_hits",
                 lambda v: max(1, int(v)),
             ),
             (
                 "adversary_max_comments",
-                "critique_adversary_max_comments",
+                "peer_review_adversary_max_comments",
                 lambda v: max(1, int(v)),
             ),
             (
                 "outline_max_comments",
-                "critique_outline_max_comments",
+                "peer_review_outline_max_comments",
                 lambda v: max(1, int(v)),
             ),
             (
                 "claims_max",
-                "critique_claims_max",
+                "peer_review_claims_max",
                 lambda v: max(1, int(v)),
             ),
             (
                 "claims_max_comments",
-                "critique_claims_max_comments",
+                "peer_review_claims_max_comments",
                 lambda v: max(1, int(v)),
             ),
             (
                 "claims_timeout_s",
-                "critique_claims_timeout_s",
+                "peer_review_claims_timeout_s",
                 lambda v: max(0.0, float(v)),
             ),
             (
                 "claims_cite_max_sources",
-                "critique_claims_cite_max_sources",
+                "peer_review_claims_cite_max_sources",
                 lambda v: max(1, int(v)),
             ),
             (
                 "verify_timeout_s",
-                "critique_verify_timeout_s",
+                "peer_review_verify_timeout_s",
                 lambda v: max(0.0, float(v)),
             ),
             (
                 "verify_max_comments",
-                "critique_verify_max_comments",
+                "peer_review_verify_max_comments",
                 lambda v: max(1, int(v)),
             ),
             (
                 "verify_max_segments",
-                "critique_verify_max_segments",
+                "peer_review_verify_max_segments",
                 lambda v: max(1, int(v)),
             ),
         ],
     )
     if "vale_min_alert_level" in table:
-        cfg.critique_vale_min_alert_level = C.parse_vale_min_alert_level(
+        cfg.peer_review_vale_min_alert_level = C.parse_vale_min_alert_level(
             str(table.get("vale_min_alert_level") or ""),
-            key="[critique].vale_min_alert_level",
+            key="[peer_review].vale_min_alert_level",
         )
     if "lanes" in table:
-        from .critique_lanes import parse_critique_lanes
+        from .peer_review_lanes import parse_peer_review_lanes
 
-        cfg.critique_lanes = parse_critique_lanes(table.get("lanes"))
+        cfg.peer_review_lanes = parse_peer_review_lanes(table.get("lanes"))
     if "advanced_aspects" in table:
-        from .critique_marg import parse_marg_aspects
+        from .peer_review_marg import parse_marg_aspects
 
-        cfg.critique_advanced_aspects = parse_marg_aspects(
+        cfg.peer_review_advanced_aspects = parse_marg_aspects(
             table.get("advanced_aspects")
         )
     if "reviewers" in table:
-        cfg.critique_reviewers = C.parse_critique_reviewers(table.get("reviewers"))
-    if cfg.critique_overlap_n_min > cfg.critique_overlap_n_max:
-        cfg.critique_overlap_n_max = cfg.critique_overlap_n_min
+        cfg.peer_review_reviewers = C.parse_peer_review_reviewers(table.get("reviewers"))
+    if cfg.peer_review_overlap_n_min > cfg.peer_review_overlap_n_max:
+        cfg.peer_review_overlap_n_max = cfg.peer_review_overlap_n_min
 
 
 def apply_rewrite(raw: dict[str, Any], cfg: "Config") -> None:
@@ -1093,15 +1093,15 @@ def apply_prompt_paths(cfg: "Config", source: Path) -> None:
     cfg.synthesize_prompt_template = C._resolve_prompt_path(
         cfg.synthesize_prompt_template, source
     )
-    if cfg.critique_reviewers:
-        cfg.critique_reviewers = tuple(
-            C.CritiqueReviewer(
+    if cfg.peer_review_reviewers:
+        cfg.peer_review_reviewers = tuple(
+            C.PeerReviewer(
                 id=row.id,
                 model=row.model,
                 prompt=C._resolve_prompt_path(row.prompt, source),
                 max_tokens=row.max_tokens,
             )
-            for row in cfg.critique_reviewers
+            for row in cfg.peer_review_reviewers
         )
     if cfg.rewrite_specialists:
         from .rewrite_areas import RewriteArea
@@ -1118,7 +1118,7 @@ def apply_prompt_paths(cfg: "Config", source: Path) -> None:
     if cfg.ste_word_list_path is not None and not cfg.ste_word_list_path.is_absolute():
         cfg.ste_word_list_path = (source.parent / cfg.ste_word_list_path).resolve()
     if (
-        cfg.critique_vale_config is not None
-        and not cfg.critique_vale_config.is_absolute()
+        cfg.peer_review_vale_config is not None
+        and not cfg.peer_review_vale_config.is_absolute()
     ):
-        cfg.critique_vale_config = (source.parent / cfg.critique_vale_config).resolve()
+        cfg.peer_review_vale_config = (source.parent / cfg.peer_review_vale_config).resolve()

@@ -198,7 +198,7 @@ _VERB_PAGES: tuple[tuple[str, str], ...] = (
     ("extract_sections", "/index"),
     ("summarize", "/index"),
     ("synthesize", "/index"),
-    ("critique", "/critique"),
+    ("peer-review", "/peer-review"),
     ("rewrite", "/rewrite"),
     ("stuff", "/stuff"),
     ("doctor", "/system"),

@@ -9,7 +9,7 @@ Rules:
 - Keep the paper's voice. Do not paraphrase the finding into the prose.
 - Copy every «PF…» placeholder unchanged.
 - Do not add numbers, citations, URLs, or experiments that are not already in PAPER_CONTENT or the finding.
-- Do not mention Paperful, the critique pack, or "the reviewer".
+- Do not mention Paperful, the peer-review pack, or "the reviewer".
 - Do not promise future work.
 - Prefer a short replacement over padding. No overclaims.
 - Prefer kind=comment when the span is ambiguous or the author must choose.

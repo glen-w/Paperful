@@ -363,12 +363,12 @@ def test_rag_ask_mode_and_advanced_knobs(tmp_path):
     assert cfg.rag_cite_scope == "library"
 
 
-def test_critique_table_is_parsed(tmp_path):
+def test_peer_review_table_is_parsed(tmp_path):
     from paperful.config import _from_dict
 
     cfg = _from_dict(
         {
-            "critique": {
+            "peer_review": {
                 "llm": True,
                 "tag": "  ",
                 "overlap_top_k": 10,
@@ -380,46 +380,46 @@ def test_critique_table_is_parsed(tmp_path):
         },
         tmp_path / "config.toml",
     )
-    assert cfg.critique_llm is True
-    assert cfg.critique_lanes == ()
-    assert cfg.critique_tag == "paperful-critique"
-    assert cfg.critique_overlap_top_k == 10
-    assert cfg.critique_overlap_n_min == 8
-    assert cfg.critique_overlap_n_max == 8
-    assert cfg.critique_cite_age_years == 7
-    assert cfg.critique_max_context_chars == 5000
-    assert cfg.critique_ai_model is False
-    assert cfg.critique_vale is False
-    assert cfg.critique_vale_config is None
-    assert cfg.critique_vale_min_alert_level == "suggestion"
-    assert cfg.critique_vale_timeout_s == 60.0
-    assert cfg.critique_forensics is False
-    assert cfg.critique_forensics_timeout_s == 300.0
-    assert cfg.critique_glossary is True
-    assert cfg.critique_glossary_dir is None
-    assert cfg.critique_glossary_similarity_min == 0.88
+    assert cfg.peer_review_llm is True
+    assert cfg.peer_review_lanes == ()
+    assert cfg.peer_review_tag == "paperful-peer-review"
+    assert cfg.peer_review_overlap_top_k == 10
+    assert cfg.peer_review_overlap_n_min == 8
+    assert cfg.peer_review_overlap_n_max == 8
+    assert cfg.peer_review_cite_age_years == 7
+    assert cfg.peer_review_max_context_chars == 5000
+    assert cfg.peer_review_ai_model is False
+    assert cfg.peer_review_vale is False
+    assert cfg.peer_review_vale_config is None
+    assert cfg.peer_review_vale_min_alert_level == "suggestion"
+    assert cfg.peer_review_vale_timeout_s == 60.0
+    assert cfg.peer_review_forensics is False
+    assert cfg.peer_review_forensics_timeout_s == 300.0
+    assert cfg.peer_review_glossary is True
+    assert cfg.peer_review_glossary_dir is None
+    assert cfg.peer_review_glossary_similarity_min == 0.88
     assert cfg.glossary_dir == cfg.state_dir / "glossary"
-    assert cfg.critique_advanced is False
-    assert cfg.critique_advanced_max_rounds == 4
-    assert cfg.critique_advanced_max_workers == 4
-    assert cfg.critique_advanced_max_comments == 12
-    assert cfg.critique_advanced_refine is True
-    assert cfg.critique_advanced_timeout_s == 0.0
-    assert cfg.critique_context_timeout_s == 0.0
-    assert cfg.critique_context_max_comments == 12
-    assert cfg.critique_context_max_hits == 8
-    assert cfg.critique_adversary_max_comments == 12
-    assert cfg.critique_outline_max_comments == 12
-    assert cfg.critique_claims_max == 8
-    assert cfg.critique_claims_max_comments == 16
-    assert cfg.critique_claims_timeout_s == 0.0
-    assert cfg.critique_claims_cite_max_sources == 3
-    assert cfg.critique_verify_timeout_s == 0.0
-    assert cfg.critique_verify_max_comments == 16
-    assert cfg.critique_verify_max_segments == 8
-    assert cfg.critique_advanced_aspects == ()
-    assert cfg.critique_reviewers == ()
-    assert cfg.critiques_dir == cfg.state_dir / "critiques"
+    assert cfg.peer_review_advanced is False
+    assert cfg.peer_review_advanced_max_rounds == 4
+    assert cfg.peer_review_advanced_max_workers == 4
+    assert cfg.peer_review_advanced_max_comments == 12
+    assert cfg.peer_review_advanced_refine is True
+    assert cfg.peer_review_advanced_timeout_s == 0.0
+    assert cfg.peer_review_context_timeout_s == 0.0
+    assert cfg.peer_review_context_max_comments == 12
+    assert cfg.peer_review_context_max_hits == 8
+    assert cfg.peer_review_adversary_max_comments == 12
+    assert cfg.peer_review_outline_max_comments == 12
+    assert cfg.peer_review_claims_max == 8
+    assert cfg.peer_review_claims_max_comments == 16
+    assert cfg.peer_review_claims_timeout_s == 0.0
+    assert cfg.peer_review_claims_cite_max_sources == 3
+    assert cfg.peer_review_verify_timeout_s == 0.0
+    assert cfg.peer_review_verify_max_comments == 16
+    assert cfg.peer_review_verify_max_segments == 8
+    assert cfg.peer_review_advanced_aspects == ()
+    assert cfg.peer_review_reviewers == ()
+    assert cfg.peer_reviews_dir == cfg.state_dir / "peer-reviews"
     assert cfg.rewrite_areas == ("style",)
     assert cfg.rewrite_outputs == ("edits", "tracked")
     assert cfg.rewrite_comments == "off"
@@ -467,15 +467,15 @@ def test_rewrite_table_is_parsed(tmp_path):
     assert cfg.rewrite_specialists[0].prompt == str(prompt.resolve())
 
 
-def test_critique_reviewers_and_ai_model_are_parsed(tmp_path):
-    from paperful.config import CritiqueReviewer, _from_dict, parse_critique_reviewers
+def test_peer_review_reviewers_and_ai_model_are_parsed(tmp_path):
+    from paperful.config import PeerReviewer, _from_dict, parse_peer_review_reviewers
 
     prompt = tmp_path / "prompts" / "methods.md"
     prompt.parent.mkdir()
     prompt.write_text("methods prompt", encoding="utf-8")
     cfg = _from_dict(
         {
-            "critique": {
+            "peer_review": {
                 "ai_model": True,
                 "reviewers": [
                     {"id": "general"},
@@ -489,68 +489,53 @@ def test_critique_reviewers_and_ai_model_are_parsed(tmp_path):
         },
         tmp_path / "config.toml",
     )
-    assert cfg.critique_ai_model is True
-    assert [r.id for r in cfg.critique_reviewers] == ["general", "methods"]
-    assert cfg.critique_reviewers[0].model == ""
-    assert cfg.critique_reviewers[0].prompt == "default"
-    assert cfg.critique_reviewers[0].max_tokens == 2048
-    assert cfg.critique_reviewers[1].model == "qwen2.5:14b"
-    assert cfg.critique_reviewers[1].prompt == str(prompt.resolve())
+    assert cfg.peer_review_ai_model is True
+    assert [r.id for r in cfg.peer_review_reviewers] == ["general", "methods"]
+    assert cfg.peer_review_reviewers[0].model == ""
+    assert cfg.peer_review_reviewers[0].prompt == "default"
+    assert cfg.peer_review_reviewers[0].max_tokens == 2048
+    assert cfg.peer_review_reviewers[1].model == "qwen2.5:14b"
+    assert cfg.peer_review_reviewers[1].prompt == str(prompt.resolve())
     with pytest.raises(ValueError, match="duplicate"):
-        parse_critique_reviewers([{"id": "a"}, {"id": "a"}])
-    assert isinstance(cfg.critique_reviewers[0], CritiqueReviewer)
-    capped = parse_critique_reviewers(
+        parse_peer_review_reviewers([{"id": "a"}, {"id": "a"}])
+    assert isinstance(cfg.peer_review_reviewers[0], PeerReviewer)
+    capped = parse_peer_review_reviewers(
         [{"id": "openreview", "prompt": "default", "max_tokens": 1024}]
     )
     assert capped[0].max_tokens == 1024
 
 
-def test_shipped_critique_prompt_resolves_outside_repo(tmp_path):
+def test_shipped_peer_review_prompt_resolves_outside_repo(tmp_path):
     from paperful.config import _from_dict, package_root
-    from paperful.critique_llm import load_reviewer_prompt
+    from paperful.peer_review_llm import load_reviewer_prompt
 
     cfg_path = tmp_path / "paperful-data" / "config.toml"
     cfg_path.parent.mkdir(parents=True)
     cfg = _from_dict(
         {
-            "critique": {
+            "peer_review": {
                 "reviewers": [
                     {
                         "id": "line-editor",
-                        "prompt": "prompts/critique-line-editor.md",
+                        "prompt": "prompts/peer-review-line-editor.md",
                     },
                 ],
             }
         },
         cfg_path,
     )
-    row = cfg.critique_reviewers[0]
-    expected = (package_root() / "prompts/critique-line-editor.md").resolve()
+    row = cfg.peer_review_reviewers[0]
+    expected = (package_root() / "prompts/peer-review-line-editor.md").resolve()
     assert row.prompt == str(expected)
     assert load_reviewer_prompt(row) is not None
 
-    cfg_legacy = _from_dict(
-        {
-            "critique": {
-                "reviewers": [
-                    {"id": "foundations", "prompt": "prompts/critique-reviewer-3.md"},
-                ],
-            }
-        },
-        cfg_path,
-    )
-    legacy = cfg_legacy.critique_reviewers[0]
-    assert legacy.prompt == str(
-        (package_root() / "prompts/critique-foundations.md").resolve()
-    )
 
-
-def test_critique_advanced_knobs_are_parsed(tmp_path):
+def test_peer_review_advanced_knobs_are_parsed(tmp_path):
     from paperful.config import _from_dict
 
     cfg = _from_dict(
         {
-            "critique": {
+            "peer_review": {
                 "advanced": True,
                 "advanced_max_rounds": 2,
                 "advanced_max_workers": 3,
@@ -561,20 +546,20 @@ def test_critique_advanced_knobs_are_parsed(tmp_path):
         },
         tmp_path / "config.toml",
     )
-    assert cfg.critique_advanced is True
-    assert cfg.critique_advanced_max_rounds == 2
-    assert cfg.critique_advanced_max_workers == 3
-    assert cfg.critique_advanced_max_comments == 5
-    assert cfg.critique_advanced_refine is False
-    assert cfg.critique_advanced_timeout_s == 90.0
+    assert cfg.peer_review_advanced is True
+    assert cfg.peer_review_advanced_max_rounds == 2
+    assert cfg.peer_review_advanced_max_workers == 3
+    assert cfg.peer_review_advanced_max_comments == 5
+    assert cfg.peer_review_advanced_refine is False
+    assert cfg.peer_review_advanced_timeout_s == 90.0
 
 
-def test_critique_lanes_and_context_knobs_are_parsed(tmp_path):
+def test_peer_review_lanes_and_context_knobs_are_parsed(tmp_path):
     from paperful.config import _from_dict
 
     cfg = _from_dict(
         {
-            "critique": {
+            "peer_review": {
                 "lanes": ["marg", "reviewers", "context"],
                 "llm": True,
                 "advanced": True,
@@ -587,20 +572,20 @@ def test_critique_lanes_and_context_knobs_are_parsed(tmp_path):
         },
         tmp_path / "config.toml",
     )
-    assert cfg.critique_lanes == ("reviewers", "marg", "context")
-    assert cfg.critique_context_timeout_s == 45.0
-    assert cfg.critique_context_max_comments == 6
-    assert cfg.critique_context_max_hits == 3
-    assert cfg.critique_adversary_max_comments == 4
-    assert cfg.critique_outline_max_comments == 5
+    assert cfg.peer_review_lanes == ("reviewers", "marg", "context")
+    assert cfg.peer_review_context_timeout_s == 45.0
+    assert cfg.peer_review_context_max_comments == 6
+    assert cfg.peer_review_context_max_hits == 3
+    assert cfg.peer_review_adversary_max_comments == 4
+    assert cfg.peer_review_outline_max_comments == 5
 
 
-def test_critique_claims_verify_and_aspects_are_parsed(tmp_path):
+def test_peer_review_claims_verify_and_aspects_are_parsed(tmp_path):
     from paperful.config import _from_dict
 
     cfg = _from_dict(
         {
-            "critique": {
+            "peer_review": {
                 "claims_max": 3,
                 "claims_max_comments": 5,
                 "claims_timeout_s": 12,
@@ -613,22 +598,22 @@ def test_critique_claims_verify_and_aspects_are_parsed(tmp_path):
         },
         tmp_path / "config.toml",
     )
-    assert cfg.critique_claims_max == 3
-    assert cfg.critique_claims_max_comments == 5
-    assert cfg.critique_claims_timeout_s == 12.0
-    assert cfg.critique_claims_cite_max_sources == 2
-    assert cfg.critique_verify_timeout_s == 90.0
-    assert cfg.critique_verify_max_comments == 7
-    assert cfg.critique_verify_max_segments == 4
-    assert cfg.critique_advanced_aspects == ("theory", "policy")
+    assert cfg.peer_review_claims_max == 3
+    assert cfg.peer_review_claims_max_comments == 5
+    assert cfg.peer_review_claims_timeout_s == 12.0
+    assert cfg.peer_review_claims_cite_max_sources == 2
+    assert cfg.peer_review_verify_timeout_s == 90.0
+    assert cfg.peer_review_verify_max_comments == 7
+    assert cfg.peer_review_verify_max_segments == 4
+    assert cfg.peer_review_advanced_aspects == ("theory", "policy")
     with pytest.raises(ValueError, match="unknown MARG aspect"):
         _from_dict(
-            {"critique": {"advanced_aspects": ["nope"]}},
+            {"peer_review": {"advanced_aspects": ["nope"]}},
             tmp_path / "config.toml",
         )
 
 
-def test_critique_vale_config_resolves_relative(tmp_path):
+def test_peer_review_vale_config_resolves_relative(tmp_path):
     from paperful.config import _from_dict
 
     ini = tmp_path / "house" / ".vale.ini"
@@ -636,7 +621,7 @@ def test_critique_vale_config_resolves_relative(tmp_path):
     ini.write_text("MinAlertLevel = suggestion\n", encoding="utf-8")
     cfg = _from_dict(
         {
-            "critique": {
+            "peer_review": {
                 "vale": True,
                 "vale_config": "house/.vale.ini",
                 "vale_min_alert_level": "warning",
@@ -645,35 +630,35 @@ def test_critique_vale_config_resolves_relative(tmp_path):
         },
         tmp_path / "config.toml",
     )
-    assert cfg.critique_vale is True
-    assert cfg.critique_vale_config == ini.resolve()
-    assert cfg.critique_vale_min_alert_level == "warning"
-    assert cfg.critique_vale_timeout_s == 12.0
+    assert cfg.peer_review_vale is True
+    assert cfg.peer_review_vale_config == ini.resolve()
+    assert cfg.peer_review_vale_min_alert_level == "warning"
+    assert cfg.peer_review_vale_timeout_s == 12.0
 
 
-def test_critique_forensics_knobs_are_parsed(tmp_path):
+def test_peer_review_forensics_knobs_are_parsed(tmp_path):
     from paperful.config import _from_dict
 
     cfg = _from_dict(
         {
-            "critique": {
+            "peer_review": {
                 "forensics": True,
                 "forensics_timeout_s": 45,
             }
         },
         tmp_path / "config.toml",
     )
-    assert cfg.critique_forensics is True
-    assert cfg.critique_forensics_timeout_s == 45.0
+    assert cfg.peer_review_forensics is True
+    assert cfg.peer_review_forensics_timeout_s == 45.0
 
 
-def test_critique_glossary_knobs_are_parsed(tmp_path):
+def test_peer_review_glossary_knobs_are_parsed(tmp_path):
     from paperful.config import _from_dict
 
     cfg = _from_dict(
         {
             "state_dir": str(tmp_path / "state"),
-            "critique": {
+            "peer_review": {
                 "glossary": False,
                 "glossary_dir": "house-terms",
                 "glossary_similarity_min": 0.91,
@@ -681,13 +666,13 @@ def test_critique_glossary_knobs_are_parsed(tmp_path):
         },
         tmp_path / "config.toml",
     )
-    assert cfg.critique_glossary is False
-    assert cfg.critique_glossary_dir == Path("house-terms")
-    assert cfg.critique_glossary_similarity_min == 0.91
+    assert cfg.peer_review_glossary is False
+    assert cfg.peer_review_glossary_dir == Path("house-terms")
+    assert cfg.peer_review_glossary_similarity_min == 0.91
     assert cfg.glossary_dir == (cfg.state_dir / "house-terms").resolve()
     with pytest.raises(ValueError, match="suggestion"):
         _from_dict(
-            {"critique": {"vale_min_alert_level": "loud"}},
+            {"peer_review": {"vale_min_alert_level": "loud"}},
             tmp_path / "config.toml",
         )
 

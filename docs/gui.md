@@ -33,7 +33,7 @@ Three jobs sit on the default nav:
 | **Ask** | `ask`, `ask --from-file` | Cited answers from PDFs already copied to disk (`simple` / `advanced`; needs `[rag]` + `[llm]` and an index). Per-sentence support vs the index is CLI `ask --claim-check` (no LLM; not on this page) |
 
 **Library**, **Activity**, and **System** support the loop. **Repair**, **Mirror**,
-**Index** (ingest / search / extract; **Briefs** is reached from it), **Critique**, **Suggest edits**, **Stuff**, and **Settings** appear only
+**Index** (ingest / search / extract; **Briefs** is reached from it), **Peer review**, **Suggest edits**, **Stuff**, and **Settings** appear only
 when **Advanced** is on (reveal only; does not enable Scholar, Sci-Hub, or LLM).
 
 ```text
@@ -250,9 +250,9 @@ Add to library**, **Co-author network on People**, **Web search on Discover**.
 
 ![Briefs: summarize a collection, then synthesize a review with a Layout choice](_static/workflows/briefs.png)
 
-**Critique** (Advanced): pick a collection item **or** drop a draft
-(pdf/docx/odt/html/rtf/txt/md/pptx, 40 MB). Writes `state/critiques/` (`pack.md`).
-Uploads stay under `state/critiques/uploads/` and are not imported to `out/`
+**Peer review** (Advanced): pick a collection item **or** drop a draft
+(pdf/docx/odt/html/rtf/txt/md/pptx, 40 MB). Writes `state/peer-reviews/` (`pack.md`).
+Uploads stay under `state/peer-reviews/uploads/` and are not imported to `out/`
 or Zotero. Optional review lanes need `[llm]` (item form also has force-LLM
 and write-child-note). Checkboxes are labeled by what they return (independent
 reviewer notes; experiments/clarity/impact; argue against conclusions; review
@@ -261,26 +261,26 @@ as an outline; claims this text supports, plus held cited-PDF locators when
 library, three retrieve rounds; compare with published work, goes online). Tooltips hold the lane ids (`reviewers`, `marg`,
 `adversary`, `outline`, `claims`, `verify` — not a truth check, `context`,
 `context-web`). Checkboxes are independent and pre-check from
-`[critique].lanes` (or the llm/advanced shims). GROBID sidecar is for MARG-S /
+`[peer_review].lanes` (or the llm/advanced shims). GROBID sidecar is for MARG-S /
 claims / verify PDF chunks (pre-checked from `[grobid].enabled`; ticking it is
 `--grobid` even when that setting is false). Optional AI-model checkbox
 requests a Binoculars extra (git overlay; not installed by default). Optional Vale checkbox
 runs house-style lint when `vale` is on PATH. The box is not pre-checked;
-`[critique].vale = true` still runs the pass. Optional Forensics (PaperGuard)
+`[peer_review].vale = true` still runs the pass. Optional Forensics (PaperGuard)
 checkbox runs `paperguard scan` when that binary is on PATH
-(`[critique].forensics = true` still runs the pass). Show-dismissed is
-item-only. Not a score. See [critique.md](critique.md).
+(`[peer_review].forensics = true` still runs the pass). Show-dismissed is
+item-only. Not a score. See [peer_review.md](peer-review.md).
 
-![Critique: library item or uploaded draft, lane checkboxes, recent packs](_static/workflows/critique.png)
+![Peer review: library item or uploaded draft, lane checkboxes, recent packs](_static/workflows/peer-review.png)
 
 **Suggest edits** (Advanced; `/rewrite`, CLI `paperful rewrite`): pick a
-recent critique pack, optional replacement draft if the file moved,
+recent peer-review pack, optional replacement draft if the file moved,
 area/output/comments controls. Writes `state/rewrites/` (edit plan, optional
 sidecar, tracked-changes Word / OpenDocument / PDF). Never overwrites the source. Empty state:
-**Run Critique first**. Style glossary/Vale swaps run with `[llm]` off. See
+**Run Peer review first**. Style glossary/Vale swaps run with `[llm]` off. See
 [rewrite.md](rewrite.md).
 
-![Suggest edits: pick a critique pack, choose areas and outputs, optional comments](_static/workflows/rewrite.png)
+![Suggest edits: pick a peer-review pack, choose areas and outputs, optional comments](_static/workflows/rewrite.png)
 
 **Review** (Advanced route `/review`, not in the nav; CLI `paperful sr`) records include / exclude / maybe against a protocol. Apply stays disabled until Preview. See [sr-mode](sr-mode.md).
 
@@ -385,9 +385,9 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/prefs/advanced` | Toggle Advanced cookie |
 | POST | `/prefs/collection` | Remember collection chip cookie |
 | POST | `/settings` | Write allowed `config.toml` fields |
-| GET | `/critique` | Advanced Critique: item picker, upload, last pack |
-| POST | `/critique` | Enqueue `critique` for `--item` or a staged `--file`; redirect `?run=` |
-| GET | `/rewrite` | Advanced Suggest edits: recent critique packs, optional draft, area/output/comments; empty state Run Critique first |
+| GET | `/peer-review` | Advanced Peer review: item picker, upload, last pack |
+| POST | `/peer-review` | Enqueue `peer-review` for `--item` or a staged `--file`; redirect `?run=` |
+| GET | `/rewrite` | Advanced Suggest edits: recent peer-review packs, optional draft, area/output/comments; empty state Run Peer review first |
 | POST | `/rewrite` | Enqueue `rewrite` for a pack (optional staged `--file`); redirect `?run=` |
 | GET | `/rewrite/download/{name}` | Download `pack.md` / `plan.json` / sidecar / `tracked.docx` / `.pptx` / `.odt` / `.pdf` from `state/rewrites/` |
 | GET | `/stuff` | Advanced Stuff: item picker, upload, lane/k, last pack |
@@ -417,7 +417,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | GET | `/briefs/report/{slug}` | HTML under `state/reports/` |
 
 HTML routes: `/discover`, `/wanted`, `/ask`, `/library`, `/activity`, `/system`, plus
-advanced `/repair`, `/mirror`, `/index`, `/briefs`, `/critique`, `/rewrite`,
+advanced `/repair`, `/mirror`, `/index`, `/briefs`, `/peer-review`, `/rewrite`,
 `/stuff`, `/settings`. `GET /` → `/wanted`.
 `/repair/preview` and `/mirror/preview` enqueue work and redirect with `?run=`; Apply
 posts `review_token` from that command record (stale previews return HTTP 409).

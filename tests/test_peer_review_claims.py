@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from paperful.config import Config
-from paperful.critique_claims import (
+from paperful.peer_review_claims import (
     attach_claim_sources,
     bind_claim,
     cites_in_window,
@@ -12,8 +12,8 @@ from paperful.critique_claims import (
     quote_in_text,
     suggested_from_claims,
 )
-from paperful.critique_units import Unit, family_of, units_from_doc
-from paperful.critique_extract import ExtractedDoc
+from paperful.peer_review_units import Unit, family_of, units_from_doc
+from paperful.peer_review_extract import ExtractedDoc
 from paperful.store import write_json
 from paperful.zot import Item
 

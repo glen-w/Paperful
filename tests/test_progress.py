@@ -89,9 +89,9 @@ def test_spinner_is_noop_when_stdio_is_not_a_tty():
     sys.stdout = fake_out
     sys.stderr = fake_err
     try:
-        with _spinner("Critique", json_out=False) as say:
+        with _spinner("Peer review", json_out=False) as say:
             say("extracting")
-        with _spinner("Critique", json_out=True) as say:
+        with _spinner("Peer review", json_out=True) as say:
             say("extracting")
     finally:
         sys.stdout = sys.__stdout__

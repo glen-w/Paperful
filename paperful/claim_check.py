@@ -12,10 +12,10 @@ from pathlib import Path
 from typing import Any
 
 from .config import Config
-from .critique import critique_id
-from .critique_claims import bind_claim, quote_in_text
-from .critique_extract import ExtractedDoc
-from .critique_units import Unit
+from .peer_review import peer_review_id
+from .peer_review_claims import bind_claim, quote_in_text
+from .peer_review_extract import ExtractedDoc
+from .peer_review_units import Unit
 from .fsio import atomic_write_text
 from .store import write_json
 from .stuff import StuffSkip, manuscript_units, resolve_k
@@ -65,7 +65,7 @@ class ClaimCheckRow:
 
 
 def claim_check_id(*, kind: str, item_key: str = "", original_name: str = "") -> str:
-    return critique_id(kind=kind, item_key=item_key, original_name=original_name)
+    return peer_review_id(kind=kind, item_key=item_key, original_name=original_name)
 
 
 def label_hits(claim: str, hits: list[Any]) -> tuple[str, str, list[ClaimCheckHit]]:

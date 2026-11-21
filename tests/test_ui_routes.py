@@ -72,7 +72,7 @@ def test_discover_handlers_are_module_level():
         ("wanted_routes", "handle_page_wanted", "register_wanted"),
         ("shell_routes", "handle_page_library", "register_shell"),
         ("repair_routes", "handle_page_repair", "register_repair"),
-        ("critique_routes", "handle_page_critique", "register_critique"),
+        ("peer_review_routes", "handle_page_peer_review", "register_peer_review"),
         ("stuff_routes", "handle_page_stuff", "register_stuff"),
     ],
 )
@@ -96,7 +96,7 @@ def test_mount_ui_has_no_inline_wanted_or_discover_routes():
     assert "register_index" in src
     assert "register_repair" in src
     assert "register_shell" in src
-    assert "register_critique" in src
+    assert "register_peer_review" in src
     assert "register_stuff" in src
 
 
@@ -169,7 +169,7 @@ def test_post_smokes_per_family(tmp_path, monkeypatch):
     )
     assert res.status_code < 500
 
-    res = client.post("/critique", data={}, follow_redirects=False)
+    res = client.post("/peer-review", data={}, follow_redirects=False)
     assert res.status_code < 500
 
     res = client.post("/rewrite", data={}, follow_redirects=False)

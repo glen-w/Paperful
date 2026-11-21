@@ -7,10 +7,10 @@ import argparse
 import sys
 from pathlib import Path
 
-from paperful.config import critique_reviewers_for, load_config
-from paperful.critique import Finding, count_findings, load_pack, render_markdown
-from paperful.critique_extract import extract_path
-from paperful.critique_llm import suggested_from_llm
+from paperful.config import peer_review_reviewers_for, load_config
+from paperful.peer_review import Finding, count_findings, load_pack, render_markdown
+from paperful.peer_review_extract import extract_path
+from paperful.peer_review_llm import suggested_from_llm
 from paperful.llm import get_client
 from paperful.store import write_json
 
@@ -61,7 +61,7 @@ def _finding_from_dict(row: dict) -> Finding:
 
 
 def _configured_reviewer_ids(cfg) -> frozenset[str]:
-    rows = critique_reviewers_for(cfg, None)
+    rows = peer_review_reviewers_for(cfg, None)
     return frozenset({r.id for r in rows} | _LEGACY_REVIEWER_IDS)
 
 
@@ -92,7 +92,7 @@ def merge_reviewers(
         raise SystemExit(f"Manuscript not found: {src}")
 
     wanted = [w.strip() for w in (reviewer_filter or []) if w and str(w).strip()]
-    run_rows = critique_reviewers_for(cfg, wanted or None)
+    run_rows = peer_review_reviewers_for(cfg, wanted or None)
     strip_ids = (
         _strip_ids_for_run(frozenset(r.id for r in run_rows))
         if wanted
@@ -166,7 +166,7 @@ def main(argv: list[str] | None = None) -> None:
         "--reviewer",
         action="append",
         default=[],
-        help="Subset of critique.reviewers ids (repeatable). Default: all.",
+        help="Subset of peer_review.reviewers ids (repeatable). Default: all.",
     )
     args = p.parse_args(argv)
     merge_reviewers(

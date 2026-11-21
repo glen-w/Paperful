@@ -7,8 +7,8 @@ from typing import Any
 import httpx
 
 from ..config import Config
-from ..critique import Finding, make_finding
-from ..critique_extract import ExtractedDoc
+from ..peer_review import Finding, make_finding
+from ..peer_review_extract import ExtractedDoc
 from ..zot import Item
 
 
@@ -161,7 +161,7 @@ def _pps_fingerprint_findings(
     *,
     offline: bool,
 ) -> list[Finding]:
-    """PPS-style fingerprint families on critique extract (same rules as ``screen``)."""
+    """PPS-style fingerprint families on peer-review extract (same rules as ``screen``)."""
     if not (text or "").strip():
         return []
     from ..screen import (

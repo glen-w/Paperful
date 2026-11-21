@@ -58,7 +58,7 @@ network = ["networkx>=3,<4", "matplotlib>=3.8"]
 # Microsoft Open XML SDK validator (Python port) for rewrite tracked.docx /
 # .pptx / .xlsx; ODF adapter for tracked.odt.
 openxml = ["openxml-audit>=0.8,<1"]
-# Binoculars (critique --ai-model) is a git overlay, not a locked extra: it
+# Binoculars (peer-review --ai-model) is a git overlay, not a locked extra: it
 # cannot resolve with rag-docling / browser-agent in one lockfile. Install:
 #   uv pip install "binoculars @ git+https://github.com/ahans30/Binoculars.git"
 docs = [
@@ -184,9 +184,9 @@ src = ["paperful", "tests"]
 "paperful/cli.py" = ["F401"]
 "paperful/cli_runtime.py" = ["F401"]
 "paperful/coverage_cmd.py" = ["F401"]
-"paperful/critique.py" = ["F401"]
-"paperful/critique_cmd.py" = ["F401"]
-"paperful/critique_overlap.py" = ["F401"]
+"paperful/peer_review.py" = ["F401"]
+"paperful/peer_review_cmd.py" = ["F401"]
+"paperful/peer_review_overlap.py" = ["F401"]
 "paperful/dedupe_cmd.py" = ["F401"]
 "paperful/export_cmd.py" = ["F401"]
 "paperful/fix_metadata_cmd.py" = ["F401"]
@@ -333,23 +333,23 @@ files = [
     "paperful/config_tables.py",
     "paperful/cookies.py",
     "paperful/coverage_cmd.py",
-    "paperful/critique_adversary.py",
-    "paperful/critique_ai_tells.py",
-    "paperful/critique_claims.py",
-    "paperful/critique_cmd.py",
-    "paperful/critique_context.py",
-    "paperful/critique_direct_quotes.py",
-    "paperful/critique_extract.py",
-    "paperful/critique_forensics.py",
-    "paperful/critique_lanes.py",
-    "paperful/critique_marg.py",
-    "paperful/critique_metrics.py",
-    "paperful/critique_outline.py",
-    "paperful/critique_overlap.py",
-    "paperful/critique_stats.py",
-    "paperful/critique_units.py",
-    "paperful/critique_vale.py",
-    "paperful/critique_verify.py",
+    "paperful/peer_review_adversary.py",
+    "paperful/peer_review_ai_tells.py",
+    "paperful/peer_review_claims.py",
+    "paperful/peer_review_cmd.py",
+    "paperful/peer_review_context.py",
+    "paperful/peer_review_direct_quotes.py",
+    "paperful/peer_review_extract.py",
+    "paperful/peer_review_forensics.py",
+    "paperful/peer_review_lanes.py",
+    "paperful/peer_review_marg.py",
+    "paperful/peer_review_metrics.py",
+    "paperful/peer_review_outline.py",
+    "paperful/peer_review_overlap.py",
+    "paperful/peer_review_stats.py",
+    "paperful/peer_review_units.py",
+    "paperful/peer_review_vale.py",
+    "paperful/peer_review_verify.py",
     "paperful/dedupe.py",
     "paperful/dedupe_cmd.py",
     "paperful/doctor.py",

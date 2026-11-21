@@ -1,4 +1,4 @@
-"""Bind a critique finding to a unique span in the current manuscript."""
+"""Bind a peer-review finding to a unique span in the current manuscript."""
 
 from __future__ import annotations
 

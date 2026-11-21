@@ -1,4 +1,4 @@
-"""Direct-quotation guards for critique prose, Vale, and LLM comments."""
+"""Direct-quotation guards for peer-review prose, Vale, and LLM comments."""
 
 from __future__ import annotations
 
@@ -6,16 +6,16 @@ import json
 import subprocess
 from pathlib import Path
 
-from paperful.critique_direct_quotes import (
+from paperful.peer_review_direct_quotes import (
     elide_direct_quotes,
     line_column_span_in_direct_quote,
     snippet_in_direct_quote,
     span_in_direct_quote,
 )
-from paperful.critique_llm import findings_from_comments
-from paperful.critique_vale import _finding_from_alert
-from paperful.critique_extract import ExtractedDoc
-from tests.test_critique import build_critique
+from paperful.peer_review_llm import findings_from_comments
+from paperful.peer_review_vale import _finding_from_alert
+from paperful.peer_review_extract import ExtractedDoc
+from tests.test_peer_review import build_peer_review
 
 
 def test_span_in_smart_quotes():
@@ -102,7 +102,7 @@ def test_prose_skips_long_sentence_in_quote(cfg, tmp_path: Path):
     body = f"Introduction.\n\n\u201c{words}.\u201d\n\nShort closing."
     path = tmp_path / "quote.txt"
     path.write_text(body, encoding="utf-8")
-    pack = build_critique(cfg, file_path=path, offline=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True)
     codes = {f["code"] for f in pack["findings"]}
     assert "long_sentence" not in codes
 
@@ -110,7 +110,7 @@ def test_prose_skips_long_sentence_in_quote(cfg, tmp_path: Path):
 def test_vale_integration_skips_quoted_match(cfg, tmp_path: Path, monkeypatch):
     ini = tmp_path / ".vale.ini"
     ini.write_text("MinAlertLevel = suggestion\n", encoding="utf-8")
-    cfg.critique_vale_config = ini
+    cfg.peer_review_vale_config = ini
     alerts = [
         {
             "Check": "House.Terms",
@@ -127,14 +127,14 @@ def test_vale_integration_skips_quoted_match(cfg, tmp_path: Path, monkeypatch):
         return subprocess.CompletedProcess(cmd, 0, stdout=payload, stderr="")
 
     monkeypatch.setattr(
-        "paperful.critique_vale.shutil.which", lambda _name: "/usr/bin/vale"
+        "paperful.peer_review_vale.shutil.which", lambda _name: "/usr/bin/vale"
     )
-    monkeypatch.setattr("paperful.critique_vale.subprocess.run", fake_run)
+    monkeypatch.setattr("paperful.peer_review_vale.subprocess.run", fake_run)
     path = tmp_path / "vale.txt"
     path.write_text(
         "Note \u201cplease utilize this\u201d here.\n",
         encoding="utf-8",
     )
-    pack = build_critique(cfg, file_path=path, offline=True, use_vale=True)
+    pack = build_peer_review(cfg, file_path=path, offline=True, use_vale=True)
     vale_rows = [f for f in pack["findings"] if f.get("source") == "vale"]
     assert not any(f["code"] == "vale_house_terms" for f in vale_rows)

@@ -62,7 +62,7 @@ Paste the following into ROADMAP as **Borrow (local, dry-run default, fail close
 | Borrow | Factory stage | Honesty bar | Suggested docs home |
 | --- | --- | --- | --- |
 | PaperQA2 loop: library PDFs → chunk/index → agentic retrieve → **cited answer with page/figure pointers**; no answer if the PDF is missing (Jenni’s missing-PDF rule is the same invariant) | Extract / synthesize | `[rag]` off by default; mirror-only; never call the manager from Ask | comparison-reference (PaperQA2 row); ROADMAP Zotero-RAG |
-| `has_successful_answer` / refuse to write the sentence if you cannot click the passage | Synthesize / critique | Copy test, not a Kosmos world-model store | ROADMAP Edison borrow #4 |
+| `has_successful_answer` / refuse to write the sentence if you cannot click the passage | Synthesize / peer-review | Copy test, not a Kosmos world-model store | ROADMAP Edison borrow #4 |
 | Split **Precedent-style novelty pack** from **Literature-style synthesis** before any outline | Novelty vs synthesize | Stamp `held` vs `public-metadata-only`; **never** “nobody has done this” | ROADMAP Wave 4 (already named) |
 | Continuation IDs / cheap vs high-effort token budget as a **user-visible** Ask control | Synthesize | Local model; do not claim LABBench wins vs GPT-5.2 Pro | ROADMAP Ask |
 | Journal/retraction metadata (Crossref, OpenAlex, existing `screen`) | Screen | Already shipped as opt-in `screen`; keep out of `paperful all` | comparison screen row |
@@ -73,7 +73,7 @@ Paste the following into ROADMAP as **Borrow (local, dry-run default, fail close
 | BBT + Quarto as the **non-hallucinating** cite path (point, do not vendor) | Write / export | Park CSL-in-Paperful until testers ask | ROADMAP Parked |
 | ASReview-class ranking only as optional local embeddings buffet | Screen | Not a replacement for dual review | ROADMAP Local embeddings |
 | Official PRISMA Word/Shiny from **exact counts**, not AI-illustrated flowcharts ([PRISMA 2020](https://www.prisma-statement.org/prisma-2020-flow-diagram)) | Screen / export | Methods figure, not SciFig “illustration mode” | ROADMAP SR mode |
-| Post-hoc Crossref/retraction checkers (Trinka/Paperpal-class) after draft | Critique | Existence ≠ claim support | ROADMAP critique |
+| Post-hoc Crossref/retraction checkers (Trinka/Paperpal-class) after draft | Peer review | Existence ≠ claim support | ROADMAP peer-review |
 | MCP **named read jobs** (`ask` vs precedent vs `refs_gap`); writes stay `--apply` | Agent | Match Elicit/Consensus/Bond table stakes without hosted corpus | comparison-reference MCP row |
 | Wanted excellence (stamps, miss reasons, snowball feeding Wanted) | Get PDF | **Foundation shipped**; residual polish, not Edison-shaped | ROADMAP Wanted |
 
@@ -90,7 +90,7 @@ Paste the following into ROADMAP as **Borrow (local, dry-run default, fail close
 | Replacing Zotero as reader / Connector / annotation UI | “Not the product” | why.md; GUI |
 | Jeffersonian / qualitative coding; Valency Hub publishing | Out of library/find/completeness/mirror/control | comparison does-not |
 | CAPTCHA bypass; “AI fetch everything”; built-in email SaaS | 1.x trust | ROADMAP |
-| Critique scores / accept-reject | Not a referee | critique.md |
+| Peer review scores / accept-reject | Not a referee | peer-review.md |
 | Draft-then-stuff extra cites from the open web (Grammarly/Overleaf Dimensions pattern) without a Zotero queue | Integrity failure mode, not a feature | ROADMAP `stuff` |
 | GenAI microscopy/blots/graphical abstracts | Publisher bans | ROADMAP figures note |
 | Bird-named agent zoo as UX | Keep ingest → retrieve → synthesize → novelty → outline | ROADMAP |

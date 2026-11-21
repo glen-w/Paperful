@@ -16,7 +16,7 @@ the source supports the sentence. Extra cites belong in Zotero before
 ## CLI
 
 `--item KEY` and `--file PATH` are mutually exclusive. `--file` accepts the
-same text formats as [critique](critique.md) (pdf, txt, md, html, rtf,
+same text formats as [peer_review](peer-review.md) (pdf, txt, md, html, rtf,
 docx, odt, pptx; legacy `.doc` if a converter is on PATH).
 
 ```bash
@@ -41,7 +41,7 @@ run.
 
 Outline query is `{heading} {body}`, truncated. Thin named sections still
 search (the heading is a useful query). Same heading ledger shape as
-`critique --lane outline`.
+`peer-review --lane outline`.
 
 `--dry-run` prints counts and does not write `state/stuff/`. `--format json`
 prints `paperful.agent.json.v1`. Not in `paperful all`. `paperful jobs` →
@@ -91,7 +91,7 @@ Advanced **Stuff** (next to Suggest edits; CLI is still `paperful stuff`):
 pick a library item **or** upload a draft, choose lane (`manuscript` /
 `outline`) and `k`, download `pack.md` / `pack.json`. Needs `[rag]` and a built index.
 Does not need `[llm]`. Never writes Zotero. Uploads stay under
-`state/critiques/uploads/` like Critique.
+`state/peer-reviews/uploads/` like Peer review.
 
 Read-only MCP tool `stuff` (`item` or `file`, `lane`, `k`, `collection`)
 returns the same envelope as `--format json`.

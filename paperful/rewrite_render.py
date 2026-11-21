@@ -14,14 +14,14 @@ def render_markdown(
 ) -> str:
     title = (
         (pack.get("input") or {}).get("title")
-        or pack.get("critique_id")
+        or pack.get("peer_review_id")
         or "manuscript"
     )
     worklog = plan.to_dict().get("worklog") or {}
     lines = [
         f"# Rewrite: {title}",
         "",
-        "Apply-from-critique. Not a generated paper. Unflagged text is unchanged.",
+        "Apply-from-peer-review. Not a generated paper. Unflagged text is unchanged.",
         "",
         "## Worklog",
         "",

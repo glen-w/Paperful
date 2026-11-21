@@ -1,4 +1,4 @@
-"""Deterministic checkers for ``paperful critique``."""
+"""Deterministic checkers for ``paperful peer-review``."""
 
 from .biblio import _crossref_work
 from .floats import _float_kind, _glossary_acronyms

@@ -59,7 +59,7 @@ is a **partial** run, not a crash.
 | `candidates.jsonl` | Post-filter / probe |
 | `summary.json` | hits, kept, exists, blocked, new |
 
-Cache JSON lives under `state/search/cache/` (not the critique SearXNG folder).
+Cache JSON lives under `state/search/cache/` (not the peer-review SearXNG folder).
 
 ## Watch
 

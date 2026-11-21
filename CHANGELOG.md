@@ -6,6 +6,8 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+- **Breaking: manuscript pack is `peer-review`.** The CLI verb is `paperful peer-review` (and `peer-review dismiss`). Config table is `[peer_review]`. Workbench page is `/peer-review`. Packs write `state/peer-reviews/` (`paperful.peer_review.pack.v1`, id field `peer_review_id`). Notes use type/verb `peer-review` and default tag `paperful-peer-review`. Prompt files are `prompts/peer-review-*.md`. There are no aliases for `critique`, `[critique]`, `state/critiques/`, or the old pack schema — re-run packs and re-apply notes. Systematic review stays `paperful sr` and `/review`. See [peer-review](docs/peer-review.md).
+
 ## 1.9.7 — 2026-11-20
 
 - **Snowball `--prioritize`.** Keyword and hybrid search order hop-0 hits by `recency`, `popular` (citation count, default), or `historical`. OpenAlex `sort=` and the queue score both follow it, so `max_candidates` does not undo the policy. Neighbour hops still use overlap rank. MCP `snowball_search`, profiles, and Discover Advanced share the same knob. Not topical relevance; published year is not the watch index cursor.
@@ -293,7 +295,7 @@ names the extra when it is missing).
 - **Critique `outline` lane.** `--lane outline` reviews an extract as a plan
   (section skeleton, claim/warrant/scope/evidence pressure) instead of a
   finished manuscript. `missing_section` / `missing_mention` move to Hygiene
-  in `pack.md` for that run. See [critique](docs/critique.md).
+  in `pack.md` for that run. See [critique](docs/peer-review.md).
 - **`paperful network`.** ORCID ego co-authorship graph with BBNJ (or custom)
   phase slices, degree always, and optional NetworkX betweenness / Burt
   constraint / Gould–Fernandez brokerage (`paperful[network]`). Writes
@@ -401,7 +403,7 @@ names the extra when it is missing).
   `--lane verify` is a local section swarm with density budgets and local
   citation grounding (not Deep Review; no manuscript upload). MARG aspects
   are config-selected (`[critique].advanced_aspects`; optional `theory`,
-  `policy`, `evidence-base`). See [critique](docs/critique.md).
+  `policy`, `evidence-base`). See [critique](docs/peer-review.md).
 
 ## 1.6.0 — 2026-10-27
 
@@ -421,7 +423,7 @@ names the extra when it is missing).
   **Forensics (PaperGuard)** pack section. Fail-closed if the binary is missing.
   Does not copy PaperGuard’s integrity score. `--file` accepts `csv` / `xlsx` /
   `xls` so a table can be scanned without a manuscript wrapper. See
-  [critique](docs/critique.md).
+  [critique](docs/peer-review.md).
 - **Critique review lanes.** Suggested peer-review extras are composable
   (`--lane` / `[critique].lanes`: `reviewers`, `marg`, `adversary`, `context`,
   `context-web`) instead of an exclusive standard/advanced pair. `--llm` /
@@ -430,7 +432,7 @@ names the extra when it is missing).
   `context-web` (OpenAlex, optional SearXNG) follow ScholarPeer *ideas*
   without vendoring that stack or MARG. Offline skips web search. `adversary`
   is a structured validity red-team (no score). See
-  [critique](docs/critique.md).
+  [critique](docs/peer-review.md).
 - **Critique pack.md critical path.** `pack.md` leads with incomplete review
   lanes (when a requested lane skipped), then **Critical path** (checked
   findings that are not hygiene, majors first), **Suggested**, and **Hygiene**
@@ -486,19 +488,19 @@ names the extra when it is missing).
   `acronym_phrase_mismatch`). `paperful glossary validate` and
   `paperful glossary export-vale` (exact Vale `swap` rules from aliases).
   Default `[critique].glossary = true`; no findings when the directory is
-  empty. See [critique](docs/critique.md).
+  empty. See [critique](docs/peer-review.md).
 - Optional **Vale** house-style pass on `paperful critique` (`--vale` /
   `[critique].vale`). Needs `vale` on PATH and a `.vale.ini`; missing extra
   records `vale_unavailable` / `vale_no_config` / `vale_failed`. Alerts are
   `lane=checked`. `doctor` ambers when Vale is missing. Paperful does not
   install Vale, ship it in Compose, or run `vale sync`. See
-  [critique](docs/critique.md).
+  [critique](docs/peer-review.md).
 - **`critique --advanced`.** Optional MARG-S-style multi-agent suggested lane
   (leader / chunk workers / aspect experts, then refine). Additive with
   `--llm` / `[[critique.reviewers]]`; set `[critique].llm` and
   `[critique].advanced` both true to run both on every critique. Advanced PDF
   chunks reuse the optional GROBID TEI cache (`--grobid` / `--no-grobid`).
-  See [critique](docs/critique.md).
+  See [critique](docs/peer-review.md).
 - **Ask modes.** `simple` (default: raw excerpts, one completion) and
   `advanced` (summarize and score each passage, then answer). Global
   `[rag].ask_mode`; a run can override from `--ask-mode`, the Ask / batch
@@ -514,7 +516,7 @@ names the extra when it is missing).
   optional `--llm` comments (multi-reviewer via `[[critique.reviewers]]`) and
   heuristic AI-prose tells as `lane=suggested`; optional `--ai-model`
   Binoculars extra. No scores. Dismiss findings. Advanced workbench page with
-  item picker and upload (`state/critiques/`). See [critique](docs/critique.md).
+  item picker and upload (`state/critiques/`). See [critique](docs/peer-review.md).
 - **Discover rows say why.** The Discover Queue and the Wanted "Waiting from"
   Discover" panel show a "Why suggested" line from each candidate's `why`.
 - **OSF demand check.** `paperful doctor` reports how many recent misses point

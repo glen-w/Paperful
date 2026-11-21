@@ -169,7 +169,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     from .repair_routes import register_repair
     from .index_routes import register_index
     from .shell_routes import register_shell
-    from .critique_routes import register_critique
+    from .peer_review_routes import register_peer_review
     from .rewrite_routes import register_rewrite
     from .stuff_routes import register_stuff
     from .review_routes import register_review
@@ -198,7 +198,7 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
     register_shell(ui)
     register_repair(ui)
     register_index(ui)
-    register_critique(ui)
+    register_peer_review(ui)
     register_rewrite(ui)
     register_stuff(ui)
     register_review(ui)

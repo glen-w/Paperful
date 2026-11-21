@@ -9,7 +9,7 @@ point `[grobid].base_url` at it.
 GROBID is off by default. The core fetch / lint / attach loop never needs it.
 `paperful extract-sections` still works with heading-heuristic rules when GROBID
 is down. Optional `[rag].parser = "grobid"` uses the same TEI cache for RAG
-ingest. `paperful critique --lane marg` reuses that cache for section-labeled
+ingest. `paperful peer-review --lane marg` reuses that cache for section-labeled
 chunks and falls back to ordinary extract text when GROBID is off, the file is
 not a PDF, the PDF is a scan, or the sidecar errors.
 
@@ -18,7 +18,7 @@ not a PDF, the PDF is a scan, or the sidecar errors.
 - Structured IMRaD fields (`abstract`, `methodology`, `conclusion`,
   `research_questions`) that heading regexes miss
 - Cleaner section labels on `rag ingest` than `pdftotext`
-- Section-labeled chunks for `critique --lane marg` (MARG-S-style; `--advanced` is an alias)
+- Section-labeled chunks for `peer-review --lane marg` (MARG-S-style; `--advanced` is an alias)
 
 Skip it for scans until `paperful ocr` has added a text layer. GROBID is not
 a metadata write-back path and does not edit Zotero parents.
@@ -66,7 +66,7 @@ Disabled stays green. Enabled and down is amber.
 PDF to `/api/processFulltextDocument` and caches TEI under
 `state/grobid/<sha256>.tei.xml` (`paperful.grobid.tei.v1`). Unchanged hashes
 skip the HTTP call unless `--force`. A warm cache for that PDF hash is enough
-for `[rag].parser = "grobid"` and for `critique --lane marg` chunks even if the sidecar is briefly down. Fields land
+for `[rag].parser = "grobid"` and for `peer-review --lane marg` chunks even if the sidecar is briefly down. Fields land
 in `state/sections/<key>.json` with provenance `grobid` (heading rules fill
 gaps; optional `--llm` still only fills missing MVP fields). Scans are skipped
 with a note until `paperful ocr` has added a text layer.
@@ -81,5 +81,5 @@ so the existing chunker keeps section labels. Changing the parser re-indexes
 on the next ingest.
 
 See [Section extract](config.md#section-extract-extract-sections),
-[RAG parsers](rag.md#parser), and [Critique](critique.md) (`--advanced` /
+[RAG parsers](rag.md#parser), and [Peer review](peer-review.md) (`--advanced` /
 `--grobid`).

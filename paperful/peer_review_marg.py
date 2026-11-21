@@ -16,10 +16,10 @@ from pathlib import Path
 from typing import Any
 
 from .config import Config
-from .critique import Finding, make_finding
-from .critique_extract import ExtractedDoc
-from .critique_llm import findings_from_comments, grounded, parse_llm_json
-from .critique_units import Unit, units_from_doc, units_from_markdown
+from .peer_review import Finding, make_finding
+from .peer_review_extract import ExtractedDoc
+from .peer_review_llm import findings_from_comments, grounded, parse_llm_json
+from .peer_review_units import Unit, units_from_doc, units_from_markdown
 from .zot import Item
 
 ASPECTS = ("experiments", "clarity", "impact")
@@ -35,7 +35,7 @@ KNOWN_ASPECTS = (
 
 
 def parse_marg_aspects(raw: Any) -> tuple[str, ...]:
-    """Parse ``[critique].advanced_aspects``. Empty → default triple."""
+    """Parse ``[peer_review].advanced_aspects``. Empty → default triple."""
     if raw is None or raw == "" or raw == []:
         return DEFAULT_ASPECTS
     if isinstance(raw, str):
@@ -43,7 +43,7 @@ def parse_marg_aspects(raw: Any) -> tuple[str, ...]:
     elif isinstance(raw, (list, tuple)):
         parts = [str(part).strip() for part in raw if str(part).strip()]
     else:
-        raise ValueError("[critique].advanced_aspects must be an array of aspect ids")
+        raise ValueError("[peer_review].advanced_aspects must be an array of aspect ids")
     seen: list[str] = []
     for part in parts:
         name = part.lower()
@@ -57,7 +57,7 @@ def parse_marg_aspects(raw: Any) -> tuple[str, ...]:
 
 
 def resolve_marg_aspects(cfg: Config) -> tuple[str, ...]:
-    raw = getattr(cfg, "critique_advanced_aspects", ()) or ()
+    raw = getattr(cfg, "peer_review_advanced_aspects", ()) or ()
     if not raw:
         return DEFAULT_ASPECTS
     return parse_marg_aspects(raw)
@@ -169,7 +169,7 @@ class Chunk:
 
 
 def advanced_timeout_s(cfg: Config) -> float:
-    raw = float(getattr(cfg, "critique_advanced_timeout_s", 0) or 0)
+    raw = float(getattr(cfg, "peer_review_advanced_timeout_s", 0) or 0)
     if raw > 0:
         return raw
     return max(float(cfg.llm_timeout_s or 120), 600.0)
@@ -249,11 +249,11 @@ def paper_chunks(
     if not units:
         units = units_from_doc(doc)
         parser = "extract"
-    max_workers = max(1, int(getattr(cfg, "critique_advanced_max_workers", 4) or 4))
+    max_workers = max(1, int(getattr(cfg, "peer_review_advanced_max_workers", 4) or 4))
     chunks = pack_chunks(
         units,
         max_workers=max_workers,
-        max_chars=int(cfg.critique_max_context_chars or 24_000),
+        max_chars=int(cfg.peer_review_max_context_chars or 24_000),
     )
     meta: dict[str, Any] = {"parser": parser, "workers": len(chunks)}
     if skip and parser == "extract":
@@ -268,9 +268,9 @@ def _chat(
     messages: list[dict[str, str]],
     timeout: float,
 ) -> str:
-    from .critique_llm import chat_with_json_retry, critique_chat_request
+    from .peer_review_llm import chat_with_json_retry, peer_review_chat_request
 
-    request = critique_chat_request(
+    request = peer_review_chat_request(
         model=model,
         messages=messages,
         timeout_seconds=max(5.0, float(timeout)),
@@ -307,7 +307,7 @@ def _run_group(
     model: str,
     deadline: float,
 ) -> tuple[list[dict[str, Any]], str, dict[str, Any]]:
-    max_rounds = max(1, int(getattr(cfg, "critique_advanced_max_rounds", 4) or 4))
+    max_rounds = max(1, int(getattr(cfg, "peer_review_advanced_max_rounds", 4) or 4))
     calls = 0
     rounds = 0
     stats: dict[str, Any] = {"id": f"marg-{aspect}", "model": model, "aspect": aspect}
@@ -505,10 +505,10 @@ def _refine(
     deadline: float,
     excerpt: str,
 ) -> tuple[list[dict[str, Any]], int]:
-    cap = max(1, int(getattr(cfg, "critique_advanced_max_comments", 12) or 12))
+    cap = max(1, int(getattr(cfg, "peer_review_advanced_max_comments", 12) or 12))
     if not comments:
         return [], 0
-    if not bool(getattr(cfg, "critique_advanced_refine", True)):
+    if not bool(getattr(cfg, "peer_review_advanced_refine", True)):
         return comments[:cap], 0
     if time.monotonic() >= deadline:
         return comments[:cap], 0
@@ -639,7 +639,7 @@ def suggested_from_marg(
         excerpt=excerpt,
     )
     meta["calls"] = int(meta["calls"]) + refine_calls
-    cap = max(1, int(getattr(cfg, "critique_advanced_max_comments", 12) or 12))
+    cap = max(1, int(getattr(cfg, "peer_review_advanced_max_comments", 12) or 12))
     findings_out = findings_from_comments(
         refined,
         hay=body_hay,
@@ -662,7 +662,7 @@ def suggested_from_marg(
                     code="llm_failed",
                     severity="info",
                     lane="suggested",
-                    detail="Advanced critique lane stopped: timeout.",
+                    detail="Advanced peer-review lane stopped: timeout.",
                     source="llm",
                     extra={"reviewer": "marg"},
                 )
@@ -677,7 +677,7 @@ def suggested_from_marg(
                     code="llm_failed",
                     severity="info",
                     lane="suggested",
-                    detail=f"Advanced critique lane failed: {err}",
+                    detail=f"Advanced peer-review lane failed: {err}",
                     source="llm",
                     extra={"reviewer": "marg"},
                 )

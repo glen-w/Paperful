@@ -562,7 +562,7 @@ def test_library_error_propagates_from_apply(llm_cfg, monkeypatch):
 def test_to_note_html_converts_markdown():
     md = (
         "## Objective\n\nThe work aims to **define** analytic autoethnography.\n\n"
-        "## Key findings\n\n*   **Critique:** overshadowed.\n*   Second point\n\n"
+        "## Key findings\n\n*   **Peer review:** overshadowed.\n*   Second point\n\n"
         "## Limitations\n\n- one\n- two\n"
     )
     html = summarize.to_note_html(md)
@@ -573,7 +573,7 @@ def test_to_note_html_converts_markdown():
         in html
     )
     assert html.count("<ul>") == 2 and html.count("</ul>") == 2
-    assert "<li><strong>Critique:</strong> overshadowed.</li>" in html
+    assert "<li><strong>Peer review:</strong> overshadowed.</li>" in html
 
 
 def test_to_note_html_strips_code_fence_and_keeps_html():
