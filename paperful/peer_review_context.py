@@ -433,7 +433,9 @@ def suggested_from_context(
     timeout = context_timeout_s(cfg)
     deadline = time.monotonic() + timeout
     excerpt = budget_slice(doc.text, cfg.peer_review_max_context_chars)
-    max_comments = max(1, int(getattr(cfg, "peer_review_context_max_comments", 12) or 12))
+    max_comments = max(
+        1, int(getattr(cfg, "peer_review_context_max_comments", 12) or 12)
+    )
     max_hits = max(1, int(getattr(cfg, "peer_review_context_max_hits", 8) or 8))
     meta: dict[str, Any] = {
         "id": lane_id,

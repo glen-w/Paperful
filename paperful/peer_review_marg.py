@@ -43,7 +43,9 @@ def parse_marg_aspects(raw: Any) -> tuple[str, ...]:
     elif isinstance(raw, (list, tuple)):
         parts = [str(part).strip() for part in raw if str(part).strip()]
     else:
-        raise ValueError("[peer_review].advanced_aspects must be an array of aspect ids")
+        raise ValueError(
+            "[peer_review].advanced_aspects must be an array of aspect ids"
+        )
     seen: list[str] = []
     for part in parts:
         name = part.lower()

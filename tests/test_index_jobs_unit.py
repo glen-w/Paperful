@@ -84,7 +84,9 @@ def test_peer_review_job_records_status_detail(tmp_path, monkeypatch):
     cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
     cfg.state_dir.mkdir(parents=True)
     cmd_id = "cmd-peer-review-detail"
-    commands.write_command(cfg, {"id": cmd_id, "verb": "peer-review", "status": "running"})
+    commands.write_command(
+        cfg, {"id": cmd_id, "verb": "peer-review", "status": "running"}
+    )
     src = tmp_path / "draft.md"
     src.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
 

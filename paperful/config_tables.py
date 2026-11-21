@@ -172,7 +172,11 @@ def apply_peer_review(raw: dict[str, Any], cfg: "Config") -> None:
         cfg,
         [
             ("llm", "peer_review_llm", bool),
-            ("tag", "peer_review_tag", lambda v: str(v).strip() or "paperful-peer-review"),
+            (
+                "tag",
+                "peer_review_tag",
+                lambda v: str(v).strip() or "paperful-peer-review",
+            ),
             ("overlap_top_k", "peer_review_overlap_top_k", lambda v: max(1, int(v))),
             ("overlap_n_min", "peer_review_overlap_n_min", lambda v: max(2, int(v))),
             ("overlap_n_max", "peer_review_overlap_n_max", lambda v: max(2, int(v))),
@@ -312,7 +316,9 @@ def apply_peer_review(raw: dict[str, Any], cfg: "Config") -> None:
             table.get("advanced_aspects")
         )
     if "reviewers" in table:
-        cfg.peer_review_reviewers = C.parse_peer_review_reviewers(table.get("reviewers"))
+        cfg.peer_review_reviewers = C.parse_peer_review_reviewers(
+            table.get("reviewers")
+        )
     if cfg.peer_review_overlap_n_min > cfg.peer_review_overlap_n_max:
         cfg.peer_review_overlap_n_max = cfg.peer_review_overlap_n_min
 
@@ -1121,4 +1127,6 @@ def apply_prompt_paths(cfg: "Config", source: Path) -> None:
         cfg.peer_review_vale_config is not None
         and not cfg.peer_review_vale_config.is_absolute()
     ):
-        cfg.peer_review_vale_config = (source.parent / cfg.peer_review_vale_config).resolve()
+        cfg.peer_review_vale_config = (
+            source.parent / cfg.peer_review_vale_config
+        ).resolve()

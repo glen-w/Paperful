@@ -344,7 +344,9 @@ def attach_claim_sources(
     fingerprint = LibraryFingerprint.from_items(scope_items)
     entries = parse_bibliography_entries(doc.text or "")
     by_num = numbered_bibliography(doc.text or "")
-    max_sources = max(1, int(getattr(cfg, "peer_review_claims_cite_max_sources", 3) or 3))
+    max_sources = max(
+        1, int(getattr(cfg, "peer_review_claims_cite_max_sources", 3) or 3)
+    )
     pages_by_key = load_library_pages(cfg, exclude_key=exclude_key)
     for row in ledger:
         window = claim_window(doc.text or "", str(row.get("text") or ""))
@@ -512,7 +514,9 @@ def suggested_from_claims(
     )
     source = units_for_families(units, SOURCE_FAMILIES, cfg)
     support = units_for_families(units, SUPPORT_FAMILIES, cfg)
-    excerpt = _join_units(source, limit=int(cfg.peer_review_max_context_chars or 24_000))
+    excerpt = _join_units(
+        source, limit=int(cfg.peer_review_max_context_chars or 24_000)
+    )
     if not excerpt.strip():
         excerpt = budget_slice(doc.text, cfg.peer_review_max_context_chars)
     if not support:

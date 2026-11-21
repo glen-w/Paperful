@@ -102,7 +102,9 @@ def prioritize_for(cfg: Any, request: Any) -> str:
     return parse_prioritize(getattr(cfg, "snowball_prioritize", DEFAULT_PRIORITIZE))
 
 
-def discover_query_from_request(request: Any, *, default: str = DEFAULT_PRIORITIZE) -> DiscoverQuery:
+def discover_query_from_request(
+    request: Any, *, default: str = DEFAULT_PRIORITIZE
+) -> DiscoverQuery:
     raw = getattr(request, "prioritize", None)
     return DiscoverQuery(
         year_from=getattr(request, "year_from", None),

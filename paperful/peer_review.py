@@ -997,4 +997,6 @@ def note_html(pack: dict[str, Any]) -> str:
         lines.append(f"<li><strong>{code}</strong>{loc_bit}: {detail}</li>")
     lines.append("</ul>")
     extra = f"{counts.get('findings', 0)} findings"
-    return wrap("\n".join(lines), note_type="peer-review", verb="peer-review", extra=extra)
+    return wrap(
+        "\n".join(lines), note_type="peer-review", verb="peer-review", extra=extra
+    )

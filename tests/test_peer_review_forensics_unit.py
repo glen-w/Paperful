@@ -270,7 +270,9 @@ def test_string_severity_labels_map(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr(
         "paperful.peer_review_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
     )
-    monkeypatch.setattr("paperful.peer_review_forensics.subprocess.run", _fake_run(report))
+    monkeypatch.setattr(
+        "paperful.peer_review_forensics.subprocess.run", _fake_run(report)
+    )
     findings, meta, _raw = run_forensics(cfg, files=[src])
     by_code = {f.code: f for f in findings}
     assert by_code["paperguard_a1"].severity == "info"
@@ -302,7 +304,9 @@ def test_detector_results_fallback_when_all_findings_empty(cfg, tmp_path, monkey
     monkeypatch.setattr(
         "paperful.peer_review_forensics.shutil.which", lambda _: "/usr/bin/paperguard"
     )
-    monkeypatch.setattr("paperful.peer_review_forensics.subprocess.run", _fake_run(report))
+    monkeypatch.setattr(
+        "paperful.peer_review_forensics.subprocess.run", _fake_run(report)
+    )
     findings, meta, _raw = run_forensics(cfg, files=[src])
     assert any(f.code == "paperguard_a1" for f in findings)
     assert meta["finding_count"] == 1

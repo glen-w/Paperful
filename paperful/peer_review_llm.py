@@ -371,7 +371,9 @@ def _run_reviewers(
         label = f"Reviewer {i}/{n_reviewers} {reviewer.id}"
         say(f"{label} · {model} (wall {timeout_s:.0f}s, idle {timeout_s:.0f}s)…")
         prompt_sha = sha256((prompt + user[:2000]).encode("utf-8")).hexdigest()[:12]
-        max_tokens = int(getattr(reviewer, "max_tokens", PEER_REVIEW_REVIEWER_MAX_TOKENS))
+        max_tokens = int(
+            getattr(reviewer, "max_tokens", PEER_REVIEW_REVIEWER_MAX_TOKENS)
+        )
         json_prompt = prompt == _PROMPT
         request = peer_review_chat_request(
             model=model,

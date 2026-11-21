@@ -356,7 +356,9 @@ def run_dismiss(
     if not cid:
         root = cfg.state_dir / "peer-reviews"
         if not root.is_dir():
-            console.print("[red]No peer-review packs on disk; pass --peer-review-id.[/]")
+            console.print(
+                "[red]No peer-review packs on disk; pass --peer-review-id.[/]"
+            )
             raise typer.Exit(1)
         # Newest peer-review folder with a pack.
         newest = None

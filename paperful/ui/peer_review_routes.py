@@ -160,7 +160,9 @@ def register_peer_review(ui: UiContext) -> None:
     app = ui.app
 
     @app.get("/peer-review", response_class=HTMLResponse)
-    def page_peer_review(request: Request, run: str = "", error: str = "") -> HTMLResponse:
+    def page_peer_review(
+        request: Request, run: str = "", error: str = ""
+    ) -> HTMLResponse:
         return handle_page_peer_review(ui, request=request, run=run, error=error)
 
     @app.post("/peer-review")

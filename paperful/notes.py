@@ -38,7 +38,9 @@ def tag_types(cfg: Config) -> dict[str, str]:
     mapping = dict(FIXED_TAGS)
     mapping[(cfg.summarize_tag or "paperful-summary").strip().lower()] = "summary"
     mapping[(cfg.synthesize_tag or "paperful-report").strip().lower()] = "review"
-    mapping[(cfg.peer_review_tag or "paperful-peer-review").strip().lower()] = "peer-review"
+    mapping[(cfg.peer_review_tag or "paperful-peer-review").strip().lower()] = (
+        "peer-review"
+    )
     prefix = (cfg.snowball_tag_prefix or "paperful-snowball").strip().lower()
     if prefix:
         mapping[prefix] = "snowball"

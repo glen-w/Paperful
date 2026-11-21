@@ -27,7 +27,11 @@ from paperful.peer_review import (
     render_markdown,
 )
 from paperful.peer_review_extract import extract_path, stage_file
-from paperful.peer_review_overlap import collapse_nested_hits, match_phrases, rank_phrases
+from paperful.peer_review_overlap import (
+    collapse_nested_hits,
+    match_phrases,
+    rank_phrases,
+)
 from paperful.peer_review_stats import grim_possible, scan_stats
 from tests.conftest import make_item
 
@@ -356,7 +360,9 @@ def test_apply_note_uses_peer_review_tag(cfg):
     html = note_html(pack)
     assert "Peer review" in html
     assert "paperful.note.v1" in html
-    assert '"type": "peer-review"' in html or '"type":"peer-review"' in html.replace(" ", "")
+    assert '"type": "peer-review"' in html or '"type":"peer-review"' in html.replace(
+        " ", ""
+    )
 
 
 def test_ngram_overlap_true_and_false_positive(cfg):
@@ -638,7 +644,15 @@ def test_cli_config_ai_model_ors_without_flag(cfg, tmp_path, monkeypatch):
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
     ok = runner.invoke(
         app,
-        ["peer-review", "--file", str(src), "--config", str(cfg_path), "--format", "json"],
+        [
+            "peer-review",
+            "--file",
+            str(src),
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
     )
     assert ok.exit_code == 0, ok.output
     body = json.loads(ok.stdout)
@@ -1046,7 +1060,9 @@ def test_default_peer_review_does_not_run_forensics(cfg, tmp_path: Path, monkeyp
 
 
 def test_forensics_unavailable_when_not_on_path(cfg, tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("paperful.peer_review_forensics.shutil.which", lambda _name: None)
+    monkeypatch.setattr(
+        "paperful.peer_review_forensics.shutil.which", lambda _name: None
+    )
     path = tmp_path / "scan.txt"
     path.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
     pack = build_peer_review(cfg, file_path=path, offline=True, use_forensics=True)
@@ -1084,7 +1100,8 @@ def test_forensics_maps_report_into_pack(cfg, tmp_path: Path, monkeypatch):
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(
-        "paperful.peer_review_forensics.shutil.which", lambda _name: "/usr/bin/paperguard"
+        "paperful.peer_review_forensics.shutil.which",
+        lambda _name: "/usr/bin/paperguard",
     )
     monkeypatch.setattr("paperful.peer_review_forensics.subprocess.run", fake_run)
     path = tmp_path / "draft.txt"
@@ -1116,7 +1133,9 @@ def test_cli_forensics_flag_writes_unavailable(cfg, tmp_path, monkeypatch):
     src = tmp_path / "draft.md"
     src.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
-    monkeypatch.setattr("paperful.peer_review_forensics.shutil.which", lambda _name: None)
+    monkeypatch.setattr(
+        "paperful.peer_review_forensics.shutil.which", lambda _name: None
+    )
     ok = runner.invoke(
         app,
         [
@@ -1150,7 +1169,9 @@ def test_cli_forensics_accepts_csv_and_xlsx(cfg, tmp_path, monkeypatch):
     xlsx_path = tmp_path / "means.xlsx"
     xlsx_path.write_bytes(b"PK")
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
-    monkeypatch.setattr("paperful.peer_review_forensics.shutil.which", lambda _name: None)
+    monkeypatch.setattr(
+        "paperful.peer_review_forensics.shutil.which", lambda _name: None
+    )
     for src in (csv_path, xlsx_path):
         ok = runner.invoke(
             app,
@@ -1181,10 +1202,20 @@ def test_cli_config_forensics_ors_without_flag(cfg, tmp_path, monkeypatch):
     src = tmp_path / "draft.md"
     src.write_text("The cat sat on the mat. " * 20, encoding="utf-8")
     monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
-    monkeypatch.setattr("paperful.peer_review_forensics.shutil.which", lambda _name: None)
+    monkeypatch.setattr(
+        "paperful.peer_review_forensics.shutil.which", lambda _name: None
+    )
     ok = runner.invoke(
         app,
-        ["peer-review", "--file", str(src), "--config", str(cfg_path), "--format", "json"],
+        [
+            "peer-review",
+            "--file",
+            str(src),
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
     )
     assert ok.exit_code == 0, ok.output
     body = json.loads(ok.stdout)
@@ -1379,7 +1410,15 @@ def test_cli_config_vale_ors_without_flag(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr("paperful.peer_review_vale.shutil.which", lambda _name: None)
     ok = runner.invoke(
         app,
-        ["peer-review", "--file", str(src), "--config", str(cfg_path), "--format", "json"],
+        [
+            "peer-review",
+            "--file",
+            str(src),
+            "--config",
+            str(cfg_path),
+            "--format",
+            "json",
+        ],
     )
     assert ok.exit_code == 0, ok.output
     body = json.loads(ok.stdout)
@@ -1789,9 +1828,7 @@ def test_reviewer_passes_max_tokens(cfg, tmp_path: Path, monkeypatch):
     prompt = tmp_path / "note.md"
     prompt.write_text("You are a note writer. No accept/reject.\n", encoding="utf-8")
     cfg.peer_review_reviewers = (
-        PeerReviewer(
-            id="capped", model="model-a", prompt=str(prompt), max_tokens=512
-        ),
+        PeerReviewer(id="capped", model="model-a", prompt=str(prompt), max_tokens=512),
     )
     seen: list[object] = []
 
