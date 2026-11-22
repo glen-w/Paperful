@@ -58,17 +58,38 @@ def _quiet_console() -> Console:
     return Console(quiet=True, file=None)
 
 
-def _load_scope_items(cfg: Config, collection: str) -> tuple[list[Any], Manifest]:
+def _collection_specs(
+    collection: str | list[str] | tuple[str, ...] | None,
+) -> list[str]:
+    """Unique collection paths from a chip, a list of ``-C`` flags, or line-separated extras."""
+    if not collection:
+        return []
+    raw = [collection] if isinstance(collection, str) else list(collection)
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        for part in str(item).splitlines():
+            spec = part.strip()
+            if spec and spec not in seen:
+                seen.add(spec)
+                out.append(spec)
+    return out
+
+
+def _load_scope_items(
+    cfg: Config, collection: str | list[str] | tuple[str, ...]
+) -> tuple[list[Any], Manifest]:
     from ..catalogue import open_library
     from ..library import LibraryError
     from ..scope import ScopeError, load_scope
 
     manifest = Manifest(cfg.manifest_path)
-    if not collection:
+    specs = _collection_specs(collection)
+    if not specs:
         return [], manifest
     try:
         backend = open_library(cfg)
-        loaded = load_scope(backend, collections=[collection], library=False)
+        loaded = load_scope(backend, collections=specs, library=False)
         return loaded.items, manifest
     except (LibraryError, ScopeError):
         return [], manifest
@@ -527,7 +548,7 @@ def peer_review(
     *,
     item_key: str = "",
     staged_path: Any | None = None,
-    collection: str = "",
+    collection: str | list[str] | tuple[str, ...] = "",
     apply: bool = False,
     llm: bool = False,
     ai_model: bool = False,
@@ -577,10 +598,10 @@ def peer_review(
     backend = None
     target = None
     scope_items: list[Any] = []
-    coll = (collection or "").strip()
+    specs = _collection_specs(collection)
     key = (item_key or "").strip()
-    if key or coll:
-        items, _manifest = _load_scope_items(cfg, coll)
+    if key or specs:
+        items, _manifest = _load_scope_items(cfg, specs)
         scope_items = items
         if key:
             target = next((it for it in items if it.key == key), None)
@@ -658,8 +679,8 @@ def peer_review(
             cfg,
             item=target,
             file_path=staged_path,
-            collections=[coll] if coll else None,
-            library=not bool(coll),
+            collections=specs or None,
+            library=not bool(specs),
             dry_run=False,
             use_llm=use_llm,
             use_ai_model=bool(ai_model),

@@ -115,6 +115,46 @@ def load_library_texts(
     return out
 
 
+def _prefix_postings(
+    prefixes: set[tuple[str, ...]],
+    tokenized: dict[str, list[str]],
+    n_min: int,
+) -> tuple[dict[tuple[str, ...], list[str]], dict[str, str]]:
+    """One pass: n-min windows that hit ``prefixes``, plus joined token strings."""
+    postings: dict[tuple[str, ...], list[str]] = {}
+    joined: dict[str, str] = {}
+    if n_min < 1 or not prefixes:
+        for key, toks in tokenized.items():
+            joined[key] = " ".join(toks)
+        return postings, joined
+    for key, toks in tokenized.items():
+        joined[key] = " ".join(toks)
+        if len(toks) < n_min:
+            continue
+        seen: set[tuple[str, ...]] = set()
+        for i in range(0, len(toks) - n_min + 1):
+            pref = tuple(toks[i : i + n_min])
+            if pref not in prefixes or pref in seen:
+                continue
+            seen.add(pref)
+            postings.setdefault(pref, []).append(key)
+    return postings, joined
+
+
+def _phrase_df(
+    gram: tuple[str, ...],
+    phrase: str,
+    n_min: int,
+    postings: dict[tuple[str, ...], list[str]],
+    joined: dict[str, str],
+) -> int:
+    pref = gram[:n_min] if len(gram) >= n_min else gram
+    candidates = postings.get(pref, ())
+    if len(gram) == n_min:
+        return len(candidates)
+    return sum(1 for key in candidates if phrase in joined[key])
+
+
 def rank_phrases(
     target: str,
     corpus: dict[str, str],
@@ -131,7 +171,9 @@ def rank_phrases(
         return []
     tf = Counter(grams)
     n_docs = max(1, len(corpus))
-    folded = {k: " ".join(_tokens(v)) for k, v in corpus.items()}
+    prefixes = {gram[:n_min] if len(gram) >= n_min else gram for gram in tf}
+    tokenized = {k: _tokens(v) for k, v in corpus.items()}
+    postings, joined = _prefix_postings(prefixes, tokenized, n_min)
     scored: list[tuple[str, float, int]] = []
     seen: set[str] = set()
     df_cap = df_max if df_max is not None else max(2, n_docs // 4 or 1)
@@ -140,7 +182,7 @@ def rank_phrases(
         if phrase in seen:
             continue
         seen.add(phrase)
-        df = sum(1 for body in folded.values() if phrase in body)
+        df = _phrase_df(gram, phrase, n_min, postings, joined)
         if df < 1 or df >= df_cap:
             continue
         idf = math.log((n_docs + 1) / (df + 1))
@@ -156,19 +198,29 @@ def match_phrases(
     n_min: int = 6,
 ) -> list[OverlapHit]:
     hits: list[OverlapHit] = []
+    needles: list[tuple[str, tuple[str, ...]]] = []
+    prefixes: set[tuple[str, ...]] = set()
     for phrase, _score, _df in phrases:
-        words = phrase.split()
+        words = tuple(phrase.split())
         if len(words) < n_min:
             continue
-        for key, body in corpus.items():
-            hay = " ".join(_tokens(body))
-            if phrase not in hay:
+        pref = words[:n_min]
+        needles.append((phrase, pref))
+        prefixes.add(pref)
+    if not needles:
+        return hits
+    tokenized = {k: _tokens(v) for k, v in corpus.items()}
+    postings, joined = _prefix_postings(prefixes, tokenized, n_min)
+    for phrase, pref in needles:
+        n_words = len(phrase.split())
+        for key in postings.get(pref, ()):
+            if phrase not in joined[key]:
                 continue
             hits.append(
                 OverlapHit(
                     other_key=key,
                     ngram=phrase,
-                    n_words=len(words),
+                    n_words=n_words,
                     source="phrase",
                 )
             )

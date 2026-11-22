@@ -1,7 +1,7 @@
 """Institutional EZProxy: fetch publisher PDFs through a campus proxy session.
 
-Auth is cookie-based (log in via browser + export cookies). We never store Sciences Po
-passwords. Configure `ezproxy_base` (e.g. https://scpo.idm.oclc.org/login?url=) and
+Auth is cookie-based (log in via browser + export cookies). We never store campus
+passwords. Configure `ezproxy_base` (e.g. https://PREFIX.idm.oclc.org/login?url=) and
 `ezproxy_cookies` pointing at a Netscape cookies.txt that includes the proxy session.
 
 Targets come from `routing.ezproxy_target`: a DOI (via doi.org) or a URL on a known

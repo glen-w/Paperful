@@ -68,7 +68,9 @@ _LABELS: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 
-_LOGIN_URL_HINTS = ("/cas/login", "federation.sciences-po.fr", "shibboleth")
+_LOGIN_URL_HINTS = ("/cas/login", "shibboleth")
+# Host fragments that mean campus SSO landed, not a publisher PDF miss.
+_SSO_HOST_HINTS = ("sso.", "idp.", "cas.", "federation.", "shibboleth")
 _LOGIN_BODY_HINTS = (
     "central authentication service",
     "entrez votre identifiant",
@@ -127,7 +129,10 @@ def looks_like_vault_login_miss(note: str) -> bool:
     if miss_label(raw).lower() == "login":
         return True
     low = raw.lower()
-    return any(h in low for h in _LOGIN_URL_HINTS)
+    if any(h in low for h in _LOGIN_URL_HINTS):
+        return True
+    host = miss_host(raw)
+    return bool(host) and any(h in host for h in _SSO_HOST_HINTS)
 
 
 # Exact miss buckets that should silence a vault host for the rest of a run.

@@ -106,6 +106,7 @@ probe stored bytes the mirror folder lacks, and for `--apply`.
 | `run_cmd.py` | `run` body after the CLI parses flags | `pipeline`, `run_hooks`, `catalogue` (PDF-todo helpers; not `zot`) |
 | `ask_cmd.py` | `ask` body after the CLI parses flags | `agent_ops`, rag, `claim_check` |
 | `claim_check.py` | `ask --claim-check` pack (`paperful.claim_check.v1`). Sentence split from `stuff`; labels from `peer_review_claims` overlap; no LLM | `stuff`, `peer_review_claims`, rag retrieve |
+| `evidence.py` / `evidence_cmd.py` | `paperful evidence` pack (`paperful.evidence.v1`). Heading split / `extract-sections`; quote or `check this`; no LLM | `sections.extract`, `peer_review_claims.quote_in_text` |
 | `dedupe_cmd.py` / `attachments_cmd.py` / `summarize_cmd.py` / `synthesize_cmd.py` | Completeness verbs after flags | domain modules via `cli_runtime` |
 | `completeness_cmd.py` | Re-export shim for the four verbs (keep `cli` imports and monkeypatches stable) | the four `*_cmd` modules |
 | `lint_cmd.py` | `lint` after flags | `lint` |
@@ -259,6 +260,7 @@ Tier policy (1.0 contract):
 | `paperful.grobid.tei.v1` | `state/grobid/<sha256>.json` next to `.tei.xml` | `sections.grobid` | T3 | Rebuildable cache (`extract-sections`, `[rag].parser = "grobid"`, `peer-review --lane marg` / `claims` / `verify`) |
 | `paperful.peer_review.pack.v1` | `state/peer-reviews/<id>/<stamp>/pack.json` | `peer-review` | T1 | `PEER_REVIEW_PACK_KEYS` (`findings`, `overlap`, `metrics`, `llm`, …). `llm` may be `null`. When set: `mode` `default`\|`marg`\|`both`\|`adversary`\|`outline`\|`claims`\|`verify`\|`context`\|`context-web`, optional `marg.parser` / `claims` / `verify` / `outline`. Optional top-level `outline` skeleton and `claims` ledger (intra-doc `status` / `support_quote` / `loc`; optional `sources[]` with `item_key`, cited-source `status`, `quote`, `loc` when `-C` ran). Optional `ai_model` / `vale` / `forensics` only when those extras ran. Context / context-web may add `llm.context.investigation` plus `log` / `log_path` |
 | `paperful.claim_check.v1` | `state/ask-claims/<stamp>/` | `ask --claim-check` | T1 | Frozen keys: `schema`, `claim_check_id`, `created_at`, `scope`, `k`, `input`, `counts`, `rows`, `skips`. Row `status` is `supported`\|`mixed`\|`unsupported`. Supported quotes occur in the indexed chunk. No LLM |
+| `paperful.evidence.v1` | `state/evidence/<stamp>/` | `evidence` | T1 | Frozen keys: `schema`, `evidence_id`, `created_at`, `scope`, `rows`, `counts`, `skips`. Cell is a quote in the held PDF or the literal `check this`. No LLM |
 | `paperful.peer_review.context.v1` | `state/peer-reviews/<id>/<stamp>/context.json` | `peer-review` (`context` / `context-web`) | T1 | Compact investigation log: summary, retrieve rounds, novelty search, Q&A. No passage text. Written only when that lane ran |
 | `paperful.rewrite.plan.v1` / `paperful.rewrite.pack.v1` | `state/rewrites/<id>/<stamp>/` | `rewrite` | T2 | Edit plan plus pack metadata. Never overwrites the source manuscript |
 | `paperful.rq_answered.v1` | `state/rq-answered/` | `rag.answered` | T2 | — |

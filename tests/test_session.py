@@ -49,7 +49,7 @@ def test_netscape_from_playwright_roundtrip(tmp_path):
         {
             "name": "session",
             "value": "ez",
-            "domain": ".scpo.idm.oclc.org",
+            "domain": ".lib.idm.oclc.org",
             "path": "/",
             "expires": 1700000000,
             "secure": True,
@@ -143,7 +143,7 @@ def test_storage_state_normalizes_samesite_and_bad_expires(tmp_path):
             {
                 "name": "ezproxy",
                 "value": "tok",
-                "domain": ".scpo.idm.oclc.org",
+                "domain": ".lib.idm.oclc.org",
                 "path": "/",
                 "sameSite": "none",
                 "expires": 1_700_000_000,
@@ -173,12 +173,12 @@ def test_ezproxy_cookie_status_cas_by_cookie_name_alone():
 
 
 def test_require_ezproxy_proxy_cookies_rejects_cas_only(cfg):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     cas_only = [
         {
             "name": "JSESSIONID",
             "value": "abc",
-            "domain": "federation.sciences-po.fr",
+            "domain": "sso.example.edu",
             "path": "/cas/",
         }
     ]
@@ -193,7 +193,7 @@ def test_require_ezproxy_proxy_cookies_rejects_cas_only(cfg):
         {
             "name": "ezproxy",
             "value": "tok",
-            "domain": ".scpo.idm.oclc.org",
+            "domain": ".lib.idm.oclc.org",
             "path": "/",
         }
     ]
@@ -255,7 +255,7 @@ def test_playwright_cookies_from_netscape_keeps_session_cookies(tmp_path):
             {
                 "name": "CASTGC",
                 "value": "TGT-1",
-                "domain": "federation.sciences-po.fr",
+                "domain": "sso.example.edu",
                 "path": "/cas/",
                 "expires": 0,
                 "secure": True,
@@ -365,14 +365,14 @@ def test_browser_session_inject_warning_on_failures(cfg):
 
 
 def test_browser_session_inject_warns_cas_only(cfg):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     write_netscape(
         vault_cookies_path(cfg),
         [
             {
                 "name": "JSESSIONID",
                 "value": "abc",
-                "domain": "federation.sciences-po.fr",
+                "domain": "sso.example.edu",
                 "path": "/cas/",
             }
         ],
@@ -439,7 +439,7 @@ def test_login_url_ezproxy_requires_base(cfg):
         raise AssertionError("expected SessionError")
     except SessionError:
         pass
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     assert "sciencedirect" in login_url_for(cfg, "ezproxy")
 
 
@@ -692,11 +692,11 @@ def test_collect_pdf_from_page_waits_out_sso():
             super().__init__(
                 resp=_FakeResp(
                     b"<html>login</html>",
-                    "https://federation.sciences-po.fr/cas/login",
+                    "https://sso.example.edu/cas/login",
                 ),
                 html="<html>central authentication service</html>",
             )
-            self.url = "https://federation.sciences-po.fr/cas/login"
+            self.url = "https://sso.example.edu/cas/login"
             self._polls = 0
 
         def inner_text(self, selector):
@@ -707,7 +707,7 @@ def test_collect_pdf_from_page_waits_out_sso():
             self._polls += 1
             if self._polls > 3:
                 return "https://www.nature.com/articles/s1"
-            return "https://federation.sciences-po.fr/cas/login"
+            return "https://sso.example.edu/cas/login"
 
         @url.setter
         def url(self, value):
@@ -729,7 +729,7 @@ def test_collect_pdf_from_page_waits_out_sso():
             return super().goto(url, **kwargs)
 
     data, final, win = collect_pdf_from_page(
-        Page(), "https://federation.sciences-po.fr/cas/login"
+        Page(), "https://sso.example.edu/cas/login"
     )
     assert data == PDF_BYTES
     assert win == "sso+meta"
@@ -746,11 +746,11 @@ def test_collect_pdf_from_page_fails_fast_on_stuck_sso(monkeypatch):
             super().__init__(
                 resp=_FakeResp(
                     b"<html>login</html>",
-                    "https://federation.sciences-po.fr/cas/login",
+                    "https://sso.example.edu/cas/login",
                 ),
                 html="<html>central authentication service</html>",
             )
-            self.url = "https://federation.sciences-po.fr/cas/login"
+            self.url = "https://sso.example.edu/cas/login"
 
         def inner_text(self, selector):
             return "central authentication service"
@@ -759,17 +759,17 @@ def test_collect_pdf_from_page_fails_fast_on_stuck_sso(monkeypatch):
             return self._html
 
     try:
-        collect_pdf_from_page(Page(), "https://federation.sciences-po.fr/cas/login")
+        collect_pdf_from_page(Page(), "https://sso.example.edu/cas/login")
         raise AssertionError("expected SessionError")
     except SessionError as exc:
-        assert "login @federation.sciences-po.fr" in str(exc)
+        assert "login @sso.example.edu" in str(exc)
 
 
 def test_looks_like_vault_login_miss():
     from paperful.page_signals import looks_like_vault_login_miss
 
-    assert looks_like_vault_login_miss("login @federation.sciences-po.fr")
-    assert looks_like_vault_login_miss("no download control @federation.sciences-po.fr")
+    assert looks_like_vault_login_miss("login @sso.example.edu")
+    assert looks_like_vault_login_miss("no download control @sso.example.edu")
     assert not looks_like_vault_login_miss("blocked @linkinghub.elsevier.com")
     assert not looks_like_vault_login_miss("no download control @wiley.com")
 
@@ -777,13 +777,13 @@ def test_looks_like_vault_login_miss():
 def test_miss_host_and_dead_vault_miss():
     from paperful.page_signals import looks_like_dead_vault_miss, miss_host
 
-    assert miss_host("login @federation.sciences-po.fr") == "federation.sciences-po.fr"
+    assert miss_host("login @sso.example.edu") == "sso.example.edu"
     assert miss_host("no download control @hal.science; steps 2/4") == "hal.science"
     assert miss_host("blocked") == ""
-    assert looks_like_dead_vault_miss("login @federation.sciences-po.fr")
+    assert looks_like_dead_vault_miss("login @sso.example.edu")
     assert looks_like_dead_vault_miss("captcha @scholar.google.com")
     assert looks_like_dead_vault_miss("no download control @hal.science")
-    assert looks_like_dead_vault_miss("no download control @federation.sciences-po.fr")
+    assert looks_like_dead_vault_miss("no download control @sso.example.edu")
     assert not looks_like_dead_vault_miss("blocked @linkinghub.elsevier.com")
     assert not looks_like_dead_vault_miss("clicked download control, no PDF @x.test")
 

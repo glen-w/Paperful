@@ -347,7 +347,10 @@ def attach_claim_sources(
     max_sources = max(
         1, int(getattr(cfg, "peer_review_claims_cite_max_sources", 3) or 3)
     )
-    pages_by_key = load_library_pages(cfg, exclude_key=exclude_key)
+    scope_keys = [it.key for it in scope_items if getattr(it, "key", None)]
+    pages_by_key = load_library_pages(
+        cfg, exclude_key=exclude_key, keys=scope_keys
+    )
     for row in ledger:
         window = claim_window(doc.text or "", str(row.get("text") or ""))
         cites = cites_in_window(window)

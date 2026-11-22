@@ -54,18 +54,20 @@ extract** for both `--item` and `--file` (same `[screen].detectors` and
 `tortured_min` as screen).
 
 Overlap is **flags to review**, not a plagiarism verdict. Boilerplate that
-appears in many library texts is dropped. Do not narrate misconduct.
+appears in many library texts is dropped. A large `-C` (or `--library`) scores
+those n-grams with a one-pass inverted n-min index on CPU. Do not narrate misconduct.
 
 ## CLI
 
-`--item KEY` and `--file PATH` are mutually exclusive. `-C` (or `--library`
-for the whole library) is the corpus for the overlap and context lanes. `--file` also accepts
+`--item KEY` and `--file PATH` are mutually exclusive. `-C` is repeatable
+(union of those collections) for the overlap and context corpus; `--library`
+is the whole library. `--file` also accepts
 `csv` / `xlsx` / `xls` so PaperGuard can scan a table without a manuscript
 wrapper (`xlsx`/`xls` have no text extract; checkers see an empty document).
 
 ```bash
 uv run paperful peer-review --item KEY -C "My Collection"
-uv run paperful peer-review --file ./draft.docx -C "My Collection"
+uv run paperful peer-review --file ./draft.docx -C "Lab papers" -C "Prior art"
 uv run paperful peer-review --file ./draft.pdf --lane reviewers
 uv run paperful peer-review --file ./draft.pdf --llm
 uv run paperful peer-review --file ./draft.pdf --llm --reviewer line-editor
@@ -105,7 +107,8 @@ Binoculars extra on for this run (git overlay; there is no
 pass on for this run (there is no `--no-vale`; set `[peer_review].vale = false`).
 `--forensics` turns the PaperGuard subprocess on for this run (there is no
 `--no-forensics`; set `[peer_review].forensics = false`).
-`-C` is the overlap / “cited but not in library” corpus. `paperful jobs` lists
+`-C` is the overlap / “cited but not in library” corpus (repeatable; the
+collections are unioned). `paperful jobs` lists
 `peer-review` under completeness.
 Not in `paperful all`.
 

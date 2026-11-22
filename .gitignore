@@ -1,4 +1,9 @@
+# Operator overlay only. email, ezproxy_base, API keys, campus hosts stay here.
+# Tracked templates: config.example.toml / config.minimal.toml.
 config.toml
+config.*.toml
+!config.example.toml
+!config.minimal.toml
 .vale.ini
 .vale-*.ini
 .venv/

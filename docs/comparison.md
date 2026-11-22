@@ -9,7 +9,7 @@ PDFs**. Hosted “paper factories” (Edison, Elicit, Deep Research, Jenni) own
 discover and draft; they do not own campus-proxy fetch, grey playbooks, or a
 restore ledger. Factory-stage matrix: [comparison reference](comparison-reference.md#paper-factory-stages).
 
-**Last reviewed:** 2026-11-20. Feature lists for other products are based on public
+**Last reviewed:** 2026-11-22. Feature lists for other products are based on public
 docs and positioning — not paid pilots or exhaustive release testing.
 
 Vendor-by-vendor notes live in the [comparison reference](comparison-reference.md).
@@ -26,7 +26,9 @@ Prefer this page for “is this the right tool?”
 | **Metadata repair** (DOI/ISBN/arXiv bulk update, parent-from-PDF) | Paperful `lint` / `fix-metadata`, or [ZotMeta](https://github.com/RoadToDream/ZotMeta) |
 | **Duplicate parents** in one collection (DOI, then title+year). Review a pack, then merge the PDF, notes, and better fields onto one item. | **Paperful** `dedupe` |
 | **Grey literature** landings (UN, FAO, ISA, and similar) kept as real PDFs | **Paperful** playbooks in `direct` / `landing`. Journal-style OA fetch is the row above |
-| **Batch notes** from PDFs you already have: one grounded summary per item, then a collection review. Local model, off by default. Scans need `ocr` first | **Paperful** `summarize` / `synthesize` |
+| **Batch notes** from PDFs you already have: one grounded summary per item, then a collection review. Local model, off by default. Scans need `ocr` first. Drop unquoted sentences with `summarize --receipts` | **Paperful** `summarize` / `synthesize` |
+| **Sourced comparison table** over PDFs you already hold (design / n / method / finding; quote or `check this`; no LLM) | **Paperful** [`evidence`](evidence.md) — CLI pack, no `--apply` |
+| **Hosted OA/preprint companion** (summaries, collection tables, email digests; license-gated full text; OpenAI) | [SummarizePaper](https://www.summarizepaper.com) ([source](https://github.com/summarizepaper/summarizepaper)) — complement. Paperful keeps campus PDFs, the restore ledger, and sourced tables over **held** files |
 | **Scriptable library surgery** (merge, enrich, disk GC, two-up scan split) via CLI/MCP | [zotero-agent](https://github.com/alex-roc/zotero-agent) |
 | **AI assistant** read/write over the library, including chat and (on some forks) OCR of scans | zotero-mcp forks ([richardjlyon](https://github.com/richardjlyon/zotero-mcp), [cookjohn](https://github.com/cookjohn/zotero-mcp), [mcp-zotero](https://github.com/Xevos117/mcp-zotero)) |
 | **Semantic search, citation graph, author/trend tools** over the public literature via MCP (hosted corpus; not your Zotero tree) | [Valency MCP Bond](https://www.valency.io/) — see [reference](comparison-reference.md#valency-mcp-bond-and-hub) |
@@ -35,7 +37,7 @@ Prefer this page for “is this the right tool?”
 | **Local research-agent harness** — coding agents (Claude Code / Codex / Cursor / …) search lit, hypothesize, run experiments on local/SSH/Slurm/cloud GPUs, keep logs on disk; not your Zotero tree | [OpenResearch](https://github.com/alphaXiv/OpenResearch) (`orx`; alphaXiv project) — [reference](comparison-reference.md#openresearch) |
 | **Web Deep Research memo** (cited longform from the open web in minutes; not a journal manuscript) | OpenAI / Gemini / Perplexity Deep Research. Paperful Ask is over **held** PDFs |
 | **Systematic-review screening** (dual review, extraction forms, PRISMA counts; usually no discovery corpus) | [Covidence](https://www.covidence.org/), [Rayyan](https://www.rayyan.ai/), DistillerSR; local [ASReview](https://asreview.nl/). Paperful `sr` can export counts and CSV; it does not replace those tools. Discover Keep/Skip is hop triage, not dual review |
-| **Chat with PDFs you upload** (no scholarly search, no Zotero restore) | Scholarcy, Explainpaper, Humata, [Gemini Notebook](https://notebooklm.google/). Paperful `ask` uses the **same** `out/` tree as fetch |
+| **Chat with PDFs you upload** (no scholarly search, no Zotero restore) | Scholarcy, Explainpaper, Humata, [Gemini Notebook](https://notebooklm.google/). Hosted OA/preprint chat + collection tables: [SummarizePaper](https://www.summarizepaper.com). Paperful `ask` / `evidence` use the **same** `out/` tree as fetch |
 | **Draft a manuscript with citations** (library ∪ global index; language/LaTeX) | [Jenni](https://jenni.ai/), [Paperpal](https://paperpal.com/), SciSpace Writer, Writefull in [Overleaf](https://docs.overleaf.com/integrations-and-add-ons/ai-features). Living cites without a model: Better BibTeX → Quarto. Paperful does not draft papers. [`rewrite`](rewrite.md) applies an existing peer-review pack as locatable edits / tracked changes — it is not a generator |
 | **Turn idea notes + experimental logs into conference LaTeX** (outline, related work, plots, self-peer-review; not your Zotero tree) | [PaperOrchestra](https://github.com/google-research/paper-orchestra) (Google Cloud AI Research; you run it). Nearby: [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) (idea → experiment → workshop paper). Paperful does not generate manuscripts — [reference](comparison-reference.md#paperorchestra) |
 | **Apply a pre-submission pack as tracked changes** (hygiene first; no invented numbers or cites) | **Paperful** [`rewrite`](rewrite.md) from a [`peer-review`](peer-review.md) pack. Patterns (not vendored code): PaperOrchestra worklog, ARIES align-then-generate, XtraGPT selected-span prompts |
@@ -76,8 +78,8 @@ Most tools in this space optimise one or more of:
 Those map onto Paperful’s jobs. **Find** is **(1)**: open access, campus
 proxy, playbooks, and an opt-in AI browser after the scripted lanes fail.
 **Completeness** is **(2)** (`lint` / `fix-metadata`, patches on disk,
-`--apply` to the adapter) plus duplicate review (`dedupe`) and opt-in
-`summarize` / `synthesize`. **Mirror** is the portable disk copy
+`--apply` to the adapter) plus duplicate review (`dedupe`), opt-in
+`summarize` / `synthesize`, and CLI `evidence` (quote or `check this`). **Mirror** is the portable disk copy
 (`snapshot` / `restore`; `snapshot --pdfs all` also copies PDFs already in
 Zotero). **(3)** is `paperful attachments`: a report by default, and
 `--fix-broken`, `--merge-files`, `--rename`, or `--link` only with
@@ -162,7 +164,14 @@ Want the files and records on disk, independent of Zotero cloud quota?
   → paperful snapshot (restore recreates only missing items)
 
 Want grounded notes, then one review of a collection, without a chat session?
-  → paperful summarize, then synthesize (local model; text-layer PDFs)
+  → paperful summarize, then synthesize (local model; text-layer PDFs).
+  Drop unquoted sentences: summarize --receipts
+
+Want a sourced n / method / finding table over PDFs you already hold (no LLM)?
+  → paperful evidence (quote or check this; pack on disk)
+
+Need hosted summaries, collection tables, or email digests over OA and preprints?
+  → SummarizePaper. Paperful still owns campus PDFs, the restore ledger, and tables over held files
 
 Library DOI looks wrong but you already have the PDF?
   → paperful lint, then fix-metadata --apply
@@ -240,4 +249,5 @@ How far a snowball hop reaches: [How a hop is cut](snowball.md#how-a-hop-is-cut)
 - [authorwatch.md](authorwatch.md) — people lists → new papers (suggest / accept / import; no hop)
 - [comparison-reference.md](comparison-reference.md) — vendor notes and extra tables
 - [commands.md](commands.md) — CLI and disk artifacts
+- [evidence.md](evidence.md) — sourced comparison table over held PDFs
 - [config.md](config.md) — `config.toml` and operations

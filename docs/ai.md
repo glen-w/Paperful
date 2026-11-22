@@ -46,7 +46,8 @@ unusable for a 1,500-PDF collection overnight.
 
 | Job | Scale | Feasible on typical academic hardware? | Notes |
 | --- | --- | --- | --- |
-| One summary | `--item KEY` | Yes (local 7B–12B, or any solid hosted chat model) | Acceptance test: four sections, no invented numbers |
+| One summary | `--item KEY` | Yes (local 7B–12B, or any solid hosted chat model) | Acceptance test: four sections, no invented numbers. `--receipts` is a post-pass on the same completion, not a second call |
+| Sourced comparison table | `evidence -C …` | **No model** | Quote or `check this` from held PDFs. [Evidence](evidence.md) |
 | Small slice | `-C … --limit 5` or one year / one type | Yes locally if a 7B tag fits; or cheap hosted | Use `--order newest` when the model is slow |
 | Whole collection summarize | ~10²–10³ PDFs | Local: only with patience or strong silicon; hosted: budget tokens + rate limits | Resume-safe; already-done items skip |
 | `synthesize` over ~10³ summaries | One review from notes already written | Local: can take hours and many map-reduce chunks; hosted: far fewer tokens than summarizing every PDF again | Run `synthesize --dry-run` for the chunk plan first |

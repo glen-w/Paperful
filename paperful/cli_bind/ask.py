@@ -422,6 +422,14 @@ def summarize(
         dir_okay=False,
         help="Text file: one collection path per line (appended to --collection).",
     ),
+    receipts: bool | None = typer.Option(
+        None,
+        "--receipts/--no-receipts",
+        help=(
+            "Drop summary sentences that cannot quote the held PDF and append a "
+            "Receipts list. Default is \\[summarize].receipts (off)."
+        ),
+    ),
     profile: str | None = ProfileOpt,
     run_config: Path | None = RunConfigFileOpt,
     config: Path | None = ConfigOpt,
@@ -447,6 +455,7 @@ def summarize(
         max_new=_typer_opt(max_new),
         max_minutes=_typer_opt(max_minutes),
         collections_file=collections_file,
+        receipts=receipts,
         profile=profile,
         run_config=run_config,
         config=config,
@@ -504,6 +513,47 @@ def extract_sections(
         dry_run=dry_run,
         force=force,
         grobid=grobid,
+        config=config,
+        fmt=fmt,
+    )
+
+
+@app.command()
+def evidence(
+    item: list[str] = typer.Option([], "--item", help="Item key (repeatable)."),
+    collection: list[str] = typer.Option(
+        [], "--collection", "-C", help="Collection scope (repeatable)."
+    ),
+    library: bool | None = LibraryOpt,
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Not in this stage. The pack stays on disk.",
+    ),
+    year_from: int | None = YearFromOpt,
+    year_to: int | None = YearToOpt,
+    item_type: list[str] = ItemTypeOpt,
+    limit: int | None = typer.Option(None, "--limit", "-n"),
+    profile: str | None = ProfileOpt,
+    run_config: Path | None = RunConfigFileOpt,
+    config: Path | None = ConfigOpt,
+    fmt: str = AgentFormatOpt,
+) -> None:
+    """Sourced comparison table over held PDFs. Quote or check this. No LLM."""
+    from paperful.evidence_cmd import run_evidence
+
+    run_evidence(
+        console,
+        item=item,
+        collection=collection,
+        library=library,
+        apply=apply,
+        year_from=year_from,
+        year_to=year_to,
+        item_type=item_type,
+        limit=limit,
+        profile=profile,
+        run_config=run_config,
         config=config,
         fmt=fmt,
     )

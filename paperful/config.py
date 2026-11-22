@@ -165,7 +165,7 @@ class Config:
         3  # captcha/block failures before a source pauses, then one probe
     )
     user_agent: str = USER_AGENT
-    # Campus EZProxy (e.g. Sciences Po). Empty base disables the source.
+    # Campus EZProxy. Empty base disables the source.
     ezproxy_base: str = ""
     # After a run, pause on a TTY to re-login and retry session-expired items.
     ezproxy_relogin: bool = True
@@ -282,6 +282,7 @@ class Config:
     summarize_dest: str = "both"  # disk | zotero | both
     summarize_order: str = "library"  # library | newest | oldest
     summarize_style: str = "plain"  # plain | ste
+    summarize_receipts: bool = False
     ste_violation_policy: str = "warn"  # warn | fail
     ste_word_list_path: Path | None = None
     synthesize_prompt_template: str = "default"
@@ -565,6 +566,10 @@ class Config:
     @property
     def sections_dir(self) -> Path:
         return self.state_dir / "sections"
+
+    @property
+    def evidence_dir(self) -> Path:
+        return self.state_dir / "evidence"
 
     @property
     def peer_reviews_dir(self) -> Path:

@@ -324,11 +324,11 @@ pack on disk.
    — filed as a collection note. A second run prints added and removed
    clusters (item keys), not a rewritten essay. Disagreement between
    papers is a pair of quotes, not a verdict.
-3. **Evidence table.** Columns: study design (OpenAlex `study_designs`
-   or work `type` when we have them, else the literal `unspecified`),
-   n, method, finding. A cell is filled only from `extract-sections`
-   or a quoted passage. Anything the model adds without a quote is the
-   literal `check this` and does not count as a finding. Export CSV.
+3. **Evidence table.** **Shipped (CLI):** `paperful evidence`. Columns: study
+   design (Extra / Zotero type; no live OpenAlex), n, method, finding. A cell
+   is filled only from `extract-sections` or a quoted passage. Anything without
+   a quote is the literal `check this` and does not count as a finding. Export
+   CSV (`state/evidence/<stamp>/`). `--apply` parked.
 4. **Figure and table pullouts.** Caption + page + file stem from the
    local PDF. No generated artwork, no graphical abstract.
 5. **Question generation from summaries.** Stays deferred until (1)
@@ -1077,15 +1077,16 @@ Ask stays optional; whether it stays third on the default nav is open.
   passage. Filed in Zotero as a starred note (`* Briefing — …`). Updates
   incrementally and shows a diff of what changed (new clusters, papers that
   shifted the picture). Flags disagreements between papers.
-- **Summaries with receipts:** each summary quotes the passages it relied
-  on and is stored as a Zotero child note marked as machine-written. Local
+- **Summaries with receipts:** **Shipped (CLI opt-in):** `summarize --receipts`
+  / `[summarize].receipts`. Each kept sentence quotes a held PDF page; unsupported
+  sentences are dropped; a Receipts list is stored on the child note. Local
   by default (Ollama); optional bring-your-own-key cloud. Turns Ask into
   the place you check claims, rather than a chat toy.
-- Stretch: evidence-table export (study type, n, method, finding), each
-  cell tied to a passage and marked “check this” when unsure; local claim
-  tracking that sorts citing papers into supporting, contrasting, or just
-  mentioning. Study-type seed for that table: Discover citation-map
-  literature categories from OpenAlex `study_designs` and work `type` (see
+- Stretch: local claim tracking that sorts citing papers into supporting,
+  contrasting, or just mentioning. (The evidence-table export is **shipped**
+  as `paperful evidence` — quote or `check this`; no LLM.) Study-type seed
+  for that table: Discover citation-map literature categories from OpenAlex
+  `study_designs` and work `type` (see
   [Citation map](snowball.md#citation-map)).
 - **Borrow from hosted literature agents** (Edison Scientific’s Literature /
   PaperQA line — [Hosted AI scientists](#after-110-edison-scientific)), still
@@ -3015,7 +3016,9 @@ prerequisites for the fetch / lint / attach loop.
 Larger product bets. Park until the ledger and core loop justify them.
 
 5. **Reading & knowledge** — local full-text index; annotation sync;
-   evidence packs; briefs grounded only in local PDFs. **Planned (see Optional
+   evidence packs; briefs grounded only in local PDFs. **Shipped (CLI):**
+   `paperful evidence`, `summarize --receipts`, `ask --claim-check`.
+   **Planned (see Optional
    LLM + subsections above):** [Zotero-RAG
    integration](#zotero-rag-integration-later-question-centric-layer);
    [EmbeddingGemma 2](#embeddinggemma-2-local-embeddings) (optional stronger
@@ -3030,9 +3033,10 @@ Larger product bets. Park until the ledger and core loop justify them.
    lists](#author-watch-lists-later-people-you-follow--their-papers) (shipped;
    saved social HTML/CSV import; live scrape still out). **[Run
    witness](#run-witness-shipped-trust-thicken)** (shipped) ties batches to
-   config/model/index for reproducibility.    Post-1.1 buffet for grounded
-   living briefs, summaries with receipts, Ask-as-claim-check, and
-   Edison-shaped conflicting-evidence / review layouts over **held** PDFs —
+   config/model/index for reproducibility.    Post-1.1 buffet remaining:
+   grounded living briefs, and Edison-shaped conflicting-evidence / review
+   layouts over **held** PDFs (receipts, claim-check, and `evidence` are
+   CLI-shipped) —
    [Summaries, briefs, and Ask](#after-110-briefs-ask),
    [Hosted AI scientists](#after-110-edison-scientific).
 6. **Writing & export** — CSL / BibLaTeX / Quarto sync; living review / gap lists;

@@ -47,12 +47,11 @@ bookmarklet”, or try the pattern many OCLC sites use:
 https://<your-prefix>.idm.oclc.org/login?url=
 ```
 
-Examples (illustrative only — use **your** institution’s URL):
+Use **your** institution’s prefix (not a sample from this repo):
 
-| Institution (example) | Typical `ezproxy_base` |
-| --- | --- |
-| Sciences Po | `https://scpo.idm.oclc.org/login?url=` |
-| Other OCLC EZProxy | `https://<prefix>.idm.oclc.org/login?url=` |
+```text
+https://<your-prefix>.idm.oclc.org/login?url=
+```
 
 The value must be the prefix that, when a target URL is appended, starts
 login. A quick check in the browser: open

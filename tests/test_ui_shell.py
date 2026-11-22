@@ -624,6 +624,65 @@ def test_peer_review_workbench_llm_checkboxes(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_peer_review_workbench_unions_extra_collections(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import paperful.agent_ops as ops
+    from paperful.ui import jobs
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    monkeypatch.setattr(ops, "doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _cfg, probe=False: [])
+    monkeypatch.setattr(
+        ops,
+        "collections_tree",
+        lambda _cfg: {"ok": True, "collections": []},
+    )
+    seen: list[dict] = []
+
+    def fake(cfg, cmd_id, **kw):
+        seen.append(kw)
+        return {"ok": True, "pack_dir": str(tmp_path / "pack")}
+
+    jobs.peer_review_fn = fake
+    try:
+        client = TestClient(create_app(cfg))
+        client.cookies.set("pf_collection", "Lab papers")
+        res = client.post(
+            "/peer-review",
+            data={"overlap_collection": "Prior art\nReviewer copies"},
+            files={
+                "file": (
+                    "draft.md",
+                    b"See Figure 2 under the ABC protocol.",
+                    "text/markdown",
+                )
+            },
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        loc = res.headers.get("location") or ""
+        cmd_id = loc.split("run=")[1].split("&")[0]
+        deadline = time.time() + 3.0
+        rec = {}
+        while time.time() < deadline:
+            rec = client.get(f"/v1/runs/{cmd_id}").json()
+            if rec.get("status") in {"done", "failed"}:
+                break
+            time.sleep(0.02)
+        assert rec.get("status") == "done", rec
+        assert seen
+        assert seen[0]["collection"] == [
+            "Lab papers",
+            "Prior art",
+            "Reviewer copies",
+        ]
+    finally:
+        jobs.peer_review_fn = None
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
 def test_stuff_workbench_item_or_file(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 

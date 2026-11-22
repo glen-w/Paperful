@@ -56,7 +56,7 @@ def runtime(monkeypatch, cfg):
     monkeypatch.setattr(cli_runtime, "_connect", lambda c, quiet=False: backend)
     monkeypatch.setattr(cli_runtime, "_live_backend", lambda c, **k: backend)
     monkeypatch.setattr(cli_runtime, "_load_scope", lambda b, **k: loaded)
-    monkeypatch.setattr(cli_runtime, "_loaded_scope", lambda b, item_keys=None: loaded)
+    monkeypatch.setattr(cli_runtime, "_loaded_scope", lambda b, **k: loaded)
     monkeypatch.setattr(cli_runtime, "_flush", lambda b: None)
     monkeypatch.setattr(cli_runtime, "_rag_auto", lambda *a, **k: None)
     return cfg, loaded, backend

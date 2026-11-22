@@ -11,21 +11,21 @@ from tests.conftest import make_item
 
 
 def test_proxify_and_login_detection():
-    base = "https://scpo.idm.oclc.org/login?url="
+    base = "https://lib.idm.oclc.org/login?url="
     assert ezproxy.proxify("https://doi.org/10.1/x", base).startswith(base)
     # Already-proxied / blank base / slash forms stay idempotent.
-    proxied = "https://www-nature-com.scpo.idm.oclc.org/articles/x"
+    proxied = "https://www-nature-com.lib.idm.oclc.org/articles/x"
     assert ezproxy.proxify(proxied, base) == proxied
     assert ezproxy.proxify("https://doi.org/10.1/x", "") == "https://doi.org/10.1/x"
     assert (
-        ezproxy.proxify("https://doi.org/10.1/x", "https://scpo.idm.oclc.org/")
-        == "https://scpo.idm.oclc.org/https://doi.org/10.1/x"
+        ezproxy.proxify("https://doi.org/10.1/x", "https://lib.idm.oclc.org/")
+        == "https://lib.idm.oclc.org/https://doi.org/10.1/x"
     )
     assert ezproxy.looks_like_login(
         httpx.Response(
             200,
             text="<html>Central Authentication Service</html>",
-            request=httpx.Request("GET", "https://federation.sciences-po.fr/cas/login"),
+            request=httpx.Request("GET", "https://sso.example.edu/cas/login"),
         )
     )
     assert not ezproxy.looks_like_login(
@@ -34,31 +34,31 @@ def test_proxify_and_login_detection():
             text="<html><meta name='citation_pdf_url' content='https://x/a.pdf'></html>",
             request=httpx.Request(
                 "GET",
-                "https://www-sciencedirect-com.scpo.idm.oclc.org/science/article/pii/S1",
+                "https://www-sciencedirect-com.lib.idm.oclc.org/science/article/pii/S1",
             ),
         )
     )
 
 
 def test_ensure_proxied_rewrites_publisher_host_onto_landing_proxy():
-    landing = "https://www-sciencedirect-com.scpo.idm.oclc.org/science/article/pii/S1"
+    landing = "https://www-sciencedirect-com.lib.idm.oclc.org/science/article/pii/S1"
     bare = "https://www.sciencedirect.com/science/article/pii/S1/pdfft"
-    out = ezproxy._ensure_proxied(bare, "https://scpo.idm.oclc.org/login?url=", landing)
-    assert out.startswith("https://www-sciencedirect-com.scpo.idm.oclc.org/")
+    out = ezproxy._ensure_proxied(bare, "https://lib.idm.oclc.org/login?url=", landing)
+    assert out.startswith("https://www-sciencedirect-com.lib.idm.oclc.org/")
     assert "pdfft" in out
-    already = "https://www-sciencedirect-com.scpo.idm.oclc.org/pdfft"
+    already = "https://www-sciencedirect-com.lib.idm.oclc.org/pdfft"
     assert (
         ezproxy._ensure_proxied(
-            already, "https://scpo.idm.oclc.org/login?url=", landing
+            already, "https://lib.idm.oclc.org/login?url=", landing
         )
         == already
     )
 
 
 def test_ezproxy_finds_direct_pdf_bytes(ctx_factory, cfg, tmp_path):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     cookie_file = tmp_path / "ezproxy-cookies.txt"
-    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
+    cookie_file.write_text(".lib.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
     cfg.ezproxy_cookies = cookie_file
 
     def handler(req):
@@ -68,7 +68,7 @@ def test_ezproxy_finds_direct_pdf_bytes(ctx_factory, cfg, tmp_path):
             headers={"content-type": "application/pdf"},
             request=httpx.Request(
                 "GET",
-                "https://www-nature-com.scpo.idm.oclc.org/articles/x.pdf",
+                "https://www-nature-com.lib.idm.oclc.org/articles/x.pdf",
             ),
         )
 
@@ -85,16 +85,16 @@ def test_extract_pdf_urls_sciencedirect():
     <html><head><meta name="citation_pdf_url" content="/science/article/pii/S0964569126000761/pdfft"></head>
     <body><a href="/science/article/pii/S0964569126000761/pdfft?download=true">Download PDF</a></body></html>
     """
-    base = "https://www-sciencedirect-com.scpo.idm.oclc.org/science/article/pii/S0964569126000761"
+    base = "https://www-sciencedirect-com.lib.idm.oclc.org/science/article/pii/S0964569126000761"
     urls = ezproxy.extract_pdf_urls(html, base)
     assert any("pdfft" in u for u in urls)
     assert any("S0964569126000761" in u for u in urls)
 
 
 def test_ezproxy_skips_non_publisher_url(ctx_factory, cfg, tmp_path):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     cookie_file = tmp_path / "ezproxy-cookies.txt"
-    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
+    cookie_file.write_text(".lib.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
     cfg.ezproxy_cookies = cookie_file
     ctx = ctx_factory(lambda r: httpx.Response(200, text="should not be fetched"))
     for c in load_netscape_cookies(cookie_file).jar:
@@ -107,7 +107,7 @@ def test_ezproxy_skips_non_publisher_url(ctx_factory, cfg, tmp_path):
 
 
 def test_ezproxy_skips_without_cookies_in_jar(ctx_factory, cfg):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     cand = ezproxy.find(make_item(), ctx_factory(lambda r: httpx.Response(200)))
     assert cand.outcome is Outcome.SKIPPED
     assert "session" in cand.note
@@ -122,10 +122,10 @@ def test_ezproxy_skips_without_config(ctx_factory, cfg):
 
 
 def test_ezproxy_finds_pdf_via_browser_html(ctx_factory, cfg, tmp_path):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     html = (
         '<html><head><meta name="citation_pdf_url" '
-        'content="https://www-sciencedirect-com.scpo.idm.oclc.org/science/article/pii/S1/pdfft">'
+        'content="https://www-sciencedirect-com.lib.idm.oclc.org/science/article/pii/S1/pdfft">'
         "</head></html>"
     )
 
@@ -136,7 +136,7 @@ def test_ezproxy_finds_pdf_via_browser_html(ctx_factory, cfg, tmp_path):
         def fetch_html(self, url, timeout_ms=45_000):
             return (
                 html,
-                "https://www-sciencedirect-com.scpo.idm.oclc.org/science/article/pii/S1",
+                "https://www-sciencedirect-com.lib.idm.oclc.org/science/article/pii/S1",
             )
 
     ctx = ctx_factory(lambda r: httpx.Response(500, text="should not be used"))
@@ -147,14 +147,14 @@ def test_ezproxy_finds_pdf_via_browser_html(ctx_factory, cfg, tmp_path):
 
 
 def test_ezproxy_finds_pdf_via_proxy(ctx_factory, cfg, tmp_path):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     cookie_file = tmp_path / "ezproxy-cookies.txt"
     cookie_file.write_text(
         "# Netscape HTTP Cookie File\n"
-        ".scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n"
+        ".lib.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n"
     )
     cfg.ezproxy_cookies = cookie_file
-    html = '<html><head><meta name="citation_pdf_url" content="https://www-sciencedirect-com.scpo.idm.oclc.org/science/article/pii/S1/pdfft"></head></html>'
+    html = '<html><head><meta name="citation_pdf_url" content="https://www-sciencedirect-com.lib.idm.oclc.org/science/article/pii/S1/pdfft"></head></html>'
 
     def handler(req):
         return httpx.Response(200, text=html, headers={"content-type": "text/html"})
@@ -169,9 +169,9 @@ def test_ezproxy_finds_pdf_via_proxy(ctx_factory, cfg, tmp_path):
 
 
 def test_ezproxy_session_ok_httpx(ctx_factory, cfg, tmp_path):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     cookie_file = tmp_path / "ezproxy-cookies.txt"
-    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
+    cookie_file.write_text(".lib.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
     cfg.ezproxy_cookies = cookie_file
 
     def handler(req):
@@ -180,7 +180,7 @@ def test_ezproxy_session_ok_httpx(ctx_factory, cfg, tmp_path):
             text="<html>publisher</html>",
             request=httpx.Request(
                 "GET",
-                "https://www-nature-com.scpo.idm.oclc.org/articles/nature",
+                "https://www-nature-com.lib.idm.oclc.org/articles/nature",
             ),
         )
 
@@ -194,16 +194,16 @@ def test_ezproxy_session_ok_httpx(ctx_factory, cfg, tmp_path):
 
 
 def test_ezproxy_session_ok_httpx_cas_bounce(ctx_factory, cfg, tmp_path):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     cookie_file = tmp_path / "ezproxy-cookies.txt"
-    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
+    cookie_file.write_text(".lib.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
     cfg.ezproxy_cookies = cookie_file
 
     def handler(req):
         return httpx.Response(
             200,
             text="<html>Central Authentication Service</html>",
-            request=httpx.Request("GET", "https://federation.sciences-po.fr/cas/login"),
+            request=httpx.Request("GET", "https://sso.example.edu/cas/login"),
         )
 
     client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
@@ -217,9 +217,9 @@ def test_ezproxy_session_ok_httpx_cas_bounce(ctx_factory, cfg, tmp_path):
 
 
 def test_ezproxy_session_ok_prefers_browser(ctx_factory, cfg, tmp_path):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     cookie_file = tmp_path / "ezproxy-cookies.txt"
-    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
+    cookie_file.write_text(".lib.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
     cfg.ezproxy_cookies = cookie_file
 
     class LoginBrowser:
@@ -229,7 +229,7 @@ def test_ezproxy_session_ok_prefers_browser(ctx_factory, cfg, tmp_path):
         def fetch_html(self, url, timeout_ms=45_000):
             return (
                 "<html>Central Authentication Service</html>",
-                "https://federation.sciences-po.fr/cas/login",
+                "https://sso.example.edu/cas/login",
             )
 
     ctx = ctx_factory(
@@ -237,7 +237,7 @@ def test_ezproxy_session_ok_prefers_browser(ctx_factory, cfg, tmp_path):
             200,
             text="<html>would look ok to httpx</html>",
             request=httpx.Request(
-                "GET", "https://www-nature-com.scpo.idm.oclc.org/articles/nature"
+                "GET", "https://www-nature-com.lib.idm.oclc.org/articles/nature"
             ),
         )
     )
@@ -248,10 +248,10 @@ def test_ezproxy_session_ok_prefers_browser(ctx_factory, cfg, tmp_path):
 
 
 def test_ezproxy_session_ok_browser_pass(ctx_factory, cfg, tmp_path):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     (tmp_path / "sessions").mkdir(parents=True, exist_ok=True)
     cookie_file = tmp_path / "ezproxy-cookies.txt"
-    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
+    cookie_file.write_text(".lib.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsession\tabc\n")
     cfg.ezproxy_cookies = cookie_file
 
     class OkBrowser:
@@ -261,7 +261,7 @@ def test_ezproxy_session_ok_browser_pass(ctx_factory, cfg, tmp_path):
         def fetch_html(self, url, timeout_ms=45_000):
             return (
                 "<html>article</html>",
-                "https://www-nature-com.scpo.idm.oclc.org/articles/nature",
+                "https://www-nature-com.lib.idm.oclc.org/articles/nature",
             )
 
     ctx = ctx_factory(lambda r: httpx.Response(500))
@@ -271,16 +271,16 @@ def test_ezproxy_session_ok_browser_pass(ctx_factory, cfg, tmp_path):
 
 
 def test_ezproxy_session_expired(ctx_factory, cfg, tmp_path):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     cookie_file = tmp_path / "c.txt"
-    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tFALSE\t0\tx\ty\n")
+    cookie_file.write_text(".lib.idm.oclc.org\tTRUE\t/\tFALSE\t0\tx\ty\n")
     cfg.ezproxy_cookies = cookie_file
 
     def handler(req):
         return httpx.Response(
             200,
             text="Entrez votre identifiant et votre mot de passe.",
-            request=httpx.Request("GET", "https://federation.sciences-po.fr/cas/login"),
+            request=httpx.Request("GET", "https://sso.example.edu/cas/login"),
         )
 
     ctx = ctx_factory(handler)
@@ -291,9 +291,9 @@ def test_ezproxy_session_expired(ctx_factory, cfg, tmp_path):
 
 
 def test_ezproxy_publisher_404_and_http_error(ctx_factory, cfg, tmp_path):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     cookie_file = tmp_path / "c.txt"
-    cookie_file.write_text(".scpo.idm.oclc.org\tTRUE\t/\tFALSE\t0\tx\ty\n")
+    cookie_file.write_text(".lib.idm.oclc.org\tTRUE\t/\tFALSE\t0\tx\ty\n")
     cfg.ezproxy_cookies = cookie_file
 
     def not_found(req):
@@ -319,7 +319,7 @@ def test_ezproxy_publisher_404_and_http_error(ctx_factory, cfg, tmp_path):
 
 def test_netscape_cookie_loader(tmp_path):
     p = tmp_path / "c.txt"
-    p.write_text("#HttpOnly_.scpo.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsid\tsecret\n")
+    p.write_text("#HttpOnly_.lib.idm.oclc.org\tTRUE\t/\tTRUE\t0\tsid\tsecret\n")
     cookies = load_netscape_cookies(p)
     assert any(c.name == "sid" and c.value == "secret" for c in cookies.jar)
 

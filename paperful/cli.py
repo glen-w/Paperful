@@ -390,6 +390,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "ocr-ignore",
         "summarize",
         "extract-sections",
+        "evidence",
         "synthesize",
         "rag",
         "ask",

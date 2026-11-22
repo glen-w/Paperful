@@ -10,7 +10,8 @@ Follow the same clicks on any collection chip.
 CLI recipes for the same verbs live in [Workflows](workflows.md)
 (`paperful all`, named run configs). How a fill searches:
 [How it works](how-it-works.md). Which pieces to turn on together:
-[Example setups](example-setups.md).
+[Example setups](example-setups.md). Every tool in one table:
+[What it does](what-it-does.md).
 
 ## Common workflows
 
@@ -35,6 +36,7 @@ Walkthroughs 1–3 do **not** need a local model. Ask and Briefs do
 | [Snowball](snowball.md) | Keyword / DOI / ORCID crawl (CLI depth) |
 | [Firefox add-on](firefox.md) | Optional. Save the open page, or selected tabs, into `out/`. The Zotero Connector stays for saving into Zotero |
 | [Ask your library](rag.md) | Cited answers from PDFs already on disk. CLI `ask --claim-check` labels each sentence against the index (no LLM) |
+| [Evidence table](evidence.md) | Sourced n / method / finding over held PDFs (CLI; quote or `check this`; no LLM) |
 | [Peer review a draft](peer-review.md) | Pre-submission pack: checkers always; optional `--lane claims` locators against held cited PDFs; optional `context` / `context-web`. Not a grade |
 
 ## Prerequisites

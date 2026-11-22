@@ -30,21 +30,38 @@ class _Backend:
         self.rows = {
             "A": _item("A", year=2024, has_pdf=True),
             "B": _item("B", year=2019, has_pdf=False, item_type="report"),
+            "C": _item("C", year=2023, has_pdf=True, collection_paths=["Other"]),
+        }
+        self.by_col = {
+            "C1": ["A", "B"],
+            "C2": ["C"],
         }
 
     def get_item(self, key):
         return self.rows.get(key)
 
     def resolve_collection(self, spec):
-        if spec != "BBNJ":
-            raise LookupError(f"No collection matching '{spec}'")
-        return Collection("C1", "BBNJ", None, "BBNJ")
+        if spec == "BBNJ":
+            return Collection("C1", "BBNJ", None, "BBNJ")
+        if spec == "Other":
+            return Collection("C2", "Other", None, "Other")
+        raise LookupError(f"No collection matching '{spec}'")
 
     def subtree_keys(self, root):
         return [root.key]
 
     def items_in_scope(self, keys):
-        return list(self.rows.values())
+        if keys is None:
+            return list(self.rows.values())
+        out: list[Item] = []
+        seen: set[str] = set()
+        for ck in keys:
+            for item_key in self.by_col.get(ck, ()):
+                if item_key in seen:
+                    continue
+                seen.add(item_key)
+                out.append(self.rows[item_key])
+        return out
 
 
 def test_load_scope_unions_item_and_collection_and_filters():
@@ -58,6 +75,12 @@ def test_load_scope_unions_item_and_collection_and_filters():
     )
     assert [it.key for it in loaded.items] == ["A"]
     assert loaded.label == "BBNJ, years ≥2020, types journalArticle"
+
+
+def test_load_scope_unions_two_collections():
+    loaded = load_scope(_Backend(), collections=["BBNJ", "Other"])
+    assert [it.key for it in loaded.items] == ["A", "B", "C"]
+    assert loaded.label == "BBNJ, Other"
 
 
 def test_unknown_item_and_inverted_years():

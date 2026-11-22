@@ -128,13 +128,20 @@ async def handle_peer_review_run(ui: UiContext, request: Request) -> RedirectRes
     if apply and staged is not None:
         apply = False
 
+    extras: list[str] = []
+    for raw in form.getlist("overlap_collection"):
+        extras.extend(str(raw).splitlines())
+    specs = jobs._collection_specs(
+        [prefs.collection, *extras] if prefs.collection else extras
+    )
+
     def work(cmd_id: str) -> None:
         jobs.peer_review(
             ui.cfg,
             cmd_id,
             item_key=item_key,
             staged_path=staged,
-            collection=prefs.collection,
+            collection=specs,
             apply=apply,
             llm=llm,
             ai_model=ai_model,
@@ -151,7 +158,12 @@ async def handle_peer_review_run(ui: UiContext, request: Request) -> RedirectRes
         ui.cfg,
         "peer-review",
         work,
-        args={"item_key": item_key, "upload": name, "apply": apply},
+        args={
+            "item_key": item_key,
+            "upload": name,
+            "apply": apply,
+            "collections": specs,
+        },
     )
     return ui.after_job("/peer-review", cmd_id)
 

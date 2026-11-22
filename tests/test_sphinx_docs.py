@@ -101,6 +101,8 @@ def test_gui_md_documents_discover_and_wanted_routes():
         "/index/ask",
         "Briefs",
         "Stays CLI",
+        "paperful evidence",
+        "summarize --receipts",
         "docker compose up",
         "browser_agent_miss",
         "After Grab",
@@ -114,12 +116,30 @@ def test_gui_md_documents_discover_and_wanted_routes():
 
 def test_walkthrough_pages_and_screenshots():
     """Keep GUI-first walkthroughs and captured workbench shots in tree."""
-    for stem in ("walkthroughs", "first-fill", "grow-library", "tidy-library"):
+    for stem in (
+        "walkthroughs",
+        "first-fill",
+        "grow-library",
+        "tidy-library",
+        "what-it-does",
+    ):
         path = DOCS / f"{stem}.md"
         assert path.is_file(), f"missing {path.name}"
     index = (DOCS / "walkthroughs.md").read_text(encoding="utf-8")
-    for needle in ("first-fill", "grow-library", "tidy-library", "Wanted"):
+    for needle in ("first-fill", "grow-library", "tidy-library", "Wanted", "what-it-does"):
         assert needle in index, f"docs/walkthroughs.md missing {needle}"
+    catalog = (DOCS / "what-it-does.md").read_text(encoding="utf-8")
+    for needle in ("Wanted", "Discover", "Repair", "Ask", "Peer review", "Evidence", "🤖"):
+        assert needle in catalog, f"docs/what-it-does.md missing {needle}"
+    landing = (ROOT / "website" / "index.html").read_text(encoding="utf-8")
+    for needle in (
+        'id="what"',
+        "What it does",
+        "tool-table",
+        "./guide/what-it-does.html",
+        "🤖",
+    ):
+        assert needle in landing, f"website/index.html missing {needle}"
     shots = DOCS / "_static" / "workflows"
     for name in (
         "wanted.png",
@@ -146,6 +166,8 @@ def test_walkthrough_pages_and_screenshots():
 def test_docs_sidebar_does_not_stack_wordmarks():
     """Site chrome already names Paperful; Furo must not print the lockup twice more."""
     conf = (DOCS / "conf.py").read_text(encoding="utf-8")
+    chrome = (DOCS / "_templates" / "page.html").read_text(encoding="utf-8")
+    assert "what-it-does" in chrome
     assert "sidebar_hide_name" in conf
     assert '"light_logo": "icon.png"' in conf
     assert '"dark_logo": "icon.png"' in conf

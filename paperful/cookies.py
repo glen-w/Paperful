@@ -247,7 +247,7 @@ def proxy_host_fragment(ezproxy_base: str) -> str:
         return ""
     if host.endswith(".idm.oclc.org") or host == "idm.oclc.org":
         return "idm.oclc.org"
-    # login?url= prefix hosts: scpo.idm.oclc.org → idm.oclc.org already handled;
+    # login?url= prefix hosts: prefix.idm.oclc.org → idm.oclc.org already handled;
     # other campuses keep the full host.
     return host
 

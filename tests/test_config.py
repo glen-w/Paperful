@@ -697,6 +697,16 @@ def test_extract_sections_table_is_parsed(tmp_path):
     assert cfg.extract_sections_fields == ("abstract", "methodology")
 
 
+def test_summarize_receipts_table_is_parsed(tmp_path):
+    from paperful.config import _from_dict
+
+    cfg = _from_dict(
+        {"summarize": {"receipts": True}},
+        tmp_path / "config.toml",
+    )
+    assert cfg.summarize_receipts is True
+
+
 @pytest.mark.parametrize(
     "table",
     [

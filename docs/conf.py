@@ -45,6 +45,7 @@ exclude_patterns = [
     # Maintainer planning notes / maturity surveys (not part of the published guide).
     "plans/**",
     "assessments/**",
+    "dogfood/**",
 ]
 
 source_suffix = {

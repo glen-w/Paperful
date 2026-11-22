@@ -19,6 +19,7 @@ Host CLI without Docker: `pipx install paperful` (or `uv tool install` /
 [legal and privacy](legal-privacy.md).
 Contributors: [`uv`](https://docs.astral.sh/uv/). Stability: [releases](releases.md).
 Why this shape: [Why Paperful](why.md).
+Tools in one place: [What it does](what-it-does.md).
 
 ```{toctree}
 :maxdepth: 2
@@ -26,6 +27,7 @@ Why this shape: [Why Paperful](why.md).
 
 how-it-works
 first-10-minutes
+what-it-does
 walkthroughs
 example-setups
 first-fill
@@ -61,6 +63,7 @@ sr-mode
 peer-review
 rewrite
 stuff
+evidence
 ezproxy
 research-ops
 sessions

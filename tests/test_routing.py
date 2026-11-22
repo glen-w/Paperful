@@ -218,7 +218,7 @@ def test_ezproxy_target_only_doi_or_publisher_host():
 
 
 def test_ezproxy_applicable_needs_cookies_and_publisher_target(cfg, tmp_path):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     cookies = tmp_path / "ezproxy-cookies.txt"
     cookies.write_text("# Netscape HTTP Cookie File\n")
     cfg.ezproxy_cookies = cookies
@@ -263,7 +263,7 @@ def test_publisher_host_groups_rewritten_ezproxy_hosts():
     )
     assert (
         publisher_host(
-            "https://www-sciencedirect-com.scpo.idm.oclc.org/science/article/pii/S1/pdfft"
+            "https://www-sciencedirect-com.lib.idm.oclc.org/science/article/pii/S1/pdfft"
         )
         == "sciencedirect.com"
     )

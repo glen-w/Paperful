@@ -3,7 +3,7 @@
 Vendor-by-vendor notes and longer capability tables. Most readers only need
 [How Paperful compares](comparison.md).
 
-**Last reviewed:** 2026-11-20. Feature lists for other products are based on public
+**Last reviewed:** 2026-11-22. Feature lists for other products are based on public
 docs and positioning — not paid pilots.
 
 ## Capability snapshot
@@ -29,7 +29,7 @@ Legend: **Yes** · **Partial** · **No**.
 | Per-item folder you can restore from | Yes | No | No | No | No | No | No |
 | Copy PDFs **already in** Zotero onto disk | Partial (`snapshot --pdfs all`) | Partial (File → Export PDFs) | No | No | No | No (`export` is bibliography; `get_item_pdf_path` is a path) | Partial (`get_pdf_path`) |
 | Grey-literature landing playbooks | Yes | No | No | No | No | No | No |
-| Grounded summary / collection review | Partial (opt-in `summarize` / `synthesize`; text layer) | No | No | No | No | Partial (README: summarize PDFs into notes) | Yes (chat reads PDF text; the model writes the summary) |
+| Grounded summary / collection review | Partial (opt-in `summarize` / `synthesize`; `--receipts` drops unquoted sentences; `evidence` is a quote-or-`check this` table, no LLM) | No | No | No | No | Partial (README: summarize PDFs into notes) | Yes (chat reads PDF text; the model writes the summary) |
 | OCR for scanned PDFs | Partial (`paperful ocr`, OCRmyPDF text layer on disk) | No | No | No | No | Partial (`pdf-prep`, OCRmyPDF) | Partial (some forks, e.g. Docling OCR pre-step) |
 
 ### Zotero version and attach (indicative)
@@ -112,7 +112,7 @@ found Elicit Pro Review-mode sensitivity ~40% vs traditional searches
 
 | Platform | Discover | Get PDF | Screen | Synthesize | Novelty | Write MS | Keep current | Local | Zotero |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Paperful 1.x** | Partial (`snowball` / `authorwatch`) | **Yes** (OA, CORE, EZProxy, grey; Sci-Hub opt-in) | Partial (`screen`; Discover Keep/Skip ≠ dual review) | Partial (`summarize` / `synthesize` / `ask` on held PDFs) | Partial (`refs gap`; never claims absence) | Partial (`stuff` CLI pack; no auto-insert) | Yes (you cron `keepup`) | **Yes** | **Yes** |
+| **Paperful 1.x** | Partial (`snowball` / `authorwatch`) | **Yes** (OA, CORE, EZProxy, grey; Sci-Hub opt-in) | Partial (`screen`; Discover Keep/Skip ≠ dual review) | Partial (`summarize` / `synthesize` / `ask` / `evidence` on held PDFs) | Partial (`refs gap`; never claims absence) | Partial (`stuff` CLI pack; no auto-insert) | Yes (you cron `keepup`) | **Yes** | **Yes** |
 | Edison Literature | Yes (hosted PaperQA3) | Partial (OA/licensed corpus; no campus fetch) | No | Yes | No (that is Precedent) | Partial (cited report) | Partial (hosted index) | No | No |
 | Edison Precedent | Yes | Partial | No | No | **Yes** (not a legal prior-art search) | No | Partial | No | No |
 | Edison Kosmos | Partial (inside the run) | No | No | Yes (reports; paper: interpretation weaker than quotes) | Partial | Partial (report, not a Zotero MS) | No | No | No |
@@ -131,6 +131,7 @@ found Elicit Pro Review-mode sensitivity ~40% vs traditional searches
 | PaperOrchestra | Yes (Google Search → Semantic Scholar; cites for the MS, not your library) | No (abstracts / metadata; no campus fetch) | No | Yes (Intro + Related Work from collected papers) | Partial (cutoff-date concurrent-work rule; not Precedent) | **Yes** (idea + experimental log → conference LaTeX + optional plots) | No | Partial (you run it; LLM + Semantic Scholar APIs) | No |
 | PaperQA2 (OSS) | No (you supply PDFs) | Partial | No | Yes (cited Q&A) | No | No | No | **Yes** | Partial (`paper-qa[zotero]`; last test is old) |
 | Gemini Notebook / Humata | No | No | No | Yes (on uploads) | No | Partial | No | No | No |
+| SummarizePaper | Partial (OA / preprint search + collections) | Partial (license-gated full text; no campus fetch) | No | Yes (hosted summaries, chat, collection tables) | Partial (scoop / missed / citation alerts) | Partial (press kit, journal club; not a Zotero MS) | Yes (email digest / saved searches) | No (hosted Django + OpenAI) | Partial (web API sync; not a restore ledger) |
 
 Sources and caveats: repo `reports/AI academic paper factories.md` (contributor research, Oct 2026).
 
@@ -266,6 +267,23 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 - **Fit:** Semantic search and cited tables/reviews over Semantic Scholar / OpenAlex / PubMed remixes. MCP is spreading. Consensus LibKey **link-resolves**; it does not ingest LibKey full text. Elicit’s SR UI is **not** PRISMA-grade recall in independent 2025 comparisons.
 - **With Paperful:** public-record question → their tool; then snowball / `ingest-dois` → `run` / Wanted for PDFs you intend to own. Overlaps Valency Bond on “ask the corpus”; Bond is MCP-first, these are researcher UIs.
 
+(summarizepaper)=
+### SummarizePaper (hosted OA companion)
+
+- **Sites:** [summarizepaper.com](https://www.summarizepaper.com) · [GitHub](https://github.com/summarizepaper/summarizepaper) (MIT Django)
+- **Fit:** Hosted summaries, chat, and collection comparison tables over arXiv / bioRxiv / medRxiv / journals. Full text when the license allows (CC BY family / CC0); abstract otherwise. Claims are checked against passages. Email digest, saved searches, rising topics. OpenAI on Heroku. Zotero web-API sync is an integration, not a disk restore ledger. Not campus EZProxy, not grey playbooks, not Sci-Hub.
+- **With Paperful:** SummarizePaper when the job is a hosted companion on OA/preprint text. Paperful when the job is fill, fix, and **held** PDFs: [`evidence`](evidence.md) (quote or `check this`, no LLM) and `summarize --receipts` (drop unquoted sentences). Do not clone the hosted digest/email surface.
+
+| Capability | Paperful | SummarizePaper |
+| --- | --- | --- |
+| Summaries / chat over **held** campus PDFs | Yes (`summarize` / `ask`; `--receipts` opt-in) | No (OA / preprint / uploaded; license-gated) |
+| Collection comparison table | Yes (`evidence`; quote or `check this`; no LLM) | Yes (Premium collection table; LLM) |
+| Bulk missing-PDF fetch / EZProxy / grey playbooks | Yes | No |
+| Disk mirror + restore ledger | Yes | No |
+| Email digest / field alerts | No (you cron `keepup`; no email) | Yes |
+| Zotero | Local API + restore | Web API sync (both ways; no `out/`) |
+| Runs on this machine | Yes | No (hosted; OpenAI) |
+
 ### Systematic-review screening
 
 - **Sites:** [Covidence](https://www.covidence.org/) · [Rayyan](https://www.rayyan.ai/) · DistillerSR · [ASReview](https://asreview.nl/) (local OSS)
@@ -351,7 +369,13 @@ Need LLM to fix one paper’s metadata while writing?
   → zotero-mcp
 
 Need a grounded summary of many text-layer PDFs, then one collection review?
-  → paperful summarize, then synthesize
+  → paperful summarize, then synthesize. Drop unquoted sentences: summarize --receipts
+
+Need a sourced n / method / finding table over PDFs you already hold (no LLM)?
+  → paperful evidence
+
+Need hosted OA/preprint summaries, collection tables, or email digests?
+  → SummarizePaper. Paperful still owns campus PDFs, the restore ledger, and tables over held files
 
 Need reproducible .bib for a paper submission?
   → bibcite fix / bibtex-tidy

@@ -127,7 +127,10 @@ def peer_review(
         readable=True,
     ),
     collection: list[str] = typer.Option(
-        [], "--collection", "-C", help="Collection path/name/key (repeatable)."
+        [],
+        "--collection",
+        "-C",
+        help="Overlap/context corpus (path/name/key). Repeatable; collections are unioned.",
     ),
     library: bool | None = LibraryOpt,
     dry_run: bool = typer.Option(

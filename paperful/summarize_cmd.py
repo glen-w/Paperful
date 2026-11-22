@@ -35,6 +35,7 @@ def run_summarize(
     max_new: int | None,
     max_minutes: float | None,
     collections_file: Path | None,
+    receipts: bool | None = None,
     profile: str | None,
     run_config: Path | None,
     config: Path | None,
@@ -81,6 +82,8 @@ def run_summarize(
         console.print("[red]Give --item KEY and/or --collection / --library.[/]")
         raise typer.Exit(1)
     dest = to_dest if to_dest is not None else cfg.summarize_dest
+    if receipts is not None:
+        cfg.summarize_receipts = bool(receipts)
     queue_order = order_value if order_value is not None else cfg.summarize_order
     if apply and dest == "disk":
         console.print(
@@ -151,6 +154,7 @@ def run_summarize(
                 "order": queue_order,
                 "max_new": max_new,
                 "max_minutes": max_minutes,
+                "receipts": cfg.summarize_receipts,
             },
             started=started,
         )
@@ -167,7 +171,7 @@ def run_summarize(
                 "not_reached": not_reached,
             },
             items=outcomes,
-            flags={"to": dest, "order": queue_order},
+            flags={"to": dest, "order": queue_order, "receipts": cfg.summarize_receipts},
             exit_code=code,
         )
         agent_box.append(payload)

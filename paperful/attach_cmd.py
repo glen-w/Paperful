@@ -44,7 +44,15 @@ def run_attach(
                 "[red]Manual ingest needs exactly one --item KEY and --file PATH.[/]"
             )
             raise typer.Exit(1)
-        loaded = cli_mod._loaded_scope(backend, item_keys=item)
+        loaded = cli_mod._loaded_scope(
+            backend,
+            collection=[],
+            library=False,
+            year_from=None,
+            year_to=None,
+            item_type=[],
+            item_keys=item,
+        )
         if not loaded.items:
             console.print(f"[red]Unknown item {item[0]}.[/]")
             raise typer.Exit(1)

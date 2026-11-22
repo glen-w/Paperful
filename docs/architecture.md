@@ -155,6 +155,7 @@ never leave a half-written `record.json` or run report.
 | `state/summaries/<key>.html` | `summarize` output when dest includes disk; the Zotero child note is the other copy |
 | `state/ask-batch/<stamp>/` | `ask --from-file` / Index batch Ask pack (`paperful.ask_batch.v1`, `answers.md`); resume cache under `by-hash/` |
 | `state/ask-claims/<stamp>/` | `ask --claim-check` pack (`paperful.claim_check.v1`, `pack.md`). No LLM; `--apply` not in this stage |
+| `state/evidence/<stamp>/` | `evidence` pack (`paperful.evidence.v1`, `pack.md`, `table.csv`). Quote or `check this`; no LLM; `--apply` not in this stage |
 | `state/rag/evidence/` | Advanced Ask passage summaries (chunk + question + model cache). Rebuildable |
 | `state/rag/questions/<key>.json` | `rag questions` / Index extract RQs (`paperful.rag.questions.v1`, provenance `rule`\|`llm`) |
 | `state/sections/<key>.json` | `extract-sections` IMRaD fields (`paperful.sections.v1`, provenance `rule`\|`grobid`\|`llm`; optional `engine`; optional `state/section-headings.toml` synonyms) |
@@ -205,6 +206,7 @@ below.
 | `summarize` | `llm.enabled` | `state/summaries/<key>.html` when dest includes disk | child note unless `--to disk` |
 | `synthesize` | `llm.enabled` | `state/reports/<slug>.html` when dest includes disk | standalone note in the scoped collection unless `--to disk` |
 | `extract-sections` | rules always; optional GROBID sidecar; optional `[extract_sections].llm` + `llm.enabled` | `state/sections/<key>.json` | none (disk only) |
+| `evidence` | none (no LLM) | `state/evidence/<stamp>/` | none (`--apply` refused) |
 | `ask` | `llm.enabled` + `rag.enabled` | `state/runs/<stamp>-ask.json`; advanced summaries under `state/rag/evidence/` | none unless batch `--apply` |
 | `rag questions` | rules always; optional `[rag].extract_questions_llm` + `llm.enabled` | `state/rag/questions/<key>.json` | none |
 | `peer-review` | checkers, metrics, heuristic AI-tells always (house glossary expansions when `state/glossary/` has entries); optional `--lane` / `[peer_review].lanes` suggested review lanes (`reviewers`, `marg`, `adversary`, `outline`, `claims`, `verify`, `context`, `context-web`; `--llm` / `--advanced` aliases; optional GROBID TEI chunks for `marg` / `claims` / `verify`); `context` / `context-web` use three-round retrieve and may write `context.json`; optional `--ai-model` Binoculars extra; optional `--vale` / `[peer_review].vale` house-style pass | `state/peer-reviews/<id>/<stamp>/` | child note with `--apply` on `--item` only |
@@ -340,7 +342,7 @@ may still be added.
 | Field | Meaning |
 | --- | --- |
 | `schema` | Always `paperful.run_report.v1` on run reports |
-| `command` | `run`, `recover`, `gaps`, `lint`, `fix-metadata`, `summarize`, or `synthesize` |
+| `command` | `run`, `recover`, `gaps`, `lint`, `fix-metadata`, `summarize`, `synthesize`, `evidence`, … |
 | `started_at` / `finished_at` | ISO-8601 UTC |
 | `duration_s` | Wall time, or `null` if start unknown |
 | `scope` | Collection path(s) or library |
@@ -366,7 +368,7 @@ may still be added.
 
 `--format json` on `run`, `refs gap`, `coverage`, `ingest-dois`, `collections add`, `inbox drain`, `gaps`, `lint`,
 `fix-metadata`, `dedupe`, snowball crawl (`search` / `hybrid` / `doi` / `orcid` /
-`collection`) plus `run` / `resume` / `apply`, `summarize`, `synthesize`, `restore`,
+`collection`) plus `run` / `resume` / `apply`, `summarize`, `synthesize`, `evidence`, `restore`,
 `import`, `recover`, `ocr`, `all`, `ask`, `inbox proposals list|apply|reject`, and `notes delete`
 prints **one** `paperful.agent.json.v1` object on stdout (`schema`, `command`, `exit`, `ok`, `partial`,
 `summary`, `items`, `paths`, `flags`, optional nested `report`). Progress and logs go to **stderr**.

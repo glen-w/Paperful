@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
 import time
 import zipfile
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -28,6 +30,9 @@ from paperful.peer_review import (
 )
 from paperful.peer_review_extract import extract_path, stage_file
 from paperful.peer_review_overlap import (
+    _drop_biblio,
+    _ngrams,
+    _tokens,
     collapse_nested_hits,
     match_phrases,
     rank_phrases,
@@ -394,6 +399,94 @@ def test_ngram_overlap_true_and_false_positive(cfg):
     assert "tungsten carbide coating" in other_hits[0].ngram
 
 
+def _rank_phrases_nested(
+    target: str,
+    corpus: dict[str, str],
+    *,
+    n_min: int = 6,
+    n_max: int = 12,
+    top_k: int = 40,
+    df_max: int | None = None,
+) -> list[tuple[str, float, int]]:
+    """Nested-loop DF (pre-posting-list) for oracle agreement on short corpora."""
+    grams = _ngrams(_tokens(_drop_biblio(target)), n_min, n_max)
+    if not grams:
+        return []
+    tf = Counter(grams)
+    n_docs = max(1, len(corpus))
+    folded = {k: " ".join(_tokens(v)) for k, v in corpus.items()}
+    scored: list[tuple[str, float, int]] = []
+    seen: set[str] = set()
+    df_cap = df_max if df_max is not None else max(2, n_docs // 4 or 1)
+    for gram, count in tf.items():
+        phrase = " ".join(gram)
+        if phrase in seen:
+            continue
+        seen.add(phrase)
+        df = sum(1 for body in folded.values() if phrase in body)
+        if df < 1 or df >= df_cap:
+            continue
+        idf = math.log((n_docs + 1) / (df + 1))
+        scored.append((phrase, count * idf, df))
+    scored.sort(key=lambda row: (-row[1], -len(row[0].split()), row[0]))
+    return scored[: max(1, top_k)]
+
+
+def _match_phrases_nested(
+    phrases: list[tuple[str, float, int]],
+    corpus: dict[str, str],
+    *,
+    n_min: int = 6,
+) -> set[tuple[str, str]]:
+    hits: set[tuple[str, str]] = set()
+    folded = {k: " ".join(_tokens(v)) for k, v in corpus.items()}
+    for phrase, _score, _df in phrases:
+        words = phrase.split()
+        if len(words) < n_min:
+            continue
+        for key, hay in folded.items():
+            if phrase in hay:
+                hits.add((key, phrase))
+    return hits
+
+
+def test_overlap_postings_agree_with_nested_oracle():
+    vocab = [f"tok{i:03d}" for i in range(40)]
+    target = " ".join(vocab[:24])
+    corpus = {}
+    for i in range(12):
+        body = list(vocab)
+        body[i] = f"alt{i:03d}"
+        corpus[f"D{i:02d}"] = "filler " + " ".join(body) + " extra words here"
+    corpus["NEEDLE"] = "lead in " + " ".join(vocab[4:16]) + " tail padding words"
+    ranked = rank_phrases(target, corpus, n_min=6, n_max=8, top_k=20, df_max=4)
+    oracle = _rank_phrases_nested(target, corpus, n_min=6, n_max=8, top_k=20, df_max=4)
+    assert ranked == oracle
+    assert _match_phrases_nested(ranked, corpus, n_min=6) == {
+        (h.other_key, h.ngram) for h in match_phrases(ranked, corpus, n_min=6)
+    }
+
+
+def test_overlap_needle_among_many_docs():
+    boilerplate = "shared methods paragraph used across dummy library items"
+    needle = "unique zirconia sol gel layer resisted cyclic salt fog"
+    corpus: dict[str, str] = {}
+    for i in range(80):
+        extra = " ".join(f"pad{i:02d}w{j}" for j in range(8))
+        corpus[f"B{i:02d}"] = f"{boilerplate}. {extra}."
+    corpus["HIT"] = f"Results. {needle}. " + " ".join(f"uniq{j}" for j in range(8))
+    target = (
+        f"Methods. {needle}. Also {boilerplate}. "
+        "Enough extra words here so the extract is not empty."
+    )
+    ranked = rank_phrases(target, corpus, n_min=6, n_max=12, top_k=40)
+    phrases = [p for p, _s, _d in ranked]
+    assert any("zirconia sol gel" in p for p in phrases)
+    assert not any(boilerplate in p for p in phrases)
+    hits = match_phrases(ranked, corpus, n_min=6)
+    assert {h.other_key for h in hits} == {"HIT"}
+
+
 def test_overlap_checker_against_rag_text_cache(cfg, tmp_path: Path):
     from paperful.store import write_json
 
@@ -725,6 +818,40 @@ def test_cli_unsupported_binary(tmp_path, monkeypatch):
     assert res.exit_code == 1
 
 
+def test_cli_peer_review_repeatable_collections(tmp_path, monkeypatch):
+    from paperful.cli import app
+
+    src = tmp_path / "draft.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\nout_dir = "{tmp_path / "out"}"\n'
+        f'state_dir = "{tmp_path / "state"}"\n'
+    )
+    seen: dict[str, object] = {}
+
+    def fake_run(_console, **kwargs):
+        seen["collection"] = kwargs.get("collection")
+
+    monkeypatch.setattr("paperful.peer_review_cmd.run_peer_review", fake_run)
+    res = runner.invoke(
+        app,
+        [
+            "peer-review",
+            "--file",
+            str(src),
+            "-C",
+            "Lab papers",
+            "-C",
+            "Prior art",
+            "--config",
+            str(cfg_path),
+        ],
+    )
+    assert res.exit_code == 0, res.output
+    assert seen["collection"] == ["Lab papers", "Prior art"]
+
+
 def test_run_peer_review_prints_phase_lines(cfg, tmp_path, monkeypatch):
     from contextlib import contextmanager
 
@@ -761,6 +888,70 @@ def test_run_peer_review_prints_phase_lines(cfg, tmp_path, monkeypatch):
     assert "Extracting" in text
     assert "Checkers: bibliography" in text
     assert "Library overlap" in text
+
+
+def test_run_peer_review_unions_two_collections(cfg, tmp_path, monkeypatch):
+    from contextlib import contextmanager
+
+    from paperful.peer_review_cmd import run_peer_review
+    from paperful.scope import ItemScope
+
+    src = tmp_path / "draft.md"
+    src.write_text(MANUSCRIPT, encoding="utf-8")
+    a = make_item(key="AAA0001", title="Alpha")
+    b = make_item(key="BBB0001", title="Beta")
+    loaded_specs: list[list[str]] = []
+    captured: dict[str, object] = {}
+
+    def load(_backend, **kwargs):
+        specs = list(kwargs.get("collection") or [])
+        loaded_specs.append(specs)
+        return ItemScope(items=[a, b], label=", ".join(specs), keys=None)
+
+    def fake_build(_cfg, **kwargs):
+        captured["collections"] = kwargs.get("collections")
+        captured["scope_keys"] = [it.key for it in (kwargs.get("scope_items") or [])]
+        return {
+            "schema": "paperful.peer_review.pack.v1",
+            "findings": [],
+            "counts": {"findings": 0, "by_code": {}, "by_lane": {}},
+            "pack_dir": str(tmp_path / "pack"),
+            "peer_review_id": "file-draft",
+            "input": {"title": "draft.md"},
+            "scope": "Lab, Prior",
+        }
+
+    monkeypatch.setenv("PAPERFUL_OFFLINE", "1")
+    monkeypatch.setattr("paperful.cli_runtime._cfg", lambda _p: cfg)
+    monkeypatch.setattr("paperful.cli_runtime._agent_json", lambda fmt: False)
+    monkeypatch.setattr("paperful.cli_runtime._offline", lambda: True)
+    monkeypatch.setattr("paperful.cli_runtime._require_manager", lambda _cfg: None)
+    monkeypatch.setattr("paperful.cli_runtime._connect", lambda *_a, **_k: object())
+    monkeypatch.setattr("paperful.cli_runtime._load_scope", load)
+    monkeypatch.setattr("paperful.peer_review.build_peer_review", fake_build)
+
+    @contextmanager
+    def fake_spinner(_text, *, json_out=False):
+        yield lambda _msg: None
+
+    monkeypatch.setattr("paperful.cli_runtime._spinner", fake_spinner)
+    run_peer_review(
+        _console(),
+        item=[],
+        file_path=src,
+        collection=["Lab", "Prior"],
+        library=False,
+        dry_run=True,
+        apply=False,
+        llm=False,
+        force=False,
+        show_dismissed=False,
+        config=None,
+        fmt="text",
+    )
+    assert loaded_specs == [["Lab", "Prior"]]
+    assert captured["collections"] == ["Lab", "Prior"]
+    assert captured["scope_keys"] == ["AAA0001", "BBB0001"]
 
 
 def test_run_peer_review_unknown_collection_exits(cfg, tmp_path, monkeypatch):

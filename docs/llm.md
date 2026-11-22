@@ -326,6 +326,7 @@ uv run paperful summarize -C BBNJ --to disk               # HTML only; Zotero tr
 uv run paperful summarize -C BBNJ --year-from 2023 -T journalArticle --limit 5
 uv run paperful summarize -C BBNJ --order newest          # recent publications first
 uv run paperful summarize --item ABCD1234 --prompt prompts/one-liner.md
+uv run paperful summarize --item ABCD1234 --receipts  # quote or drop; Receipts list
 ```
 
 - Full PDF text is extracted (`pdftotext`, then `pypdf`) and reduced to
@@ -357,6 +358,11 @@ uv run paperful summarize --item ABCD1234 --prompt prompts/one-liner.md
   truncation warning, lower `max_context_chars` or raise `max_num_ctx`.
 - If `[lint].llm_pdf_match` is on and the item is flagged, `summarize` refuses
   it; pass `--force` to override.
+- `--receipts` (or `[summarize].receipts = true`) binds each sentence to a
+  held PDF page after the model replies. Unsupported sentences are **dropped**.
+  A Receipts list (`p. N: “quote”`) is appended. The prompt sha includes
+  `receipts:1`, so existing notes are regenerated. If nothing quotes, the item
+  is skipped (`no quoted span`) and no empty file is written. Off by default.
 - `[summarize].style = ste` appends ASD-STE100 Simplified Technical English
   constraints to the prompt (≤25 words/sentence, ≤6 sentences/paragraph,
   prefer active voice, approved vocabulary with domain terms allowed). The
@@ -519,6 +525,7 @@ allow_remote = true
   `simple` (default) and `advanced` (`--ask-mode` / `[rag].ask_mode`).
 - [config.md](config.md#llm-optional-local-first) — key reference
 - [commands.md](commands.md) — `recover` / `summarize` / `synthesize` / `extract-sections` / `rewrite` flags and exit codes
+- [evidence.md](evidence.md) — sourced comparison table over held PDFs (no LLM)
 - [rewrite.md](rewrite.md) — apply a peer-review pack (style-only without a model)
 - [architecture.md](architecture.md#llm-layer-optional-local-first) — layer, gates, note write path
 - [camofox.md](camofox.md) — opt-in scripted Camoufox lane before `browser_agent`

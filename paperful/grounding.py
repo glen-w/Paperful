@@ -28,6 +28,25 @@ def pdf_text_for(
     return text_from_pdf(path, max_pages=max_pages)
 
 
+def pdf_pages_for(
+    cfg: Config,
+    item: Item,
+    manifest: Manifest | None,
+    backend: LibraryBackend | None,
+) -> list[str]:
+    """Per-page text for locators. Empty list when the PDF cannot be read."""
+    path = ensure_pdf(cfg, item, manifest, backend)
+    if not path or not path.is_file():
+        return []
+    try:
+        from .rag.extract import LightParser
+
+        return LightParser().pages(path)
+    except Exception:
+        raw = text_from_pdf(path, max_pages=None)
+        return [raw] if raw.strip() else []
+
+
 def budget_slice(text: str, max_chars: int) -> str:
     """Head + detected headings + tail within a character budget."""
     text = text.strip()

@@ -311,6 +311,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[summarize].dest` | `both` | `disk` (`state/summaries/`), `zotero` (child note), or `both`. `--to` overrides |
 | `[summarize].order` | `library` | Summarize queue order before `--limit`: `library` (manager order), `newest`, or `oldest`. `--order` overrides. Undated items stay last under `newest` / `oldest`. Type stays a filter (`-T`) |
 | `[summarize].style` | `plain` | Summary writing style: `plain` (default) or `ste` (ASD-STE100 Simplified Technical English constraints in the prompt + post-check) |
+| `[summarize].receipts` | `false` | Drop sentences that cannot quote the held PDF and append a Receipts list. `--receipts` / `--no-receipts` override. Changes the prompt sha |
 | `[summarize].ste_violation_policy` | `warn` | When `style = ste`: `warn` (keep the summary, emit a warning) or `fail` (mark the item failed) |
 | `[summarize].ste_word_list_path` | unset | Optional path to an approved-word list (one word per line). Relative paths resolve from the config file. Domain words from the PDF/metadata stay allowed |
 | `[synthesize].dest` | `both` | `disk` (`state/reports/`), `zotero` (standalone note in the collection), or `both` |

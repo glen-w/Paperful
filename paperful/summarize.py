@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import html as html_lib
 import re
 import time
 import warnings
@@ -13,7 +14,7 @@ from pathlib import Path
 
 from .progress import Track
 from .config import Config, parse_summarize_order, wants_disk, wants_zotero
-from .grounding import budget_slice, metadata_block, pdf_text_for
+from .grounding import budget_slice, metadata_block, pdf_pages_for, pdf_text_for
 from .library import LibraryBackend, LibraryError
 from .llm import (
     CompletionRequest,
@@ -29,6 +30,14 @@ from .zot import Item
 
 # Persist + skip so overnight runs do not re-fail the same empty PDFs every night.
 NO_TEXT_SKIP_REASON = "no PDF text (needs ocr)"
+NO_QUOTE_SKIP_REASON = "no quoted span"
+
+
+class ReceiptsEmpty(ValueError):
+    """Every summary sentence failed to quote the held PDF."""
+
+    def __init__(self, message: str = NO_QUOTE_SKIP_REASON) -> None:
+        super().__init__(message)
 
 
 def order_items(items: list[Item], order: str) -> list[Item]:
@@ -172,6 +181,79 @@ class IdentityMismatch(ValueError):
     """The gated identity check flagged this PDF; pass --force to summarize anyway."""
 
 
+_RECEIPT_BLOCK = re.compile(r"(?is)(<(h[1-6]|p|li)\b[^>]*>)(.*?)(</\2>)")
+
+
+def _page_pairs(
+    cfg: Config,
+    item: Item,
+    manifest: Manifest | None,
+    backend: LibraryBackend | None,
+    *,
+    fallback: str,
+) -> list[tuple[int, str]]:
+    pages = [p for p in pdf_pages_for(cfg, item, manifest, backend) if str(p).strip()]
+    if not pages and (fallback or "").strip():
+        pages = [fallback]
+    return [(i, text) for i, text in enumerate(pages, start=1)]
+
+
+def apply_receipts_html(
+    html_body: str,
+    pages: list[tuple[int, str]],
+    *,
+    cfg: Config,
+) -> str:
+    """Drop summary sentences that cannot quote a held page. Append Receipts."""
+    from .peer_review_claims import bind_claim_to_pages, quote_in_text
+    from .peer_review_metrics import split_sentences
+
+    min_words = max(1, int(getattr(cfg, "stuff_min_sentence_words", 8) or 8))
+    receipts: list[tuple[str, str]] = []
+
+    def _rewrite(match: re.Match[str]) -> str:
+        tag = match.group(2)
+        inner = match.group(3)
+        if tag.lower().startswith("h"):
+            return match.group(0)
+        plain = html_lib.unescape(re.sub(r"<[^>]+>", " ", inner or ""))
+        kept: list[str] = []
+        for sent in split_sentences(plain):
+            words = [w for w in sent.split() if w]
+            if len(words) < min_words:
+                continue
+            bound = bind_claim_to_pages(sent, pages)
+            quote = str(bound.get("quote") or "")
+            loc = str(bound.get("loc") or "")
+            page_text = ""
+            for n, text in pages:
+                if loc == f"p. {n}":
+                    page_text = text
+                    break
+            if (
+                str(bound.get("status") or "") == "supported"
+                and quote
+                and quote_in_text(quote, page_text or " ".join(t for _, t in pages))
+            ):
+                kept.append(sent.strip())
+                receipts.append((loc, quote))
+        if not kept:
+            return ""
+        return f"{match.group(1)}{html_lib.escape(' '.join(kept))}{match.group(4)}"
+
+    body = html_body or ""
+    if not _RECEIPT_BLOCK.search(body):
+        body = f"<p>{html_lib.escape(html_lib.unescape(re.sub(r'<[^>]+>', ' ', body)))}</p>"
+    new_body = _RECEIPT_BLOCK.sub(_rewrite, body)
+    if not receipts:
+        raise ReceiptsEmpty()
+    items = "\n".join(
+        f"<li>{html_lib.escape(loc)}: “{html_lib.escape(quote)}”</li>"
+        for loc, quote in receipts
+    )
+    return f"{new_body.strip()}\n<h2>Receipts</h2>\n<ul>\n{items}\n</ul>"
+
+
 def render_summary(
     cfg: Config,
     item: Item,
@@ -210,7 +292,10 @@ def render_summary(
         )
     )
     _enforce_ste(cfg, html_body, item_key=item.key, metadata=meta, text=text)
-    sha = hashlib.sha256(template.encode()).hexdigest()[:8]
+    if cfg.summarize_receipts:
+        pages = _page_pairs(cfg, item, manifest, backend, fallback=raw)
+        html_body = apply_receipts_html(html_body, pages, cfg=cfg)
+    sha = current_prompt_sha(cfg)
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     footer = f"<p><em>paperful · {cfg.llm_model} · {stamp} · prompt {sha}</em></p>"
     if llm_egress_is_remote(cfg):
@@ -393,7 +478,8 @@ def parse_summary_provenance(html: str) -> dict[str, str] | None:
 
 def current_prompt_sha(cfg: Config) -> str:
     template, _ = load_prompt_template(cfg)
-    return hashlib.sha256(template.encode()).hexdigest()[:8]
+    blob = template + ("\nreceipts:1" if cfg.summarize_receipts else "")
+    return hashlib.sha256(blob.encode()).hexdigest()[:8]
 
 
 def summary_matches_config(cfg: Config, html: str) -> bool:
@@ -608,7 +694,21 @@ def summarize_items(
                     if on_row is not None:
                         on_row(row)
                     continue
-            html = render_summary(cfg, it, manifest, backend, force=force)
+            try:
+                html = render_summary(cfg, it, manifest, backend, force=force)
+            except ReceiptsEmpty as exc:
+                skipped += 1
+                row = SummaryRow(
+                    key=it.key,
+                    title=it.title,
+                    label=it.label,
+                    status="skipped",
+                    reason=str(exc) or NO_QUOTE_SKIP_REASON,
+                )
+                rows.append(row)
+                if on_row is not None:
+                    on_row(row)
+                continue
             fresh += 1
             disk_path = ""
             note_key = ""

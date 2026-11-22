@@ -14,7 +14,7 @@ later — see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10
 
 Jobs, with screenshots: [Walkthroughs](walkthroughs.md)
 ([first fill](first-fill.md), [grow](grow-library.md),
-[tidy](tidy-library.md)).
+[tidy](tidy-library.md)). Tool catalog: [What it does](what-it-does.md).
 
 ![Wanted is the home page: missing PDFs selected for Preview, Grab, Attach](_static/workflows/wanted.png)
 
@@ -294,8 +294,9 @@ outline section. Writes `state/stuff/` (`pack.md` / `pack.json`). Needs
 
 **Stays CLI** (no GUI control): `session login`, `doctor --guide`, mid-run
 EZProxy re-login, snowball `approve-each`, `collections add`, Sci-Hub source
-toggles; Ask TTY multi-turn, `--show-context`, named run profiles, and
-`ask --claim-check`.
+toggles; Ask TTY multi-turn, `--show-context`, named run profiles,
+`ask --claim-check`, `paperful evidence`, and `summarize --receipts`
+(Briefs summarize does not turn receipts on).
 `paperful all` / named run configs stay [workflows](workflows.md).
 
 ---

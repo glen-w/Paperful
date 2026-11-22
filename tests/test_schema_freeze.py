@@ -23,6 +23,14 @@ from paperful.precedent import (
     PrecedentRow,
     write_pack as write_precedent_pack,
 )
+from paperful.evidence import (
+    EVIDENCE_PACK_KEYS,
+    SCHEMA as EVIDENCE_SCHEMA,
+    EvidenceBatch,
+    EvidenceRow,
+    pack_payload as evidence_pack_payload,
+    write_pack as write_evidence_pack,
+)
 from paperful.stuff import (
     STUFF_PACK_KEYS,
     SCHEMA as STUFF_SCHEMA,
@@ -198,6 +206,40 @@ def test_stuff_pack_keys_match_golden(cfg):
     folder = write_stuff_pack(cfg, payload, stamp="20260101T000000Z")
     pack = json.loads((folder / "pack.json").read_text(encoding="utf-8"))
     assert STUFF_PACK_KEYS <= pack.keys()
+
+
+def test_evidence_pack_keys_match_golden(cfg):
+    keys = json.loads(
+        (FIX / "evidence_pack_v1" / "keys.json").read_text(encoding="utf-8")
+    )
+    assert keys == sorted(EVIDENCE_PACK_KEYS)
+    payload = evidence_pack_payload(
+        evidence_id="bbnj",
+        scope="BBNJ",
+        batch=EvidenceBatch(
+            rows=[
+                EvidenceRow(
+                    key="ABCD1234",
+                    title="Marine governance",
+                    year=2019,
+                    stem="marine -- ABCD1234",
+                    design="journalArticle",
+                    n="n = 42",
+                    method="We surveyed twelve sites.",
+                    finding="Most sites showed improvement.",
+                    loc="p. 1",
+                )
+            ]
+        ),
+        created_at="2026-01-01T00:00:00+00:00",
+    )
+    assert payload["schema"] == EVIDENCE_SCHEMA
+    assert EVIDENCE_PACK_KEYS <= payload.keys()
+    folder = write_evidence_pack(cfg, payload, stamp="20260101T000000Z")
+    pack = json.loads((folder / "pack.json").read_text(encoding="utf-8"))
+    assert EVIDENCE_PACK_KEYS <= pack.keys()
+    assert (folder / "table.csv").is_file()
+    assert (folder / "pack.md").is_file()
 
 
 def test_coverage_pack_keys_match_golden(tmp_path: Path):

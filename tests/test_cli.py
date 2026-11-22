@@ -414,6 +414,7 @@ def test_jobs_matches_registered_commands():
         "auto-parks orphans under utility)."
     )
     assert "run-report-counts" in JOBS["utility"]
+    assert "evidence" in JOBS["completeness"]
     assert "run-report-new-count" in JOBS["utility"]
 
 
@@ -760,7 +761,7 @@ def test_run_ezproxy_preflight_marks_down_when_probe_fails(
 ):
     _stub_one_item(stub_zotero)
     cfg_file.write_text(
-        cfg_file.read_text() + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+        cfg_file.read_text() + 'ezproxy_base = "https://lib.idm.oclc.org/login?url="\n'
     )
     seen: list[bool] = []
 
@@ -791,7 +792,7 @@ def test_run_ezproxy_preflight_marks_down_when_probe_fails(
 def test_run_ezproxy_preflight_login_on_tty(cfg_file, stub_zotero, monkeypatch):
     _stub_one_item(stub_zotero)
     cfg_file.write_text(
-        cfg_file.read_text() + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+        cfg_file.read_text() + 'ezproxy_base = "https://lib.idm.oclc.org/login?url="\n'
     )
     logins: list[str] = []
     releases: list[bool] = []
@@ -1006,7 +1007,7 @@ def test_doctor_probe_ambers_expired_ezproxy(
     cfg_file, tmp_path, stub_zotero, monkeypatch
 ):
     cfg_file.write_text(
-        cfg_file.read_text() + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+        cfg_file.read_text() + 'ezproxy_base = "https://lib.idm.oclc.org/login?url="\n'
     )
     meta = tmp_path / "state" / "sessions" / "meta.json"
     meta.parent.mkdir(parents=True)
@@ -1019,7 +1020,7 @@ def test_doctor_probe_ambers_expired_ezproxy(
             {
                 "name": "ezproxy",
                 "value": "tok",
-                "domain": ".scpo.idm.oclc.org",
+                "domain": ".lib.idm.oclc.org",
                 "path": "/",
                 "secure": True,
                 "sameSite": "None",
@@ -1043,7 +1044,7 @@ def test_doctor_probe_ambers_cas_only_without_live_call(
     cfg_file, tmp_path, stub_zotero, monkeypatch
 ):
     cfg_file.write_text(
-        cfg_file.read_text() + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+        cfg_file.read_text() + 'ezproxy_base = "https://lib.idm.oclc.org/login?url="\n'
     )
     sessions = tmp_path / "state" / "sessions"
     sessions.mkdir(parents=True)
@@ -1056,7 +1057,7 @@ def test_doctor_probe_ambers_cas_only_without_live_call(
             {
                 "name": "JSESSIONID",
                 "value": "cas",
-                "domain": "federation.sciences-po.fr",
+                "domain": "sso.example.edu",
                 "path": "/cas/",
             }
         ],
@@ -1081,7 +1082,7 @@ def test_doctor_offline_green_with_proxy_ticket(
     cfg_file, tmp_path, stub_zotero, monkeypatch
 ):
     cfg_file.write_text(
-        cfg_file.read_text() + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+        cfg_file.read_text() + 'ezproxy_base = "https://lib.idm.oclc.org/login?url="\n'
     )
     sessions = tmp_path / "state" / "sessions"
     sessions.mkdir(parents=True)
@@ -1094,7 +1095,7 @@ def test_doctor_offline_green_with_proxy_ticket(
             {
                 "name": "ezproxy",
                 "value": "tok",
-                "domain": ".scpo.idm.oclc.org",
+                "domain": ".lib.idm.oclc.org",
                 "path": "/",
                 "secure": True,
                 "sameSite": "None",
@@ -1120,7 +1121,7 @@ def test_doctor_offline_ambers_meta_only_without_proxy_ticket(
     cfg_file, tmp_path, stub_zotero, monkeypatch
 ):
     cfg_file.write_text(
-        cfg_file.read_text() + 'ezproxy_base = "https://scpo.idm.oclc.org/login?url="\n'
+        cfg_file.read_text() + 'ezproxy_base = "https://lib.idm.oclc.org/login?url="\n'
     )
     meta = tmp_path / "state" / "sessions" / "meta.json"
     meta.parent.mkdir(parents=True)

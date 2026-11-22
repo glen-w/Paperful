@@ -385,6 +385,7 @@ def apply_summarize(raw: dict[str, Any], cfg: "Config") -> None:
                 "ste_word_list_path",
                 lambda v: Path(v).expanduser() if v else None,
             ),
+            ("receipts", "summarize_receipts", bool),
         ],
     )
     if "dest" in summ:

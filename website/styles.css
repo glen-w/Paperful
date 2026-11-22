@@ -266,6 +266,43 @@ a {
   font-size: 0.9em;
 }
 
+.section h3 {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 1.75rem 0 0.6rem;
+  letter-spacing: -0.02em;
+}
+
+.tool-table-wrap {
+  overflow-x: auto;
+  margin: 0 0 0.35rem;
+}
+
+.tool-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.tool-table th,
+.tool-table td {
+  border: 1px solid var(--line);
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.tool-table th {
+  background: rgba(16, 24, 32, 0.04);
+  font-weight: 600;
+}
+
+.tool-table td:first-child,
+.tool-table td:last-child {
+  white-space: nowrap;
+}
+
 .outcomes,
 .steps {
   margin: 0 0 1.25rem;

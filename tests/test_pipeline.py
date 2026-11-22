@@ -955,7 +955,7 @@ def test_soft_block_without_browser_is_retryable(pipe_factory):
 
 
 def test_publisher_403_retries_via_browser_and_proxifies(pipe_factory, cfg):
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     browser = _StubBrowser()
     src = StubSource(
         "unpaywall",
@@ -977,7 +977,7 @@ def test_publisher_403_retries_via_browser_and_proxifies(pipe_factory, cfg):
     rec = manifest.get("A")
     assert rec.status == STATUS_OK
     assert "unpaywall:browser" in rec.attempts
-    assert browser.urls[0].startswith("https://scpo.idm.oclc.org/login?url=")
+    assert browser.urls[0].startswith("https://lib.idm.oclc.org/login?url=")
 
 
 def test_ezproxy_uses_browser_before_httpx(pipe_factory):
@@ -986,7 +986,7 @@ def test_ezproxy_uses_browser_before_httpx(pipe_factory):
         "ezproxy",
         {
             "A": Candidate(
-                url="https://www-sciencedirect-com.scpo.idm.oclc.org/pdfft",
+                url="https://www-sciencedirect-com.lib.idm.oclc.org/pdfft",
                 source="ezproxy",
             )
         },
@@ -1099,7 +1099,7 @@ def test_oa_skips_publisher_host_across_items(pipe_factory):
 def test_vault_sso_misses_trip_ezproxy_and_skip_proxify(pipe_factory, cfg):
     from paperful.session import SessionError
 
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     pubs = {
         "A": "https://www.sciencedirect.com/science/article/pii/S1/pdfft",
         "B": "https://www.wiley.com/doi/pdf/10.1002/x",
@@ -1115,7 +1115,7 @@ def test_vault_sso_misses_trip_ezproxy_and_skip_proxify(pipe_factory, cfg):
 
         def fetch_pdf(self, url, timeout_ms=60_000):
             self.urls.append(url)
-            raise SessionError("no download control @federation.sciences-po.fr")
+            raise SessionError("no download control @sso.example.edu")
 
         def close(self) -> None:
             return
@@ -1236,7 +1236,7 @@ def test_connect_timeout_does_not_block_publisher_until_threshold(pipe_factory):
 def test_ezproxy_down_hook_fires_between_batches(pipe_factory, cfg):
     from paperful.session import SessionError
 
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     cfg.concurrency_oa = 1
     pubs = {
         "A": "https://www.sciencedirect.com/science/article/pii/S1/pdfft",
@@ -1249,7 +1249,7 @@ def test_ezproxy_down_hook_fires_between_batches(pipe_factory, cfg):
             return True
 
         def fetch_pdf(self, url, timeout_ms=60_000):
-            raise SessionError("login @federation.sciences-po.fr")
+            raise SessionError("login @sso.example.edu")
 
         def close(self) -> None:
             return
@@ -1283,7 +1283,7 @@ def test_ezproxy_down_hook_fires_between_batches(pipe_factory, cfg):
 def test_ezproxy_down_hook_recovery_clears_skip(pipe_factory, cfg):
     from paperful.session import SessionError
 
-    cfg.ezproxy_base = "https://scpo.idm.oclc.org/login?url="
+    cfg.ezproxy_base = "https://lib.idm.oclc.org/login?url="
     cfg.concurrency_oa = 1
     state = {"n": 0}
 
@@ -1294,7 +1294,7 @@ def test_ezproxy_down_hook_recovery_clears_skip(pipe_factory, cfg):
         def fetch_pdf(self, url, timeout_ms=60_000):
             state["n"] += 1
             if state["n"] <= 2:
-                raise SessionError("login @federation.sciences-po.fr")
+                raise SessionError("login @sso.example.edu")
             return PDF_BYTES, url, "body"
 
         def close(self) -> None:

@@ -149,6 +149,26 @@ def test_attach_claim_sources_locator_quote_in_page(tmp_path):
     assert extra == []
 
 
+def test_attach_claim_sources_loads_only_scope_keys(tmp_path, monkeypatch):
+    cfg = Config(state_dir=tmp_path / "state", out_dir=tmp_path / "out")
+    cfg.state_dir.mkdir(parents=True)
+    doc = ExtractedDoc(
+        text="Results\n\nA claim [1].\n\nReferences\n\n[1] Smith, A. (2020). https://doi.org/10.1000/abc\n",
+        format="md",
+    )
+    ledger = [{"id": "c1", "text": "A claim", "status": "unsupported"}]
+    seen: dict[str, object] = {}
+
+    def fake_load(_cfg, *, exclude_key="", keys=None):
+        seen["exclude_key"] = exclude_key
+        seen["keys"] = None if keys is None else list(keys)
+        return {}
+
+    monkeypatch.setattr("paperful.peer_review_overlap.load_library_pages", fake_load)
+    attach_claim_sources(ledger, doc, cfg, [_item()], extra=[], comment_cap=8)
+    assert seen["keys"] == ["LIB1"]
+
+
 def test_attach_claim_sources_no_scope_skips():
     cfg = Config()
     doc = ExtractedDoc(text="A claim [1].\n\nReferences\n\n[1] X.", format="md")
