@@ -171,7 +171,11 @@ def run_summarize(
                 "not_reached": not_reached,
             },
             items=outcomes,
-            flags={"to": dest, "order": queue_order, "receipts": cfg.summarize_receipts},
+            flags={
+                "to": dest,
+                "order": queue_order,
+                "receipts": cfg.summarize_receipts,
+            },
             exit_code=code,
         )
         agent_box.append(payload)

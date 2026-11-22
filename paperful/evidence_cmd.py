@@ -35,7 +35,9 @@ def run_evidence(
     from .evidence import collect_items, pack_payload, write_pack
 
     if apply:
-        console.print("[red]evidence --apply is not in this stage. The pack stays on disk.[/]")
+        console.print(
+            "[red]evidence --apply is not in this stage. The pack stays on disk.[/]"
+        )
         raise typer.Exit(1)
     if not item and cli_mod._scope_unset(collection, library, profile, run_config):
         console.print("[red]Give --item KEY and/or --collection / --library.[/]")

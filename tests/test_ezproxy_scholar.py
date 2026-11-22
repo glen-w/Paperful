@@ -48,9 +48,7 @@ def test_ensure_proxied_rewrites_publisher_host_onto_landing_proxy():
     assert "pdfft" in out
     already = "https://www-sciencedirect-com.lib.idm.oclc.org/pdfft"
     assert (
-        ezproxy._ensure_proxied(
-            already, "https://lib.idm.oclc.org/login?url=", landing
-        )
+        ezproxy._ensure_proxied(already, "https://lib.idm.oclc.org/login?url=", landing)
         == already
     )
 

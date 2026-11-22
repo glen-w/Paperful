@@ -4726,9 +4726,25 @@ def test_profile_prioritize_round_trip(tmp_path: Path):
     assert loaded.prioritize == "recency"
 
 
-def test_cli_refuses_prioritize_overlap():
+def test_cli_refuses_prioritize_overlap(tmp_path: Path):
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        f'email = "t@example.org"\n'
+        f'out_dir = "{tmp_path / "out"}"\n'
+        f'state_dir = "{tmp_path / "state"}"\n'
+        "[snowball]\nenabled = true\n"
+    )
     result = runner.invoke(
-        cli.app, ["snowball", "search", "kelp", "--prioritize", "overlap"]
+        cli.app,
+        [
+            "snowball",
+            "search",
+            "kelp",
+            "--prioritize",
+            "overlap",
+            "-c",
+            str(cfg_path),
+        ],
     )
     assert result.exit_code != 0
     assert "overlap" in plain_text(result.stdout + result.stderr).lower()

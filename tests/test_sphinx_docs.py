@@ -126,10 +126,24 @@ def test_walkthrough_pages_and_screenshots():
         path = DOCS / f"{stem}.md"
         assert path.is_file(), f"missing {path.name}"
     index = (DOCS / "walkthroughs.md").read_text(encoding="utf-8")
-    for needle in ("first-fill", "grow-library", "tidy-library", "Wanted", "what-it-does"):
+    for needle in (
+        "first-fill",
+        "grow-library",
+        "tidy-library",
+        "Wanted",
+        "what-it-does",
+    ):
         assert needle in index, f"docs/walkthroughs.md missing {needle}"
     catalog = (DOCS / "what-it-does.md").read_text(encoding="utf-8")
-    for needle in ("Wanted", "Discover", "Repair", "Ask", "Peer review", "Evidence", "🤖"):
+    for needle in (
+        "Wanted",
+        "Discover",
+        "Repair",
+        "Ask",
+        "Peer review",
+        "Evidence",
+        "🤖",
+    ):
         assert needle in catalog, f"docs/what-it-does.md missing {needle}"
     landing = (ROOT / "website" / "index.html").read_text(encoding="utf-8")
     for needle in (
