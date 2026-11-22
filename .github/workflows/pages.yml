@@ -8,7 +8,6 @@ on:
       - "docs/**"
       - "scripts/release/build_docs.sh"
       - "scripts/release/assemble_pages_site.sh"
-      - "scripts/release/build_docs.sh"
       - "tests/test_sphinx_docs.py"
       - "pyproject.toml"
       - "Makefile"
@@ -27,10 +26,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,5 +41,13 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v5
