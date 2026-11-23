@@ -11,7 +11,17 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 INDEX = DOCS / "index.md"
 
-_SKIP_STEMS = frozenset({"index"})
+_SKIP_STEMS = frozenset(
+    {
+        "index",
+        # Dedicated page, linked from the guide, kept out of the sidebar.
+        "scihub",
+        # Maintainer dogfood; listed in docs/conf.py exclude_patterns.
+        "bbnj-author-lanes",
+        "e2e-nba",
+        "e2e-stack",
+    }
+)
 
 
 def _toctree_stems(text: str) -> set[str]:

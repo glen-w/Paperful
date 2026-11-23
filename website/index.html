@@ -17,17 +17,17 @@
       property="og:description"
       content="Fill missing PDFs in the Zotero library you already keep. Open access first, campus when you have it. Tidy records and keep a folder copy on your machine."
     />
-    <meta property="og:image" content="https://paperful.app/images/og-v2.png" />
+    <meta property="og:image" content="https://paperful.app/images/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="Paperful Wanted: missing PDF counts in a Zotero library"
+      content="Paperful logo: a cardboard box of papers"
     />
     <meta property="og:url" content="https://paperful.app/" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://paperful.app/images/og-v2.png" />
+    <meta name="twitter:image" content="https://paperful.app/images/og.png" />
     <meta name="twitter:title" content="Paperful — find the PDFs your Zotero library is missing" />
     <meta
       name="twitter:description"
@@ -48,7 +48,7 @@
         "url": "https://paperful.app/",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Linux, macOS, Windows",
-        "softwareVersion": "1.9.7",
+        "softwareVersion": "1.9.8",
         "license": "https://opensource.org/licenses/MIT"
       }
     </script>
@@ -207,9 +207,9 @@
             point back at the PDFs you already hold.
           </p>
           <p class="section-lead">
-            Wanted, Discover, Library, Activity, and System are on the default
-            nav; ⚙️ marks Advanced; 🤖 marks optional AI (off until you enable
-            it).
+            The default nav is Wanted, Discover, Ask, Library, Activity, and
+            System. Ask answers need optional AI turned on. ⚙️ marks Advanced;
+            🤖 marks optional AI (off until you enable it).
           </p>
 
           <h3>Fill missing PDFs</h3>
@@ -274,9 +274,9 @@
                   <td><a href="./guide/authorwatch.html">guide</a></td>
                 </tr>
                 <tr>
-                  <td><a href="./guide/search.html">Web</a></td>
+                  <td><a href="./guide/grey-search.html">Web</a></td>
                   <td>Grey-literature hits via SearXNG; Preview apply creates parents</td>
-                  <td><a href="./guide/search.html">guide</a></td>
+                  <td><a href="./guide/grey-search.html">guide</a></td>
                 </tr>
                 <tr>
                   <td><a href="./guide/research-pack.html">Research pack</a></td>
@@ -449,19 +449,24 @@
         <div class="wrap narrow">
           <h2>Install</h2>
           <p>
-            Build on your machine — there is no app store package and no
-            published Docker image. Keep Zotero on the host with the local API
-            enabled, then open the workbench at
+            Keep Zotero open on the host with the local API enabled, then open
+            the workbench at
             <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>.
-            Host CLI without Docker:
-            <code>pipx install paperful</code>
-            (or <code>uv tool install paperful</code> /
-            <code>pip install paperful</code>;
-            campus login / HTML PDF need
-            <code>paperful[browser]</code>)
-            (<a href="https://pypi.org/project/paperful/">PyPI</a>).
+            Host install without Docker
+            (<a href="https://pypi.org/project/paperful/">PyPI</a>):
           </p>
-          <pre class="code"><code>git clone --branch v1.9.7 https://github.com/glen-w/Paperful.git
+          <pre class="code"><code>uv tool install "paperful[serve]"     # or: pipx install "paperful[serve]"
+mkdir my-paperful &amp;&amp; cd my-paperful
+printf 'email = "you@university.edu"\n' &gt; config.toml
+paperful doctor
+paperful serve                        # http://127.0.0.1:8765</code></pre>
+          <p>
+            Campus login / HTML PDF: install
+            <code>"paperful[serve,browser]"</code>. The
+            <code>uv tool</code> line was run on a Linux box;
+            <code>pipx</code> is the same shape. Prefer a container:
+          </p>
+          <pre class="code"><code>git clone --branch v1.9.8 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
 mkdir -p ../paperful-data ../paperful-out
@@ -478,9 +483,12 @@ docker compose up</code></pre>
             (Unpaywall). To keep data in the checkout, set
             <code>PAPERFUL_DATA=.</code> and <code>PAPERFUL_OUT=./out</code>,
             then copy <code>config.toml</code> next to <code>compose.yaml</code>.
+            The guide and this page track <code>main</code>.
+            <code>pip</code> and the <code>v1.9.8</code> tag are the current
+            release.
           </p>
           <p class="fine">
-            Omit <code>--branch v1.9.7</code> to track latest <code>main</code>.
+            Omit <code>--branch v1.9.8</code> to track latest <code>main</code>.
             <a href="./guide/docker.html">Docker</a>
             ·
             <a href="./guide/zotero.html">Zotero</a>
@@ -495,7 +503,7 @@ docker compose up</code></pre>
 
     <footer class="site-footer">
       <div class="wrap footer-inner">
-        <p><a href="https://glenwright.earth">© Glen Wright</a> · 1.9.7</p>
+        <p><a href="https://glenwright.earth">© Glen Wright</a> · 1.9.8</p>
         <p>
           <a href="./guide/legal-privacy.html">Legal / privacy</a>
         </p>

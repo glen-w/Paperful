@@ -23,20 +23,22 @@ from urllib.parse import urlencode
 
 from playwright.sync_api import sync_playwright
 
+from paperful.config import load_config
+
 ROOT = Path(__file__).resolve().parents[2]
 DOCS_OUT = ROOT / "docs" / "_static" / "workflows"
 WEB_OUT = ROOT / "website" / "images"
-THREADS = ROOT / "state" / "rag" / "threads"
+THREADS = Path(load_config().state_dir) / "rag" / "threads"
 BASE = os.environ.get("PAPERFUL_UI", "http://127.0.0.1:8765").rstrip("/")
-COLLECTION = os.environ.get("PAPERFUL_SHOT_COLLECTION", "ocean/BBNJ")
-TOPIC_QUERY = os.environ.get("PAPERFUL_SHOT_TOPIC", "area based management")
-SEARCH_Q = os.environ.get("PAPERFUL_SHOT_SEARCH", "clearing-house mechanism")
+COLLECTION = os.environ.get("PAPERFUL_SHOT_COLLECTION", "Reading/Coral reefs")
+TOPIC_QUERY = os.environ.get("PAPERFUL_SHOT_TOPIC", "coral reef restoration")
+SEARCH_Q = os.environ.get("PAPERFUL_SHOT_SEARCH", "reef restoration")
 ASK_QUESTION = os.environ.get(
     "PAPERFUL_SHOT_ASK",
-    "What is the BBNJ clearing-house mechanism?",
+    "What are coral endosymbionts?",
 )
-PEOPLE_LIST = os.environ.get("PAPERFUL_SHOT_LIST", "bbnj-test-voices")
-FOLLOW_ORCID = os.environ.get("PAPERFUL_SHOT_ORCID", "0000-0001-9025-7632")
+PEOPLE_LIST = os.environ.get("PAPERFUL_SHOT_LIST", "reef-voices")
+FOLLOW_ORCID = os.environ.get("PAPERFUL_SHOT_ORCID", "0000-0000-0000-0000")
 # Title order floats "(untitled)" rows to the top; newest-first reads better.
 WANTED_ORDER = os.environ.get("PAPERFUL_SHOT_ORDER", "year_new")
 VIEWPORT = {"width": 1440, "height": 900}
@@ -168,6 +170,8 @@ def _best_ask_thread(collection: str, question: str) -> str | None:
         ]
         blob = " ".join(questions).lower()
         exact = 1 if want and any(q.lower() == want for q in questions) else 0
+        if not exact:
+            continue
         topical = 1 if tokens and any(tok in blob for tok in tokens) else 0
         ranked.append(
             (exact, topical, sum(len(a) for a in answers), path.stat().st_mtime, path.stem)
@@ -233,7 +237,11 @@ def main() -> None:
 
         page.goto(f"{BASE}/wanted?order={WANTED_ORDER}", wait_until="domcontentloaded")
         _ready(page)
+        page.evaluate("() => window.scrollTo(0, 0)")
+        page.wait_for_timeout(200)
         _tick_first(page, 3)
+        page.evaluate("() => window.scrollTo(0, 0)")
+        page.wait_for_timeout(150)
         _shot(page, "wanted.png")
 
         page.goto(f"{BASE}/wanted?tab=held&order={WANTED_ORDER}", wait_until="domcontentloaded")
@@ -276,20 +284,28 @@ def main() -> None:
         page.goto(f"{BASE}/library", wait_until="domcontentloaded")
         _ready(page)
         page.evaluate(
-            """() => {
-              document.querySelectorAll('.coll-tree > .coll-node').forEach((el) => {
-                const name = el.querySelector(':scope > summary .coll-name');
-                el.open = !!(name && /ocean/i.test(name.textContent || ''));
-              });
+            """(collection) => {
+              const parts = collection.split('/').filter(Boolean);
+              const root = (parts[0] || '').toLowerCase();
+              const tree = document.querySelector('.coll-tree');
+              if (tree) {
+                [...tree.children].forEach((el) => {
+                  if (el.classList.contains('coll-labels')) return;
+                  const name = el.querySelector('.coll-name');
+                  const text = (name ? name.textContent || '' : '').trim().toLowerCase();
+                  if (text !== root) el.style.display = 'none';
+                });
+              }
               document.querySelectorAll('.coll-name').forEach((el) => {
-                if (/^bbnj$/i.test((el.textContent || '').trim())) {
+                const name = (el.textContent || '').trim();
+                if (parts.some((p) => p.toLowerCase() === name.toLowerCase())) {
                   const details = el.closest('details');
                   if (details) details.open = true;
                 }
               });
-            }"""
+            }""",
+            COLLECTION,
         )
-        page.locator("h1", has_text="Library").first.scroll_into_view_if_needed()
         page.wait_for_timeout(250)
         _shot(page, "library.png")
 

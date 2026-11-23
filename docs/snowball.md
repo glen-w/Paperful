@@ -39,14 +39,14 @@ paperful snowball search "marine spatial planning" "offshore renewable energy"
 paperful snowball search msp ore --or
 paperful snowball doi 10.1038/s41586-021-03819-2 --depth 2 --direction both
 paperful snowball doi 10.1038/s41586-021-03819-2 10.1126/science.aao5646
-paperful snowball orcid 0000-0002-9162-9618
-paperful snowball orcid 0000-0002-9162-9618 0000-0002-1825-0097 --depth 1
+paperful snowball orcid 0000-0000-0000-0000
+paperful snowball orcid 0000-0000-0000-0000 0000-0002-1825-0097 --depth 1
 paperful snowball collection "Inbox/Seeds" --direction refs
 paperful snowball run --profile doi-refs-gated
 paperful snowball apply <run-id> -C "Inbox/Snowball"
 paperful snowball hybrid "high seas EIA" --hybrid-seeds 5 --direction refs
 paperful snowball search "high seas EIA" --gate auto --fetch-pdfs fast -C "Inbox/Snowball"
-paperful snowball orcid 0000-0002-9162-9618 --gate auto --fetch-pdfs full -C "Snowball/0000-0002-9162-9618"
+paperful snowball orcid 0000-0000-0000-0000 --gate auto --fetch-pdfs full -C "Snowball/0000-0000-0000-0000"
 paperful snowball search "high seas EIA" --gate dry-run --format json
 paperful snowball apply <run-id> -C "Inbox/Snowball" --format json
 paperful snowball watch save bbnj --profile keyword-scout
@@ -293,7 +293,7 @@ paperful snowball doi 10.1016/j.jclepro.2022.132764 --depth 2 --direction both -
 ```
 
 ```text
-paperful snowball orcid 0000-0002-9162-9618 --depth 1 --direction both --per-hop-limit 25 --per-hop-rank most-cited --max-candidates all
+paperful snowball orcid 0000-0000-0000-0000 --depth 1 --direction both --per-hop-limit 25 --per-hop-rank most-cited --max-candidates all
 ```
 
 ```mermaid
@@ -407,7 +407,7 @@ on the pack. Paperful does not send mail.
 
 ```text
 paperful snowball search "BBNJ EIA" --gate auto --fetch-pdfs fast -C "Inbox/Snowball"
-paperful snowball orcid 0000-0002-9162-9618 --gate auto --fetch-pdfs full -C "Snowball/me"
+paperful snowball orcid 0000-0000-0000-0000 --gate auto --fetch-pdfs full -C "Snowball/me"
 ```
 
 Both modes stay on the keys snowball just created. Sci-Hub and Scholar run

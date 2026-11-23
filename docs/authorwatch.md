@@ -148,9 +148,8 @@ snowball run or watch packs; see [snowball.md](snowball.md#bibtex--ris-from-the-
 ## Local dogfood (operator)
 
 Validate on a test collection without committing `state/` or pack edits. Example:
-`suggest bbnj-test-voices -C ocean/BBNJ --method mix`; accept a few; optional
-`--seed-from`; confirm OpenAlex budget exit **2** is actionable. See
-[bbnj-author-lanes.md](bbnj-author-lanes.md) Phase 3.
+`suggest test-voices -C "Reading/Coral reefs" --method mix`; accept a few; optional
+`--seed-from`; confirm OpenAlex budget exit **2** is actionable.
 
 ## Versus snowball
 

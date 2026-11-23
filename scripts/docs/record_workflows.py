@@ -31,7 +31,7 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "docs" / "_static" / "workflows"
 BASE = os.environ.get("PAPERFUL_UI", "http://127.0.0.1:8765").rstrip("/")
-COLLECTION = os.environ.get("PAPERFUL_SHOT_COLLECTION", "ocean/BBNJ")
+COLLECTION = os.environ.get("PAPERFUL_SHOT_COLLECTION", "Reading/Coral reefs")
 # Title order floats "(untitled)" rows to the top; newest-first reads better.
 WANTED_ORDER = os.environ.get("PAPERFUL_SHOT_ORDER", "year_new")
 VIEWPORT = {"width": 1280, "height": 800}
@@ -149,7 +149,12 @@ class Recorder:
     def settle(self) -> None:
         self.page.wait_for_load_state("networkidle")
         self.page.wait_for_timeout(300)
-        self.page.evaluate("() => document.fonts.ready")
+        try:
+            self.page.evaluate("() => document.fonts.ready")
+        except Exception:
+            self.page.wait_for_load_state("domcontentloaded")
+            self.page.wait_for_timeout(200)
+            self.page.evaluate("() => document.fonts.ready")
         self._cursor_sync()
 
     def scroll_to_heading(self, text: str, offset: int = 16) -> None:
@@ -372,7 +377,8 @@ def flow_library_scope(browser, workdir: Path) -> None:
     row.scroll_into_view_if_needed()
     page.wait_for_timeout(200)
     rec.frame(0.6)
-    rec.click(row.locator("button.icon-btn").first, hold_before=0.5, navigates=True)
+    rec.click(row.locator("button.icon-btn").first, hold_before=0.5, navigates=False)
+    page.wait_for_timeout(800)
     page.evaluate("() => window.scrollTo(0, 0)")
     page.wait_for_timeout(200)
     rec.frame(1.0)

@@ -6,12 +6,17 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.9.8 — 2026-11-23
+
+- **Ask Markdown.** Workbench Ask renders a small escaped Markdown subset (headings, lists, links, code) so assistant turns stay readable without raw HTML. Threads live under `state_dir/rag/threads`.
+- **Docs and landing.** README, paperful.app, and the Sphinx guide list tools in **What it does** tables (including CLI `evidence` and `summarize --receipts`). ⚙️ is Advanced; 🤖 is optional AI (off until you enable it). The grey-search guide is `docs/grey-search.md`. Workbench screenshots and GIFs are recaptured from a demo collection; `scripts/docs/seed_demo_collection.py` is the seed path in CONTRIBUTING. Comparison names [SummarizePaper](https://github.com/summarizepaper/summarizepaper) as a hosted OA complement.
+- **Snowball ORCID knobs.** `[snowball]` gains `orcid_public_works`, `orcid_author_works`, `hop_min_overlap`, and `auto_apply_max` for ORCID-seeded crawls.
 - **RAG LiteParse.** Optional `[rag].parser = "liteparse"` (full document) or `"hybrid"` (`light` plus LiteParse markdown on `table-likely` / `multi-column` / remaining OCR pages). Extra `paperful[rag-liteparse]`. Default parser stays `light`. OCRmyPDF still rewrites scans; LiteParse does not call LlamaParse. `doctor` ambers when the extra is missing.
-- **Docs.** README, landing, and the Sphinx guide list tools in **What it does** tables (including CLI `evidence` and `summarize --receipts`). ⚙️ is Advanced; 🤖 is optional AI (off until you enable it). Comparison names [SummarizePaper](https://github.com/summarizepaper/summarizepaper) as a hosted OA complement.
 - **`summarize --receipts`.** Opt-in: drop summary sentences that cannot quote the held PDF and append a Receipts list (page + quote). `[summarize].receipts` is the config default (off). Empty after binding skips the item (`no quoted span`).
 - **`paperful evidence`.** Sourced comparison table over held PDFs (no LLM). Cells are a quote or `check this`. Pack: `state/evidence/<stamp>/` (`pack.json`, `pack.md`, `table.csv`). `--apply` is refused.
 - **Peer-review overlap.** Distinctive n-grams vs a large `-C` use a one-pass n-min posting list on CPU. Still flags to review, not a plagiarism verdict. Repeat `-C` to union collections (workbench: extra collections field plus the header chip).
 - **Breaking: manuscript pack is `peer-review`.** The CLI verb is `paperful peer-review` (and `peer-review dismiss`). Config table is `[peer_review]`. Workbench page is `/peer-review`. Packs write `state/peer-reviews/` (`paperful.peer_review.pack.v1`, id field `peer_review_id`). Notes use type/verb `peer-review` and default tag `paperful-peer-review`. Prompt files are `prompts/peer-review-*.md`. There are no aliases for `critique`, `[critique]`, `state/critiques/`, or the old pack schema — re-run packs and re-apply notes. Systematic review stays `paperful sr` and `/review`. See [peer-review](docs/peer-review.md).
+- **CI.** GitHub Actions is smoke-only again (`pytest -m smoke` on Ubuntu). Lint, types, the full suite, audit, socket, fresh-install, browser, and docker jobs stay parked. Public copy now matches that gate.
 
 ## 1.9.7 — 2026-11-20
 
@@ -309,7 +314,7 @@ names the extra when it is missing).
 - **`paperful search`.** SearXNG-backed grey query (PDFs and playbook-host
   landings). Writes `state/search/<run-id>/` (`paperful.search.v1`). Discover →
   Web. Apply creates metadata parents only; PDFs stay Wanted / `run`. Not a
-  Google HTML scrape. [Web grey search](docs/search.md).
+  Google HTML scrape. [Web grey search](docs/grey-search.md).
 
 ### Changed
 

@@ -111,6 +111,13 @@ a {
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .hero-atmosphere,
+  .hero-copy {
+    animation: none;
+  }
+}
+
 .hero-logo {
   display: block;
   width: min(18rem, 78vw);

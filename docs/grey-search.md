@@ -1,6 +1,6 @@
 # Web grey search
 
-Discover grey literature (IUCN, undocs, PrepCom, author PDFs) from a query.
+Discover grey literature (reports, working papers, author PDFs) from a query.
 This is **not** a Google or Scholar HTML scraper. Paperful calls a
 [SearXNG](https://docs.searxng.org/) JSON API you configure
 (`[searxng].base_url` or `SEARXNG_BASE_URL`). It is **not** a `paperful run`
@@ -14,20 +14,20 @@ fetch.
 ## CLI
 
 ```text
-paperful search Gjerde "high seas" OR BBNJ \
-  --hosts iucn.org,dosi-project.org,undocs.org,highseasalliance.org,iisd.org \
+paperful search "coral reef" OR "reef restoration" \
+  --hosts example.org \
   --max 30 --format json
-paperful search Gjerde IUCN --apply -C "Gjerde tribute/grey"
+paperful search "coral reef" --apply -C "Reading/Coral reefs"
 paperful search --run-id <id>
 paperful search --list
-paperful search watch save iucn --query "Gjerde IUCN" --hosts iucn.org --interval-days 7
-paperful search watch run iucn          # first time: baseline, inbox empty
-paperful search watch run iucn --force  # skip the interval wait
-paperful search watch apply iucn -C "Gjerde tribute/grey"          # dry-run
-paperful search watch apply iucn -C "Gjerde tribute/grey" --apply  # metadata parents
-paperful search watch show iucn
+paperful search watch save reefs --query "coral reef" --hosts example.org --interval-days 7
+paperful search watch run reefs          # first time: baseline, inbox empty
+paperful search watch run reefs --force  # skip the interval wait
+paperful search watch apply reefs -C "Reading/Coral reefs"          # dry-run
+paperful search watch apply reefs -C "Reading/Coral reefs" --apply  # metadata parents
+paperful search watch show reefs
 paperful search watch list
-paperful search watch save iucn2 --from-run <run-id>   # copy query and hosts from state/search/<run-id>/
+paperful search watch save reefs2 --from-run <run-id>   # copy query and hosts from state/search/<run-id>/
 paperful search watch due           # watches whose interval has elapsed
 ```
 
@@ -89,13 +89,13 @@ Settings). Same Preview → apply honesty as Topic / People. Copy on the tab:
 PDFs still need Wanted. The tab can **Save watch** / **Run** a saved grey
 watch (inbox on disk). Apply from the CLI.
 
-## Example (Gjerde / BBNJ)
+## Example
 
 ```text
-paperful search Gjerde IUCN BBNJ \
-  --hosts iucn.org,dosi-project.org,undocs.org,highseasalliance.org,iisd.org \
+paperful search "coral reef" OR "reef restoration" \
+  --hosts example.org \
   --max 20
 ```
 
-Then `--apply -C "ocean/BBNJ"` (or the collection chip on Discover → Web) and
-`paperful run` / Wanted for PDFs. See [BBNJ author lanes](bbnj-author-lanes.md).
+Then `--apply -C "Reading/Coral reefs"` (or the collection chip on Discover → Web) and
+`paperful run` / Wanted for PDFs.

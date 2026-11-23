@@ -92,8 +92,8 @@ search is off until `[serpapi].enabled` and `SERPAPI_API_KEY`; cap with
 until `[camofox].enabled` and a reachable server at `[camofox].base_url`.
 Opt-in [GROBID](grobid.md) is off until `[grobid].enabled` and a reachable
 server at `[grobid].base_url`.
-Sci-Hub is off until
-you add `"scihub"` to `sources` or pass `--scihub` — see [Sci-Hub](scihub.md).
+Sci-Hub is off by default, may be opted in at the user’s own risk, and legal
+compliance is the user’s responsibility. See [Sci-Hub](scihub.md).
 Items dated after 2021 are not sent to Sci-Hub; a `--year-from` past that
 year drops it from the run list.
 
@@ -366,7 +366,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[snowball].auto_apply_max` | `0` | With `--gate auto`, refuse apply when more than this many **new** rows would be created (`0` = no cap). Use for batch safety (e.g. `50`). |
 | `[snowball].author_site_preflight` | `false` | Co-author graph + proposed `state/author-packs/`. Promote before `author_site` fetch. Corpus frequency without a snowball run is `paperful authors -C … --apply` |
 | `[authorwatch]` | — | Not parsed. Caps are `authorwatch run --max-authors` / `--per-author-limit`. `doctor` ambers lists with people and no ORCID/OpenAlex id. No social scrape |
-| `[searxng].base_url` | `""` | SearXNG JSON endpoint for `paperful search` / Discover Web and author-site remainder discovery, or `SEARXNG_BASE_URL`. Never a default `run` source. Exit 2 from `search` when unset. [Web grey search](search.md), [Twenty and SearXNG](#twenty-and-searxng) |
+| `[searxng].base_url` | `""` | SearXNG JSON endpoint for `paperful search` / Discover Web and author-site remainder discovery, or `SEARXNG_BASE_URL`. Never a default `run` source. Exit 2 from `search` when unset. [Web grey search](grey-search.md), [Twenty and SearXNG](#twenty-and-searxng) |
 | `[ingest].dedupe_scope` | `library` | `library` or `collection` when skipping `exists` |
 | `[ocr].languages` | `eng` | Tesseract languages for `paperful ocr` (`eng+fra` or `eng fra`) |
 | `[ocr].auto_ignore_failures` | `true` | After `ocr --apply`, add failed or missing items to `state/ocr-ignore.jsonl` (`--no-auto-ignore-failures` skips for one run; `ocr-ignore` edits the list) |

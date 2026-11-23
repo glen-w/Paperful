@@ -379,7 +379,6 @@ uv run paperful run -C ocean/BBNJ                        # grey:author_site when
 ```
 
 This library’s BBNJ folder is **`ocean/BBNJ`**, not a top-level `BBNJ`.
-Dogfood on a small sibling: [BBNJ author lanes](bbnj-author-lanes.md).
 
 Snowball `--author-site-preflight` is the frontier/co-author path to the same
 `state/author-packs/` files; `authors` is the in-library frequency path.
@@ -406,7 +405,7 @@ ResearchGate publication URLs; you click Request full-text.
 
 An opt-in harness that chains snowball → ORCID → full fetch → summarize →
 Twenty/reachout/handoff on `-C e2e/NBA` (not production BBNJ). Not in default
-CI. See [E2E NBA](e2e-nba.md) and `make e2e-nba`.
+CI. See `make e2e-nba` (maintainer harness; not in the published guide).
 
 ## What this is not
 

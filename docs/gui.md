@@ -233,9 +233,9 @@ report**; Briefs labels the same pair **Dry-run** / **Write report**). **Extract
 `[rag].enabled` required; optional GROBID checkbox. See
 [rag.md](rag.md#structured-sections-mirror-only) and [GROBID](grobid.md).
 
-![Index: ingest scoped and a passage search run over ocean/BBNJ](_static/workflows/index.png)
+![Index: ingest scoped and a passage search run over Reading/Coral reefs](_static/workflows/index.png)
 
-![Ask: a cited answer from PDFs already on disk in ocean/BBNJ](_static/workflows/index-ask.png)
+![Ask: a cited answer from PDFs already on disk in Reading/Coral reefs](_static/workflows/index-ask.png)
 
 **Briefs**: collection **summarize** / **synthesize** when `[llm]` is on.
 Synthesize has a **Layout** control (`default`, `conflict`, `review`; CLI

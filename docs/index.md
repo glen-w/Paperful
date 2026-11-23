@@ -13,8 +13,9 @@ machine and attach the PDFs you trust. [Terms](TERMS.md).
 Clone the repo, then `docker compose build` and `docker compose up` →
 `http://127.0.0.1:8765` ([GUI](gui.md)).
 [Docker](docker.md) (light / heavy packs). CLI: `docker compose run --rm paperful …`.
-Host CLI without Docker: `pipx install paperful` (or `uv tool install` /
-`pip install`); campus login and HTML PDF need `paperful[browser]`
+Host workbench without Docker: `uv tool install "paperful[serve]"` (or
+`pipx install "paperful[serve]"`) then a one-line `email` in `config.toml`;
+campus login and HTML PDF need `paperful[serve,browser]`
 ([releases](releases.md#releases-and-stability)). Fetch stance:
 [legal and privacy](legal-privacy.md).
 Contributors: [`uv`](https://docs.astral.sh/uv/). Stability: [releases](releases.md).
@@ -67,7 +68,6 @@ evidence
 ezproxy
 research-ops
 sessions
-scihub
 legal-privacy
 serpapi
 camofox
@@ -87,11 +87,8 @@ comparison-reference
 snowball
 authorwatch
 network
-search
+grey-search
 keepup
 since
-bbnj-author-lanes
-e2e-stack
-e2e-nba
 ROADMAP
 ```

@@ -788,6 +788,32 @@ details > ul {
   margin: 0;
   font: inherit;
 }
+.ask-md {
+  margin: 0;
+  font: inherit;
+  max-width: 42rem;
+}
+.ask-md > :first-child {
+  margin-top: 0;
+}
+.ask-md > :last-child {
+  margin-bottom: 0;
+}
+.ask-md h1,
+.ask-md h2,
+.ask-md h3 {
+  font-family: var(--font-display, inherit);
+  font-size: 1.05rem;
+  font-weight: 650;
+  margin: 0.6rem 0 0.25rem;
+}
+.ask-md p {
+  margin: 0 0 0.5rem;
+}
+.ask-md ul {
+  margin: 0 0 0.5rem;
+  padding-left: 1.2rem;
+}
 .ask-sources {
   margin: 0.75rem 0 1rem;
 }

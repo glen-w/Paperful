@@ -213,7 +213,7 @@ paperful search Gjerde IUCN BBNJ \
   --max 20
 ```
 
-See [Web grey search](search.md).
+See [Web grey search](grey-search.md).
 
 ## Phase 4 — Engineering follow-ons (from real failures)
 

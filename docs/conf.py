@@ -46,6 +46,9 @@ exclude_patterns = [
     "plans/**",
     "assessments/**",
     "dogfood/**",
+    "bbnj-author-lanes.md",
+    "e2e-nba.md",
+    "e2e-stack.md",
 ]
 
 source_suffix = {
@@ -71,6 +74,7 @@ suppress_warnings = ["myst.xref_missing", "misc.highlighting_failure"]
 
 html_theme = "furo"
 html_title = "Paperful"
+html_baseurl = "https://paperful.app/guide/"
 html_favicon = "favicon.ico"
 html_theme_options = {
     # Box mark only. The sticky site header already has the Nunito wordmark;

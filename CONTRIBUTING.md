@@ -23,17 +23,26 @@ only `docs/*.md`; every page must appear in `docs/index.md` toctrees
 (`tests/test_sphinx_docs.py`). The docs workflow is advisory (warnings
 allowed) and Pages deploys without `-W`, so run `DOCS_STRICT=1 make docs`
 locally before pushing guide changes. Live site: [paperful.app](https://paperful.app/) with the guide at
-[paperful.app/guide/](https://paperful.app/guide/). Workbench screenshots:
-run `docker compose up`, then
+[paperful.app/guide/](https://paperful.app/guide/). Public shots use a
+demo collection (`Reading/Coral reefs` by default). Seed it once (Zotero
+open, email in config, network; Ask needs `[llm]`):
+
+```sh
+uv run python scripts/docs/seed_demo_collection.py
+```
+
+Then `docker compose up` or `paperful serve`, then
 `uv run python scripts/docs/capture_workbench.py` (writes
 `docs/_static/workflows/*.png` and homepage copies under `website/images/`).
-The script fills demo values and ticks rows; it does not submit Grab or
+Wanted must show the page title and Have / Held / Missing counts. The
+script fills demo values and ticks rows; it does not submit Grab or
 Apply. Do not capture Settings (email) or Sci-Hub. Workflow GIFs:
 `uv run python scripts/docs/record_workflows.py [flow …]` (needs `ffmpeg`;
 writes `docs/_static/workflows/*.gif` from still frames with a drawn
 cursor). Its only writes are a Wanted **Preview** dry-run and the Library
 **Set scope** cookie. Point either script at a non-default port with
-`PAPERFUL_UI=http://127.0.0.1:8766`. Both open Wanted with
+`PAPERFUL_UI=http://127.0.0.1:8766`. Override the collection with
+`PAPERFUL_SHOT_COLLECTION`. Both open Wanted with
 `order=year_new` (`PAPERFUL_SHOT_ORDER`) so untitled stubs, which sort first
 by title, stay off the pictures. Re-run both after a visible UI change
 and commit the images with it.

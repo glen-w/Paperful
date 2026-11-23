@@ -176,6 +176,11 @@ def mount_ui(app: FastAPI, cfg: Config) -> None:
 
     commands.reconcile_orphans(cfg)
     templates = Jinja2Templates(directory=str(_ui_dir() / "templates"))
+    from markupsafe import Markup
+
+    from .md import md_to_html
+
+    templates.env.filters["md"] = lambda text: Markup(md_to_html(text))
     import itertools
 
     _tip_counter = itertools.count(1)

@@ -5,9 +5,10 @@ they exist, campus login when you have it, then you attach the files you
 trust. Zotero stays the catalogue. Optional notes and answers use a model
 only when you turn one on, and they point back at the PDFs you already hold.
 
-Wanted, Discover, Library, Activity, and System are on the default nav;
-⚙️ marks Advanced; 🤖 marks optional AI (off until you enable it — local
-[Ollama](https://ollama.com) when the machine can run it, or hosted APIs via
+The default nav is Wanted, Discover, Ask, Library, Activity, and System.
+Ask answers need optional AI turned on. ⚙️ marks Advanced; 🤖 marks optional
+AI (off until you enable it — local [Ollama](https://ollama.com) when the
+machine can run it, or hosted APIs via
 [LiteLLM](llm.md#litellm-paid--openai-compatible-apis)).
 
 New here: [first 10 minutes](first-10-minutes.md). Click-through jobs:
@@ -30,7 +31,7 @@ New here: [first 10 minutes](first-10-minutes.md). Click-through jobs:
 | --- | --- | --- |
 | [Discover](grow-library.md) | Topic search, citation map, Keep/Skip queue, then metadata parents — PDFs still go through Wanted | [guide](snowball.md) |
 | [People](authorwatch.md) | Follow ORCID / OpenAlex authors; run the list; accept new works into the collection | [guide](authorwatch.md) |
-| [Web](search.md) | Grey-literature hits via SearXNG; Preview apply creates parents | [guide](search.md) |
+| [Web](grey-search.md) | Grey-literature hits via SearXNG; Preview apply creates parents | [guide](grey-search.md) |
 | [Research pack](research-pack.md) | Works cited in a PDF you already hold → parents in the collection → fill PDFs | [guide](research-pack.md) |
 | [Keepup](keepup.md) | Poll topic watches, people lists, and what-cites on a cadence you cron; no email | [guide](keepup.md) |
 

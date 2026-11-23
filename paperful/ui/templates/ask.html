@@ -52,7 +52,11 @@
   {% for turn in turns %}
     <div class="ask-turn ask-{{ turn.role }}">
       <p class="ask-role">{{ turn.role }}</p>
+      {% if turn.role == "assistant" %}
+      <div class="ask-md">{{ turn.content | md }}</div>
+      {% else %}
       <pre>{{ turn.content }}</pre>
+      {% endif %}
     </div>
   {% endfor %}
   </div>

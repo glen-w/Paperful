@@ -6,7 +6,7 @@
 {% block body_attrs %}{% if poll_run %} data-poll-run="{{ poll_run }}"{% endif %}{% endblock %}
 {% block content %}
 <h1>Discover</h1>
-<p class="page-lede">Find papers that are not in the library yet. Topic search grows a citation and keyword graph from OpenAlex. Web search finds grey PDFs and landings via SearXNG (IUCN, undocs, PrepCom). People watches authors. Nothing is added to Zotero until you Preview apply and then Add selected. Filling PDFs happens on Wanted after items exist.</p>
+<p class="page-lede">Find papers that are not in the library yet. Topic search grows a citation and keyword graph from OpenAlex. Web search finds grey PDFs and landings via SearXNG (reports and working papers). People watches authors. Nothing is added to Zotero until you Preview apply and then Add selected. Filling PDFs happens on Wanted after items exist.</p>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
 {{ job_status(job) }}
 <div class="tabs">
@@ -287,7 +287,7 @@
   </form>
   <form method="post" action="/discover/packs-promote" class="toolbar">
     <p class="field-legend">Packs {{ info("Turn a named on-disk pack into library items. Same idea as Apply on the Queue, for packs built elsewhere.") }}</p>
-    <label>Promote pack slug <input name="slug" placeholder="ocean-bbnj"></label>
+    <label>Promote pack slug <input name="slug" placeholder="reading-list"></label>
     <button type="submit" class="secondary">Packs promote</button>
   </form>
 </section>
@@ -303,13 +303,13 @@
 {% if tab == 'web' and web_search|default('on') != 'off' %}
 <section class="panel" id="discoverWebSection">
   <h2>Web</h2>
-  <p class="section-lede">Search the open web through SearXNG for grey literature (IUCN, undocs, PrepCom, author PDFs). Hits are ranked toward PDFs and known playbook hosts. Preview apply then Add selected creates metadata parents. PDFs still need Wanted / <code>paperful run</code>.</p>
+  <p class="section-lede">Search the open web through SearXNG for grey literature (reports and working papers, author PDFs). Hits are ranked toward PDFs and known playbook hosts. Preview apply then Add selected creates metadata parents. PDFs still need Wanted / <code>paperful run</code>.</p>
   {% if not searxng_configured %}
   <p class="error-banner">SearXNG is unset. Set <code>[searxng].base_url</code> or <code>SEARXNG_BASE_URL</code>, then check <a href="/system">System</a> / doctor or <a href="/settings">Settings</a>. This tab does not scrape Google or Scholar HTML.</p>
   {% else %}
   <form method="post" action="/discover/search/run" class="form-stack" id="discoverWebForm">
     <label>Query {{ info("Terms sent to SearXNG. Quote phrases. filetype:pdf is appended unless you pick none.") }}
-      <input name="query" placeholder='Gjerde "high seas" OR BBNJ'>
+      <input name="query" placeholder='"coral reef" OR "reef restoration"'>
     </label>
     <label>Hosts {{ info("Optional comma list. Restricts hits and adds site: ORs.") }}
       <input name="hosts" placeholder="iucn.org,undocs.org,highseasalliance.org">
@@ -325,8 +325,8 @@
   </form>
   <form method="post" action="/discover/search/watch/save" class="form-stack">
     <p class="field-legend">Watch {{ info("Save this query as a pull-only grey watch. Paperful remembers seen URLs and proposes new ones. You still cron search watch run — there is no built-in scheduler.") }}</p>
-    <label>Watch name <input name="name" placeholder="iucn-gjerde" required></label>
-    <label>Query <input name="query" placeholder='Gjerde "high seas" OR BBNJ'></label>
+    <label>Watch name <input name="name" placeholder="my-search" required></label>
+    <label>Query <input name="query" placeholder='"coral reef" OR "reef restoration"'></label>
     <label>Hosts <input name="hosts" placeholder="iucn.org,undocs.org"></label>
     <input type="hidden" name="filetype" value="pdf">
     <label>Interval days <input name="interval_days" type="number" min="0" max="365" value="7"></label>

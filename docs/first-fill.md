@@ -20,7 +20,7 @@ http://127.0.0.1:8765). Zotero is open on the host with the local API
 enabled. You do not need campus EZProxy or a local model for an open-access
 pass (`Open access` on the preset chip).
 
-The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
+The screenshots are `Reading/Coral reefs`. The clicks are the same for any collection.
 
 ## What you’ll do
 
@@ -44,7 +44,7 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
    Missing. The default tab is the first non-empty bucket. Missing rows use
    miss-surface icons (hover for the plain-language reason).
 
-![Wanted: missing PDFs in ocean/BBNJ, rows selected for Preview / Grab](_static/workflows/wanted.png)
+![Wanted: missing PDFs in Reading/Coral reefs, rows selected for Preview / Grab](_static/workflows/wanted.png)
 
 3. Tick the rows you want, then **Preview selected** (or **Preview all**).
    The button labels switch from *all* to *selected* as you tick. Preview
@@ -110,10 +110,10 @@ those copies attached in Zotero if you asked.
 ## CLI equivalent
 
 ```sh
-docker compose run --rm paperful gaps -C ocean/BBNJ
-docker compose run --rm paperful run -C ocean/BBNJ --preset oa --dry-run
+docker compose run --rm paperful gaps -C "Reading/Coral reefs"
+docker compose run --rm paperful run -C "Reading/Coral reefs" --preset oa --dry-run
 # manual: download only, then attach
-docker compose run --rm paperful run -C ocean/BBNJ --preset oa --no-attach
+docker compose run --rm paperful run -C "Reading/Coral reefs" --preset oa --no-attach
 # open out/ yourself
 docker compose run --rm paperful attach   # every PDF waiting in the manifest; attach has no -C
 # automatic is `run` without --no-attach (config attach = true), on Zotero 10+

@@ -4,7 +4,7 @@ An **ORCID ego** co-authorship graph: who wrote with one person, sliced by
 named year windows, with optional SNA metrics. Distinct from the Discover
 **Queue citation map** (works, not people) and from snowball
 `--author-site-preflight` `coauthors.json` (PDF-pack ranking, not brokerage).
-Grey reports still need [`paperful search`](search.md) / Discover → Web (playbooks fetch PDFs; this graph does not).
+Grey reports still need [`paperful search`](grey-search.md) / Discover → Web (playbooks fetch PDFs; this graph does not).
 
 Writes `state/network/<run-id>/` (`paperful.network.v1`). That directory is
 already gitignored with the rest of `state/`.
@@ -74,8 +74,7 @@ PAPERFUL_E2E=1 paperful network orcid 0000-0001-9025-7632 \
 ```
 
 Copy [templates/network-watch-assessment.md](templates/network-watch-assessment.md)
-to gitignored `assessments/YYYY-MM-DD-gjerde-network.md`. No Zotero writes.
-See [BBNJ author lanes](bbnj-author-lanes.md).
+to gitignored `assessments/YYYY-MM-DD-network.md`. No Zotero writes.
 
 ## Schema
 

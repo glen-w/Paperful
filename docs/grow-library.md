@@ -15,7 +15,7 @@ in the same click.
 Workbench at http://127.0.0.1:8765. A collection chip is helpful (new
 parents can land there) but topic search itself does not require one.
 
-The screenshots are the Discover page on a live `ocean/BBNJ` chip.
+The screenshots are the Discover page on a live `Reading/Coral reefs` chip.
 
 ## What you’ll do
 
@@ -33,7 +33,7 @@ The screenshots are the Discover page on a live `ocean/BBNJ` chip.
    dry-run queue). Advanced can filter by OpenAlex study designs or trusted
    journal lists (`listed_in`: DOAJ, MEDLINE, …).
 
-2. Type a query (for example `area based management`) and **Search**. You
+2. Type a query (for example `coral reef restoration`) and **Search**. You
    land on **Queue**, where per-row **Keep** / **Skip** marks the candidates.
    Nothing is written to Zotero yet. (**Explore**, the first tab, skips the
    keyword step: paste a DOI or title and **Open map**.)
@@ -74,7 +74,7 @@ between hops), and profile save/run on Topic, plus a **Grow** tab with
 Those are the [research pack](research-pack.md) and [snowball](snowball.md)
 surfaces, not the first click. The **Web** tab (SearXNG grey search, with
 **Save watch** / **Run**) is the third default-nav way to grow; see
-[Web grey search](search.md).
+[Web grey search](grey-search.md).
 
 ### People
 
@@ -111,12 +111,12 @@ clear next step on Wanted.
 ## CLI equivalent
 
 ```sh
-docker compose run --rm paperful snowball search "area based management" --gate dry-run
+docker compose run --rm paperful snowball search "coral reef restoration" --gate dry-run
 # review state/snowball/<run-id>/
-docker compose run --rm paperful snowball apply <run-id> --apply -C ocean/BBNJ
-docker compose run --rm paperful authorwatch save ocean-people
-docker compose run --rm paperful authorwatch add ocean-people --orcid 0000-0002-1825-0097
-docker compose run --rm paperful authorwatch run ocean-people
+docker compose run --rm paperful snowball apply <run-id> --apply -C "Reading/Coral reefs"
+docker compose run --rm paperful authorwatch save reef-voices
+docker compose run --rm paperful authorwatch add reef-voices --orcid 0000-0000-0000-0000
+docker compose run --rm paperful authorwatch run reef-voices
 ```
 
 ## Next

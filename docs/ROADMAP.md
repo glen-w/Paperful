@@ -583,7 +583,7 @@ install.
 
 | Desk | Already in tree | Next proof |
 | --- | --- | --- |
-| Ocean / BBNJ | [bbnj-author-lanes](bbnj-author-lanes.md), grey packs, `author_site`, `authorwatch` | `since` and the topic gap map on `ocean/BBNJ` |
+| Ocean / BBNJ | grey packs, `author_site`, `authorwatch` | `since` and the topic gap map on `ocean/BBNJ` |
 | Policy grey | `search` / `search watch`, RFMO and UN-doc playbooks | Playbook health on learned rows, or `siblings` if the holdings actually link out |
 | Journal desk | Shipped example packs `styles/JMLC`, `styles/JCP`, `styles/MarinePolicy`; `peer-review` | Claim-check on one manuscript extract. Not a new style product |
 
@@ -824,7 +824,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.7).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.8).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -832,7 +832,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.9.7` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.9.8` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
@@ -1861,7 +1861,7 @@ for the end-to-end operator story.
 | 23 | Same — **Wave 2:** OpenAlex publication trend report for a query or saved snowball seed (`snowball trends`) | **Shipped** |
 | 24 | Same — **Wave 3:** thicker `authorwatch` briefing (co-authors + recent works via OpenAlex) | **Shipped** |
 | 25 | ORCID ego co-authorship SNA (`paperful network`, Discover People map, BBNJ phase slices) | **Shipped** — [network](network.md); extra `paperful[network]` |
-| 26 | `paperful search` + Discover Web (SearXNG grey query; metadata parents; PDFs via Wanted) | **Shipped** — [search](search.md); `search watch` URL poll shipped (you cron it) |
+| 26 | `paperful search` + Discover Web (SearXNG grey query; metadata parents; PDFs via Wanted) | **Shipped** — [search](grey-search.md); `search watch` URL poll shipped (you cron it) |
 | 27 | [Literature-discovery Wave 5](#literature-discovery-complement-waves) — hop-0 `--prioritize` + DiscoverQuery spine (CLI/MCP/GUI share it; public verb stays `snowball`) | **Shipped** |
 
 (literature-discovery-complement-waves)=
@@ -3190,7 +3190,7 @@ second doc tree that drifts from the CLI.
 - Repo `reports/AI academic paper factories.md` — contributor research behind
   the matrix (not user-facing)
 - [snowball.md](snowball.md) — library-building from a keyword, multi-DOI / multi-ORCID, or collection
-- [bbnj-author-lanes.md](bbnj-author-lanes.md) — dogfood `author_site` + `authorwatch` on `ocean/BBNJ` / `ocean/BBNJ-test`
+- Maintainer dogfood for `author_site` + `authorwatch` lives in the repo, not in the published guide
 - [firefox.md](firefox.md) — optional Firefox add-on; mirror writes, Zotero read
 - [After 1.7 (live map)](#after-17-live-map) — what to build next
 - [After 1.1.0 (area index)](#after-110-buffet-by-area) — jobs by area;

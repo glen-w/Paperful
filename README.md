@@ -37,9 +37,10 @@ they exist, campus login when you have it, then you attach the files you
 trust. Zotero stays the catalogue. Optional notes and answers use a model
 only when you turn one on, and they point back at the PDFs you already hold.
 
-Wanted, Discover, Library, Activity, and System are on the default nav;
-⚙️ marks Advanced; 🤖 marks optional AI (off until you enable it — local
-[Ollama](https://ollama.com) when the machine can run it, or hosted APIs via
+The default nav is Wanted, Discover, Ask, Library, Activity, and System.
+Ask answers need optional AI turned on. ⚙️ marks Advanced; 🤖 marks optional
+AI (off until you enable it — local [Ollama](https://ollama.com) when the
+machine can run it, or hosted APIs via
 [LiteLLM](docs/llm.md#litellm-paid--openai-compatible-apis)).
 
 ### Fill missing PDFs
@@ -58,7 +59,7 @@ Wanted, Discover, Library, Activity, and System are on the default nav;
 | --- | --- | --- |
 | [Discover](docs/grow-library.md) | Topic search, citation map, Keep/Skip queue, then metadata parents — PDFs still go through Wanted | [guide](docs/snowball.md) |
 | [People](docs/authorwatch.md) | Follow ORCID / OpenAlex authors; run the list; accept new works into the collection | [guide](docs/authorwatch.md) |
-| [Web](docs/search.md) | Grey-literature hits via SearXNG; Preview apply creates parents | [guide](docs/search.md) |
+| [Web](docs/grey-search.md) | Grey-literature hits via SearXNG; Preview apply creates parents | [guide](docs/grey-search.md) |
 | [Research pack](docs/research-pack.md) | Works cited in a PDF you already hold → parents in the collection → fill PDFs | [guide](docs/research-pack.md) |
 | [Keepup](docs/keepup.md) | Poll topic watches, people lists, and what-cites on a cadence you cron; no email | [guide](docs/keepup.md) |
 
@@ -121,8 +122,9 @@ Clone the repo and build the image with Compose.
 **You need**
 
 - [Docker](https://docs.docker.com/get-docker/) with Compose v2.
-- Zotero **on the host** (not in Docker), local API enabled:
+- Zotero **open on the host** (not in Docker), local API enabled:
   Settings → Advanced → *Allow other applications on this computer to communicate with Zotero*.
+  Open Zotero before you run doctor.
 - Zotero 10 or newer to attach PDFs (manual **Attach**, or automatic on Grab).
   On Zotero 7–9 the tool still downloads to disk; attach later in Zotero.
   [Zotero](docs/zotero.md).
@@ -136,19 +138,25 @@ No campus access: choose **Open access**. Campus library login: choose
 [Configuration](docs/config.md).
 
 ```sh
-git clone --branch v1.9.7 https://github.com/glen-w/Paperful.git
+git clone --branch v1.9.8 https://github.com/glen-w/Paperful.git
 cd Paperful
-cp .env.example .env          # PAPERFUL_DATA=. PAPERFUL_OUT=./out keeps data here
-                              # .env.example sets PAPERFUL_IMAGE_MODE=heavy
-cp config.minimal.toml config.toml   # set email; full file is config.example.toml
-docker compose build                 # heavy when set in .env; CI uses light
-docker compose run --rm paperful doctor          # once; --guide for Enter walk
-docker compose up                                # stays up; workbench at http://127.0.0.1:8765
+cp .env.example .env
+mkdir -p ../paperful-data ../paperful-out
+cp config.minimal.toml ../paperful-data/config.toml   # set email
+docker compose build
+docker compose run --rm paperful doctor
+docker compose up
 ```
 
-The sample `.env` keeps your config and downloads in this folder. Where those
-files live, and what the first health check means if Zotero is not open yet:
-[Docker](docs/docker.md).
+Compose reads `config.toml` from `PAPERFUL_DATA` and the PDF mirror from
+`PAPERFUL_OUT` (the `.env` defaults are `../paperful-data` and
+`../paperful-out`), not from the git root. To keep data in the checkout, set
+`PAPERFUL_DATA=.` and `PAPERFUL_OUT=./out` in `.env`, then copy `config.toml`
+next to `compose.yaml`. Where those files live, and what the first health
+check means if Zotero is not open yet: [Docker](docs/docker.md).
+
+The guide and this README track `main`. `pip` and the `v1.9.8` tag are the
+current release.
 
 The same jobs from the command line: [Commands](docs/commands.md).
 
@@ -209,22 +217,28 @@ ollama pull qwen2.5:7b                       # local default; then enable [llm] 
 
 ## Install with pip
 
-For a **CLI on the host** (Zotero local API on this machine; no Docker
-workbench image):
+Workbench on the host (Zotero open, local API on; no Docker image). The
+`uv tool` line was run on a Linux box; `pipx` is the same shape and was not
+run in that check. Chromium downloads on first campus login.
+
+You need Zotero open and an email address (Unpaywall).
 
 ```sh
-pipx install paperful          # or: uv tool install paperful, or pip install paperful
-pip install "paperful[browser]"   # for campus login / HTML PDF (Playwright)
-playwright install chromium    # once
-cp config.minimal.toml config.toml   # set email — see docs/config.md
+uv tool install "paperful[serve]"     # or: pipx install "paperful[serve]"
+mkdir my-paperful && cd my-paperful
+printf 'email = "you@university.edu"\n' > config.toml
 paperful doctor
+paperful serve                        # http://127.0.0.1:8765
 ```
 
-Optional extras: `[browser]` (Playwright; session login / htmlpdf), `[llm]`, `[rag]`, `[rag-docling]`, `[rag-liteparse]`, `[browser-agent]` (Python 3.11+), `[openxml]`, `[network]`. The `[serve]` extra
-(workbench) runs without Docker. The operator path is
-**clone + Compose** ([Docker](docs/docker.md)). GitHub CI runs
-the smoke tests, lint and types, and the full offline suite on Ubuntu (Python 3.12); it does not build the image or install a fresh
-`paperful[serve]` venv.
+Campus login / HTML PDF: install `"paperful[serve,browser]"` instead.
+
+Optional extras: `[browser]`, `[llm]`, `[rag]`, `[rag-docling]`,
+`[rag-liteparse]`, `[browser-agent]` (Python 3.11+), `[openxml]`,
+`[network]`. The operator path is **clone + Compose**
+([Docker](docs/docker.md)). GitHub CI currently runs the smoke tests only
+(Ubuntu, Python 3.12); the full suite runs locally. It does not build the
+image or install a fresh `paperful[serve]` venv.
 
 ## Develop
 

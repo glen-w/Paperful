@@ -527,7 +527,7 @@ concurrency = 2
 # Public instances: https://searx.space/ — Paperful needs GET /search?format=json,
 # which many public hosts leave off. Run your own if JSON is disabled.
 # Never a default run source. Used by `paperful search` / Discover → Web
-# and author-site remainder. See docs/search.md and docs/snowball.md
+# and author-site remainder. See docs/grey-search.md and docs/snowball.md
 # "Twenty and SearXNG".
 # [searxng]
 # base_url = ""                  # instance root; or SEARXNG_BASE_URL
