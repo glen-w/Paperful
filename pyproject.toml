@@ -48,6 +48,8 @@ llm = ["litellm>=1.70,<2"]
 rag = ["lancedb>=0.39,<1"]
 # Layout-aware PDF parsing for `[rag].parser = "docling"`. Pulls in torch.
 rag-docling = ["docling>=2"]
+# Local table/layout parser for `[rag].parser = "liteparse"` or `"hybrid"`.
+rag-liteparse = ["liteparse>=2.21"]
 browser-agent = [
     "browser-use>=0.11; python_version >= '3.11'",
     "ollama>=0.4; python_version >= '3.11'",

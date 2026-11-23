@@ -135,8 +135,10 @@ parser = "GROBID"
 
 def test_parse_rag_parser_accepts_grobid():
     assert parse_rag_parser("grobid") == "grobid"
-    with pytest.raises(ValueError, match="light, docling, or grobid"):
+    with pytest.raises(ValueError, match="liteparse"):
         parse_rag_parser("tei")
+    assert parse_rag_parser("hybrid") == "hybrid"
+    assert parse_rag_parser("liteparse") == "liteparse"
 
 
 def test_grobid_defaults_are_off(tmp_path):

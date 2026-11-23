@@ -795,6 +795,11 @@ def apply_rag(raw: dict[str, Any], cfg: "Config", source: Path) -> None:
             ("ocr", "rag_ocr", lambda v: C.parse_rag_ocr(str(v))),
             ("parser", "rag_parser", lambda v: C.parse_rag_parser(str(v))),
             (
+                "liteparse_route",
+                "rag_liteparse_route",
+                lambda v: C.parse_rag_liteparse_route(str(v)),
+            ),
+            (
                 "embed_provider",
                 "rag_embed_provider",
                 lambda v: C.parse_rag_embed_provider(str(v)),

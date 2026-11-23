@@ -208,6 +208,29 @@ def test_doctor_rag_row_is_green_and_quiet_when_off(cfg):
     assert "disabled" in check.detail
 
 
+def test_doctor_ambers_missing_liteparse_when_parser_needs_it(cfg, monkeypatch):
+    import importlib.util
+
+    pytest.importorskip("lancedb")
+    cfg.rag_enabled = True
+    cfg.rag_parser = "hybrid"
+    real = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util,
+        "find_spec",
+        lambda name, *a: None if name == "liteparse" else real(name, *a),
+    )
+
+    def missing(cfg):
+        raise LlmConfigError("Try: ollama pull nomic-embed-text")
+
+    monkeypatch.setattr("paperful.llm.preflight.validate_embedder", missing)
+    parser, embeddings, index = _rag_checks(cfg)
+    assert parser.status == "amber" and "rag-liteparse" in parser.detail
+    assert embeddings.status == "amber"
+    assert index.status == "amber"
+
+
 def test_doctor_ambers_missing_lancedb(cfg, monkeypatch):
     import importlib.util
 

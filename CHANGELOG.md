@@ -6,6 +6,7 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+- **RAG LiteParse.** Optional `[rag].parser = "liteparse"` (full document) or `"hybrid"` (`light` plus LiteParse markdown on `table-likely` / `multi-column` / remaining OCR pages). Extra `paperful[rag-liteparse]`. Default parser stays `light`. OCRmyPDF still rewrites scans; LiteParse does not call LlamaParse. `doctor` ambers when the extra is missing.
 - **Docs.** README, landing, and the Sphinx guide list tools in **What it does** tables (including CLI `evidence` and `summarize --receipts`). ⚙️ is Advanced; 🤖 is optional AI (off until you enable it). Comparison names [SummarizePaper](https://github.com/summarizepaper/summarizepaper) as a hosted OA complement.
 - **`summarize --receipts`.** Opt-in: drop summary sentences that cannot quote the held PDF and append a Receipts list (page + quote). `[summarize].receipts` is the config default (off). Empty after binding skips the item (`no quoted span`).
 - **`paperful evidence`.** Sourced comparison table over held PDFs (no LLM). Cells are a quote or `check this`. Pack: `state/evidence/<stamp>/` (`pack.json`, `pack.md`, `table.csv`). `--apply` is refused.

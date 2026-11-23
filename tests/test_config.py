@@ -298,6 +298,7 @@ def test_rag_defaults_are_off(tmp_path):
     cfg = _from_dict({}, tmp_path / "config.toml")
     assert cfg.rag_enabled is False and cfg.rag_auto_ingest is False
     assert cfg.rag_ocr == "auto" and cfg.rag_parser == "light"
+    assert cfg.rag_liteparse_route == "all"
     assert cfg.rag_embed_provider == "ollama"
     assert cfg.rag_embed_model == "nomic-embed-text"
     assert cfg.rag_dir == cfg.state_dir / "rag"
@@ -312,7 +313,8 @@ def test_rag_table_is_parsed_and_clamped(tmp_path):
                 "enabled": True,
                 "auto_ingest": True,
                 "ocr": "OFF",
-                "parser": "Docling",
+                "parser": "hybrid",
+                "liteparse_route": "TABLES",
                 "embed_provider": "litellm",
                 "embed_model": " openai/text-embedding-3-small ",
                 "embed_batch_size": 0,
@@ -327,7 +329,8 @@ def test_rag_table_is_parsed_and_clamped(tmp_path):
         tmp_path / "config.toml",
     )
     assert cfg.rag_enabled and cfg.rag_auto_ingest
-    assert cfg.rag_ocr == "off" and cfg.rag_parser == "docling"
+    assert cfg.rag_ocr == "off" and cfg.rag_parser == "hybrid"
+    assert cfg.rag_liteparse_route == "tables"
     assert cfg.rag_embed_provider == "litellm"
     assert cfg.rag_embed_model == "openai/text-embedding-3-small"
     assert cfg.rag_embed_batch_size == 1 and cfg.rag_top_k == 1
@@ -722,6 +725,7 @@ def test_summarize_receipts_table_is_parsed(tmp_path):
     [
         {"ocr": "always"},
         {"parser": "pymupdf"},
+        {"liteparse_route": "pages"},
         {"embed_provider": "openai"},
         {"embed_model": " "},
     ],

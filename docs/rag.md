@@ -75,7 +75,7 @@ the **heavy** Compose image (`PAPERFUL_IMAGE_MODE=heavy`), which includes
 enabled = true
 auto_ingest = false            # true: index new PDFs after run / attach / inbox / snapshot / ocr
 ocr = "auto"                   # auto | off
-parser = "light"               # light | docling | grobid
+parser = "light"               # light | docling | grobid | liteparse | hybrid
 embed_provider = "ollama"      # ollama | litellm
 embed_model = "nomic-embed-text"
 top_k = 10                     # passages sent to the model per question (simple mode)
@@ -171,6 +171,30 @@ hash. It is not the default. See [GROBID](grobid.md).
 [rag]
 parser = "grobid"
 ```
+
+`liteparse` and `hybrid` use [LiteParse](https://github.com/run-llama/liteparse)
+locally (`paperful[rag-liteparse]`). They do not rewrite the mirror; OCRmyPDF
+still owns scanned PDFs when `[rag].ocr = "auto"`. Parse-time OCR (bundled
+Tesseract, `[ocr].languages`) only runs on pages LiteParse still marks as
+needing OCR (embedded images, sparse figures). `ocria-nano` is not pulled.
+
+- `liteparse` — markdown for every page.
+- `hybrid` — `light` for the body; LiteParse markdown only on routed pages.
+  `[rag].liteparse_route` is `all` (default), `tables` (`table-likely` /
+  `multi-column`), or `ocr` (`needs_ocr`).
+
+```bash
+uv sync --extra rag --extra rag-liteparse
+```
+
+```toml
+[rag]
+parser = "hybrid"
+# liteparse_route = "all"   # all | tables | ocr
+```
+
+`doctor` ambers when the parser is `liteparse` or `hybrid` and the extra is
+missing. Neither extra is in the Docker images.
 
 Changing the parser re-indexes every PDF on the next ingest.
 

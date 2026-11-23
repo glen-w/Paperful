@@ -1289,6 +1289,17 @@ def _rag_checks(cfg) -> list[Check]:
             Check("RAG index", "amber", "lancedb not installed — uv sync --extra rag")
         ]
     out: list[Check] = []
+    if cfg.rag_parser in {"liteparse", "hybrid"}:
+        if importlib.util.find_spec("liteparse") is None:
+            out.append(
+                Check(
+                    "RAG parser",
+                    "amber",
+                    f"{cfg.rag_parser} needs uv sync --extra rag-liteparse",
+                )
+            )
+        else:
+            out.append(Check("RAG parser", "green", cfg.rag_parser))
     try:
         embedder = validate_embedder(cfg)
         out.append(

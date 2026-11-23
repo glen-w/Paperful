@@ -3144,6 +3144,21 @@ wheels = [
 ]
 
 [[package]]
+name = "liteparse"
+version = "2.21.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/53/59/dfda8831dc41ea7bf831e8a8136dc7dab07296a03480c2ff6e0062a75458/liteparse-2.21.0.tar.gz", hash = "sha256:41da34aef0f4f81ac7cd3a4b130b032b691cd12c4df5dc2b44ec0894ab1a24b3", size = 850051, upload-time = "2026-11-23T04:56:55.306Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c8/bf/c6231efc29061f95b5e16670fa431019f06f3cc3ed5341e36f22501b4112/liteparse-2.21.0-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:fe4d2651e447bad46f38abc8809a8e9e392dc88126e0afdb262aa56e138999ab", size = 12839880, upload-time = "2026-11-23T04:56:38.259Z" },
+    { url = "https://files.pythonhosted.org/packages/07/8e/944fc17bb6799e8a113f8eb9d761f4e81956fb4c86436eef2db951fc33a3/liteparse-2.21.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:cd54dbe559bbb957260b3ed8d0831cdb6589d2e17fe762e3e7df1e5fb0ab6f23", size = 12172178, upload-time = "2026-11-23T04:56:40.282Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/0e/31a3ac8c5cdc3c4a8cefe1d1c9070e54fbf2e0aaee1ce766cfcca728ff63/liteparse-2.21.0-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:79953db97701781660ba4fa10599f9f2d31c9042d88a66b798ca559179e092c1", size = 13738153, upload-time = "2026-11-23T04:56:42.419Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/5e/5bc5d69ba40c4d4d2f5825f85ececc5149c4bbcdc74aae08bd85d3ac205b/liteparse-2.21.0-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:b3acb7b581b86b00824db74c9e52cb077ac2c74eda3217a6b6a48dfb1f54983b", size = 14118111, upload-time = "2026-11-23T04:56:45.968Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/8e/3a133c4d3f0e4d224ee5eb8087bb87980bc30b5214b9cc946d65567c636b/liteparse-2.21.0-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:a71e29bb7f634469ed76032102467c97b46defcb151ddd6659cf2c44bb203401", size = 17255342, upload-time = "2026-11-23T04:56:48.679Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/ff/cd766d6d9fdfafaa7d29df1f0fe110c0210c35144fd12ee77661887c1dcd/liteparse-2.21.0-cp310-abi3-win_amd64.whl", hash = "sha256:787d4ea60989d24f6a2ab73fb16069d80379f962d6005060bed2358109575f97", size = 12243017, upload-time = "2026-11-23T04:56:51.654Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/bd/8bca54ad2669a9a5e8a5c5a8352141ceddc7d7f507d1268fb58e89249584/liteparse-2.21.0-cp310-abi3-win_arm64.whl", hash = "sha256:8ffca0aeca2919eae29141fc5ab36cf29de5ea7645298e440e334f14a474935c", size = 11517658, upload-time = "2026-11-23T04:56:53.598Z" },
+]
+
+[[package]]
 name = "lxml"
 version = "6.1.3"
 source = { registry = "https://pypi.org/simple" }
@@ -4822,6 +4837,9 @@ rag = [
 rag-docling = [
     { name = "docling" },
 ]
+rag-liteparse = [
+    { name = "liteparse" },
+]
 serve = [
     { name = "fastapi" },
     { name = "jinja2" },
@@ -4864,6 +4882,7 @@ requires-dist = [
     { name = "jinja2", marker = "extra == 'serve'", specifier = ">=3.1" },
     { name = "lancedb", marker = "extra == 'rag'", specifier = ">=0.39,<1" },
     { name = "litellm", marker = "extra == 'llm'", specifier = ">=1.70,<2" },
+    { name = "liteparse", marker = "extra == 'rag-liteparse'", specifier = ">=2.21" },
     { name = "matplotlib", marker = "extra == 'network'", specifier = ">=3.8" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=2.0.0" },
     { name = "networkx", marker = "extra == 'network'", specifier = ">=3,<4" },
@@ -4884,7 +4903,7 @@ requires-dist = [
     { name = "urllib3", specifier = ">=2.8" },
     { name = "uvicorn", marker = "extra == 'serve'", specifier = ">=0.32" },
 ]
-provides-extras = ["browser", "htmlpdf", "llm", "rag", "rag-docling", "browser-agent", "serve", "network", "openxml", "docs"]
+provides-extras = ["browser", "htmlpdf", "llm", "rag", "rag-docling", "rag-liteparse", "browser-agent", "serve", "network", "openxml", "docs"]
 
 [package.metadata.requires-dev]
 dev = [

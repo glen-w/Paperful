@@ -220,7 +220,7 @@ cp config.minimal.toml config.toml   # set email — see docs/config.md
 paperful doctor
 ```
 
-Optional extras: `[browser]` (Playwright; session login / htmlpdf), `[llm]`, `[rag]`, `[rag-docling]`, `[browser-agent]` (Python 3.11+), `[openxml]`, `[network]`. The `[serve]` extra
+Optional extras: `[browser]` (Playwright; session login / htmlpdf), `[llm]`, `[rag]`, `[rag-docling]`, `[rag-liteparse]`, `[browser-agent]` (Python 3.11+), `[openxml]`, `[network]`. The `[serve]` extra
 (workbench) runs without Docker. The operator path is
 **clone + Compose** ([Docker](docs/docker.md)). GitHub CI runs
 the smoke tests, lint and types, and the full offline suite on Ubuntu (Python 3.12); it does not build the image or install a fresh

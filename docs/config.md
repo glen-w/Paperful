@@ -373,7 +373,8 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[rag].enabled` | `false` | Master switch for `paperful rag` and `paperful ask`. Needs `paperful[rag]` (host `uv sync --extra rag` or **heavy** image). See [rag.md](rag.md) |
 | `[rag].auto_ingest` | `false` | Index new PDFs after `run`, `attach`, `inbox`, `snapshot`, `ocr --apply` and `snowball` |
 | `[rag].ocr` | `auto` | `auto` runs OCRmyPDF on scans during ingest and rewrites them under `out_dir`; `off` leaves them alone. PDFs with a text layer are never OCR'd |
-| `[rag].parser` | `light` | `light` (`pdftotext` / `pypdf`), `docling` (needs `paperful[rag-docling]`), or `grobid` (needs `[grobid].enabled`; see [GROBID](grobid.md)) |
+| `[rag].parser` | `light` | `light` (`pdftotext` / `pypdf`), `docling` (needs `paperful[rag-docling]`), `grobid` (needs `[grobid].enabled`; see [GROBID](grobid.md)), `liteparse`, or `hybrid` (both need `paperful[rag-liteparse]`; see [rag.md](rag.md#parser)) |
+| `[rag].liteparse_route` | `all` | When `parser = "hybrid"`: `all`, `tables` (`table-likely` / `multi-column`), or `ocr`. Ignored otherwise |
 | `[rag].embed_provider` | `ollama` | `ollama` or `litellm` |
 | `[rag].embed_model` | `nomic-embed-text` | Embedding model. `bge-m3` for multilingual libraries. Each model keeps its own index under `state/rag/` |
 | `[rag].embed_base_url` / `embed_api_base` | `""` | Ollama root / LiteLLM base URL for embeddings; empty uses `[llm].base_url` / `[llm].api_base` |

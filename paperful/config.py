@@ -433,7 +433,8 @@ class Config:
         False  # index new PDFs after run / attach / inbox / snapshot / ocr
     )
     rag_ocr: str = "auto"  # auto | off. auto rewrites scanned PDFs under out/
-    rag_parser: str = "light"  # light | docling | grobid
+    rag_parser: str = "light"  # light | docling | grobid | liteparse | hybrid
+    rag_liteparse_route: str = "all"  # all | tables | ocr; hybrid only
     rag_embed_provider: str = "ollama"  # ollama | litellm
     rag_embed_model: str = "nomic-embed-text"
     rag_embed_base_url: str = ""  # empty → llm.base_url
@@ -1061,7 +1062,8 @@ def parse_dest(value: str, *, key: str = "dest") -> str:
 
 
 _RAG_OCR_MODES = frozenset({"auto", "off"})
-_RAG_PARSERS = frozenset({"light", "docling", "grobid"})
+_RAG_PARSERS = frozenset({"light", "docling", "grobid", "liteparse", "hybrid"})
+_RAG_LITEPARSE_ROUTES = frozenset({"all", "tables", "ocr"})
 _RAG_EMBED_PROVIDERS = frozenset({"ollama", "litellm"})
 _RAG_FOCI = frozenset(
     {"default", "questions", "gaps", "methods", "answered", "conflict"}
@@ -1115,9 +1117,20 @@ def parse_rag_parser(value: str) -> str:
     parser = str(value).strip().lower()
     if parser not in _RAG_PARSERS:
         raise ValueError(
-            f"config [rag].parser {value!r} must be light, docling, or grobid"
+            "config [rag].parser "
+            f"{value!r} must be light, docling, grobid, liteparse, or hybrid"
         )
     return parser
+
+
+def parse_rag_liteparse_route(value: str) -> str:
+    """Normalise ``[rag].liteparse_route``. ``all`` is the hybrid default."""
+    route = str(value).strip().lower() or "all"
+    if route not in _RAG_LITEPARSE_ROUTES:
+        raise ValueError(
+            f"config [rag].liteparse_route {value!r} must be all, tables, or ocr"
+        )
+    return route
 
 
 def parse_rag_embed_provider(value: str) -> str:

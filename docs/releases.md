@@ -2,7 +2,7 @@
 
 **1.9.7** is the current release (`pipx install paperful` / `uv tool install paperful`
 after this tag is published; `pip install paperful` still works). Optional extras:
-`[browser]`, `[llm]`, `[rag]`, `[rag-docling]`, `[serve]`, `[browser-agent]`, `[openxml]`, `[network]`. **1.1.0** introduced PyPI and
+`[browser]`, `[llm]`, `[rag]`, `[rag-docling]`, `[rag-liteparse]`, `[serve]`, `[browser-agent]`, `[openxml]`, `[network]`. **1.1.0** introduced PyPI and
 trusted publishing. For campus login and HTML PDF paths, install
 `paperful[browser]` and run `playwright install chromium` once. The **operator** install is
 clone plus `docker compose build` on your computer (see [Docker](docker.md)).

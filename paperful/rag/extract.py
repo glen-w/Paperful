@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import shutil
 import subprocess
 from pathlib import Path
@@ -20,6 +21,12 @@ MIN_CHARS_PER_PAGE = 80
 MIN_TEXT_PAGE_FRACTION = 0.6
 # Whole-document extraction. Typical papers take well under a second.
 _PDFTOTEXT_TIMEOUT_S = 180.0
+_LOG = logging.getLogger("paperful.rag.extract")
+_LITEPARSE_EXTRA = (
+    "liteparse is not installed; pip install 'paperful[rag-liteparse]' "
+    'or set [rag].parser = "light"'
+)
+_TABLE_LAYOUT_REASONS = frozenset({"table-likely", "multi-column"})
 
 
 class ParseError(Exception):
@@ -176,8 +183,12 @@ class DoclingParser:
 
 
 def _strip_placeholders(markdown: str) -> str:
-    """Docling marks each figure with a comment; it is not text to search."""
-    return markdown.replace("<!-- image -->", "")
+    """Docling / LiteParse mark figures with comments; they are not text to search."""
+    return (
+        markdown.replace("<!-- image -->", "")
+        .replace("![]()", "")
+        .replace("![](image)", "")
+    )
 
 
 class GrobidParser:
@@ -214,11 +225,240 @@ class GrobidParser:
         raise ParseError("GROBID returned empty TEI")
 
 
+class LiteParseParser:
+    """Markdown pages from LiteParse. Needs ``paperful[rag-liteparse]``.
+
+    OCRmyPDF still rewrites scans in ``out_dir`` first. Parse-time OCR here
+    is for embedded images and remaining sparse pages, using Tesseract.
+    """
+
+    name = "liteparse"
+    version = 1
+
+    def __init__(self, cfg: Config) -> None:
+        self.cfg = cfg
+
+    def cache_extra(self) -> dict[str, Any]:
+        return {}
+
+    def pages(self, path: Path) -> list[str]:
+        if not path.is_file():
+            raise ParseError(f"no such file: {path}")
+        try:
+            result = _liteparse_client(
+                self.cfg, ocr_enabled=True, target_pages=None
+            ).parse(str(path))
+        except ParserUnavailable:
+            raise
+        except Exception as exc:
+            raise ParseError(f"liteparse failed: {exc}") from exc
+        pages = _liteparse_markdown_pages(result)
+        if pages:
+            return pages
+        raise ParseError("LiteParse returned empty text")
+
+
+class HybridParser:
+    """``light`` pages, with LiteParse markdown spliced onto routed pages."""
+
+    name = "hybrid"
+    version = 1
+
+    def __init__(
+        self,
+        cfg: Config,
+        *,
+        light: Parser | None = None,
+        client_factory: Any | None = None,
+    ) -> None:
+        self.cfg = cfg
+        self._light = light or LightParser()
+        self._client_factory = client_factory
+
+    def cache_extra(self) -> dict[str, Any]:
+        return {"liteparse_route": self.cfg.rag_liteparse_route}
+
+    def pages(self, path: Path) -> list[str]:
+        light_pages = self._light.pages(path)
+        try:
+            probe = self._client(ocr_enabled=False, target_pages=None)
+            complexity = probe.is_complex(str(path))
+        except ParserUnavailable:
+            raise
+        except Exception as exc:
+            _LOG.warning("liteparse is_complex failed; keeping light pages: %s", exc)
+            return light_pages
+        layout_nums, ocr_nums = routed_page_numbers(
+            complexity, self.cfg.rag_liteparse_route
+        )
+        if not layout_nums and not ocr_nums:
+            return light_pages
+        replacements: dict[int, str] = {}
+        if layout_nums:
+            replacements.update(
+                self._parse_targets(path, layout_nums, ocr_enabled=False)
+            )
+        if ocr_nums:
+            replacements.update(self._parse_targets(path, ocr_nums, ocr_enabled=True))
+        out = list(light_pages)
+        for index, text in replacements.items():
+            if 0 <= index < len(out):
+                out[index] = text
+        return out
+
+    def _client(self, *, ocr_enabled: bool, target_pages: str | None) -> Any:
+        if self._client_factory is not None:
+            return self._client_factory(
+                ocr_enabled=ocr_enabled, target_pages=target_pages
+            )
+        return _liteparse_client(
+            self.cfg, ocr_enabled=ocr_enabled, target_pages=target_pages
+        )
+
+    def _parse_targets(
+        self, path: Path, page_numbers: list[int], *, ocr_enabled: bool
+    ) -> dict[int, str]:
+        target = ",".join(str(n) for n in page_numbers)
+        try:
+            result = self._client(ocr_enabled=ocr_enabled, target_pages=target).parse(
+                str(path)
+            )
+        except ParserUnavailable:
+            raise
+        except Exception as exc:
+            _LOG.warning(
+                "liteparse parse failed for pages %s; keeping light text: %s",
+                target,
+                exc,
+            )
+            return {}
+        by_index: dict[int, str] = {}
+        parsed = list(getattr(result, "pages", None) or [])
+        texts = _liteparse_markdown_pages(result)
+        if len(parsed) == len(texts) == len(page_numbers) == 1:
+            by_index[page_numbers[0] - 1] = texts[0]
+            return by_index
+        if len(parsed) == len(texts):
+            for page, text in zip(parsed, texts):
+                number = _page_number(page)
+                if number >= 1:
+                    by_index[number - 1] = text
+            if by_index:
+                return by_index
+        if len(texts) == len(page_numbers):
+            return {n - 1: text for n, text in zip(page_numbers, texts)}
+        return by_index
+
+
+def routed_page_numbers(pages: Any, route: str) -> tuple[list[int], list[int]]:
+    """1-based page numbers for layout-only LiteParse vs parse-time OCR.
+
+    Layout reasons live on ``page.layout.reasons`` (object or dict). When the
+    binding omits ``layout``, ``tables`` routes nothing; ``ocr`` still uses
+    ``needs_ocr``. ``dense-graphics`` is ignored.
+    """
+    want_tables = route in {"all", "tables"}
+    want_ocr = route in {"all", "ocr"}
+    layout: list[int] = []
+    ocr: list[int] = []
+    seen_layout: set[int] = set()
+    seen_ocr: set[int] = set()
+    for page in pages or []:
+        number = _page_number(page)
+        if number < 1:
+            continue
+        needs = bool(getattr(page, "needs_ocr", False))
+        table = bool(_layout_reasons(page) & _TABLE_LAYOUT_REASONS)
+        if want_ocr and needs:
+            if number not in seen_ocr:
+                ocr.append(number)
+                seen_ocr.add(number)
+        elif want_tables and table:
+            if number not in seen_layout:
+                layout.append(number)
+                seen_layout.add(number)
+    return layout, ocr
+
+
+def _liteparse_client(
+    cfg: Config, *, ocr_enabled: bool, target_pages: str | None
+) -> Any:
+    cls = _liteparse_class()
+    kwargs: dict[str, Any] = {
+        "ocr_enabled": ocr_enabled,
+        "ocr_language": _ocr_language(cfg),
+        "output_format": "markdown",
+        "quiet": True,
+    }
+    if target_pages:
+        kwargs["target_pages"] = target_pages
+    try:
+        return cls(image_mode="off", **kwargs)
+    except TypeError:
+        return cls(**kwargs)
+
+
+def _liteparse_class() -> Any:
+    try:
+        from liteparse import LiteParse
+    except ImportError as exc:
+        raise ParserUnavailable(_LITEPARSE_EXTRA) from exc
+    return LiteParse
+
+
+def _ocr_language(cfg: Config) -> str:
+    raw = (cfg.ocr_languages or "eng").replace("+", " ").split()
+    return raw[0] if raw else "eng"
+
+
+def _page_number(page: Any) -> int:
+    value = getattr(page, "page_number", None)
+    if value is None:
+        value = getattr(page, "page_num", 0)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _layout_reasons(page: Any) -> set[str]:
+    layout = getattr(page, "layout", None)
+    if layout is None:
+        return set()
+    if isinstance(layout, dict):
+        reasons = layout.get("reasons") or []
+    else:
+        reasons = getattr(layout, "reasons", None) or []
+    return {str(item) for item in reasons}
+
+
+def _liteparse_markdown_pages(result: Any) -> list[str]:
+    pages = list(getattr(result, "pages", None) or [])
+    full = _strip_placeholders(str(getattr(result, "text", "") or ""))
+    if not pages:
+        return [full] if full.strip() else []
+    out: list[str] = []
+    for page in pages:
+        markdown = getattr(page, "markdown", None)
+        text = getattr(page, "text", None)
+        chosen = markdown if markdown not in (None, "") else text
+        out.append(_strip_placeholders(str(chosen or "")))
+    if len(pages) == 1 and full.strip() and len(full) >= len(out[0]):
+        return [full]
+    if full.strip() and all(not page.strip() for page in out):
+        return [full]
+    return out
+
+
 def get_parser(cfg: Config) -> Parser:
     if cfg.rag_parser == "docling":
         return DoclingParser()
     if cfg.rag_parser == "grobid":
         return GrobidParser(cfg)
+    if cfg.rag_parser == "liteparse":
+        return LiteParseParser(cfg)
+    if cfg.rag_parser == "hybrid":
+        return HybridParser(cfg)
     return LightParser()
 
 
@@ -232,6 +472,7 @@ def cached_pages(
     """Pages of ``path``, parsed once per file content and parser version."""
     cache = text_cache_path(cfg, key)
     stored = load_json(cache)
+    extra = _cache_extra(parser)
     if (
         stored is not None
         and stored.get("schema") == TEXT_SCHEMA
@@ -239,18 +480,27 @@ def cached_pages(
         and stored.get("parser") == parser.name
         and stored.get("parser_version") == parser.version
         and isinstance(stored.get("pages"), list)
+        and all(stored.get(k) == v for k, v in extra.items())
     ):
         return [str(page) for page in stored["pages"]]
     pages = parser.pages(path)
-    write_json(
-        cache,
-        {
-            "schema": TEXT_SCHEMA,
-            "key": key,
-            "sha256": sha256,
-            "parser": parser.name,
-            "parser_version": parser.version,
-            "pages": pages,
-        },
-    )
+    payload: dict[str, Any] = {
+        "schema": TEXT_SCHEMA,
+        "key": key,
+        "sha256": sha256,
+        "parser": parser.name,
+        "parser_version": parser.version,
+        "pages": pages,
+    }
+    payload.update(extra)
+    write_json(cache, payload)
     return pages
+
+
+def _cache_extra(parser: Parser) -> dict[str, Any]:
+    extra = getattr(parser, "cache_extra", None)
+    if extra is None:
+        return {}
+    if callable(extra):
+        extra = extra()
+    return dict(extra) if extra else {}

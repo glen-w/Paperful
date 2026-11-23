@@ -119,7 +119,9 @@ outside the git root as sibling dirs.
 | **light** | `light` (Compose default when unset) | `[serve]` | CI, small stranger image |
 | **heavy** | `heavy` (set in `.env.example`) | `[serve]` `[llm]` `[rag]` `[browser-agent]` | Full local env |
 
-`rag-docling` (Torch) is not in either image; use host `uv sync --extra rag-docling` if you need Docling parsing.
+`rag-docling` (Torch) and `rag-liteparse` are not in either image; use host
+`uv sync --extra rag-docling` or `--extra rag-liteparse` if you need those
+parsers.
 
 ```sh
 # Local full pack (recommended after cp .env.example .env):
