@@ -321,12 +321,11 @@ Count requests when the point of a change is fewer of them: `FakeZotero.calls`.
 
 ### CI and local pitfalls
 
-GitHub Actions (`.github/workflows/ci.yml`) runs three jobs on Ubuntu, Python
+GitHub Actions (`.github/workflows/ci.yml`) runs one job on Ubuntu, Python
 3.12: `uv run pytest -m smoke` (CLI version, shell pages, workbench command
-paths), lint (`ruff`, format, `mypy`), and the full offline suite with
-coverage. Audit, the socket gate, fresh-install, docker, browser, and the
-other OS/Python cells are not on the gate. The order for
-putting them back is [CI gate, cut back to smoke](ROADMAP.md#after-17-ci-rebuild).
+paths). Lint, the full offline suite, audit, the socket gate, fresh-install,
+docker, browser, and the other OS/Python cells are not on the gate. The order
+for putting them back is [CI gate, cut back to smoke](ROADMAP.md#after-17-ci-rebuild).
 
 Run the rest locally before a release:
 

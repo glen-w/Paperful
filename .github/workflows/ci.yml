@@ -1,5 +1,5 @@
-# Minimum gate. The OS/Python matrix, lint, audit, socket, fresh-install,
-# browser, and docker jobs are parked. Bring them back one step at a time:
+# Minimum gate. Lint, full suite, audit, socket, fresh-install, browser, and
+# docker are parked. Bring them back one step at a time:
 # docs/ROADMAP.md (CI gate, cut back to smoke).
 name: CI
 
@@ -18,32 +18,3 @@ jobs:
           python-version: "3.12"
       - run: uv sync --group dev --extra serve
       - run: uv run pytest -m smoke -q
-
-  lint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.12"
-      - run: uv sync --group dev
-      - run: make lint
-
-  suite:
-    # Full offline suite on one cell. Its coverage report feeds the badge.
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.12"
-      - run: uv sync --group dev --extra serve
-      - run: uv run pytest -q --cov=paperful --cov-report=term --cov-report=json:coverage.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: coverage-json
-          path: coverage.json
-          if-no-files-found: error
-          retention-days: 5

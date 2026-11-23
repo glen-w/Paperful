@@ -44,8 +44,8 @@ Zotero must be running with the local API enabled for integration tests that tou
 
 ```sh
 uv sync --group dev --extra serve
-make test                 # the offline suite (the same one CI runs)
-make lint                 # ruff check + ruff format --check + mypy (local; not a CI job)
+make test                 # full offline suite (local; not a CI job yet)
+make lint                 # ruff check + ruff format --check + mypy (local)
                           # mypy covers only [tool.mypy].files in pyproject.toml;
                           # add a new module there once it is typed end to end
 DOCS_STRICT=1 make docs   # after: uv sync --extra docs
@@ -53,11 +53,11 @@ DOCS_STRICT=1 make docs   # after: uv sync --extra docs
 
 Local-trust boundaries and reporting: [SECURITY.md](SECURITY.md).
 
-CI runs smoke, lint, and the full offline suite on Ubuntu
-(`.github/workflows/ci.yml`). The rest of the old gate ( audit, socket, fresh-install, docker,
-browser, and the OS/Python suite) is local until it is added back one job
-at a time ([roadmap](docs/ROADMAP.md#after-17-ci-rebuild)). The coverage
-badge refreshes only when a suite job uploads `coverage-json` again. The Docs
+CI runs smoke only on Ubuntu (`.github/workflows/ci.yml`). Lint, the full
+suite, audit, socket, fresh-install, docker, browser, and the OS/Python
+matrix are local until added back one job at a time
+([roadmap](docs/ROADMAP.md#after-17-ci-rebuild)). The coverage badge refreshes
+only when a suite job uploads `coverage-json` again (also parked). The Docs
 workflow (`.github/workflows/docs.yml`) runs the guide corpus tests and a strict
 Sphinx build; pushes to `main` that touch `docs/` or `website/` also redeploy
 Pages (`.github/workflows/pages.yml`).

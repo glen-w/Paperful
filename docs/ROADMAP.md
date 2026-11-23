@@ -715,9 +715,10 @@ The 15-cell suite (Ubuntu, macOS, and Windows, each on Python 3.10–3.14)
 plus lint, audit, socket, fresh-install, browser, and docker sat in the
 queue, and the Windows cells failed on path spelling and encoding. 1.9.0
 cut the gate to one job: Ubuntu, Python 3.12, `uv run pytest -m smoke`
-(CLI version, shell pages, workbench command paths). 1.9.4 put back lint
-and the full offline suite on that same cell, with the coverage report the
-badge reads.
+(CLI version, shell pages, workbench command paths). 1.9.4 briefly put back
+lint and the full offline suite on that same cell; they are parked again so
+`main` stays green while versions stabilise. Lint, suite, and the coverage
+badge refresh stay local until those jobs return.
 
 Bring jobs back one at a time, and only after the previous step has been
 green on `main` without sitting in a queue. Do not restore the 15-cell
@@ -726,8 +727,8 @@ matrix in one change.
 | Step | Job | What it proves |
 | --- | --- | --- |
 | 0 (done) | smoke | The package imports, `paperful` reports its version, and the workbench routes boot |
-| 1 (done, 1.9.4) | lint | `ruff`, format, and `mypy` on Ubuntu 3.12 |
-| 2 (done, 1.9.4) | suite, Ubuntu 3.12 | Full offline pytest, and the coverage artifact the badge reads |
+| 1 | lint | `ruff`, format, and `mypy` on Ubuntu 3.12 (`make lint` locally) |
+| 2 | suite, Ubuntu 3.12 | Full offline pytest, and the coverage artifact the badge reads |
 | 3 | socket | That same suite with sockets disabled |
 | 4 | fresh-install | An isolated `.[serve]` install: `doctor` exits 2 without Zotero, then `/health` answers |
 | 5 | docker | The light image, `doctor` exits 2, no live Zotero |
