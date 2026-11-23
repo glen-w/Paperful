@@ -108,6 +108,8 @@ def create_new(
             {"tag": prefix},
             {"tag": f"{prefix}:{row.provenance.get('backend') or 'openalex'}"},
         ]
+        if row.run_id:
+            tags.append({"tag": f"paperful-run:{row.run_id}"})
         staged = list((row.operator or {}).get("tags") or [])
         for extra in merge_tags(extra_tags, staged, [from_seed_tag(row.seed)]):
             tags.append({"tag": extra})

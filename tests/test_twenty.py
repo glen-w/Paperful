@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from paperful.snowball.authors import classify_listing_url, load_pack_file, pack_path
 from paperful.twenty import (
     PersonHit,
@@ -226,6 +228,27 @@ def test_twenty_request_retries_429(cfg, monkeypatch):
     )
     assert calls["n"] == 2
     assert payload["data"]["people"] == []
+
+
+def test_twenty_request_no_retry_on_connect_failure(cfg, monkeypatch):
+    import httpx
+
+    from paperful.twenty import twenty_request
+
+    monkeypatch.setenv("TWENTY_API_KEY", "test-key")
+    cfg.twenty_base_url = "https://api.twenty.example"
+    cfg.twenty_retry_max = 8
+    calls = {"n": 0}
+
+    def sender(method, url, headers, params, body):
+        calls["n"] += 1
+        raise httpx.ConnectError("Connection refused", request=httpx.Request("GET", url))
+
+    with pytest.raises(httpx.ConnectError):
+        twenty_request(
+            cfg, "GET", "rest/people", sender=sender, sleeper=lambda _s: None
+        )
+    assert calls["n"] == 1
 
 
 def test_lookup_apply_does_not_post(cfg, monkeypatch):

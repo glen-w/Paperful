@@ -189,24 +189,23 @@ class PhaseResult:
 
 
 def extract_orcids_from_candidates(path: Path, *, limit: int = MAX_ORCIDS) -> list[str]:
-    """Collect unique ORCID iDs from a snowball ``candidates.jsonl`` queue."""
+    """ORCID iDs from hop-0 keyword hits only (authors on seed papers, not hop-1 refs)."""
+    return list(extract_orcid_seed_map(path, limit=limit).keys())
+
+
+def extract_orcid_seed_map(
+    path: Path, *, limit: int = MAX_ORCIDS, hop: int = 0
+) -> dict[str, list[str]]:
+    """Map ORCID → DOIs where that author appears on hop-0 ``new`` rows from a keyword seed."""
+    from collections import Counter
+
+    from .resolve import normalize_doi
     from .snowball.openalex import normalize_orcid
 
-    seen: list[str] = []
-    found: set[str] = set()
+    counts: Counter[str] = Counter()
+    dois_by_orcid: dict[str, set[str]] = {}
     if not path.is_file():
-        return seen
-
-    def _add(raw: str) -> bool:
-        oid = normalize_orcid(raw) or ""
-        if not oid:
-            match = ORCID_RE.search(raw or "")
-            oid = normalize_orcid(match.group(0)) if match else ""
-        if not oid or oid in found:
-            return False
-        found.add(oid)
-        seen.append(oid)
-        return bool(limit and len(seen) >= limit)
+        return {}
 
     with path.open(encoding="utf-8") as handle:
         for line in handle:
@@ -214,17 +213,79 @@ def extract_orcids_from_candidates(path: Path, *, limit: int = MAX_ORCIDS) -> li
             if not line:
                 continue
             row = json.loads(line)
+            if int(row.get("hop") or 0) != hop:
+                continue
+            if str(row.get("status") or "") != "new":
+                continue
+            seed = row.get("seed") or {}
+            if str(seed.get("type") or "") != "keyword":
+                continue
+            doi = normalize_doi(str((row.get("ids") or {}).get("doi") or "")) or ""
             biblio = row.get("biblio") or {}
             for rec in biblio.get("author_records") or []:
                 if not isinstance(rec, dict):
                     continue
-                if _add(str(rec.get("orcid") or "")):
-                    return seen
-            blob = json.dumps(row, ensure_ascii=False)
-            for match in ORCID_RE.finditer(blob):
-                if _add(match.group(0)):
-                    return seen
-    return seen
+                oid = normalize_orcid(str(rec.get("orcid") or "")) or ""
+                if not oid:
+                    continue
+                counts[oid] += 1
+                if doi:
+                    dois_by_orcid.setdefault(oid, set()).add(doi)
+
+    ranked = [oid for oid, _n in counts.most_common(limit if limit > 0 else None)]
+    out = {oid: sorted(dois_by_orcid.get(oid, ())) for oid in ranked}
+    if out:
+        return out
+    coauthors = path.parent / "coauthors.json"
+    if coauthors.is_file():
+        return _seed_map_from_coauthors(coauthors, path, limit=limit)
+    return {}
+
+
+def _seed_map_from_coauthors(
+    coauthors_path: Path, queue_path: Path, *, limit: int
+) -> dict[str, list[str]]:
+    """When hop-0 rows were applied away, rank ORCIDs from the crawl co-author graph."""
+    from .resolve import normalize_doi
+    from .snowball.openalex import normalize_orcid
+
+    try:
+        payload = json.loads(coauthors_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    nodes = [
+        node
+        for node in (payload.get("nodes") or [])
+        if isinstance(node, dict) and normalize_orcid(str(node.get("orcid") or ""))
+    ]
+    nodes.sort(key=lambda n: (-int(n.get("frequency") or 0), str(n.get("orcid") or "")))
+    picked = [
+        normalize_orcid(str(node.get("orcid") or "")) or ""
+        for node in nodes[: max(limit, 0)]
+        if normalize_orcid(str(node.get("orcid") or ""))
+    ]
+    if not picked or not queue_path.is_file():
+        return {oid: [] for oid in picked}
+    dois_by_orcid: dict[str, set[str]] = {oid: set() for oid in picked}
+    want = set(picked)
+    with queue_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            if str(row.get("status") or "") != "new":
+                continue
+            doi = normalize_doi(str((row.get("ids") or {}).get("doi") or "")) or ""
+            if not doi:
+                continue
+            for rec in (row.get("biblio") or {}).get("author_records") or []:
+                if not isinstance(rec, dict):
+                    continue
+                oid = normalize_orcid(str(rec.get("orcid") or "")) or ""
+                if oid in want:
+                    dois_by_orcid[oid].add(doi)
+    return {oid: sorted(dois_by_orcid.get(oid, ())) for oid in picked}
 
 
 def soft_skip_matrix(
@@ -271,6 +332,33 @@ def _paperful_command(root: Path) -> list[str]:
     return ["uv", "run", "paperful"]
 
 
+def _snowball_run_id_from_json(path: Path) -> str | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    val = payload.get("snowball_run_id")
+    if val:
+        return str(val).strip() or None
+    queue = str((payload.get("artifacts") or {}).get("queue") or "")
+    if not queue:
+        return None
+    qpath = Path(queue)
+    if qpath.name == "candidates.jsonl":
+        return qpath.parent.name
+    if qpath.is_dir() and (qpath / "candidates.jsonl").is_file():
+        return qpath.name
+    return None
+
+
+def _load_resume_snowball_run_id(dest: Path) -> str | None:
+    for name in ("report.json", "phase-snowball_search.json"):
+        run_id = _snowball_run_id_from_json(dest / name)
+        if run_id:
+            return run_id
+    return None
+
+
 class E2ERunner:
     def __init__(
         self,
@@ -283,6 +371,7 @@ class E2ERunner:
         dry_run_search: bool = False,
         fetch_browser_agent: bool = True,
         fetch_camofox: bool | None = None,
+        snowball_run_id: str | None = None,
         paperful: Callable[..., subprocess.CompletedProcess[str]] | None = None,
         env: dict[str, str] | None = None,
     ) -> None:
@@ -318,7 +407,9 @@ class E2ERunner:
             "pack_slug": self.plan.pack_slug,
             "started_at": datetime.now(timezone.utc).isoformat(),
         }
-        self.snowball_run_id: str | None = None
+        self.snowball_run_id: str | None = snowball_run_id
+        if self.snowball_run_id is None:
+            self.snowball_run_id = _load_resume_snowball_run_id(self.dest)
         self.orcid_run_id: str | None = None
 
     def _default_paperful(
@@ -613,51 +704,75 @@ class E2ERunner:
                     reason="no candidates.jsonl to extract ORCIDs from",
                 )
             )
-        orcids = extract_orcids_from_candidates(queue, limit=self.plan.max_orcids)
-        if not orcids:
+        seed_map = extract_orcid_seed_map(queue, limit=self.plan.max_orcids)
+        if not seed_map:
             return self._record(
                 PhaseResult(
                     name="snowball_orcid",
                     status="skip",
                     required=False,
-                    reason="no ORCIDs on snowball author_records",
+                    reason="no ORCIDs on hop-0 keyword seeds",
                     artifacts={"queue": str(queue)},
                 )
             )
-        args = [
-            "snowball",
-            "orcid",
-            *orcids,
-            "--year-from",
-            str(self.plan.year_from),
-            "--year-to",
-            str(self.plan.year_to),
-            "--max-candidates",
-            str(self.plan.max_candidates),
-            "--depth",
-            str(self.plan.depth),
-            "--per-hop-limit",
-            str(self.plan.per_hop_limit),
-            "--gate",
-            "auto",
-            "--fetch-pdfs",
-            self.plan.fetch_pdfs,
-            "-C",
-            self.plan.collection,
-            "--author-site-preflight",
-        ]
-        result, payload = self._run_cmd(
-            args, phase="snowball_orcid", required=True, want_json=True
-        )
-        result.summary["orcids"] = orcids
-        result.artifacts["queue_source"] = str(queue)
-        run_id = self._snowball_id_from_payload(payload, result)
-        if run_id:
-            self.orcid_run_id = run_id
-            result.artifacts["queue"] = str(
-                self.root / "state" / "snowball" / run_id / "candidates.jsonl"
+        orcid_cap = min(30, self.plan.max_candidates)
+        outcomes: list[PhaseResult] = []
+        for orcid, seed_dois in seed_map.items():
+            args = [
+                "snowball",
+                "orcid",
+                orcid,
+                "--year-from",
+                str(self.plan.year_from),
+                "--year-to",
+                str(self.plan.year_to),
+                "--max-candidates",
+                str(orcid_cap),
+                "--depth",
+                "0",
+                "--per-hop-limit",
+                str(self.plan.per_hop_limit),
+                "--gate",
+                "auto",
+                "--fetch-pdfs",
+                self.plan.fetch_pdfs,
+                "-C",
+                self.plan.collection,
+                "--author-site-preflight",
+            ]
+            for doi in seed_dois[:20]:
+                args.extend(["--doi", doi])
+            one, payload = self._run_cmd(
+                args, phase=f"snowball_orcid_{orcid}", required=False, want_json=True
             )
-        return self._record(result)
+            one.name = "snowball_orcid"
+            outcomes.append(one)
+            run_id = self._snowball_id_from_payload(payload, one)
+            if run_id:
+                self.orcid_run_id = run_id
+        fail = next((r for r in outcomes if r.status == "fail"), None)
+        merged = PhaseResult(
+            name="snowball_orcid",
+            status=fail.status if fail else "ok",
+            required=True,
+            exit_code=fail.exit_code if fail else 0,
+            reason=fail.reason if fail else "",
+        )
+        merged.summary = {
+            "orcids": list(seed_map.keys()),
+            "orcid_seed_dois": {k: v[:20] for k, v in seed_map.items()},
+            "runs": len(outcomes),
+        }
+        merged.artifacts["queue_source"] = str(queue)
+        if self.orcid_run_id:
+            merged.artifacts["queue"] = str(
+                self.root
+                / "state"
+                / "snowball"
+                / self.orcid_run_id
+                / "candidates.jsonl"
+            )
+        return self._record(merged)
 
     def phase_run_fetch(self) -> PhaseResult:
         argv = [
@@ -1034,6 +1149,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Reuse an existing state/e2e/<run-id> (or legacy state/e2e-nba/) directory.",
     )
     parser.add_argument(
+        "--snowball-run-id",
+        default=None,
+        help="Keyword snowball run for ORCID seeding (default: report/phase artifact or newest).",
+    )
+    parser.add_argument(
         "--browser-agent",
         dest="fetch_browser_agent",
         action="store_true",
@@ -1090,6 +1210,7 @@ def main(argv: list[str] | None = None) -> int:
         dry_run_search=args.dry_run_search,
         fetch_browser_agent=fetch_browser_agent,
         fetch_camofox=args.fetch_camofox,
+        snowball_run_id=(args.snowball_run_id or "").strip() or None,
     )
     return runner.run()
 

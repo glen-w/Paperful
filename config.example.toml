@@ -505,6 +505,10 @@ concurrency = 2
 # hybrid_seeds = 5
 # refine = false
 # dedupe_after = "off"           # off | classify | apply
+# orcid_public_works = false     # full ORCID public-works list after seed DOIs
+# orcid_author_works = false     # OpenAlex author.orcid bibliography (cap per hop)
+# hop_min_overlap = 1            # drop hop≥1 neighbours with no overlap (unless cites_query set)
+# auto_apply_max = 0             # --gate auto: abort if more than N new creates (0 = off)
 # author_site_preflight = false
 # author_site_max_authors = 15
 # author_site_max_queries = 20

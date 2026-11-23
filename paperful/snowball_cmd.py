@@ -538,6 +538,7 @@ def run_snowball_doi(
 def run_snowball_orcid(
     console: Console,
     orcids: Any,
+    dois: Any,
     year_from: Any,
     year_to: Any,
     depth: Any,
@@ -608,9 +609,10 @@ def run_snowball_orcid(
     except SnowballError as exc:
         console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(exc.code) from exc
+    seed_dois = [str(d).strip() for d in (dois or []) if str(d).strip()]
     _run_snowball(
         cfg,
-        lambda c: run_orcid(c, seeds, request, console=out),
+        lambda c: run_orcid(c, seeds, request, console=out, seed_dois=seed_dois or None),
         json_out=json_out,
         command="snowball orcid",
     )

@@ -19,6 +19,7 @@ from .openalex import OpenAlexClient
 from .queue import write_queue, write_report
 from .discover import prioritize_for
 from .rank import apply_overlap
+from .relevance import filter_hop_neighbors
 from .tally import Tally, paint
 from .titles import repair_reference_titles
 
@@ -248,6 +249,11 @@ def _snowball_prepare_queue(
         study_designs=tuple(study_designs or ()),
         listed_in=tuple(listed_in or ()),
     )
+    hop_min = cfg.snowball_hop_min_overlap
+    cites_q = str(getattr(oa, "cites_query", "") or "").strip()
+    rows = filter_hop_neighbors(
+        rows, min_overlap=hop_min, cites_query=cites_q
+    )
     rows = truncate(rows, caps[0])
     if gate == "approve-batch" and not request.iterative:
         for row in rows:
@@ -333,6 +339,8 @@ def _execute_preflight(
         console=console,
     )
     if cfg.twenty_enabled and cfg.twenty_lookup_on_preflight:
+        import httpx
+
         from ..twenty import lookup_authors, twenty_ready
         from .authors import load_pack_file, pack_path, pack_slug
 
@@ -341,16 +349,22 @@ def _execute_preflight(
             pack = load_pack_file(pack_path(cfg, slug, promoted=False))
             people = list(pack.authors) if pack is not None else []
             if people:
-                lookup_authors(
-                    cfg,
-                    people,
-                    collection=request.collection,
-                    apply=True,
-                )
-                console.print(
-                    "twenty lookup on preflight · proposed pack/contacts updated "
-                    "(promote before author_site fetch; no mail)"
-                )
+                try:
+                    lookup_authors(
+                        cfg,
+                        people,
+                        collection=request.collection,
+                        apply=True,
+                    )
+                    console.print(
+                        "twenty lookup on preflight · proposed pack/contacts updated "
+                        "(promote before author_site fetch; no mail)"
+                    )
+                except httpx.HTTPError as exc:
+                    console.print(
+                        "[yellow]twenty lookup_on_preflight skipped[/] "
+                        f"(CRM unreachable: {exc})"
+                    )
         else:
             console.print(
                 "[yellow]twenty lookup_on_preflight skipped[/] "
@@ -429,6 +443,18 @@ def _execute_create_and_fill(
         raise SnowballError(f"Library was not read. Refusing to create items.{detail}")
     try:
         creatable = _settled_rows(rows, _blocked_dois(paused))
+        cap = (
+            request.auto_apply_max
+            if request.auto_apply_max is not None
+            else cfg.snowball_auto_apply_max
+        )
+        pending = [row for row in creatable if row.status == "new" and row.keep is not False]
+        if cap > 0 and len(pending) > cap:
+            tally.stop()
+            raise SnowballError(
+                f"gate auto would create {len(pending)} items; "
+                f"auto_apply_max is {cap}. Raise the cap, use dry-run, or tighten filters."
+            )
         items, counts = create_new(
             lib,
             creatable,

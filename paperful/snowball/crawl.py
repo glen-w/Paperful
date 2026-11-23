@@ -492,6 +492,7 @@ def orcid_candidates(
     keyword_min_score: float = 0.0,
     cites_query: str = "",
     hop_end: int | None = None,
+    author_works: bool = False,
 ) -> tuple[list[Candidate], list[str]]:
     """One or more people's works (hop 0), then one expander over the combined seeds."""
     _remember_keywords(
@@ -531,6 +532,7 @@ def orcid_candidates(
             failed=failed,
             seed_works=seed_works,
             seen_ids=seen_ids,
+            author_works=author_works,
         )
         if paused or client.deferred:
             break
@@ -582,6 +584,7 @@ def _orcid_person_hop0(
     seed_works: list[dict[str, Any]],
     seen_ids: set[str],
     skip_dois: bool = False,
+    author_works: bool = False,
 ) -> bool:
     """Resolve ORCID API DOIs + OpenAlex author works for one person. True if deferred."""
     seed = {"type": "orcid", "value": orcid}
@@ -671,11 +674,13 @@ def _orcid_person_hop0(
             if client.deferred:
                 return True
 
-    author_works: list[dict[str, Any]] = []
+    openalex_author_works: list[dict[str, Any]] = []
+    if not author_works:
+        return False
     client.stage = f"OpenAlex author {orcid}"
     client.note(client.stage)
     try:
-        author_works = client.works_by_author_orcid(
+        openalex_author_works = client.works_by_author_orcid(
             orcid, limit=max_candidates, year_from=year_from, year_to=year_to
         )
     except OpenAlexBudgetExceeded as exc:
@@ -698,7 +703,7 @@ def _orcid_person_hop0(
             why_prefix=f"ORCID {orcid}",
         )
         return True
-    for work in author_works:
+    for work in openalex_author_works:
         oa = short_id(str(work.get("id") or ""))
         if oa and oa in seen_ids:
             continue
@@ -1629,6 +1634,7 @@ def _resume_author(
             seed_works=seed_works,
             seen_ids=seen_ids,
             skip_dois=skip_dois,
+            author_works=bool(deferred.get("author_works", True)),
         )
         if paused or client.deferred:
             return rows
@@ -1757,6 +1763,7 @@ def _resume_seeds(
                 seed_works=seed_works,
                 seen_ids=seen_ids,
                 skip_dois=skip_dois,
+                author_works=bool(deferred.get("author_works", True)),
             )
             if paused or client.deferred:
                 return rows

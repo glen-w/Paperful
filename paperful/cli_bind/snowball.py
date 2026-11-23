@@ -359,6 +359,9 @@ def snowball_orcid(
     stop_k: int | None = StopKOpt,
     stop_max_screened: int | None = StopMaxScreenedOpt,
     seeds_file: str | None = SeedsFileOpt,
+    doi: list[str] = typer.Option(
+        [], "--doi", help="Limit hop-0 to these DOIs (repeat; one ORCID only)."
+    ),
     config: Path | None = ConfigOpt,
     fmt: str = AgentFormatOpt,
 ) -> None:
@@ -368,6 +371,7 @@ def snowball_orcid(
     run_snowball_orcid(
         console,
         orcids=orcids,
+        dois=doi,
         year_from=year_from,
         year_to=year_to,
         depth=depth,

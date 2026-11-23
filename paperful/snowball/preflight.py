@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import httpx
 from rich.console import Console
 
 from ..config import Config
@@ -72,7 +73,10 @@ def run_author_site_preflight(
             from ..twenty import listing_for_author, twenty_ready
 
             if twenty_ready(cfg):
-                url = listing_for_author(cfg, author)
+                try:
+                    url = listing_for_author(cfg, author)
+                except httpx.HTTPError:
+                    url = ""
                 if url:
                     source = "twenty"
         if not url and searxng_base_url(cfg) and queries < query_cap and author.name:
@@ -98,13 +102,16 @@ def run_author_site_preflight(
             if source == "searxng" and getattr(cfg, "twenty_writeback_listings", False):
                 from ..twenty import writeback_author_listing
 
-                writeback_author_listing(
-                    cfg,
-                    author,
-                    url,
-                    collection=collection,
-                    source="searxng",
-                )
+                try:
+                    writeback_author_listing(
+                        cfg,
+                        author,
+                        url,
+                        collection=collection,
+                        source="searxng",
+                    )
+                except httpx.HTTPError:
+                    pass
         people.append(author)
     slug = pack_slug(collection)
     pack = AuthorPack(

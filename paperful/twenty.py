@@ -45,6 +45,32 @@ _PERSONAL = (
 )
 Getter = Callable[[str, dict[str, str], dict[str, str]], Any]
 
+# Fail fast when CRM host is down; avoid multi-minute retry loops on SYN_SENT/half-open TCP.
+_TWENTY_CONNECT_S = 5.0
+_TWENTY_READ_S = 25.0
+
+
+def _twenty_http_timeout() -> httpx.Timeout:
+    return httpx.Timeout(
+        connect=_TWENTY_CONNECT_S,
+        read=_TWENTY_READ_S,
+        write=_TWENTY_READ_S,
+        pool=_TWENTY_CONNECT_S,
+    )
+
+
+def _twenty_transport_failed(exc: BaseException) -> bool:
+    """Errors where repeating the request will not help until the host is back."""
+    return isinstance(
+        exc,
+        (
+            httpx.ConnectError,
+            httpx.ConnectTimeout,
+            httpx.NetworkError,
+            httpx.PoolTimeout,
+        ),
+    )
+
 
 def twenty_api_key() -> str:
     return (os.environ.get("TWENTY_API_KEY") or "").strip()
@@ -104,7 +130,7 @@ def _headers() -> dict[str, str]:
 def _default_get(url: str, headers: dict[str, str], params: dict[str, str]) -> Any:
     from .http import client as http_client
 
-    with http_client(timeout=20, retries=0, guard=False) as client:
+    with http_client(timeout=_twenty_http_timeout(), retries=0, guard=False) as client:
         resp = client.get(url, headers=headers, params=params)
         resp.raise_for_status()
         return resp.json()
@@ -271,7 +297,7 @@ def _default_send(
 ) -> Any:
     from .http import client as http_client
 
-    with http_client(timeout=30, retries=0, guard=False) as client:
+    with http_client(timeout=_twenty_http_timeout(), retries=0, guard=False) as client:
         resp = client.request(
             method, url, headers=headers, params=params or None, json=body
         )
@@ -324,6 +350,8 @@ def twenty_request(
             headers_map = exc.response.headers if exc.response is not None else {}
             sleep(_retry_delay(headers_map, attempt, base))
         except httpx.HTTPError as exc:
+            if _twenty_transport_failed(exc):
+                raise
             last = exc
             if attempt >= retries:
                 raise

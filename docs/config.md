@@ -360,6 +360,10 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[snowball].stop_tau` / `stop_min_points` | `0.95` / `4` | Fitted Keep ceiling. Needs that many labeled hops. Config and profile only |
 | `[snowball].stop_max_screened` | `0` | `budget` cap. `0` means unset. CLI `--stop-max-screened` |
 | `[snowball].dedupe_after` | `off` | After create: `off`, `classify` (`state/dedupe-packs/`), or `apply` (merge high-DOI extras) |
+| `[snowball].orcid_public_works` | `false` | After resolving seed DOIs, also pull that ORCID’s public-works list. Prefer `false` unless you intend a full-author crawl. |
+| `[snowball].orcid_author_works` | `false` | OpenAlex `author.orcid:` full bibliography. Requires a seed paper on that ORCID; use with low `--per-hop-limit`. |
+| `[snowball].hop_min_overlap` | `1` | Drop hop ≥ 1 keyword neighbours with no ref/keyword/seed overlap unless `[snowball]` or the run sets an inherited `cites_query` (keyword seeds at depth ≥ 1 default to filtering refs/cites with the seed query). |
+| `[snowball].auto_apply_max` | `0` | With `--gate auto`, refuse apply when more than this many **new** rows would be created (`0` = no cap). Use for batch safety (e.g. `50`). |
 | `[snowball].author_site_preflight` | `false` | Co-author graph + proposed `state/author-packs/`. Promote before `author_site` fetch. Corpus frequency without a snowball run is `paperful authors -C … --apply` |
 | `[authorwatch]` | — | Not parsed. Caps are `authorwatch run --max-authors` / `--per-author-limit`. `doctor` ambers lists with people and no ORCID/OpenAlex id. No social scrape |
 | `[searxng].base_url` | `""` | SearXNG JSON endpoint for `paperful search` / Discover Web and author-site remainder discovery, or `SEARXNG_BASE_URL`. Never a default `run` source. Exit 2 from `search` when unset. [Web grey search](search.md), [Twenty and SearXNG](#twenty-and-searxng) |

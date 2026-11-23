@@ -14,6 +14,7 @@ from paperful.e2e_nba import (
     SCHEMA,
     E2ERunner,
     _paperful_command,
+    _seed_map_from_coauthors,
     build_e2e_plan,
     collection_for_topic,
     extract_orcids_from_candidates,
@@ -68,6 +69,10 @@ def test_extract_orcids_from_author_records(tmp_path: Path):
     queue = tmp_path / "candidates.jsonl"
     rows = [
         {
+            "hop": 0,
+            "status": "new",
+            "seed": {"type": "keyword", "value": "mcdr"},
+            "ids": {"doi": "10.1000/a"},
             "biblio": {
                 "author_records": [
                     {
@@ -76,15 +81,19 @@ def test_extract_orcids_from_author_records(tmp_path: Path):
                     },
                     {"orcid": "", "display_name": "B"},
                 ]
-            }
+            },
         },
         {
+            "hop": 0,
+            "status": "new",
+            "seed": {"type": "keyword", "value": "mcdr"},
+            "ids": {"doi": "10.1000/b"},
             "biblio": {
                 "author_records": [
                     {"orcid": "0000-0002-1825-0097"},
                     {"orcid": "0000-0001-2345-6789"},
                 ]
-            }
+            },
         },
     ]
     queue.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
@@ -96,6 +105,43 @@ def test_extract_orcids_from_author_records(tmp_path: Path):
 
 def test_extract_orcids_empty_queue(tmp_path: Path):
     assert extract_orcids_from_candidates(tmp_path / "missing.jsonl") == []
+
+
+def test_extract_orcids_from_coauthors_graph(tmp_path: Path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    queue = run_dir / "candidates.jsonl"
+    queue.write_text(
+        json.dumps(
+            {
+                "hop": 1,
+                "status": "new",
+                "seed": {"type": "keyword", "value": "mcdr"},
+                "ids": {"doi": "10.1000/seed"},
+                "biblio": {
+                    "author_records": [
+                        {"orcid": "https://orcid.org/0000-0002-4242-7526"}
+                    ]
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (run_dir / "coauthors.json").write_text(
+        json.dumps(
+            {
+                "nodes": [
+                    {"orcid": "0000-0002-4242-7526", "frequency": 9},
+                    {"orcid": "0000-0001-7294-2599", "frequency": 1},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    got = _seed_map_from_coauthors(run_dir / "coauthors.json", queue, limit=1)
+    assert list(got) == ["0000-0002-4242-7526"]
+    assert got["0000-0002-4242-7526"] == ["10.1000/seed"]
 
 
 def test_soft_skip_matrix():

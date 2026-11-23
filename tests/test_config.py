@@ -189,6 +189,16 @@ def test_snowball_default_tags(tmp_path):
     assert load_config(p).snowball_default_tags == ("bbnj", "grey")
 
 
+def test_snowball_hop_min_overlap_from_toml(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text(
+        'email = "me@example.org"\n\n[snowball]\nhop_min_overlap = 2\n',
+        encoding="utf-8",
+    )
+    assert load_config(p).snowball_hop_min_overlap == 2
+    assert Config().snowball_hop_min_overlap == 1
+
+
 def test_keepup_and_map_categories_from_toml(tmp_path):
     bare = Config()
     assert bare.keepup_interval_days == 7

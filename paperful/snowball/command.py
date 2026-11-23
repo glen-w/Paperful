@@ -162,6 +162,9 @@ class SnowballRequest:
     iterative: bool = False
     depth_ceiling: int | None = None
     prioritize: str | None = None
+    orcid_public_works: bool | None = None
+    orcid_author_works: bool | None = None
+    auto_apply_max: int | None = None
 
 
 @dataclass
@@ -195,7 +198,12 @@ def run_search(
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
     keywords = _keyword_caps(cfg, request)
-    cites_query = _checked_cites_query(request, direction, expands=depth >= 1)
+    cites_query = _inherit_cites_query(
+        query,
+        _checked_cites_query(request, direction, expands=depth >= 1),
+        direction,
+        depth=depth,
+    )
     hop_end = _arm_stop(cfg, request, depth)
     return _execute(
         cfg,
@@ -259,7 +267,12 @@ def run_hybrid(
     except ValueError as exc:
         raise SnowballError(str(exc)) from exc
     keywords = _keyword_caps(cfg, request)
-    cites_query = _checked_cites_query(request, direction, expands=True)
+    cites_query = _inherit_cites_query(
+        text,
+        _checked_cites_query(request, direction, expands=True),
+        direction,
+        depth=1,
+    )
     _arm_stop(cfg, request, 1)
     seeds = (
         request.hybrid_seeds
@@ -388,6 +401,7 @@ def run_orcid(
     lookup: Lookup | None = None,
     backend: Any = None,
     orcid_getter: Any = None,
+    seed_dois: list[str] | None = None,
 ) -> PathResult:
     _guard(cfg, request)
     raw_list = [orcid] if isinstance(orcid, str) else list(orcid)
@@ -412,13 +426,27 @@ def run_orcid(
     cites_query = _checked_cites_query(request, direction, expands=depth >= 1)
     hop_end = _arm_stop(cfg, request, depth)
     backends = _backends(cfg, request)
+    public_works = (
+        cfg.snowball_orcid_public_works
+        if request.orcid_public_works is None
+        else request.orcid_public_works
+    )
+    author_works = (
+        cfg.snowball_orcid_author_works
+        if request.orcid_author_works is None
+        else request.orcid_author_works
+    )
     dois_by_orcid: dict[str, list[str]] = {item: [] for item in cleaned}
-    if "orcid" in backends:
+    if "orcid" in backends and public_works:
         for item in cleaned:
             try:
                 dois_by_orcid[item] = orcid_dois(item, getter=orcid_getter)
             except OrcidError as exc:
                 raise SnowballError(str(exc)) from exc
+    elif not public_works:
+        console.print(
+            "[dim]orcid public works off; hop-0 uses explicit DOIs only[/]"
+        )
     else:
         console.print("[yellow]orcid backend off; using OpenAlex author filter only[/]")
 
@@ -428,6 +456,7 @@ def run_orcid(
         return orcid_candidates(
             oa,
             cleaned,
+            seed_dois,
             dois_by_orcid=dois_by_orcid,
             run_id=run_id,
             gate=gate,
@@ -444,6 +473,7 @@ def run_orcid(
             keyword_min_score=keywords[2],
             cites_query=cites_query,
             hop_end=hop_end,
+            author_works=author_works,
         )
 
     return _execute(
@@ -692,6 +722,26 @@ def _search_keywords_on(cfg: Config, request: SnowballRequest) -> bool:
     if request.search_keywords is None:
         return bool(cfg.snowball_search_keywords)
     return bool(request.search_keywords)
+
+
+def _inherit_cites_query(
+    seed_query: str,
+    explicit: str,
+    direction: str,
+    *,
+    depth: int,
+) -> str:
+    """Use the keyword seed as the ref/cite filter when depth ≥ 1 and none was set."""
+    query = (explicit or "").strip()
+    if query or depth < 1:
+        return query
+    seed = (seed_query or "").strip()
+    if not seed:
+        return ""
+    sides = direction_sides(direction)
+    if "refs" in sides or "cites" in sides:
+        return seed
+    return ""
 
 
 def _checked_cites_query(

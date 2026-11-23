@@ -386,6 +386,14 @@ class Config:
     snowball_author_site_preflight: bool = False
     snowball_author_site_max_authors: int = 15
     snowball_author_site_max_queries: int = 20
+    # ORCID snowball: off = only explicit --doi / seed-queue DOIs (no full public ORCID list,
+    # no OpenAlex ``works_by_author_orcid`` corpus dump).
+    snowball_orcid_public_works: bool = False
+    snowball_orcid_author_works: bool = False
+    # Hop ≥ 1 rows from a keyword seed need keyword/ref/seed overlap (see rank.py).
+    snowball_hop_min_overlap: int = 1
+    # gate auto aborts when more than this many new parents would be created (0 = off).
+    snowball_auto_apply_max: int = 0
     # Saturation stop. off keeps the one-shot hop caps.
     snowball_stop_rule: str = (
         "off"  # off | marginal_yield | asymptotic_coverage | budget | any
@@ -928,6 +936,14 @@ def _apply_snowball(raw: Any, cfg: Config) -> None:
         cfg.snowball_author_site_max_authors = int(raw["author_site_max_authors"])
     if "author_site_max_queries" in raw:
         cfg.snowball_author_site_max_queries = int(raw["author_site_max_queries"])
+    if "orcid_public_works" in raw:
+        cfg.snowball_orcid_public_works = bool(raw["orcid_public_works"])
+    if "orcid_author_works" in raw:
+        cfg.snowball_orcid_author_works = bool(raw["orcid_author_works"])
+    if "hop_min_overlap" in raw:
+        cfg.snowball_hop_min_overlap = max(0, int(raw["hop_min_overlap"]))
+    if "auto_apply_max" in raw:
+        cfg.snowball_auto_apply_max = max(0, int(raw["auto_apply_max"]))
     if any(
         key in raw
         for key in (

@@ -113,7 +113,11 @@ def _client(
 
 def _cfg(tmp_path: Path, **extra: str) -> Config:
     body = f'email = "t@example.org"\nout_dir = "{tmp_path / "out"}"\nstate_dir = "{tmp_path / "state"}"\n'
-    body += "[snowball]\nenabled = true\n"
+    body += (
+        "[snowball]\nenabled = true\n"
+        "orcid_public_works = true\n"
+        "orcid_author_works = true\n"
+    )
     body += extra.get("more", "")
     path = tmp_path / "config.toml"
     path.write_text(body)
@@ -1535,16 +1539,16 @@ def test_keyword_depth_expand_and_soft_ceiling(tmp_path: Path):
 
     works = {
         "W9": _work("W9", "10.1000/hit", "Hit", 2021, 2, ["W2"]),
-        "W2": _work("W2", "10.1000/ref", "Ref", 2019, 1),
+        "W2": _work("W2", "10.1000/ref", "Ref on bbnj", 2019, 1),
     }
 
     def getter(path: str, params: dict) -> dict:
-        if "search" in params:
-            return {"results": [works["W9"]]}
         filt = str(params.get("filter") or "")
         if filt.startswith("openalex:"):
             ids = filt.split(":", 1)[1].split("|")
             return {"results": [works[i] for i in ids if i in works]}
+        if "search" in params:
+            return {"results": [works["W9"]]}
         if path.startswith("/works/https://doi.org/"):
             doi = path.split("/works/https://doi.org/", 1)[1]
             for work in works.values():
