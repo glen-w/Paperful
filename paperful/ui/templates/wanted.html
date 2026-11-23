@@ -28,15 +28,12 @@
 <div class="tabs" role="tablist" aria-label="Wanted buckets">
   <span class="tab-with-help">
     <a href="{{ wanted_pagination.tab_urls.missing }}" {% if tab == 'missing' %}class="active" aria-current="page"{% endif %}>Missing <span class="tab-count">{{ counts.missing }}</span></a>
-    {{ info("Items with no stored PDF. This is the usual list to Preview and Grab.") }}
   </span>
   <span class="tab-with-help">
     <a href="{{ wanted_pagination.tab_urls.held }}" {% if tab == 'held' %}class="active" aria-current="page"{% endif %}>Held <span class="tab-count">{{ counts.held }}</span></a>
-    {{ info("A PDF was downloaded or linked, but it is not attached yet, the DOI does not match, or the file still needs a check.") }}
   </span>
   <span class="tab-with-help">
     <a href="{{ wanted_pagination.tab_urls.have }}" {% if tab == 'have' %}class="active" aria-current="page"{% endif %}>Have <span class="tab-count">{{ counts.have }}</span></a>
-    {{ info("A PDF whose DOI matches the library item is already on the record.") }}
   </span>
 </div>
 
@@ -50,10 +47,10 @@
     <summary class="field-legend">Filters {{ info("Narrow which items this run considers. Leave blank to use the whole Missing list (or your ticked rows).") }}</summary>
     <p class="section-lede">Optional limits. Undated items are dropped when you set a year range.</p>
     <div class="field-row">
-      <label>Year from {{ info("Only items dated this year or later. Undated items are excluded.") }} <input name="year_from" type="number" inputmode="numeric"></label>
-      <label>Year to {{ info("Only items dated this year or earlier. Undated items are excluded.") }} <input name="year_to" type="number" inputmode="numeric"></label>
-      <label>Type {{ info("Limit to a Zotero item type such as journalArticle or report.") }} <input name="item_type" placeholder="journalArticle"></label>
-      <label>Limit {{ info("Stop after this many items. Leave blank to consider every matching row.") }} <input name="limit" type="number" min="1" inputmode="numeric"></label>
+      <label>Year from <input name="year_from" type="number" inputmode="numeric"></label>
+      <label>Year to <input name="year_to" type="number" inputmode="numeric"></label>
+      <label>Type <input name="item_type" placeholder="journalArticle"></label>
+      <label>Limit <input name="limit" type="number" min="1" inputmode="numeric"></label>
     </div>
     <div class="field-row">
       <label><input type="checkbox" name="retry_failed" value="1"> Retry failed {{ info("Try again on items that already came back empty on a previous run.") }}</label>
@@ -65,9 +62,8 @@
   </details>
   {% endif %}
   <div class="field-group action-bar">
-    <p class="field-legend">Actions {{ info("Preview is safe. Grab downloads to Paperful. Attach writes held files into the library.") }} <span class="counts" id="wanted-selected-count" aria-live="polite"></span></p>
+    <p class="field-legend">Actions <span class="counts" id="wanted-selected-count" aria-live="polite"></span></p>
     <button type="submit" id="preview-btn" data-label-all="Preview all" data-label-sel="Preview selected">Preview all</button>
-    {{ info("Show which items would be fetched, without downloading.") }}
     <button type="submit" formaction="/wanted/grab" id="grab-btn" data-label-all="Grab all" data-label-sel="Grab selected">Grab all</button>
     {% if attach_mode == 'auto' %}
     {{ info("Download PDFs into the out/ folder on this computer and attach them into the library when write access is available (Zotero 10 or newer).") }}
@@ -99,7 +95,7 @@
       <input type="hidden" name="tab" value="{{ tab }}">
       <input type="hidden" name="page" value="1">
       <label>
-        Order by {{ info("Sort this tab. Year sorts put undated items last.") }}
+        Order by
         <select name="order" data-autosubmit>
           {% for value, label in wanted_pagination.orders %}
           <option value="{{ value }}"{% if value == wanted_pagination.order %} selected{% endif %}>{{ label }}</option>
@@ -107,7 +103,7 @@
         </select>
       </label>
       <label>
-        Per page {{ info("How many rows to show. Larger pages are heavier to render.") }}
+        Per page
         <select name="per_page" data-autosubmit>
           {% for n in wanted_pagination.page_sizes %}
           <option value="{{ n }}"{% if n == wanted_pagination.per_page %} selected{% endif %}>{{ n }}</option>
@@ -123,7 +119,7 @@
         </select>
       </label>
       <label>
-        Search {{ info("Match title, Zotero item key, or DOI. Applied with the other filters on this tab.") }}
+        Search
         <input type="search" name="q" value="{{ wanted_pagination.q }}" placeholder="Title, key, or DOI">
       </label>
       <button type="submit" class="secondary">Apply</button>
@@ -199,12 +195,10 @@
       <label><input type="checkbox" name="allow_mismatch" value="1"> Allow DOI mismatch {{ info("Attach a PDF whose DOI does not match the library item. The file may be a different paper.", danger=true) }}</label>
       <label><input type="checkbox" name="allow_short" value="1"> Allow short PDF {{ info("Attach a dense one-page PDF that Paperful held back because it often looks like a landing page, not a full article.", danger=true) }}</label>
       <button type="submit" class="secondary">Preview attach</button>
-      {{ info("Show which held files would be attached with the overrides above, without writing to the library.") }}
     </form>
     <form method="post" action="/wanted/attach" class="toolbar">
       <input type="hidden" name="review_token" value="{{ attach_token }}">
       <button type="submit"{% if not attach_token %} disabled title="Preview attach first"{% endif %}>Attach held PDFs</button>
-      {{ info("Apply the last successful attach preview. Disabled until a Preview attach has finished.") }}
     </form>
   </div>
   <div class="cluster">
@@ -219,7 +213,7 @@
           <option value="browser_agent_not_found">browser_agent_not_found</option>
         </select>
       </label>
-      <label>Limit {{ info("Cap how many items Recover tries this time.") }} <input name="recover_limit" type="number" min="1" inputmode="numeric"></label>
+      <label>Limit <input name="recover_limit" type="number" min="1" inputmode="numeric"></label>
       <button type="submit" class="secondary">Preview recover</button>
       {{ info("Show which items would be sent to the browser agent, without opening a browser.") }}
     </form>
@@ -240,14 +234,13 @@
         <option value="watch">watch</option>
       </select>
     </label>
-    <label><input type="checkbox" name="include_doi_tabs" value="1"> Include DOI tabs {{ info("Also open doi.org for items that have no better URL.") }}</label>
+    <label><input type="checkbox" name="include_doi_tabs" value="1"> Include DOI tabs</label>
     <button type="submit" class="secondary">Handoff</button>
   </form>
   <form method="post" action="/wanted/inbox/drain" class="toolbar">
     <p class="field-legend">Inbox {{ info("A drop folder for PDFs you downloaded yourself. Paperful matches files to library items by DOI or title.") }}</p>
     <p class="section-lede">Put hand-downloaded PDFs in the configured inbox folder, then drain it here.</p>
     <button type="submit" class="secondary">Drain inbox</button>
-    {{ info("Match whatever is waiting in the drop folder and attach the hits. Unmatched files stay put.") }}
   </form>
   <form method="post" action="/wanted/reachout" class="toolbar keys-form">
     <p class="field-legend">Reachout {{ info("Export a list of authors to ask for a PDF (ResearchGate and similar). Paperful never sends mail.") }}</p>
@@ -291,10 +284,8 @@
     {% if pending.total > 10 %}<p class="section-lede">and {{ pending.total - 10 }} more (open Discover to add the rest).</p>{% endif %}
     <div class="toolbar">
       <button type="submit" class="secondary">Preview add</button>
-      {{ info("Classify the ticked DOIs against this collection without writing. Rows without a DOI stay for Discover.") }}
       <button type="submit" formaction="/wanted/pending-apply" formmethod="post"{% if not pending_token %} disabled title="Preview add first"{% endif %}>Apply add</button>
       <input type="hidden" name="review_token" value="{{ pending_token }}">
-      {{ info("Create metadata parents for the last successful Preview add. They land under Missing. Disabled until a Preview add has finished.") }}
     </div>
   </form>
   {% endif %}

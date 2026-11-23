@@ -28,7 +28,7 @@
   <h2>Library item</h2>
   <p class="section-lede">The item picker follows the collection chip. Overlap and “cited but not in library” union that chip with any extra collections below (CLI <code>-C</code>, repeatable) when <code>state/rag/text/</code> exists.</p>
   <form method="post" action="/peer-review" class="toolbar" enctype="multipart/form-data">
-    <label>Item {{ info("A paper already mirrored under out/. --item on the CLI.") }}
+    <label>Item
       <select name="item_key">
         <option value="">Choose an item</option>
         {% for it in items %}
@@ -47,7 +47,7 @@
     <label><input type="checkbox" name="vale" value="1"> Vale {{ info("Optional house-style pass. Not pre-checked. Needs vale on PATH and [peer_review].vale_config (or .vale.ini next to the paperful config). Missing extra records vale_unavailable / vale_no_config / vale_failed. Also runs when [peer_review].vale is true.") }}</label>
     <label><input type="checkbox" name="forensics" value="1"> Forensics (PaperGuard) {{ info("Optional subprocess scan. Not a lane. Needs paperguard on PATH. Findings are suggested anomalies to investigate, not a misconduct verdict. Missing extra records paperguard_unavailable. Also runs when [peer_review].forensics is true.") }}</label>
     <label><input type="checkbox" name="apply" value="1"> Write child note {{ info("Library item only. Tagged paperful-peer-review. Uploads stay disk-only.", danger=true) }}</label>
-    <label><input type="checkbox" name="show_dismissed" value="1"> Show dismissed {{ info("Include findings you previously dismissed in pack.md.") }}</label>
+    <label><input type="checkbox" name="show_dismissed" value="1"> Show dismissed</label>
     <button type="submit">Peer review item</button>
     {{ info("Writes state/peer-reviews/<item-key>/<stamp>/pack.json and pack.md. Does not fetch or attach.") }}
   </form>

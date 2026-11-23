@@ -23,7 +23,7 @@
 <form method="post" action="/briefs/summarize" class="form-stack">
   <div class="field-group">
     <p class="field-legend">Filters {{ info("Which PDFs to summarize, in what order, and where to write them.") }}</p>
-    <label>Order {{ info("Queue order before Limit. library: Zotero order. newest / oldest: by year. Undated items sort last.") }}
+    <label>Order
       <select name="order">
         {% for o in orders %}
         <option value="{{ o }}" {% if o == flags.summarize_order %}selected{% endif %}>{{ o }}</option>
@@ -37,13 +37,12 @@
         {% endfor %}
       </select>
     </label>
-    <label>Limit {{ info("Max items to consider, including ones that will be skipped because a summary already exists.") }} <input type="number" name="limit" min="1"></label>
-    <label>Max new {{ info("Stop after this many new model summaries. Skips do not count, so this caps token spend.") }} <input type="number" name="max_new" min="1"></label>
-    <label>Year from {{ info("Only items dated this year or later. Undated items are excluded.") }} <input type="number" name="year_from"></label>
-    <label>Year to {{ info("Only items dated this year or earlier. Undated items are excluded.") }} <input type="number" name="year_to"></label>
+    <label>Limit <input type="number" name="limit" min="1"></label>
+    <label>Max new <input type="number" name="max_new" min="1"></label>
+    <label>Year from <input type="number" name="year_from"></label>
+    <label>Year to <input type="number" name="year_to"></label>
     <label><input type="checkbox" name="force" value="1"> Force {{ info("Regenerate even when a summary already exists, and summarize when the PDF identity check would skip the item.") }}</label>
     <button type="submit" {% if summarize_result.status == 'queued' or summarize_result.status == 'running' %}data-poll-button{% endif %}>Summarize</button>
-    {{ info("Write grounded summaries for PDFs in scope. Spends tokens. Skips papers that already have a summary unless Force is on.") }}
   </div>
 </form>
 {% if summaries %}
@@ -92,9 +91,9 @@
         {% endfor %}
       </select>
     </label>
-    <label>Limit {{ info("Max summary notes to include. Leave blank for the whole scope.") }} <input type="number" name="limit" min="1" value="{{ synth_form.limit }}"></label>
-    <label>Year from {{ info("Only summaries dated this year or later.") }} <input type="number" name="year_from" value="{{ synth_form.year_from }}"></label>
-    <label>Year to {{ info("Only summaries dated this year or earlier.") }} <input type="number" name="year_to" value="{{ synth_form.year_to }}"></label>
+    <label>Limit <input type="number" name="limit" min="1" value="{{ synth_form.limit }}"></label>
+    <label>Year from <input type="number" name="year_from" value="{{ synth_form.year_from }}"></label>
+    <label>Year to <input type="number" name="year_to" value="{{ synth_form.year_to }}"></label>
     <label>Layout {{ info("default: current review sections. conflict: camps and methods, no smoothed narrative. review: question → methods → findings → limits. Distinct from Ask --focus. --layout on the CLI.") }}
       <select name="layout">
         {% for layout in layout_options %}
@@ -107,9 +106,7 @@
     <p class="counts">No collection in the chip — destination defaults to disk. Zotero or both needs a collection.</p>
     {% endif %}
     <button type="submit" name="dry_run" value="1"{% if synthesize_result.status in ('queued', 'running') and synthesize_result.args.dry_run %} data-poll-button{% endif %}>Dry-run</button>
-    {{ info("Show source counts and the chunk plan. No model call.") }}
     <button type="submit" name="dry_run" value="0"{% if synthesize_result.status in ('queued', 'running') and not synthesize_result.args.dry_run %} data-poll-button{% endif %}>Write report</button>
-    {{ info("Call the model and write the report to Dest.") }}
   </div>
 </form>
 {% if reports %}

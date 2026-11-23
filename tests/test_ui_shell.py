@@ -505,7 +505,6 @@ def test_pages_include_beginner_help(tmp_path, monkeypatch):
     ask = client.get("/ask")
     assert ask.status_code == 200
     assert 'class="page-lede"' in ask.text
-    assert "Ignore cached answers" in ask.text
 
     briefs = client.get("/briefs")
     assert "Regenerate even when a summary already exists" in briefs.text

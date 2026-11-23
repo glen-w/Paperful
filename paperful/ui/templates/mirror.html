@@ -56,7 +56,6 @@
     <form method="post" action="/mirror/apply" class="toolbar">
       <input type="hidden" name="review_token" value="{{ run_rec.review_token }}">
       <button type="submit">Apply {{ verb }}</button>
-      {{ info("Write the last successful preview for this action.") }}
     </form>
     {% endif %}
   </div>

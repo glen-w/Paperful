@@ -69,7 +69,7 @@
         of {{ library_pagination.total }}
       </span>
       <label>
-        Per page {{ info("How many rows to show. Larger pages are heavier to render.") }}
+        Per page
         <select name="per_page" data-autosubmit>
           {% for n in library_pagination.page_sizes %}
           <option value="{{ n }}"{% if n == library_pagination.per_page %} selected{% endif %}>{{ n }}</option>

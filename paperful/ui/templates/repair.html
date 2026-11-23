@@ -65,7 +65,7 @@
       {% if q.verb == 'attachments' %}
       <label><input type="checkbox" name="fix_broken" value="1"> Fix broken {{ info("Clear or repair attachment links that no longer point at a file.") }}</label>
       <label><input type="checkbox" name="merge_files" value="1"> Merge files {{ info("Collapse duplicate PDF attachments on the same item into one file.") }}</label>
-      <label><input type="checkbox" name="rename" value="1"> Rename {{ info("Rename attachment titles to match the parent item.") }}</label>
+      <label><input type="checkbox" name="rename" value="1"> Rename</label>
       <label><input type="checkbox" name="link" value="1"> Link (personal library) {{ info("Turn a linked PDF URL into a stored file. Only works on a personal Zotero library, not a group.") }}</label>
       {% endif %}
       {% if q.verb == 'ocr' %}

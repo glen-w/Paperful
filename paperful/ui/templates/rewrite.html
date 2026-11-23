@@ -18,7 +18,7 @@
   {% if recent %}
   <p class="section-lede">Dismissed findings are skipped. The source file and Zotero stay unchanged.</p>
   <form method="post" action="/rewrite" class="toolbar" enctype="multipart/form-data">
-    <label>Pack {{ info("Latest packs on disk. --pack on the CLI.") }}
+    <label>Pack
       <select name="pack_dir">
         <option value="">Choose a pack</option>
         {% for row in recent %}

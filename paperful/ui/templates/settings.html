@@ -11,9 +11,9 @@
   <p class="section-lede">Email, out/ path, and the checkboxes are written into <code>{{ config_path or 'config.toml' }}</code> (values are validated first; the file is never left half-written). The <strong>Preset</strong> is remembered in this browser only. Campus uses your university login; Open access does not.</p>
 <form method="post" action="/settings" class="form-stack">
   <div class="field-group">
-    <p class="field-legend">Local {{ info("Stored in config.toml on this machine. Not sent anywhere except Unpaywall, which requires the email.") }}</p>
+    <p class="field-legend">Local</p>
     <label>Unpaywall email {{ info("Required by Unpaywall’s API. Use an address you control. Paperful sends it only to Unpaywall.") }} <input name="email" type="email" value="{{ email }}" autocomplete="email"></label>
-    <label>out/ path {{ info("Folder for the on-disk library mirror, summaries, and reports. Restore and Index read from here. The parent folder must already exist.") }} <input name="out_dir" value="{{ out_dir }}"></label>
+    <label>out/ path <input name="out_dir" value="{{ out_dir }}"></label>
     <label>Preset {{ info("Open access: public PDF sources only. Campus: also use EZProxy / university login for paywalled papers. Stored as a browser cookie, not in config.toml — the CLI keeps its own --preset flag.") }}
       <select name="preset">
         <option value="oa" {% if prefs.preset == 'oa' %}selected{% endif %}>Open access</option>
@@ -28,7 +28,7 @@
       </select>
     </label>
     {% endif %}
-    <label>Citation map edits {{ info("Where the Discover map shows library actions (add, tags, Find PDF). both = sidebar panel (default).") }}
+    <label>Citation map edits
       <select name="citation_map_edit">
         <option value="both" {% if citation_map_edit == 'both' %}selected{% endif %}>Both</option>
         <option value="sidebar" {% if citation_map_edit == 'sidebar' %}selected{% endif %}>Sidebar only</option>
@@ -36,11 +36,10 @@
         <option value="off" {% if citation_map_edit == 'off' %}selected{% endif %}>Off</option>
       </select>
     </label>
-    <label><input type="checkbox" name="citation_map_auto_search" value="1" {% if citation_map_auto_search %}checked{% endif %}> Auto-search PDF after Add to library {{ info("When you add a paper from the map, also run Find PDF for that item. Off by default.") }}</label>
-    <label><input type="checkbox" name="coauthor_network" value="1" {% if coauthor_network != 'off' %}checked{% endif %}> Co-author network on People {{ info("Show the ORCID ego map on Discover → People. Off hides the panel.") }}</label>
-    <label><input type="checkbox" name="web_search" value="1" {% if web_search != 'off' %}checked{% endif %}> Web search on Discover {{ info("Show Discover → Web (SearXNG grey search). Off hides the tab.") }}</label>
+    <label><input type="checkbox" name="citation_map_auto_search" value="1" {% if citation_map_auto_search %}checked{% endif %}> Auto-search PDF after Add to library</label>
+    <label><input type="checkbox" name="coauthor_network" value="1" {% if coauthor_network != 'off' %}checked{% endif %}> Co-author network on People</label>
+    <label><input type="checkbox" name="web_search" value="1" {% if web_search != 'off' %}checked{% endif %}> Web search on Discover</label>
     <button type="submit">Save</button>
-    {{ info("Write these values into config.toml on this machine.") }}
   </div>
 </form>
 </section>

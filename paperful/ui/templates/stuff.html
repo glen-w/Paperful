@@ -23,7 +23,7 @@
   <h2>Library item</h2>
   <p class="section-lede">Scope follows the collection chip. The source item is never listed as a hit for itself.</p>
   <form method="post" action="/stuff" class="toolbar" enctype="multipart/form-data">
-    <label>Item {{ info("A paper already mirrored under out/. --item on the CLI.") }}
+    <label>Item
       <select name="item_key">
         <option value="">Choose an item</option>
         {% for it in items %}
@@ -67,7 +67,6 @@
       <input type="number" name="k" min="1" value="{{ stuff_k }}">
     </label>
     <button type="submit">Stuff file</button>
-    {{ info("Same as --file. Collection chip is the search scope.") }}
   </form>
 </section>
 
