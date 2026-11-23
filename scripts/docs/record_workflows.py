@@ -31,7 +31,7 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "docs" / "_static" / "workflows"
 BASE = os.environ.get("PAPERFUL_UI", "http://127.0.0.1:8765").rstrip("/")
-COLLECTION = os.environ.get("PAPERFUL_SHOT_COLLECTION", "Reading/Coral reefs")
+COLLECTION = os.environ.get("PAPERFUL_SHOT_COLLECTION", "ocean/BBNJ")
 # Title order floats "(untitled)" rows to the top; newest-first reads better.
 WANTED_ORDER = os.environ.get("PAPERFUL_SHOT_ORDER", "year_new")
 VIEWPORT = {"width": 1280, "height": 800}
@@ -377,7 +377,7 @@ def flow_library_scope(browser, workdir: Path) -> None:
     row.scroll_into_view_if_needed()
     page.wait_for_timeout(200)
     rec.frame(0.6)
-    rec.click(row.locator("button.icon-btn").first, hold_before=0.5, navigates=False)
+    rec.click(row.locator("button.icon-btn").first, hold_before=0.5, navigates=True)
     page.wait_for_timeout(800)
     page.evaluate("() => window.scrollTo(0, 0)")
     page.wait_for_timeout(200)

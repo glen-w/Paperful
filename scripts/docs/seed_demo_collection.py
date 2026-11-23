@@ -5,8 +5,12 @@ Needs Zotero open (local API), Unpaywall email in config.toml, and network.
 Ask needs ``[llm]`` enabled. Does not opt in Sci-Hub or Scholar.
 
     uv run python scripts/docs/seed_demo_collection.py
-    PAPERFUL_SHOT_COLLECTION="Reading/Coral reefs" \\
+    PAPERFUL_SHOT_COLLECTION="ocean/BBNJ" \\
       uv run python scripts/docs/seed_demo_collection.py
+
+Public shots default to ``ocean/BBNJ``. If that collection already has
+enough parents, snowball and ``run`` are skipped so production is not
+mutated; ingest and Ask still run.
 """
 
 from __future__ import annotations
@@ -18,10 +22,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_COLLECTION = os.environ.get("PAPERFUL_SHOT_COLLECTION", "Reading/Coral reefs")
-DEFAULT_QUERY = os.environ.get("PAPERFUL_SHOT_TOPIC", "coral reef restoration")
+DEFAULT_COLLECTION = os.environ.get("PAPERFUL_SHOT_COLLECTION", "ocean/BBNJ")
+DEFAULT_QUERY = os.environ.get("PAPERFUL_SHOT_TOPIC", "BBNJ Agreement")
 DEFAULT_ASK = os.environ.get(
-    "PAPERFUL_SHOT_ASK", "What are coral endosymbionts?"
+    "PAPERFUL_SHOT_ASK", "What does the BBNJ Agreement require for EIAs?"
 )
 MIN_PARENTS = 20
 
@@ -78,7 +82,7 @@ def main() -> None:
     have_enough = n is not None and n >= MIN_PARENTS
 
     if have_enough:
-        print(f"skip snowball: {collection} already has ~{n} items")
+        print(f"skip snowball and run: {collection} already has ~{n} items")
     else:
         _paperful(
             "snowball",
@@ -99,32 +103,31 @@ def main() -> None:
             "--no-author-site-preflight",
             "--no-refine",
         )
-
-    # Have: a few OA PDFs attached (Zotero 10+).
-    _paperful(
-        "run",
-        "-C",
-        collection,
-        "--preset",
-        "oa",
-        "--limit",
-        "5",
-        "--no-browser-agent",
-        check=False,
-    )
-    # Held: downloaded to out/, not attached.
-    _paperful(
-        "run",
-        "-C",
-        collection,
-        "--preset",
-        "oa",
-        "--limit",
-        "5",
-        "--no-attach",
-        "--no-browser-agent",
-        check=False,
-    )
+        # Have: a few OA PDFs attached (Zotero 10+).
+        _paperful(
+            "run",
+            "-C",
+            collection,
+            "--preset",
+            "oa",
+            "--limit",
+            "5",
+            "--no-browser-agent",
+            check=False,
+        )
+        # Held: downloaded to out/, not attached.
+        _paperful(
+            "run",
+            "-C",
+            collection,
+            "--preset",
+            "oa",
+            "--limit",
+            "5",
+            "--no-attach",
+            "--no-browser-agent",
+            check=False,
+        )
 
     ingest = _paperful("rag", "ingest", "-C", collection, check=False)
     if ingest.returncode != 0:

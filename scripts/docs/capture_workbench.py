@@ -30,15 +30,15 @@ DOCS_OUT = ROOT / "docs" / "_static" / "workflows"
 WEB_OUT = ROOT / "website" / "images"
 THREADS = Path(load_config().state_dir) / "rag" / "threads"
 BASE = os.environ.get("PAPERFUL_UI", "http://127.0.0.1:8765").rstrip("/")
-COLLECTION = os.environ.get("PAPERFUL_SHOT_COLLECTION", "Reading/Coral reefs")
-TOPIC_QUERY = os.environ.get("PAPERFUL_SHOT_TOPIC", "coral reef restoration")
-SEARCH_Q = os.environ.get("PAPERFUL_SHOT_SEARCH", "reef restoration")
+COLLECTION = os.environ.get("PAPERFUL_SHOT_COLLECTION", "ocean/BBNJ")
+TOPIC_QUERY = os.environ.get("PAPERFUL_SHOT_TOPIC", "BBNJ Agreement")
+SEARCH_Q = os.environ.get("PAPERFUL_SHOT_SEARCH", "environmental impact assessment")
 ASK_QUESTION = os.environ.get(
     "PAPERFUL_SHOT_ASK",
-    "What are coral endosymbionts?",
+    "What does the BBNJ Agreement require for EIAs?",
 )
-PEOPLE_LIST = os.environ.get("PAPERFUL_SHOT_LIST", "reef-voices")
-FOLLOW_ORCID = os.environ.get("PAPERFUL_SHOT_ORCID", "0000-0000-0000-0000")
+PEOPLE_LIST = os.environ.get("PAPERFUL_SHOT_LIST", "bbnj-voices")
+FOLLOW_ORCID = os.environ.get("PAPERFUL_SHOT_ORCID", "0000-0001-9025-7632")
 # Title order floats "(untitled)" rows to the top; newest-first reads better.
 WANTED_ORDER = os.environ.get("PAPERFUL_SHOT_ORDER", "year_new")
 VIEWPORT = {"width": 1440, "height": 900}

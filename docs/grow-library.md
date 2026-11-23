@@ -15,7 +15,7 @@ in the same click.
 Workbench at http://127.0.0.1:8765. A collection chip is helpful (new
 parents can land there) but topic search itself does not require one.
 
-The screenshots are the Discover page on a live `Reading/Coral reefs` chip.
+The screenshots are the Discover page on a live `ocean/BBNJ` chip.
 
 ## What you’ll do
 
@@ -33,7 +33,7 @@ The screenshots are the Discover page on a live `Reading/Coral reefs` chip.
    dry-run queue). Advanced can filter by OpenAlex study designs or trusted
    journal lists (`listed_in`: DOAJ, MEDLINE, …).
 
-2. Type a query (for example `coral reef restoration`) and **Search**. You
+2. Type a query (for example `BBNJ Agreement`) and **Search**. You
    land on **Queue**, where per-row **Keep** / **Skip** marks the candidates.
    Nothing is written to Zotero yet. (**Explore**, the first tab, skips the
    keyword step: paste a DOI or title and **Open map**.)
@@ -111,12 +111,12 @@ clear next step on Wanted.
 ## CLI equivalent
 
 ```sh
-docker compose run --rm paperful snowball search "coral reef restoration" --gate dry-run
+docker compose run --rm paperful snowball search "BBNJ Agreement" --gate dry-run
 # review state/snowball/<run-id>/
-docker compose run --rm paperful snowball apply <run-id> --apply -C "Reading/Coral reefs"
-docker compose run --rm paperful authorwatch save reef-voices
-docker compose run --rm paperful authorwatch add reef-voices --orcid 0000-0000-0000-0000
-docker compose run --rm paperful authorwatch run reef-voices
+docker compose run --rm paperful snowball apply <run-id> --apply -C ocean/BBNJ
+docker compose run --rm paperful authorwatch save bbnj-voices
+docker compose run --rm paperful authorwatch add bbnj-voices --orcid 0000-0001-9025-7632
+docker compose run --rm paperful authorwatch run bbnj-voices
 ```
 
 ## Next

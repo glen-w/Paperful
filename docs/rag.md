@@ -8,7 +8,7 @@ completion); **advanced** scores passages first — [Ask modes](#ask-modes).
 workbench, that is **Ask** on the default nav. Extra cites for a draft reuse
 that retriever: [stuff](stuff.md).
 
-![Ask: a cited answer from PDFs already on disk in Reading/Coral reefs](_static/workflows/index-ask.png)
+![Ask: a cited answer from PDFs already on disk in ocean/BBNJ](_static/workflows/index-ask.png)
 
 Everything here is optional and off until `[rag].enabled = true`.
 

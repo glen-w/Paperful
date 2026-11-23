@@ -23,9 +23,9 @@ only `docs/*.md`; every page must appear in `docs/index.md` toctrees
 (`tests/test_sphinx_docs.py`). The docs workflow is advisory (warnings
 allowed) and Pages deploys without `-W`, so run `DOCS_STRICT=1 make docs`
 locally before pushing guide changes. Live site: [paperful.app](https://paperful.app/) with the guide at
-[paperful.app/guide/](https://paperful.app/guide/). Public shots use a
-demo collection (`Reading/Coral reefs` by default). Seed it once (Zotero
-open, email in config, network; Ask needs `[llm]`):
+[paperful.app/guide/](https://paperful.app/guide/). Public shots use `ocean/BBNJ` (Ocean → BBNJ; `-C BBNJ` will not resolve).
+If that collection is already populated, seed skips snowball and `run`.
+Otherwise seed once (Zotero open, email in config, network; Ask needs `[llm]`):
 
 ```sh
 uv run python scripts/docs/seed_demo_collection.py

@@ -14,20 +14,20 @@ fetch.
 ## CLI
 
 ```text
-paperful search "coral reef" OR "reef restoration" \
+paperful search "BBNJ" OR "biodiversity beyond national jurisdiction" \
   --hosts example.org \
   --max 30 --format json
-paperful search "coral reef" --apply -C "Reading/Coral reefs"
+paperful search "BBNJ" --apply -C ocean/BBNJ
 paperful search --run-id <id>
 paperful search --list
-paperful search watch save reefs --query "coral reef" --hosts example.org --interval-days 7
-paperful search watch run reefs          # first time: baseline, inbox empty
-paperful search watch run reefs --force  # skip the interval wait
-paperful search watch apply reefs -C "Reading/Coral reefs"          # dry-run
-paperful search watch apply reefs -C "Reading/Coral reefs" --apply  # metadata parents
-paperful search watch show reefs
+paperful search watch save bbnj-grey --query "BBNJ" --hosts example.org --interval-days 7
+paperful search watch run bbnj-grey          # first time: baseline, inbox empty
+paperful search watch run bbnj-grey --force  # skip the interval wait
+paperful search watch apply bbnj-grey -C ocean/BBNJ          # dry-run
+paperful search watch apply bbnj-grey -C ocean/BBNJ --apply  # metadata parents
+paperful search watch show bbnj-grey
 paperful search watch list
-paperful search watch save reefs2 --from-run <run-id>   # copy query and hosts from state/search/<run-id>/
+paperful search watch save bbnj-grey2 --from-run <run-id>   # copy query and hosts from state/search/<run-id>/
 paperful search watch due           # watches whose interval has elapsed
 ```
 
@@ -92,10 +92,10 @@ watch (inbox on disk). Apply from the CLI.
 ## Example
 
 ```text
-paperful search "coral reef" OR "reef restoration" \
+paperful search "BBNJ" OR "biodiversity beyond national jurisdiction" \
   --hosts example.org \
   --max 20
 ```
 
-Then `--apply -C "Reading/Coral reefs"` (or the collection chip on Discover → Web) and
+Then `--apply -C ocean/BBNJ` (or the collection chip on Discover → Web) and
 `paperful run` / Wanted for PDFs.

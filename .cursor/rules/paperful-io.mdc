@@ -1,0 +1,12 @@
+---
+description: Do not add paperful.io disclaimers in public copy
+alwaysApply: true
+---
+
+# paperful.io
+
+Do not mention **paperful.io** in user-facing copy, including “Not paperful.io” collision strips, hero footnotes, README asides, or FAQ rows that exist only to disclaim the other site.
+
+This project is Paperful (`paperful.app`, this repo). Say what it is. Do not name the other domain.
+
+Roadmap items that still list a “paperful.io strip” as a launch gate are stale; do not reintroduce that copy.

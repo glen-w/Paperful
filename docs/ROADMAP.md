@@ -1401,7 +1401,7 @@ Repair and further Ask work until Wanted proves out.
 
 Launch gates, in order:
 
-1. The paperful.io collision strip, then a link-preview paste test.
+1. A link-preview paste test (no paperful.io disclaimer — do not add one).
 2. Re-crop the share image as `og-v2.png` so the Wanted heading and count
    show. **Shipped** (`website/images/og-v2.png`, homepage `og:image`).
 3. A `robots.txt` with the sitemap line.
@@ -1488,7 +1488,7 @@ the 1.1 plan stays legible.
 
 1. **1.1.1** — P0 scoping and ticks, Attach-at-zero, review-token test,
    version single-source, first-hour copy.
-2. **Launch gates** — paperful.io strip, share image (`og-v2.png` **shipped**),
+2. **Launch gates** — share image (`og-v2.png` **shipped**),
    robots, title; GitHub About remains an operator step.
 3. **Wanted excellence** — **shipped** (stamps, reasons, hand-ticks,
    Waiting→add); keep honesty polish here.

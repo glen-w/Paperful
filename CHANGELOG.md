@@ -6,6 +6,8 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+- **Docs.** Walkthrough screenshots and capture defaults use `ocean/BBNJ` (not a coral-reef demo collection).
+
 ## 1.9.8 — 2026-11-23
 
 - **Ask Markdown.** Workbench Ask renders a small escaped Markdown subset (headings, lists, links, code) so assistant turns stay readable without raw HTML. Threads live under `state_dir/rag/threads`.

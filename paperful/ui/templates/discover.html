@@ -309,7 +309,7 @@
   {% else %}
   <form method="post" action="/discover/search/run" class="form-stack" id="discoverWebForm">
     <label>Query {{ info("Terms sent to SearXNG. Quote phrases. filetype:pdf is appended unless you pick none.") }}
-      <input name="query" placeholder='"coral reef" OR "reef restoration"'>
+      <input name="query" placeholder='"BBNJ" OR "biodiversity beyond national jurisdiction"'>
     </label>
     <label>Hosts {{ info("Optional comma list. Restricts hits and adds site: ORs.") }}
       <input name="hosts" placeholder="iucn.org,undocs.org,highseasalliance.org">
@@ -326,7 +326,7 @@
   <form method="post" action="/discover/search/watch/save" class="form-stack">
     <p class="field-legend">Watch {{ info("Save this query as a pull-only grey watch. Paperful remembers seen URLs and proposes new ones. You still cron search watch run — there is no built-in scheduler.") }}</p>
     <label>Watch name <input name="name" placeholder="my-search" required></label>
-    <label>Query <input name="query" placeholder='"coral reef" OR "reef restoration"'></label>
+    <label>Query <input name="query" placeholder='"BBNJ" OR "biodiversity beyond national jurisdiction"'></label>
     <label>Hosts <input name="hosts" placeholder="iucn.org,undocs.org"></label>
     <input type="hidden" name="filetype" value="pdf">
     <label>Interval days <input name="interval_days" type="number" min="0" max="365" value="7"></label>
