@@ -28,9 +28,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv sync --group dev
-      - run: uv run ruff check paperful tests
-      - run: uv run ruff format --check paperful tests
-      - run: uv run mypy
+      - run: make lint
 
   suite:
     # Full offline suite on one cell. Its coverage report feeds the badge.

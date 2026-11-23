@@ -242,7 +242,9 @@ def test_twenty_request_no_retry_on_connect_failure(cfg, monkeypatch):
 
     def sender(method, url, headers, params, body):
         calls["n"] += 1
-        raise httpx.ConnectError("Connection refused", request=httpx.Request("GET", url))
+        raise httpx.ConnectError(
+            "Connection refused", request=httpx.Request("GET", url)
+        )
 
     with pytest.raises(httpx.ConnectError):
         twenty_request(

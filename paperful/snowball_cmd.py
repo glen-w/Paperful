@@ -612,7 +612,9 @@ def run_snowball_orcid(
     seed_dois = [str(d).strip() for d in (dois or []) if str(d).strip()]
     _run_snowball(
         cfg,
-        lambda c: run_orcid(c, seeds, request, console=out, seed_dois=seed_dois or None),
+        lambda c: run_orcid(
+            c, seeds, request, console=out, seed_dois=seed_dois or None
+        ),
         json_out=json_out,
         command="snowball orcid",
     )

@@ -251,9 +251,7 @@ def _snowball_prepare_queue(
     )
     hop_min = cfg.snowball_hop_min_overlap
     cites_q = str(getattr(oa, "cites_query", "") or "").strip()
-    rows = filter_hop_neighbors(
-        rows, min_overlap=hop_min, cites_query=cites_q
-    )
+    rows = filter_hop_neighbors(rows, min_overlap=hop_min, cites_query=cites_q)
     rows = truncate(rows, caps[0])
     if gate == "approve-batch" and not request.iterative:
         for row in rows:
@@ -448,7 +446,9 @@ def _execute_create_and_fill(
             if request.auto_apply_max is not None
             else cfg.snowball_auto_apply_max
         )
-        pending = [row for row in creatable if row.status == "new" and row.keep is not False]
+        pending = [
+            row for row in creatable if row.status == "new" and row.keep is not False
+        ]
         if cap > 0 and len(pending) > cap:
             tally.stop()
             raise SnowballError(

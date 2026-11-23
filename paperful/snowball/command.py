@@ -444,9 +444,7 @@ def run_orcid(
             except OrcidError as exc:
                 raise SnowballError(str(exc)) from exc
     elif not public_works:
-        console.print(
-            "[dim]orcid public works off; hop-0 uses explicit DOIs only[/]"
-        )
+        console.print("[dim]orcid public works off; hop-0 uses explicit DOIs only[/]")
     else:
         console.print("[yellow]orcid backend off; using OpenAlex author filter only[/]")
 
