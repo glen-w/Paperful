@@ -26,6 +26,17 @@ AUTHOR = "paperful rewrite"
 _NS_DECL = re.compile(rb'xmlns:([A-Za-z0-9]+)="([^"]+)"')
 _XML_DECL = re.compile(rb"<\?xml[^?]*\?>")
 _IGNORABLE = re.compile(r'\s(?:mc:)?Ignorable="([^"]+)"')
+_AUTO_NS_PREFIX = re.compile(rb"\bns\d+:")
+_WP_INLINE = re.compile(rb"<wp:inline\b[\s\S]*?</wp:inline>")
+
+# Standard OOXML prefixes ElementTree may otherwise emit as nsN.
+_KNOWN_URI_PREFIXES: dict[str, str] = {
+    "http://schemas.openxmlformats.org/drawingml/2006/main": "a",
+    "http://schemas.openxmlformats.org/drawingml/2006/picture": "pic",
+    "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing": "wp",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships": "r",
+    "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing": "wp14",
+}
 
 _CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -52,13 +63,57 @@ def _w(tag: str) -> str:
 
 
 def _register_prefixes(xml: bytes) -> None:
-    """Keep Word's ``w:`` prefixes instead of ElementTree ``ns0:`` on write."""
+    """Register xmlns bindings so write keeps Word prefixes (not ``ns0:`` / ``ns4:``)."""
     ET.register_namespace("w", W_URI)
-    for match in _NS_DECL.finditer(xml[:8000]):
+    seen: set[tuple[str, str]] = set()
+    for match in _NS_DECL.finditer(xml):
         prefix = match.group(1).decode("ascii")
         uri = match.group(2).decode("ascii")
-        if prefix != "xml":
+        if prefix == "xml":
+            continue
+        key = (prefix, uri)
+        if key in seen:
+            continue
+        seen.add(key)
+        ET.register_namespace(prefix, uri)
+
+
+def _register_prefixes_from_tree(root: ET.Element) -> None:
+    """Pick up inline ``xmlns:*`` on descendants (common in drawing markup)."""
+    for el in root.iter():
+        for attr, val in el.attrib.items():
+            if attr.startswith("xmlns:"):
+                prefix = attr.split(":", 1)[1]
+                if prefix and val:
+                    ET.register_namespace(prefix, val)
+
+
+def _register_known_uri_prefixes(root: ET.Element) -> None:
+    uris: set[str] = set()
+    for el in root.iter():
+        if el.tag.startswith("{"):
+            uris.add(el.tag[1:].split("}", 1)[0])
+    for uri, prefix in _KNOWN_URI_PREFIXES.items():
+        if uri in uris:
             ET.register_namespace(prefix, uri)
+
+
+def _preserve_wp_inlines(original: bytes, serialized: bytes) -> bytes:
+    """Keep figure ``wp:inline`` bytes from the source — ET drops inline drawing xmlns."""
+    orig_blocks = _WP_INLINE.findall(original)
+    if not orig_blocks:
+        return serialized
+    ser_matches = list(_WP_INLINE.finditer(serialized))
+    if len(orig_blocks) != len(ser_matches):
+        return serialized
+    parts: list[bytes] = []
+    last = 0
+    for ob, sm in zip(orig_blocks, ser_matches):
+        parts.append(serialized[last : sm.start()])
+        parts.append(ob)
+        last = sm.end()
+    parts.append(serialized[last:])
+    return b"".join(parts)
 
 
 def _xml_id(el: ET.Element) -> int | None:
@@ -93,7 +148,11 @@ def _root_open_tag(xml: bytes, local: str) -> re.Match[bytes] | None:
 def _serialize_part(original: bytes, root: ET.Element, *, local: str) -> bytes:
     """Write XML but keep the source root tag (xmlns / mc:Ignorable)."""
     _register_prefixes(original)
+    _register_prefixes_from_tree(root)
+    _register_known_uri_prefixes(root)
     out = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    if local == "document":
+        out = _preserve_wp_inlines(original, out)
     orig_decl = _XML_DECL.match(original)
     new_decl = _XML_DECL.match(out)
     if orig_decl and new_decl:
@@ -135,6 +194,8 @@ def docx_structural_issues(path: Path) -> list[str]:
         return [f"docx: {exc}"]
     if b"ns0:" in raw:
         issues.append("document.xml uses ns0: prefixes")
+    if _AUTO_NS_PREFIX.search(raw):
+        issues.append("document.xml uses auto-generated nsN: prefixes")
     issues.extend(_undeclared_ignorable(raw))
     try:
         root = _DET.fromstring(raw)
@@ -180,6 +241,8 @@ def docx_structural_issues(path: Path) -> list[str]:
     if comments_raw is not None:
         if b"ns0:" in comments_raw:
             issues.append("comments.xml uses ns0: prefixes")
+        if _AUTO_NS_PREFIX.search(comments_raw):
+            issues.append("comments.xml uses auto-generated nsN: prefixes")
         try:
             croot = _DET.fromstring(comments_raw)
         except (ET.ParseError, ValueError) as exc:
@@ -263,32 +326,58 @@ def _para_text(p: ET.Element) -> str:
     return "".join(t.text or "" for t in p.iter(_w("t")))
 
 
-_FRAGILE_LOCAL = frozenset(
-    {
-        "ins",
-        "del",
-        "fldChar",
-        "instrText",
-        "fldSimple",
-        "drawing",
-        "pict",
-        "txbxContent",
-        "hyperlink",
-    }
-)
+_FRAGILE_LABELS: dict[str, str] = {
+    "ins": "existing tracked changes",
+    "del": "existing tracked changes",
+    "fldChar": "field codes",
+    "instrText": "field codes",
+    "fldSimple": "field codes",
+    "drawing": "figures",
+    "pict": "figures",
+    "txbxContent": "text boxes",
+    "hyperlink": "hyperlinks",
+}
+
+
+def _fragility_reasons(p: ET.Element) -> list[str]:
+    """Why a paragraph cannot take tracked ins/del without flattening Word XML."""
+    seen: set[str] = set()
+    reasons: list[str] = []
+    for el in p.iter():
+        local = el.tag.rsplit("}", 1)[-1]
+        label = _FRAGILE_LABELS.get(local)
+        if label and label not in seen:
+            seen.add(label)
+            reasons.append(label)
+        if local == "r" and el.find(_w("rPr")) is not None:
+            if "mixed character formatting" not in seen:
+                seen.add("mixed character formatting")
+                reasons.append("mixed character formatting")
+    return reasons
 
 
 def _para_is_fragile(p: ET.Element) -> bool:
-    """True when a body rewrite would flatten run properties or fields."""
-    for el in p.iter():
-        local = el.tag.rsplit("}", 1)[-1]
-        if local in _FRAGILE_LOCAL:
-            return True
-        if local == "r" and el.find(_w("rPr")) is not None:
-            return True
-        if local == "rPr":
-            return True
-    return False
+    return bool(_fragility_reasons(p))
+
+
+def _skipped_body_comment(edit: RewriteEdit, reasons: list[str]) -> str:
+    """Word comment when a body edit becomes a note instead of tracked change."""
+    parts: list[str] = []
+    if reasons:
+        parts.append(
+            "Could not apply as a tracked change (" + ", ".join(reasons) + ")."
+        )
+    if (edit.body or "").strip():
+        parts.append(edit.body.strip())
+    if edit.kind == "replace" and (edit.replacement or "").strip():
+        if (edit.quote or "").strip() and edit.replacement.strip() != edit.quote.strip():
+            parts.append(f"Current: \"{(edit.quote or '')[:240]}\"")
+            parts.append(f"Suggested: \"{edit.replacement.strip()[:500]}\"")
+        elif edit.replacement.strip():
+            parts.append(f"Suggested: \"{edit.replacement.strip()[:500]}\"")
+    elif (edit.quote or "").strip() and not (edit.body or "").strip():
+        parts.append(f"Span: \"{(edit.quote or '')[:240]}\"")
+    return "\n\n".join(parts)[:32767]
 
 
 def _is_comment_ref_run(child: ET.Element) -> bool:
@@ -389,10 +478,7 @@ def _apply_edits_to_paras(
                 next_id += 1
                 return True
             if _para_is_fragile(p):
-                note = (
-                    edit.body
-                    or f"Tracked change skipped (complex formatting): {edit.quote[:80]}"
-                )
+                note = _skipped_body_comment(edit, _fragility_reasons(p))
                 _anchor_comment(p, next_id)
                 comments.append((next_id, note))
                 next_id += 1

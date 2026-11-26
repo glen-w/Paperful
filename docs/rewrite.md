@@ -136,8 +136,12 @@ drafts should not assume them. See [llm.md](llm.md).
 - Tracked-changes v1 uses stdlib OOXML for `.docx`. Unique paragraph match
   only; miss → skip. If a paragraph has run properties, fields, existing
   revisions, or a text box, rewrite leaves the runs and writes a Word
-  comment instead of flattening. Apply-time misses are recorded on the plan
-  (`docx_miss` / `office_miss`). Complex Word is not round-tripped. `.pptx` / `.odt` get a copy with unique-span
+  comment instead of flattening (the comment states why, the finding detail,
+  and any suggested replacement). Apply-time misses are recorded on the plan
+  (`docx_miss` / `office_miss`). Figure ``wp:inline`` drawing blocks are copied
+  verbatim from the source so inline DrawingML namespaces survive (Word otherwise
+  refuses to open the file). Complex Word is not round-tripped beyond that.
+  `.pptx` / `.odt` get a copy with unique-span
   replacements (not Word revision markup; comments stay in the edit plan).
   `--output odt` on a non-ODT source builds a paragraph OpenDocument spine
   the same way. `--output pdf` prints the applied text with numbered comment

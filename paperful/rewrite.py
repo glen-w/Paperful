@@ -189,6 +189,7 @@ def _deterministic_edit(
         suggested = suggested_fixed
         if suggested == quote:
             return None
+    note = str(finding.get("detail") or "").strip()[:500]
     return RewriteEdit(
         kind="replace",
         finding_ids=[str(finding.get("id") or "")],
@@ -196,11 +197,30 @@ def _deterministic_edit(
         loc=aln.loc,
         quote=quote,
         replacement=suggested,
+        body=note,
         source_paragraph=aln.paragraph,
         target_paragraph=aln.paragraph.replace(quote, suggested, 1),
         start=aln.start,
         end=aln.end,
     )
+
+
+def _enrich_edit_context(
+    edits: list[RewriteEdit], findings: list[dict[str, Any]]
+) -> None:
+    """Attach peer-review detail for Word comments when tracked apply is skipped."""
+    by_id = {str(f.get("id") or ""): f for f in findings if f.get("id")}
+    for edit in edits:
+        if (edit.body or "").strip():
+            continue
+        for fid in edit.finding_ids:
+            row = by_id.get(fid)
+            if not row:
+                continue
+            detail = str(row.get("detail") or "").strip()
+            if detail:
+                edit.body = detail[:500]
+            break
 
 
 def _comment_edit(
@@ -538,6 +558,7 @@ def build_rewrite(
             )
 
     proposed = filter_broken_edits(cfg, proposed, skips, full_text=text)
+    _enrich_edit_context(proposed, list(pack.get("findings") or []))
 
     plan = merge_edits(
         proposed, max_edits=int(cfg.rewrite_max_edits or 80), existing_skips=skips

@@ -598,6 +598,91 @@ def test_old_pack_without_hash_still_runs(cfg, tmp_path: Path):
     assert (result.get("plan") or {}).get("edits")
 
 
+def test_tracked_docx_preserves_inline_drawing(tmp_path: Path):
+    """Round-trip must not rewrite a:/pic: inline drawing as ns4:/ns5: (Word refuses)."""
+    drawing = (
+        '<w:p><w:r><w:drawing><wp:inline'
+        ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"'
+        ' descr="Figure test">'
+        "<wp:cNvGraphicFramePr>"
+        '<a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
+        ' noChangeAspect="1"/>'
+        "</wp:cNvGraphicFramePr>"
+        '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+        '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+        '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+        '<pic:nvPicPr><pic:cNvPr id="0" name="x.png"/><pic:cNvPicPr/></pic:nvPicPr>'
+        "</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"
+    )
+    body = (
+        '<?xml version="1.0"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        '<w:body><w:p><w:r><w:t>Editable lead paragraph.</w:t></w:r></w:p>'
+        f"{drawing}</w:body></w:document>"
+    )
+    src = tmp_path / "src.docx"
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("word/document.xml", body)
+        zf.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>',
+        )
+    dest = tmp_path / "out.docx"
+    edit = RewriteEdit(
+        kind="replace",
+        finding_ids=["a"],
+        area="style",
+        quote="Editable lead paragraph.",
+        replacement="Edited lead paragraph.",
+    )
+    skips = apply_tracked_docx(src, dest, [edit])
+    assert skips == []
+    with zipfile.ZipFile(dest) as zf:
+        xml = zf.read("word/document.xml")
+    assert b"ns4:" not in xml
+    assert b"ns5:" not in xml
+    assert b"a:graphic" in xml or b"graphic xmlns:a=" in xml
+    assert docx_structural_issues(dest) == []
+
+
+def test_tracked_docx_no_edits_round_trips_drawing(tmp_path: Path):
+    """Even with zero edits, serialize must not break embedded figures."""
+    drawing = (
+        '<w:p><w:r><w:drawing><wp:inline'
+        ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"'
+        ' descr="Figure noop">'
+        "<wp:cNvGraphicFramePr>"
+        '<a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
+        ' noChangeAspect="1"/>'
+        "</wp:cNvGraphicFramePr>"
+        '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+        '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+        '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+        '<pic:nvPicPr><pic:cNvPr id="0" name="x.png"/><pic:cNvPicPr/></pic:nvPicPr>'
+        "</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"
+    )
+    body = (
+        '<?xml version="1.0"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+        ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">'
+        f"<w:body>{drawing}</w:body></w:document>"
+    )
+    src = tmp_path / "src.docx"
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("word/document.xml", body)
+        zf.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>',
+        )
+    dest = tmp_path / "out.docx"
+    assert apply_tracked_docx(src, dest, []) == []
+    assert docx_structural_issues(dest) == []
+    with zipfile.ZipFile(dest) as zf:
+        xml = zf.read("word/document.xml")
+    assert b"ns4:" not in xml
+    assert b'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"' in xml
+
+
 def test_tracked_docx_insert_delete(tmp_path: Path):
     src = tmp_path / "src.docx"
     body = (
@@ -628,6 +713,42 @@ def test_tracked_docx_insert_delete(tmp_path: Path):
     assert "Areas Beyond National Jurisdiction" in xml
     assert "ns0:" not in xml
     assert docx_structural_issues(dest) == []
+
+
+def test_fragile_existing_tracked_comment_is_actionable(tmp_path: Path):
+    src = tmp_path / "src.docx"
+    body = (
+        '<?xml version="1.0"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:p>"
+        '<w:ins w:author="Author" w:date="2026-01-01T00:00:00Z" w:id="1">'
+        "<w:r><w:t>Maritime Area beyond national jurisdictions</w:t></w:r>"
+        "</w:ins>"
+        "</w:p>"
+        "</w:document>"
+    )
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("word/document.xml", body)
+        zf.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>',
+        )
+    dest = tmp_path / "out.docx"
+    edit = RewriteEdit(
+        kind="replace",
+        finding_ids=["a"],
+        area="style",
+        quote="Maritime Area beyond national jurisdictions",
+        replacement="Areas Beyond National Jurisdiction",
+        body="Use house ABNJ phrasing (glossary).",
+    )
+    apply_tracked_docx(src, dest, [edit])
+    with zipfile.ZipFile(dest) as zf:
+        comments = zf.read("word/comments.xml").decode("utf-8")
+    assert "existing tracked changes" in comments
+    assert "Use house ABNJ phrasing" in comments
+    assert "Suggested:" in comments
+    assert "Areas Beyond National Jurisdiction" in comments
 
 
 def test_tracked_docx_mixed_runs_become_comment(tmp_path: Path):
@@ -664,9 +785,9 @@ def test_tracked_docx_mixed_runs_become_comment(tmp_path: Path):
     assert "w:b" in xml
     assert "w:ins" not in xml
     assert "Maritime Area beyond national jurisdictions" in xml
-    assert (
-        "complex formatting" in comments.lower() or "Tracked change skipped" in comments
-    )
+    assert "Could not apply as a tracked change" in comments
+    assert "mixed character formatting" in comments
+    assert "Suggested:" in comments
 
 
 def test_second_body_edit_on_paragraph_is_docx_miss(tmp_path: Path):

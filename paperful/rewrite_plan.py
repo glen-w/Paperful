@@ -44,7 +44,7 @@ class RewriteEdit:
         row = asdict(self)
         if self.kind != "replace":
             row.pop("replacement", None)
-        if self.kind != "comment":
+        if self.kind != "comment" and not self.body:
             row.pop("body", None)
         if not self.source_paragraph:
             row.pop("source_paragraph", None)
