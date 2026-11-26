@@ -23,7 +23,7 @@ Prefer this page for “is this the right tool?”
 |--------------|----------|
 | A platform-agnostic **mirror** of the library (backup, and a way out if the citation manager changes). Zotero is the tested catalogue ([adapters](adapters.md)) | **Paperful** `snapshot` / `restore` — [quiet mirror](quiet-mirror.md) |
 | Bulk **missing-PDF** fetch for a Zotero library (open access first, campus proxy when you have it), collection-shaped folders, resumable CLI | **Paperful** (this repo) |
-| **In-Zotero** “find OA PDF” plus optional grey-zone sources in one plugin UI | [zotero-zotadata](https://github.com/ydeng11/zotero-zotadata) |
+| **In-Zotero** “find OA PDF” (plugin UI; optional grey-zone sources on some tools) | [zotero-zotadata](https://github.com/ydeng11/zotero-zotadata); OA-only [Littview OpenAlex PDF](https://github.com/Littview/zotero-openalex-pdf); batch + institutional proxy [ZotFetch](https://github.com/fdossi/zotfetch). Paperful still owns CLI resume, grey playbooks, and the restore ledger |
 | **Attachment hygiene** (broken links, rename, stored-to-linked, duplicate files on one parent) | **Paperful** `attachments` (report by default; surgery with a flag and `--apply`). In-app: [StorScan](https://github.com/brian-j-griffith/StorScan), [Attanger](https://github.com/MuiseDestiny/zotero-attanger), [ZotMoov](https://github.com/wileyyugioh/zotmoov) |
 | **Citation counts on items you already hold** (sortable column; OpenAlex / Crossref) | **Paperful** [`metrics`](metrics.md) (disk cache + Library). In-Zotero Extra columns remain complementary: [Google Scholar Citation Count](https://github.com/justinribeiro/zotero-google-scholar-citation-count), [Zotero Open Citations](https://github.com/josesiqueira/zotero-open-citations), [AlphaPulse](https://github.com/IrisM6/AlphaPulse) (also alphaXiv likes) |
 | **Metadata repair** (DOI/ISBN/arXiv bulk update, parent-from-PDF) | Paperful `lint` / `fix-metadata`, or [ZotMeta](https://github.com/RoadToDream/ZotMeta) |
@@ -33,14 +33,14 @@ Prefer this page for “is this the right tool?”
 | **Sourced comparison table** over PDFs you already hold (design / n / method / finding; quote or `check this`; no LLM) | **Paperful** [`evidence`](evidence.md) — CLI pack, no `--apply` |
 | **Hosted OA/preprint companion** (summaries, collection tables, email digests; license-gated full text; OpenAI) | [SummarizePaper](https://www.summarizepaper.com) ([source](https://github.com/summarizepaper/summarizepaper)) — complement. Paperful keeps campus PDFs, the restore ledger, and sourced tables over **held** files |
 | **Scriptable library surgery** (merge, enrich, disk GC, two-up scan split) via CLI/MCP | [zotero-agent](https://github.com/alex-roc/zotero-agent) |
-| **AI assistant** read/write over the library, including chat and (on some forks) OCR of scans | zotero-mcp forks ([richardjlyon](https://github.com/richardjlyon/zotero-mcp), [cookjohn](https://github.com/cookjohn/zotero-mcp), [mcp-zotero](https://github.com/Xevos117/mcp-zotero)) |
+| **AI assistant** read/write over the library, including chat and (on some forks) OCR of scans | [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) (community default); also [cookjohn](https://github.com/cookjohn/zotero-mcp), [Zoteus](https://github.com/oscardvs/zoteus); quieter forks: [richardjlyon](https://github.com/richardjlyon/zotero-mcp), [mcp-zotero](https://github.com/Xevos117/mcp-zotero) |
 | **Semantic search, citation graph, author/trend tools** over the public literature via MCP (hosted corpus; not your Zotero tree) | [Valency MCP Bond](https://www.valency.io/) — see [reference](comparison-reference.md#valency-mcp-bond-and-hub) |
-| **Hosted literature search / cited review** over a public corpus (not your Zotero tree) | [Elicit](https://elicit.com/), [Consensus](https://consensus.app/), [Undermind](https://undermind.ai/), [SciSpace](https://www.typeset.io/), [Scite](https://scite.ai/) — see [reference](comparison-reference.md#hosted-literature-search) |
-| **Hosted AI scientist** — cited reviews over ~175M papers/trials/patents, “has anyone done this?”, optional multi-hour discovery + experimental analysis | [Edison Scientific](https://docs.edisonscientific.com/) (Literature / Precedent / Kosmos). Nearby loops: [Google Co-Scientist](https://deepmind.google/blog/co-scientist-a-multi-agent-ai-partner-to-accelerate-research/), [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) (workshop-grade, not a library helper) — [reference](comparison-reference.md#edison-scientific) |
+| **Hosted literature search / cited review** over a public corpus (not your Zotero tree) | [Elicit](https://elicit.com/), [Consensus](https://consensus.app/), [Undermind](https://undermind.ai/), [SciSpace](https://scispace.com/), [Scite](https://scite.ai/), [Ai2 Asta](https://asta.allen.ai/), [Paperguide](https://paperguide.ai/) — see [reference](comparison-reference.md#hosted-literature-search) |
+| **Hosted AI scientist** — cited reviews over ~175M papers/trials/patents, “has anyone done this?”, optional multi-hour discovery + experimental analysis | [Edison Scientific](https://docs.edisonscientific.com/) (Literature / Precedent / Kosmos). Nearby loops: [Google Co-Scientist](https://deepmind.google/blog/co-scientist-a-multi-agent-ai-partner-to-accelerate-research/) / Labs Hypothesis Generation (hypotheses, not manuscripts), [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) (workshop-grade, not a library helper) — [reference](comparison-reference.md#edison-scientific) |
 | **Local research-agent harness** — coding agents (Claude Code / Codex / Cursor / …) search lit, hypothesize, run experiments on local/SSH/Slurm/cloud GPUs, keep logs on disk; not your Zotero tree | [OpenResearch](https://github.com/alphaXiv/OpenResearch) (`orx`; alphaXiv project) — {ref}`reference <openresearch>` |
 | **Web Deep Research memo** (cited longform from the open web in minutes; not a journal manuscript) | OpenAI / Gemini / Perplexity Deep Research. Paperful Ask is over **held** PDFs |
-| **Systematic-review screening** (dual review, extraction forms, PRISMA counts; usually no discovery corpus) | [Covidence](https://www.covidence.org/), [Rayyan](https://www.rayyan.ai/), DistillerSR; local [ASReview](https://asreview.nl/). Paperful `sr` can export counts and CSV; it does not replace those tools. Discover Keep/Skip is hop triage, not dual review |
-| **Chat with PDFs you upload** (no scholarly search, no Zotero restore) | Scholarcy, Explainpaper, Humata, [Gemini Notebook](https://notebooklm.google/). Hosted OA/preprint chat + collection tables: [SummarizePaper](https://www.summarizepaper.com). Paperful `ask` / `evidence` use the **same** `out/` tree as fetch |
+| **Systematic-review screening** (dual review, extraction forms, PRISMA counts; usually no discovery corpus) | [Covidence](https://www.covidence.org/), [Rayyan](https://www.rayyan.ai/), [DistillerSR](https://www.distillersr.com/); local [ASReview](https://asreview.nl/). Paperful `sr` can export counts and CSV; it does not replace those tools. Discover Keep/Skip is hop triage, not dual review |
+| **Chat with PDFs you upload** (no scholarly search, no Zotero restore) | Scholarcy, Explainpaper, Humata, [Gemini Notebook](https://notebooklm.google/). Hosted OA/preprint chat + collection tables: [SummarizePaper](https://www.summarizepaper.com). In-Zotero AI chat / RAG: [PapersGPT](https://github.com/papersgpt/papersgpt-for-zotero), [SeerAI](https://github.com/dralkh/seerai), [ZotSeek](https://github.com/introfini/ZotSeek). Paperful `ask` / `evidence` use the **same** `out/` tree as fetch |
 | **Draft a manuscript with citations** (library ∪ global index; language/LaTeX) | [Jenni](https://jenni.ai/), [Paperpal](https://paperpal.com/), SciSpace Writer, Writefull in [Overleaf](https://docs.overleaf.com/integrations-and-add-ons/ai-features). Living cites without a model: Better BibTeX → Quarto. Paperful writing help is peer-review, suggest edits, and extra-cite suggestions ([stuff](stuff.md) does not insert cites) |
 | **Turn idea notes + experimental logs into conference LaTeX** (outline, related work, plots, self-peer-review; not your Zotero tree) | [PaperOrchestra](https://github.com/google-research/paper-orchestra) (Google Cloud AI Research; you run it). Nearby: [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) (idea → experiment → workshop paper). Paperful does not generate manuscripts — {ref}`reference <paperorchestra>` |
 | **Apply a pre-submission pack as tracked changes** (hygiene first; no invented numbers or cites) | **Paperful** [`rewrite`](rewrite.md) from a [`peer-review`](peer-review.md) pack. Patterns (not vendored code): PaperOrchestra worklog, ARIES align-then-generate, XtraGPT selected-span prompts |
@@ -180,7 +180,7 @@ Library DOI looks wrong but you already have the PDF?
   → paperful lint, then fix-metadata --apply
 
 Want the same job but stay inside Zotero with one plugin?
-  → zotero-zotadata (review legal/ToS for its extra sources)
+  → zotero-zotadata (review legal/ToS for its extra sources); OA-only: Littview OpenAlex PDF; batch + proxy: ZotFetch. Paperful still owns CLI resume, grey playbooks, and the restore ledger
 
 Library is messy on disk (broken links, dup PDFs on one item, filenames)?
   → paperful attachments (report). Add --fix-broken, --merge-files, --rename, or --link with --apply to write.
@@ -205,7 +205,7 @@ Scanned PDFs with no text layer?
   → paperful ocr (disk text layer). Two-up books: zotero-agent pdf-prep
 
 Want a chat agent in the loop?
-  → a zotero-mcp fork
+  → 54yyyu/zotero-mcp (community default), or cookjohn / Zoteus. In-Zotero AI: PapersGPT, SeerAI, ZotSeek
 
 Need semantic search / citation graph / trends across all public papers, not just your library?
   → Valency MCP Bond (or similar lit MCP). Paperful snowball + authorwatch grow *your* collection; `snowball trends` for year histograms on a query; `mcp` / CLI JSON for gaps, dry-run discovery, trends, export, and ask over *your* mirror
@@ -217,7 +217,7 @@ Need a local coding-agent loop that searches papers, runs experiments, and keeps
   → OpenResearch (orx). Paperful still owns campus PDFs, grey playbooks, and the restore ledger if cites should live in your library
 
 Need Elicit/Consensus-style tables over the public record, not campus PDFs?
-  → Elicit, Consensus, Undermind, SciSpace. Then snowball / ingest-dois → paperful run
+  → Elicit, Consensus, Undermind, SciSpace, Ai2 Asta, Paperguide. Then snowball / ingest-dois → paperful run
 
 Need dual-review screening and a PRISMA flow?
   → Covidence, Rayyan, DistillerSR, or local ASReview. Paperful fills PDFs and can later export counts
@@ -239,6 +239,9 @@ Need a literature-grounded pre-submission peer-review of a draft you already hav
 
 Need cited Q&A on a folder of PDFs with no Zotero?
   → PaperQA2 (OSS). Paperful when those PDFs should also live in a restore ledger
+
+Need a citation map of the public graph (not downloads into your library)?
+  → Litmaps / ResearchRabbit (same company) or Connected Papers. Paperful snowball downloads
 ```
 
 More branches: [comparison reference](comparison-reference.md#choosing-in-one-glance).

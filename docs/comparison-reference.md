@@ -22,7 +22,7 @@ Legend: **Yes** · **Partial** · **No**.
 | **Sci-Hub** (explicit opt-in) | Yes | Partial | Yes | No | No | Partial | No |
 | Metadata lint / verify DOI | Yes | No | Yes | No | Yes | Yes | Partial |
 | Metadata apply | Yes | No | Yes | No | Yes | Yes | Partial |
-| Attachment / disk repair | No | Partial | Partial | Yes | No | Partial | No |
+| Attachment / disk repair | Partial (`attachments`; report by default, surgery with `--apply`) | Partial | Partial | Yes | No | Partial | No |
 | Dedupe / merge items | Yes (`dedupe --apply` merges children and better fields, then trashes the extra; Zotero only) | Partial | No | Partial | No | Yes | Partial |
 | CLI / automation | Yes | No | No | No | No | Yes | Yes (MCP) |
 | Disk-first then write-back | Yes | No | No | Partial | No | Partial | No |
@@ -39,7 +39,10 @@ Verify against each project’s latest release before upgrading Zotero.
 | Tool | Typical Zotero | Notes |
 |------|----------------|-------|
 | Paperful | 7–9 download; **10+** attach and `fix-metadata --apply` | Local HTTP API |
-| StorScan, Attanger, ZotMeta 2.0, zotodata | **7–9** (per upstream READMEs) | Plugin `.xpi` |
+| Attanger | **7–10** | Plugin `.xpi` |
+| ZotMeta 2.1 | **7–10** | Plugin `.xpi` |
+| StorScan | **9** (not 10) | Plugin `.xpi`; low adoption |
+| zotero-zotadata | **8–10** (older build for 7.x) | Plugin `.xpi` |
 | zotero-agent | **7+** | Bridge plugin + CLI |
 | ZotFile | **≤6** | [Not maintained for Zotero 7+](https://github.com/jlegewie/zotfile/issues/674) |
 | Built-in Find Available PDF | **6+** | Custom resolvers in Config Editor |
@@ -70,7 +73,7 @@ Verify against each project’s latest release before upgrading Zotero.
 
 Legend: **Yes** · **Partial** · **No**. Valency rows reflect public positioning for
 [MCP Bond](https://www.valency.io/) (not a hands-on product audit). Edison
-rows reflect [public docs](https://docs.edisonscientific.com/) (2026-10-26),
+rows reflect [public docs](https://docs.edisonscientific.com/) (2026-11-26),
 not a paid pilot.
 
 | Capability | Paperful | Valency MCP Bond | Edison Scientific | zotero-mcp (typical) |
@@ -102,7 +105,7 @@ Nobody ships discover → campus PDF → dual screen → extract → synthesize 
 novelty → journal manuscript → keep current, **and** local/offline Zotero
 restore. Hosted tools saturate discover/synthesize. Paperful 1.x owns **get
 PDF** (proxy + grey + provenance) and the **restore ledger**. Scores are
-public-docs positioning (2026-10-26), not a paid audit.
+public-docs positioning (2026-11-26), not a paid audit.
 
 Legend: **Yes** · **Partial** · **No**. **Novelty** is split from synthesize
 on purpose (Edison Literature vs Precedent). **Write MS** means a
@@ -117,10 +120,12 @@ found Elicit Pro Review-mode sensitivity ~40% vs traditional searches
 | Edison Precedent | Yes | Partial | No | No | **Yes** (not a legal prior-art search) | No | Partial | No | No |
 | Edison Kosmos | Partial (inside the run) | No | No | Yes (reports; paper: interpretation weaker than quotes) | Partial | Partial (report, not a Zotero MS) | No | No | No |
 | Elicit | Yes (~138M) | Partial (upload / OA) | Partial (SR UI; low independent recall) | Yes | No | Partial (report templates) | Partial | No | Yes (import) |
-| Consensus | Yes | Partial (OA + uploads; LibKey = **links**) | Partial | Yes | No | **No** (will not write your literature review) | Partial | No | Yes (one-way) |
+| Consensus | Yes (~400M+ scholarly index) | Partial (OA + uploads; LibKey = **links**) | Partial | Yes | No | Partial (Deep Review / Literature Review Skill = structured **report**, not a journal MS workspace) | Partial | No | Yes (one-way) |
 | Undermind | Yes | Partial | No | Yes | No | No | **Yes** (alerts) | No | No |
 | SciSpace | Yes | Partial | Partial (claimed SLR) | Yes | No | Yes (AI Writer) | No | No | Partial |
 | Scite | Yes | No | No | Partial | Partial (supporting/contrasting) | No | No | No | No |
+| Ai2 Asta | Yes (108M+ abstracts / 12M+ full text) | Partial (OA corpus; no campus fetch) | No | Yes | Partial | Partial (cited report) | Partial | No | No |
+| Paperguide | Yes | Partial | Partial | Yes | No | Yes (AI writer) | Partial | No | Partial |
 | Valency Bond | Yes | Partial (Hub = OA) | No | No | No | No | Yes | No | No |
 | Covidence / Rayyan | No | Partial (imported PDFs) | **Yes** | Partial / No | No | No | No | No / Partial | Yes / Partial |
 | ASReview | No | No | **Yes** (local active learning) | No | No | No | No | **Yes** | Partial |
@@ -131,9 +136,10 @@ found Elicit Pro Review-mode sensitivity ~40% vs traditional searches
 | PaperOrchestra | Yes (Google Search → Semantic Scholar; cites for the MS, not your library) | No (abstracts / metadata; no campus fetch) | No | Yes (Intro + Related Work from collected papers) | Partial (cutoff-date concurrent-work rule; not Precedent) | **Yes** (idea + experimental log → conference LaTeX + optional plots) | No | Partial (you run it; LLM + Semantic Scholar APIs) | No |
 | PaperQA2 (OSS) | No (you supply PDFs) | Partial | No | Yes (cited Q&A) | No | No | No | **Yes** | Partial (`paper-qa[zotero]`; last test is old) |
 | Gemini Notebook / Humata | No | No | No | Yes (on uploads) | No | Partial | No | No | No |
-| SummarizePaper | Partial (OA / preprint search + collections) | Partial (license-gated full text; no campus fetch) | No | Yes (hosted summaries, chat, collection tables) | Partial (scoop / missed / citation alerts) | Partial (press kit, journal club; not a Zotero MS) | Yes (email digest / saved searches) | No (hosted Django + OpenAI) | Partial (web API sync; not a restore ledger) |
+| SummarizePaper | Partial (OA / preprint search + collections) | Partial (license-gated full text from DOI / journal / preprint pages; FAQ forbids PDF upload; no campus fetch) | No | Yes (hosted summaries, chat, collection tables) | Partial (scoop / missed / citation alerts) | Partial (press kit, journal club; not a Zotero MS) | Yes (email digest / saved searches) | No (hosted Django + OpenAI) | Partial (web API sync; not a restore ledger) |
 
-Sources and caveats: repo `reports/AI academic paper factories.md` (contributor research, Oct 2026).
+Sources and caveats: repo `reports/AI academic paper factories.md` (Oct 2026) and
+`reports/Paperful competitor landscape 2026.md` (Nov 2026).
 
 (paperguard)=
 ### PaperGuard (research integrity screener)
@@ -188,8 +194,8 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 ### zotero-zotadata
 
 - **Sites:** [GitHub](https://github.com/ydeng11/zotero-zotadata)
-- **Fit:** Plugin combining attachment validation, multi-source PDF retrieval, and metadata updates.
-- **With Paperful:** Overlapping PDF mission; zotodata stays in Zotero.
+- **Fit:** Plugin combining attachment validation, multi-source PDF retrieval, and metadata updates. Current line targets **Zotero 8–10** (older build for 7.x). Nearby OA/batch peers: [Littview OpenAlex PDF](https://github.com/Littview/zotero-openalex-pdf) (legal OA attach), [ZotFetch](https://github.com/fdossi/zotfetch) (batch OA → Unpaywall → S2 → OpenAlex → CORE → DOI landing → institutional proxy).
+- **With Paperful:** Overlapping PDF mission; zotodata / ZotFetch / Littview stay in Zotero. Paperful owns CLI resume, grey playbooks, and the restore ledger.
 
 ### StorScan
 
@@ -217,14 +223,14 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 
 ### zotero-mcp ecosystem
 
-- **Sites:** [richardjlyon/zotero-mcp](https://github.com/richardjlyon/zotero-mcp) · [cookjohn/zotero-mcp](https://github.com/cookjohn/zotero-mcp) · [mcp-zotero](https://github.com/Xevos117/mcp-zotero)
-- **Fit:** LLM-facing search, PDF text, create items, sometimes Unpaywall attach. Some forks OCR scans (Docling) or write reading notes from chat.
-- **With Paperful:** MCP when a person is in the loop; Paperful for unattended collection runs, the disk ledger, `ocr` on image PDFs, and batch `summarize` / `synthesize`.
+- **Sites:** [54yyyu/zotero-mcp](https://github.com/54yyyu/zotero-mcp) (community default) · [cookjohn/zotero-mcp](https://github.com/cookjohn/zotero-mcp) · [Zoteus](https://github.com/oscardvs/zoteus) · quieter: [richardjlyon/zotero-mcp](https://github.com/richardjlyon/zotero-mcp) · [mcp-zotero](https://github.com/Xevos117/mcp-zotero)
+- **Fit:** LLM-facing search, PDF text, create items, sometimes Unpaywall attach. Some forks OCR scans (Docling) or write reading notes from chat. In-Zotero AI chat / RAG (not MCP): [PapersGPT](https://github.com/papersgpt/papersgpt-for-zotero), [SeerAI](https://github.com/dralkh/seerai), [ZotSeek](https://github.com/introfini/ZotSeek).
+- **With Paperful:** MCP / in-app AI when a person is in the loop; Paperful for unattended collection runs, the disk ledger, `ocr` on image PDFs, and batch `summarize` / `synthesize`.
 
 ### Valency MCP Bond and Hub
 
 - **Sites:** [valency.io](https://www.valency.io/)
-- **Fit:** **MCP Bond** — hosted semantic access to a very large public paper/preprint corpus (search, citation graph, authors, trends, export) for LLM clients. **Hub** — open publishing, versioning, and review; out of scope for Paperful’s library/mirror jobs.
+- **Fit:** **MCP Bond** — hosted semantic access to a very large public paper/preprint corpus (marketing **500M+**; ChemRxiv notes ~**45M** OA/preprint works indexed against a larger citation graph; ~36 MCP tools in public docs) for LLM clients. **Hub** — open publishing, versioning, and review; out of scope for Paperful’s library/mirror jobs.
 - **With Paperful:** Bond when the question is “what does the literature say?” across hundreds of millions of works. Paperful when the question is “fill, fix, mirror, and reason over **my** collection” — `run`, `snapshot`, `snowball` / `authorwatch` to grow it, `ask` / `precedent` / `refs_gap` / `gaps` / dry-run `snowball_search` / `snowball trends` / `export-proposals` (and optional `paperful mcp` with the same JSON envelopes) over the on-disk index. Typical stack: Bond (or similar) for discovery → snowball / `ingest-dois` / manual save → Paperful for PDFs and disk-first hygiene.
 - **Not a substitute for:** EZProxy-backed fetch, grey-literature playbooks, collection-shaped `out/` restore, or unattended batch attach.
 
@@ -263,9 +269,15 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 
 ### Hosted literature search
 
-- **Sites:** [Elicit](https://elicit.com/) · [Consensus](https://consensus.app/) · [Undermind](https://undermind.ai/) · [SciSpace](https://www.typeset.io/) · [Scite](https://scite.ai/)
-- **Fit:** Semantic search and cited tables/reviews over Semantic Scholar / OpenAlex / PubMed remixes. MCP is spreading. Consensus LibKey **link-resolves**; it does not ingest LibKey full text. Elicit’s SR UI is **not** PRISMA-grade recall in independent 2025 comparisons.
+- **Sites:** [Elicit](https://elicit.com/) · [Consensus](https://consensus.app/) · [Undermind](https://undermind.ai/) · [SciSpace](https://scispace.com/) (formerly Typeset) · [Scite](https://scite.ai/) · [Ai2 Asta](https://asta.allen.ai/) · [Paperguide](https://paperguide.ai/)
+- **Fit:** Semantic search and cited tables/reviews over Semantic Scholar / OpenAlex / PubMed remixes. MCP is spreading (Elicit exposes API/MCP; Bond remains MCP-first for the global corpus). Consensus LibKey **link-resolves**; it does not ingest LibKey full text. Consensus Deep Review / Literature Review Skill write a structured **report** over a **400M+** scholarly index — not a journal manuscript workspace. Elicit’s SR UI is **not** PRISMA-grade recall in independent 2025 comparisons. Scite (Oct 2026): Collection Files, rebuilt Assistant preview, Scite MCP → Collections. Nearby UIs: Anara; Logically (ex-Afforai).
 - **With Paperful:** public-record question → their tool; then snowball / `ingest-dois` → `run` / Wanted for PDFs you intend to own. Overlaps Valency Bond on “ask the corpus”; Bond is MCP-first, these are researcher UIs.
+
+### Citation maps
+
+- **Sites:** [Litmaps](https://www.litmaps.com/) · [ResearchRabbit](https://www.researchrabbit.ai/) (same company as Litmaps) · [Connected Papers](https://www.connectedpapers.com/)
+- **Fit:** Visual citation neighbourhoods and seed-paper exploration. ResearchRabbit is often one-way into Zotero; Litmaps offers two-way sync on some plans. They **link out**; they do not run Paperful’s download + restore ledger.
+- **With Paperful:** map first if you want the graph; then snowball / `ingest-dois` → `run` when the keepers should live in your collection.
 
 (summarizepaper)=
 ### SummarizePaper (hosted OA companion)
@@ -276,7 +288,7 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 
 | Capability | Paperful | SummarizePaper |
 | --- | --- | --- |
-| Summaries / chat over **held** campus PDFs | Yes (`summarize` / `ask`; `--receipts` opt-in) | No (OA / preprint / uploaded; license-gated) |
+| Summaries / chat over **held** campus PDFs | Yes (`summarize` / `ask`; `--receipts` opt-in) | No (OA / preprint / journal pages; license-gated; FAQ forbids PDF upload) |
 | Collection comparison table | Yes (`evidence`; quote or `check this`; no LLM) | Yes (Premium collection table; LLM) |
 | Bulk missing-PDF fetch / EZProxy / grey playbooks | Yes | No |
 | Disk mirror + restore ledger | Yes | No |
@@ -286,7 +298,7 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 
 ### Systematic-review screening
 
-- **Sites:** [Covidence](https://www.covidence.org/) · [Rayyan](https://www.rayyan.ai/) · DistillerSR · [ASReview](https://asreview.nl/) (local OSS)
+- **Sites:** [Covidence](https://www.covidence.org/) · [Rayyan](https://www.rayyan.ai/) · [DistillerSR](https://www.distillersr.com/) · [ASReview](https://asreview.nl/) (local OSS)
 - **Fit:** Import → dual screen → extraction forms → audit / PRISMA counts. Usually **no** discovery corpus and **no** campus PDF fetch.
 - **With Paperful:** they screen; Paperful fills PDFs and writes Zotero. Discover Keep/Skip is hop triage. Interop (export queue / import `included.csv`) is the SnowBallSLR lesson, not vendoring Covidence.
 
@@ -300,7 +312,7 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 ### PaperOrchestra (Google Research)
 
 - **Sites:** [GitHub](https://github.com/google-research/paper-orchestra) · [project page](https://yiwen-song.github.io/paper_orchestra/) · [arXiv:2604.05018](https://arxiv.org/abs/2604.05018)
-- **Fit:** Open multi-agent **paper writer**, not a library helper. Input is unconstrained pre-writing material (idea summary + experimental log) plus a conference LaTeX template. Agents: outline, literature review, section writing, content refinement, optional plotting. The literature agent searches the web, enriches candidates on **Semantic Scholar**, writes `references.bib` + a citation map, then fills Introduction and Related Work from that checklist only (cutoff-date concurrent-work rule; do not claim SOTA unless the log evaluated that paper). Authors report a 50–68% win-margin vs single-agent and AI Scientist-v2 on literature-review quality in an 11-researcher side-by-side, with a remaining gap to human ground truth. **PaperWritingBench** (200 reverse-engineered CVPR/ICLR 2025 packets) is **not** in the code repo. README disclaimer: not an officially supported Google product. You supply LLM keys (Gemini / Vertex / OpenAI) and a Semantic Scholar key.
+- **Fit:** Open multi-agent **paper writer**, not a library helper. Input is unconstrained pre-writing material (idea summary + experimental log) plus a conference LaTeX template. Agents: outline, literature review, section writing, content refinement, optional plotting. The literature agent searches the web, enriches candidates on **Semantic Scholar**, writes `references.bib` + a citation map, then fills Introduction and Related Work from that checklist only (cutoff-date concurrent-work rule; do not claim SOTA unless the log evaluated that paper). Authors report a 50–68% win-margin vs single-agent and AI Scientist-v2 on literature-review quality in an 11-researcher side-by-side, with a remaining gap to human ground truth. **PaperWritingBench** (200 reverse-engineered CVPR/ICLR 2025 packets) is **not** in the code repo; the dataset is on Hugging Face (`yiwen-song/PaperWritingBench`). README disclaimer: not an officially supported Google product. You supply LLM keys (Gemini / Vertex / OpenAI) and a Semantic Scholar key.
 - **With Paperful:** PaperOrchestra when the job is “turn this idea and these numbers into conference LaTeX.” Paperful when the job is fill, fix, mirror, and Ask **this** library. Cites it puts in the manuscript are not in Zotero until you ingest them (`ingest-dois` / snowball) and `run`. [`rewrite`](rewrite.md) borrows the **worklog / align-then-generate / selected-span** patterns; it does **not** vendor the pipeline and will not emit a paper from a lab notebook. Typical stack: Paperful for PDFs you own → human draft or PaperOrchestra for a first LaTeX pass → Paperful `peer-review` / `rewrite` on a file you already have.
 - **Not a substitute for:** missing-PDF fetch, EZProxy / grey playbooks, `snapshot` / `restore`, collection-scoped RAG, or unattended attach. Not Sakana (no experiment loop) and not Edison Literature (no 175M hosted corpus).
 
@@ -366,7 +378,10 @@ Need a text layer on a scanned PDF?
   → paperful ocr. Two-up books: zotero-agent `pdf-prep`
 
 Need LLM to fix one paper’s metadata while writing?
-  → zotero-mcp
+  → 54yyyu/zotero-mcp (or cookjohn / Zoteus)
+
+Need in-Zotero chat / RAG over attached PDFs?
+  → PapersGPT, SeerAI, or ZotSeek. Paperful ask when those PDFs should also live in the restore ledger
 
 Need a grounded summary of many text-layer PDFs, then one collection review?
   → paperful summarize, then synthesize. Drop unquoted sentences: summarize --receipts
@@ -390,10 +405,13 @@ Need a local coding-agent loop (lit → hypothesis → experiment → artifacts 
   → OpenResearch (orx). Then ingest cites you want to keep into Zotero and fill PDFs with Paperful
 
 Need Elicit/Consensus tables over the public record?
-  → those UIs, then Paperful for PDFs you will own
+  → Elicit, Consensus, Undermind, SciSpace, Ai2 Asta, Paperguide — then Paperful for PDFs you will own
+
+Need a citation map of the public graph (not downloads)?
+  → Litmaps / ResearchRabbit / Connected Papers. Paperful snowball downloads
 
 Need dual-review SR screening?
-  → Covidence / Rayyan / ASReview
+  → Covidence / Rayyan / DistillerSR / ASReview
 
 Need a web Deep Research memo?
   → OpenAI / Gemini / Perplexity. Not Zotero
