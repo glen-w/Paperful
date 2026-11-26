@@ -8,10 +8,13 @@ that is closed costs write-back, not the read work. See
 
 from __future__ import annotations
 
+import logging
 import shutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 from .attach import AttachResult
 from .config import Config
@@ -111,10 +114,17 @@ class MirrorCatalogue:
             folder = self.out_dir / col.path if col is not None else None
             if folder is None or not folder.is_dir():
                 continue
+            try:
+                children = list(folder.iterdir())
+            except OSError as exc:
+                # Docker bind mounts can raise EINVAL (errno 22) on one folder.
+                # Doctor already skips those; a run must not abort the rest.
+                log.warning("skipping unreadable mirror folder %s: %s", folder, exc)
+                continue
             found.extend(
                 sorted(
                     d
-                    for d in folder.iterdir()
+                    for d in children
                     if d.is_dir() and is_item_dirname(d.name)
                 )
             )

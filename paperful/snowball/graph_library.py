@@ -249,7 +249,7 @@ def find_pdf_for_key(cfg: Config, item_key: str, *, collection: str) -> None:
     key = (item_key or "").strip()
     if not key:
         raise CitationGraphError("Missing item key.")
-    auto_attach = (getattr(cfg, "ui_attach_mode", "manual") or "manual") == "auto"
+    auto_attach = (getattr(cfg, "ui_attach_mode", "auto") or "auto") == "auto"
     console = Console(file=StringIO(), highlight=False, width=120)
     run_fetch(
         console,

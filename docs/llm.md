@@ -176,6 +176,7 @@ LiteLLM by import only. The TTY guide prints the fix for each amber row.
 
 ## 4. Verbs
 
+(a-recover-browser-agent-pdf-recovery)=
 ### A. `recover` — browser-agent PDF recovery
 
 Model choice (Ollama tags, VRAM bands, acceptance test):
@@ -319,6 +320,7 @@ an XtraGPT Ollama tag; ICLR/ReviseQA criteria are ML-shaped. Optional
 formats from any source. See
 [rewrite.md](rewrite.md).
 
+(d-summarize-grounded-summary-note)=
 ### D. `summarize` — grounded summary note
 
 ```sh
@@ -372,6 +374,7 @@ uv run paperful summarize --item ABCD1234 --receipts  # quote or drop; Receipts 
   keeps the summary and warns; `fail` marks the item failed. Optional
   `ste_word_list_path` enables vocabulary checks against an approved list.
 
+(e-synthesize-summary-of-summaries)=
 ### E. `synthesize` — summary of summaries
 
 ```sh
@@ -448,6 +451,7 @@ uv run paperful extract-sections --library --dry-run
   writes. Distinct from `summarize` (HTML prose) and `rag questions` (RQ queue
   for `rag answered`). See [rag.md](rag.md#structured-sections-mirror-only).
 
+(llm-docker)=
 ## 5. Docker
 
 **light** images omit `litellm` and `browser-use`. **heavy**
@@ -531,4 +535,4 @@ allow_remote = true
 - [architecture.md](architecture.md#llm-layer-optional-local-first) — layer, gates, note write path
 - [camofox.md](camofox.md) — opt-in scripted Camoufox lane before `browser_agent`
 - [sessions.md](sessions.md) — vault profile ownership during `recover`
-- [ROADMAP.md](ROADMAP.md#optional-llm-assist-local-litellm) — what is later (Cloud/BU2, `num_ctx` pass-through)
+- {ref}`ROADMAP.md <optional-llm-assist-local-litellm>` — what is later (Cloud/BU2, `num_ctx` pass-through)

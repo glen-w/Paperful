@@ -15,6 +15,20 @@ Command reference and install steps live in [LLM setup](llm.md). Ask / index
 details are in [Ask your library](rag.md). Recover model bands are in
 [Browser agent models](browser-agent-models.md).
 
+(honesty)=
+## Honesty
+
+Optional AI here is **instant, grounded, critical feedback** over files you
+already hold — not a mark, not a referee, not a paper generator.
+
+- A peer-review pack is not a grade and not accept/reject.
+- Heuristic AI-prose tells and optional detector extras are **not proof** of
+  authorship or of AI use.
+- Language models invent, skip, and flatten. Quotes and `--receipts` /
+  overlap locators are there so you can check the PDF.
+- Suggest edits never overwrites the source. Stuff **suggests** extra
+  library cites; it does not insert them into the manuscript.
+
 ## Two paths
 
 | Path | When to use | What leaves the machine |
@@ -298,6 +312,6 @@ chunk plan is huge and wall time matters.
 | [llm.md](llm.md) | Install, config keys, verb behaviour, troubleshooting |
 | [rag.md](rag.md) | Index, Ask, embedding providers |
 | [browser-agent-models.md](browser-agent-models.md) | Recover / Ollama VRAM bands |
-| [example-setups.md](example-setups.md#notes-a-collection-review-and-ask) | Workbench setup 4 |
+| {ref}`example-setups.md <notes-a-collection-review-and-ask>` | Workbench setup 4 |
 | [config.md](config.md#llm-optional-local-first) | Full key tables |
 | [docker.md](docker.md#image-mode-light-vs-heavy) | light vs heavy (LiteLLM + RAG) |

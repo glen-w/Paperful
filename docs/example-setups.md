@@ -1,9 +1,9 @@
 # Example setups
 
 Four ways to run Paperful, from one collection of free PDFs to a workbench
-that grows the library, fills what it can, and leaves you reading in Zotero.
-Pick the row that matches the job. Later rows add pieces; they do not replace
-the earlier ones.
+that grows the library, stays current, answers questions over held PDFs, and
+offers writing help. Pick the row that matches the job. Later rows add
+pieces; they do not replace the earlier ones.
 
 Click-by-click jobs stay in [Walkthroughs](walkthroughs.md). Search order is
 [How it works](how-it-works.md). Named command recipes are
@@ -24,8 +24,9 @@ you run it, or you point cron / launchd at the command. See
 [Snowball watch](snowball.md#watch) and [Author watch](authorwatch.md).
 
 Zotero stays the catalogue you browse, annotate, and cite. Paperful is the
-worker: it looks for PDFs, proposes new parents, and keeps a folder copy
-under `out/`. [Quiet mirror](quiet-mirror.md).
+workbench: it looks for PDFs, proposes new parents, keeps a folder copy
+under `out/`, and (when you turn them on) Ask and writing help.
+[Quiet mirror](quiet-mirror.md). Fetch stance: [legal and privacy](legal-privacy.md).
 
 ## 1. One collection, open access
 
@@ -44,13 +45,12 @@ mostly hits the open-access indexes — Unpaywall and OpenAlex first — and
 skips campus, Scholar, and the browser. CORE is in that list and stays
 quiet until `core_api_key` is set. [Source routing](sources.md).
 
-Google Scholar, the browser agent, and Sci-Hub stay off. Sci-Hub is off by
-default; opting in is your own risk and your own compliance. See
+Google Scholar and the browser agent stay off. Sci-Hub is off by default.
 [Sci-Hub](scihub.md).
 
 **Loop.** [First fill](first-fill.md): **Wanted** → **Preview** → **Grab**
-onto `out/` → open a couple of files → **Attach** the ones you trust
-(automatic attach is a Settings switch, and it needs Zotero 10 or newer).
+onto `out/` (and into Zotero 10 or newer). Open a couple of files on disk.
+Settings can make Attach a separate step.
 
 ```sh
 docker compose run --rm paperful gaps -C "My Collection"
@@ -252,6 +252,7 @@ Items that still miss can go to a handoff list (`gaps --handoff` or
 `reachout`) so you email an author or open a page yourself. Those commands
 do not download. [Workflows](workflows.md).
 
+(notes-a-collection-review-and-ask)=
 ### Notes, a collection review, Ask, and Peer review
 
 A model is optional. **Local AI (default path):** [Ollama](https://ollama.com)
@@ -275,7 +276,7 @@ Three reading jobs, in order:
 | Cited answers              | `rag ingest`, then `ask` | An index of `out/`, then answers that name the papers and pages. **Ask** on the workbench. Needs `[rag].enabled`                                                          |
 | Sentence support           | `ask --claim-check --file` | Each sentence vs the local index (`supported` / `mixed` / `unsupported`). No chat model. CLI pack under `state/ask-claims/`. [Ask](rag.md#claim-check)                    |
 | Sourced comparison table   | `evidence`               | Design / n / method / finding over held PDFs. Quote or `check this`. No LLM. Pack under `state/evidence/`. [Evidence](evidence.md)                                         |
-| Pre-submission pack        | `peer-review`               | Checkers always, including unquoted overlap vs `-C` when `rag ingest` ran. Optional `--lane claims` (intra-doc plus held cited-PDF locators), `--lane context` / `context-web`. Not a grade. [Peer review](peer-review.md) |
+| Pre-submission pack        | `peer-review`               | Checkers always, including unquoted overlap vs `-C` when `rag ingest` ran. Optional `--lane claims` (intra-doc plus held cited-PDF locators), `--lane context` / `context-web`. [Peer review](peer-review.md). Honesty: [AI](ai.md#honesty) |
 
 
 `fix-metadata` (title and identifier patches; `--apply` writes the catalogue)
@@ -311,7 +312,7 @@ docker compose run --rm paperful ask "What do these papers agree on?" -C "Inbox/
 `synthesize` writes `state/reports/<slug>.html` and, with the default
 destination, a standalone Zotero note tagged `paperful-report`. Re-runs
 update that note when the source summaries are unchanged unless you pass
-`--force`. [LLM](llm.md#e-synthesize-summary-of-summaries).
+`--force`. {ref}`LLM <e-synthesize-summary-of-summaries>`.
 
 Summaries and the collection review want a 7B-class instruct model. Ask
 uses that chat model plus embeddings (`ollama pull nomic-embed-text` locally,

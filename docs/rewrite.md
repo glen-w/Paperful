@@ -3,7 +3,7 @@
 `paperful rewrite` takes an existing [`peer-review`](peer-review.md) pack and
 proposes locatable edits. The Advanced workbench labels this **Suggest
 edits** so it is not read as “the AI rewrites my paper.” It is
-**apply-from-peer-review**, not a paper generator. It does not re-run peer-review,
+**apply-from-peer-review**. It does not re-run peer-review,
 does not overwrite the source file, and does not write to the reference
 manager.
 
@@ -20,7 +20,7 @@ Paperful does not vendor [PaperOrchestra](https://github.com/google-research/pap
 Docs credit the patterns: a worklog, align-then-generate, selected-span prompts.
 Product routing vs PaperOrchestra (idea+log → conference LaTeX):
 [How Paperful compares](comparison.md) and the
-[comparison reference](comparison-reference.md#paperorchestra).
+{ref}`comparison reference <paperorchestra>`.
 
 ## CLI
 

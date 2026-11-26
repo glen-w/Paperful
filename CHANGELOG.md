@@ -4,7 +4,13 @@ All notable user-facing changes. **1.0.0** locks the trust contract: required
 `paperful.run_report.v1` and `paperful.item.v1` keys are frozen (extra keys
 may still be added). See [releases](docs/releases.md).
 
-## Unreleased
+## 1.9.10 — 2026-11-26
+
+- **Unreadable mirror folders.** A collection directory the mount cannot list (`EINVAL`, the same case `doctor` already skips) is skipped. The rest of the scope still loads.
+- **`paperful --version`.** `--version` / `-V` print the same package version as `paperful version`. `-v` stays `--verbose`.
+- **Workbench attach default is automatic.** `[ui].attach_mode` defaults to `auto`: Grab writes `out/` and attaches when Zotero 10+ can write. Settings → After Grab still switches to manual. Zotero 7–9 still leave files on disk.
+- **Docs positioning.** Public copy leads with the local workbench (land literature, keep current, Ask, writing help). Adapter honesty lives on adapters/why. AI caveats once on the AI page.
+- **paperful.app.** Workbench offer in title/meta, four job cards, catalog tables reordered, Services nav (same fill page), Grab-attach default in the lede.
 
 ## 1.9.9.2 — 2026-11-26
 

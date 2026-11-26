@@ -25,6 +25,12 @@ from paperful.cli_bind._shared import (
 )
 
 
+def _print_version(value: bool) -> None:
+    if value:
+        console.print(__version__)
+        raise typer.Exit()
+
+
 @app.callback()
 def _main(
     offline: bool = typer.Option(
@@ -35,11 +41,20 @@ def _main(
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Debug log on stderr. Tokens are redacted."
     ),
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        help="Print the package version and exit.",
+        is_eager=True,
+        callback=_print_version,
+    ),
 ) -> None:
     """paperful."""
     from paperful import cli_runtime as _rt
     from paperful.log import configure
 
+    del version
     _rt._OFFLINE = offline
     configure(verbose=verbose)
 

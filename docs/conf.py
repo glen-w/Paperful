@@ -69,8 +69,8 @@ myst_enable_extensions = [
 ]
 myst_heading_anchors = 3
 myst_fence_as_directive = ["mermaid"]
-# GitHub-style relative links must not fail the build.
-suppress_warnings = ["myst.xref_missing", "misc.highlighting_failure"]
+# Highlighting of CLI/TOML snippets can fail without a Pygments lexer.
+suppress_warnings = ["misc.highlighting_failure"]
 
 html_theme = "furo"
 html_title = "Paperful"

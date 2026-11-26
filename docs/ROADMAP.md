@@ -39,7 +39,7 @@ split novelty Q then A ([peer_review.md](peer-review.md)). **1.9.6** (2026-11-19
 ships cited-source locators on `--lane claims` and CLI `ask --claim-check`
 ([rag.md](rag.md#claim-check)). **1.9.7** (2026-11-20) ships hop-0
 `--prioritize` (`recency` / `popular` / `historical`) on keyword and hybrid
-search ([snowball](snowball.md)). **1.9.9** (2026-11-26) ships academic discourse hygiene, Suggest edits copy sanitizer, and [`metrics`](metrics.md). **1.9.9.2** comments unquoted library overlap on Suggest edits (no cite insert). The **live map** is [After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
+search ([snowball](snowball.md)). **1.9.9** (2026-11-26) ships academic discourse hygiene, Suggest edits copy sanitizer, and [`metrics`](metrics.md). **1.9.9.2** comments unquoted library overlap on Suggest edits (no cite insert). **1.9.10** (2026-11-26) adds `--version` / `-V`, automatic Grab attach, and a skip for an unreadable mirror folder. The **live map** is [After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
 still lists jobs by area; many of those rows have shipped. Do not re-pick
 them as the next thing to build.
 
@@ -64,17 +64,15 @@ and grey URL watches have shipped too. The live order is
 [After 1.7](#after-17-live-map); the area index below is the encyclopaedia.
 
 (after-110-v2-factory-framing)=
-**1.x vs v2 (factory, still not a calendar).** Public 1.x copy stays
-**“find missing PDFs in Zotero.”** Internally, v2 is **named packs on that
-ledger**, not a hosted Kosmos clone and not launch-page “academic paper
-factory.” Sequence: Wanted honest → grow/keep current → Ask **your** PDFs →
+**1.x vs named packs (still not a calendar).** Public copy leads with the
+local workbench (land literature, keep current, Ask, writing help). Internally,
+named packs sit on that ledger, not a hosted Kosmos clone. Sequence: Wanted honest → grow/keep current → Ask **your** PDFs →
 then (gated) precedent pack, conflicting-evidence briefs, `stuff` into
 Zotero, PRISMA **counts**. Those packs have since shipped. At most **one**
 bigger bet a year. Grey-host watching shipped (`search` / `search watch`);
-the bet now on the table is [systematic review](#after-17-sr). Never
-auto-manuscript. Comparison routing:
+the bet now on the table is [systematic review](#after-17-sr). Comparison routing:
 [comparison.md](comparison.md); stage matrix:
-[paper factory stages](comparison-reference.md#paper-factory-stages);
+{ref}`paper factory stages <paper-factory-stages>`;
 packs: [v2 factory](#after-110-paper-factory).
 
 (after-17-live-map)=
@@ -105,7 +103,7 @@ under it is still the encyclopaedia of jobs; it is not the order.
 (after-17-settled)=
 ### What 1.7 already settled
 
-Sources: [1.7 decision log](plans/1.7-wave.md), [legal-privacy](legal-privacy.md),
+Sources: [1.7 decision log](https://github.com/glen-w/Paperful/blob/main/docs/plans/1.7-wave.md), [legal-privacy](legal-privacy.md),
 changelog **1.7.0**. The 1.8.0 workbench hardening wave sits on top of
 that tag (content-security policy, orphaned jobs, cached counts, Wanted and
 Discover layout). It is in tree; it is not a reason to reopen 1.7’s
@@ -267,8 +265,9 @@ proposals, promoted author packs, acronym files, and (when used) `sr`
 screen rows. Operators re-litigate those because nothing reads them
 together.
 
-**Command sketch:** `paperful decisions -C …`. Prints one table. Omits a
-source that has no stable key rather than scraping note prose.
+**Shape:** a read-only join of decisions already on disk for one collection.
+Prints one table. Omits a source that has no stable key rather than scraping
+note prose.
 
 | Source on disk | Row shows |
 | --- | --- |
@@ -488,14 +487,14 @@ follow cover the scheduled-by-the-operator case without a second agent.
 These are parked holes with a shape. None of them outranks the `since`
 dogfood or SR-2. Pick one when a desk hits it.
 
-**Playbook health.** `paperful playbooks health` (report). For each row
-in `learned.toml`: win count, last win, consecutive misses, last HTTP
+**Playbook health.** A report of learned playbooks. For each row in
+`learned.toml`: win count, last win, consecutive misses, last HTTP
 status when we have it. `doctor` ambers when the miss streak is at
 least `[playbooks].stale_after` (default 5) or `last_win` is older than
-`[playbooks].stale_days` (default 180). `playbooks retire` marks the
-row disabled and keeps it in the file. No automatic retire. If there
-is no learned file, exit 0 with “no learned playbooks.” Dogfood is
-whatever `state/` already accumulated on ocean grey hosts.
+`[playbooks].stale_days` (default 180). Retiring a row marks it disabled
+and keeps it in the file. No automatic retire. If there is no learned
+file, exit 0 with “no learned playbooks.” Dogfood is whatever `state/`
+already accumulated on ocean grey hosts.
 
 **Wrong-paper queue.** `lint` already raises `pdf_identity_mismatch`.
 The missing piece is a disposition: keep, or move the bytes to
@@ -506,9 +505,9 @@ libraries: report only.
 
 **Orphan files.** List mirror files (and, when the operator passes a
 path, Zotero `storage/` files) that no item record references. Default
-report. `--apply` **moves** them to `state/trash/<stamp>/`. A second
-command, `paperful trash empty --older-than 30d --apply`, unlinks.
-Group libraries refused. This is not a startup daemon.
+report. An apply step **moves** them to `state/trash/<stamp>/`. A later
+step unlinks files older than a delay (30 days). Group libraries
+refused. This is not a startup daemon.
 
 **License gate.** Stamps already exist (`license`, `oa_status`,
 `version`). The gate is an opt-in allowlist in config. When it is on,
@@ -519,7 +518,7 @@ When it ships, add the allowlist shape to
 not a redistributor.
 
 **Annotation mirror.** Zotero stays the reader. Phase 1: on `snapshot`
-(or `paperful annotations mirror`), write
+(or a dedicated annotation export), write
 `out/<item>/annotations.json` (`paperful.annotations.v1`: text, page,
 color, comment) from the backend’s annotation read. Read-only. Phase 2:
 `[rag].prefer_highlights` (default off) lets ingest mark those passages
@@ -538,15 +537,15 @@ express “whose papers”; a sync product is a different job
 **Status:** roadmap. The parked line “SI / dataset / code siblings” gets
 this shape and no wider one.
 
-`paperful siblings -C` (dry-run) looks at links already on the mirrored
+A dry-run over one collection looks at links already on the mirrored
 PDF or its landing metadata. It may record a sibling only when the host
 is on an allowlist: Zenodo, OSF, Dryad, Figshare, a GitHub release, or
 a Dataverse host the operator added. License is copied when that host’s
-API returns one. `--apply` downloads into `out/<item>/siblings/` under
-a byte cap and does **not** attach into Zotero unless `--attach` is
-also passed (second flag, on purpose). Stamp `sibling:zenodo` (or the
-host’s short name). Refuse generic cloud drives, personal blogs, and
-any pirate host. Cap requests per run.
+API returns one. Apply downloads into `out/<item>/siblings/` under a
+byte cap and does **not** attach into Zotero unless a second, explicit
+attach step is also passed. Stamp `sibling:zenodo` (or the host’s short
+name). Refuse generic cloud drives, personal blogs, and any pirate
+host. Cap requests per run.
 
 **Acceptance.** A fixture PDF whose only outbound link is a Zenodo
 record yields one row; a fixture whose only link is a file host not on
@@ -560,11 +559,11 @@ Collaboration stays “shared disk,” as in
 [Maybe later §8](#maybe-later). Thicken the mechanism; do not add a
 server.
 
-- **`paperful mirror diff DIR`** compares this `out/` to another tree
-  (a Syncthing copy, a backup, a colleague’s snapshot you were handed).
-  Rows: item key, PDF added or hash changed, `record.json` hash
-  changed, notes added. No merge button in the first slice. The
-  operator uses `restore` on the keys they choose, dry-run first.
+- **Mirror diff.** Compare this `out/` to another tree (a Syncthing
+  copy, a backup, a colleague’s snapshot you were handed). Rows: item
+  key, PDF added or hash changed, `record.json` hash changed, notes
+  added. No merge button in the first slice. The operator uses
+  `restore` on the keys they choose, dry-run first.
 - **Attach clash.** `attach` and the apply path of `run` take an
   exclusive file `state/locks/<item-key>` (host, pid, timestamp). A
   lock older than `[attach].lock_hours` (default 12) is stale and may
@@ -585,7 +584,7 @@ install.
 | Desk | Already in tree | Next proof |
 | --- | --- | --- |
 | Ocean / BBNJ | grey packs, `author_site`, `authorwatch` | `since` and the topic gap map on `ocean/BBNJ` |
-| Policy grey | `search` / `search watch`, RFMO and UN-doc playbooks | Playbook health on learned rows, or `siblings` if the holdings actually link out |
+| Policy grey | `search` / `search watch`, RFMO and UN-doc playbooks | Playbook health on learned rows, or sibling datasets if the holdings actually link out |
 | Journal desk | Shipped example packs `styles/JMLC`, `styles/JCP`, `styles/MarinePolicy`; `peer-review` | Claim-check on one manuscript extract. Not a new style product |
 
 Do not open a fourth desk to justify a feature.
@@ -595,13 +594,13 @@ Do not open a fourth desk to justify a feature.
 
 **Status:** exploratory. Not on the 1.9.x cut. Not a second source of truth.
 
-**Context.** [Neo4j Relate](https://neo4j.com/product/relate/) (Apache 2.0, in-process
-Rust, MCP) targets agents that need **connected** data without standing up a
+**Context.** Neo4j Relate (Apache 2.0, in-process
+Rust, MCP; the product page is gone) targets agents that need **connected** data without standing up a
 server. Paperful already ships graph-shaped work on disk: snowball
 [`paperful.citation_graph.v1`](snowball.md), co-author
 [`paperful.network.v1`](network.md) (NetworkX → GEXF/GraphML), OpenAlex hops,
 identity/resolver graph items in [Maybe later §3](#maybe-later), and read-only
-[`paperful mcp`](commands.md#agent-channel-format-json-and-mcp). Ask retrieval
+{ref}`paperful mcp <agent-channel-format-json-and-mcp>`. Ask retrieval
 stays **[LanceDB](rag.md)** on the mirror. Relate is a **query and agent
 surface** experiment, not a replacement for `out/` or the RAG index unless a
 spike shows a clear win.
@@ -622,9 +621,9 @@ hold **derived** projections only — same honesty as co-author runs under
 
 - **Mirror-first.** Canonical items stay `out/<key>/record.json` + PDFs. Relate
   reads exports; it does not become the write path for parents or attachments.
-- **No dual-schedule.** Do not replace nightshift
-  [`paperful-summarize`](https://github.com/glen-w/nightshift) ingest or add a
-  second embedding pipeline without the [embeddings spike](#after-17-embeddings-order) bar.
+- **No dual-schedule.** Do not replace a nightshift-style summarize ingest
+  or add a second embedding pipeline without the
+  [embeddings spike](#after-17-embeddings-order) bar.
 - **No Zotero sqlite.** Same rule as the rest of the tree.
 - **Agent channel.** New reads should reuse `paperful.agent.json.v1` and MCP
   patterns; cap result size; structured retryable errors like existing batch
@@ -773,8 +772,9 @@ Not a calendar. Each line can be the last line.
    only if you actually open the packs.
 2. **`refs gap` memory** — new / still missing / now owned. **Shipped in
    1.9.4.** Dogfood: hand one pack to `ingest-dois` within a month.
-3. **`paperful decisions -C`** — read-only join. Drop it if Discover
-   already shows the only rows that matter.
+3. **Decisions join** — read-only table of Keep/Skip, dismiss, and
+   reject rows already on disk. Drop it if Discover already shows the
+   only rows that matter.
 4. **Claim check** — then, only if used, brief diff and the evidence
    table.
 5. **SR-2** — a queue (SR-1 reasons and the counts diagram shipped in
@@ -825,22 +825,23 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.9.2).
-- Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
-  Zotero unless Settings is automatic.
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.10).
+- Attach is **automatic by default** (`[ui].attach_mode = auto`); Grab writes
+  Zotero when the library can (Zotero 10+). Settings → After Grab switches to
+  manual.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
   zero disabled, attach count honesty, first-hour copy.
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.9.9.2` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.9.10` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
 ### 1.1.1 (stop-ship) — shipped
 
 Landed in tree (tag when ready). Implementation notes:
-[docs/plans/1.1.1-stop-ship.md](plans/1.1.1-stop-ship.md). User-facing copy:
+[docs/plans/1.1.1-stop-ship.md](https://github.com/glen-w/Paperful/blob/main/docs/plans/1.1.1-stop-ship.md). User-facing copy:
 [gui.md](gui.md), [first-fill.md](first-fill.md).
 
 - Grab-selected `item_keys`, preview token keys, tests.
@@ -934,7 +935,7 @@ Pieces underneath: `watch.py`, `digest.py`, `briefing.py`;
   [`paperful since`](#after-17-habit), not a second poller.
 
 (after-110-research-integrity-paperguard)=
-### Research integrity forensics ([PaperGuard](https://github.com/exergyleizhou-ux/PaperGuard))
+### Research integrity forensics (PaperGuard)
 
 **Last reviewed:** 2026-10-26 against PaperGuard **2.17.0** (public README,
 [ROADMAP](https://github.com/exergyleizhou-ux/PaperGuard/blob/main/ROADMAP.md),
@@ -974,7 +975,7 @@ works?” — not “are these CSV means GRIM-impossible?”
 
 1. **Docs + comparison routing (now).** Short-answer row in
    [comparison.md](comparison.md); vendor notes in
-   [comparison reference](comparison-reference.md#paperguard). Peer review
+   {ref}`comparison reference <paperguard>`. Peer review
    `statcheck_p_mismatch` footer should point heavy stats/table jobs at
    PaperGuard, not promise parity.
 2. **Mirror hand-off (test).** For a mirrored item, document a stable recipe:
@@ -987,11 +988,11 @@ works?” — not “are these CSV means GRIM-impossible?”
    tool attribution). Fail closed if `paperguard` is not on `PATH`. Never fold
    PaperGuard severities into a single Paperful grade.
 4. **Collection batch (roadmap, after `screen` proves boring).**
-   `paperful screen --supplements` or a sibling verb: for items with tagged
-   supplementary data, batch-invoke PaperGuard in report-only mode; write
-   `state/runs/<stamp>-forensics.json` (schema TBD). Still no auto-tag of
-   misconduct — optional `--apply` might only add a child note “forensics pack
-   available” with a path, same honesty as `screen --apply`.
+   For items with tagged supplementary data, batch-invoke PaperGuard in
+   report-only mode; write `state/runs/<stamp>-forensics.json` (schema TBD).
+   Still no auto-tag of misconduct — optional `--apply` might only add a
+   child note “forensics pack available” with a path, same honesty as
+   `screen --apply`.
 5. **Workbench (roadmap).** Advanced Peer review panel: “Open forensics report”
    when a sidecar JSON exists; link out to PaperGuard HTML export. Not on the
    default nav.
@@ -1027,7 +1028,7 @@ ML western-blot classifier, Redis-backed Web UI cache) stay **their** bets.
 
 Factory-stage context: PaperGuard strengthens **screen / audit** on **files**;
 Paperful 1.x **screen** is **metadata + PPS on PDFs you hold**. See
-[paper factory stages](comparison-reference.md#paper-factory-stages).
+{ref}`paper factory stages <paper-factory-stages>`.
 
 (after-110-openalex-topics)=
 ### OpenAlex topics (January 2027)
@@ -1318,7 +1319,7 @@ discovery loops; Elicit / Consensus / Undermind / SciSpace / Scite / Valency
 = public-corpus search; Covidence / Rayyan / ASReview = screening; Jenni /
 Paperpal / Overleaf = interactive draft; PaperOrchestra = idea+log →
 conference LaTeX (you run it); PaperQA2 / GPT Researcher / STORM = local or
-web reports. Detail: [comparison reference](comparison-reference.md#paper-factory-stages).
+web reports. Detail: {ref}`comparison reference <paper-factory-stages>`.
 
 **1.x stays Wanted.** v2 packs stay off until `[llm]` / `[rag]` / gates, and
 until Wanted is honest. Do not grow 1.x into a second product.
@@ -1343,7 +1344,7 @@ until Wanted is honest. Do not grow 1.x into a second product.
 | Main-body-first reading of LLM peer-review (appendix bias literacy; optional prompt/pack slices later) | Peer review | Suggested lanes only; no scores; see arXiv:2611.17811 | [peer_review.md](peer-review.md#reading-llm-lanes-main-text-vs-appendix), [ROADMAP](#peer-review-llm-literacy) |
 | Apply a peer-review pack as locatable edits / tracked changes (worklog, align-then-generate, selected-span prompts; no vendor) | Write | Pack required; never overwrite the source; no invented numbers/cites | [rewrite.md](rewrite.md) (shipped) |
 | Deepen `rewrite` from PaperOrchestra **patterns** (allowed-facts worklog, citation checklist, fail-closed critic). Do **not** vendor the pipeline | Write | Still pack-required; critic may only reject or comment; local `[llm]`; no web search from rewrite | [Rewrite deepen](#rewrite-deepen-paperorchestra-patterns) (later) |
-| Deep forensics on supplementary tables / stats / figures (external tool) | Screen / audit | No merged score; subprocess or hand-off | [PaperGuard](#research-integrity-forensics-paperguard) |
+| Deep forensics on supplementary tables / stats / figures (external tool) | Screen / audit | No merged score; subprocess or hand-off | [PaperGuard](#after-110-research-integrity-paperguard) |
 | Named MCP read jobs (`ask` vs precedent vs `refs_gap`); writes stay `--apply` | Agent | Table stakes without a hosted corpus | [Literature-discovery](#literature-discovery-complement-waves) |
 
 **Stay out (v2 included):** hosted multi-user as the product; Kosmos world
@@ -1365,7 +1366,7 @@ reason over **this** collection.
 (after-110-distribution)=
 ### Distribution and install
 
-**Settled in 1.7** ([decision log](plans/1.7-wave.md)). The list underneath
+**Settled in 1.7** ([decision log](https://github.com/glen-w/Paperful/blob/main/docs/plans/1.7-wave.md)). The list underneath
 is the old brief; do not reopen it.
 
 - CLI route: `pipx install paperful` / `uv tool install paperful`.
@@ -1387,22 +1388,20 @@ is the old brief; do not reopen it.
 librarians and research-support staff (also the paid cleaning report);
 policy / NGO researchers (warmest first trial).
 
-**Pitch:** the clean-up step that comes after discovery tools, not a rival
-to them. It runs locally and is open source, so library data stays on the
-user’s machine. Never promise “every paywalled PDF”. Never call Camofox
-“stealth”. Own one search phrase: **“find missing PDFs in Zotero”**. Keep
-Ask, Discover, snowball, and “paper factory” / “AI scientist” out of the
-title, meta, share card, and GitHub About. Do not promise journal
-manuscripts. Point Edison/Elicit/Jenni from [comparison.md](comparison.md)
-instead.
+**Pitch:** a local research workbench for the library you already keep: land
+literature on this machine, stay current, Ask held PDFs, writing help on a
+draft you wrote. It runs locally and is open source. Never promise “every
+paywalled PDF”. Never call Camofox “stealth”. Do not promise a journal
+manuscript from scratch. Point Edison/Elicit/Jenni from
+[comparison.md](comparison.md) instead.
 
-**Adoption copy:** document auto-attach as off by default, Zotero 10+ only,
-and switched on in Settings. Make the PyPI README lead with Wanted. Hold
-Repair and further Ask work until Wanted proves out.
+**Adoption copy:** Grab attaches by default on Zotero 10+ (`[ui].attach_mode =
+auto`). Settings → After Grab switches to manual. README leads with the
+workbench offer.
 
 Launch gates, in order:
 
-1. A link-preview paste test (no paperful.io disclaimer — do not add one).
+1. A link-preview paste test (do not add a collision disclaimer).
 2. Re-crop the share image as `og-v2.png` so the Wanted heading and count
    show. **Shipped** (`website/images/og-v2.png`, homepage `og:image`).
 3. A `robots.txt` with the sitemap line.
@@ -1432,7 +1431,7 @@ decision is findable.
 1. **Legal and fetch stance.** **Written:** [legal-privacy](legal-privacy.md).
    Publisher terms and campus licences stay the operator’s call. Complements
    [Compliance & provenance](#maybe-later) and
-   [CAPTCHA / soft bot walls](#optional-llm-assist-local-litellm).
+   {ref}`CAPTCHA / soft bot walls <optional-llm-assist-local-litellm>`.
 2. **Evidence after the first hour.** Local witness on run reports is
    shipped. An opt-in “send a report” button is still out, and it is not on
    the [live order](#after-17-order): a one-maintainer tool does not grow a
@@ -1539,7 +1538,7 @@ everything”). Tag when ready.
 | Attachment **provenance stamp** (`oa:unpaywall` / `campus:ezproxy` / `grey:undocs` on notes or title prefix) | Trust inside Zotero | Shipped on the Zotero attachment note. A readable parent line follows `[remarks].surface` |
 | `--dry-run` **Would-hit** column (sources in order) | Trust before network | Shipped |
 | Exit **2** + next-steps when Zotero is down (`collections` / `run` / `attach`) | Fresh clone never dead-ends | Shipped |
-| Slim README + [CHANGELOG](../CHANGELOG.md) known limits | Trust before install | Shipped |
+| Slim README + [CHANGELOG](https://github.com/glen-w/Paperful/blob/main/CHANGELOG.md) known limits | Trust before install | Shipped |
 | Lock `paperful.run_report.v1` | Trust for agents | **Shipped** — required keys frozen (`RUN_REPORT_*_KEYS` incl. miss rollups); golden fixtures; extra keys may be added |
 | Lock `paperful.item.v1` and `snapshot` / `restore` (additive keys only after 1.0) | Trust for the disk ledger | **Shipped** — required keys frozen; restore is create-missing (not lossless round-trip) |
 | Strip legacy flat-PDF migrate + mixed-layout doctor amber | Day-0 mirror never steers people into a whole-library layout cleanup | **Shipped (0.1 → 1.0)** |
@@ -1589,7 +1588,7 @@ for real-library runs; keep filled reports under gitignored `assessments/`.
   optional `browser_agent`; items stay `retryable` / `soft block` rather than
   hard `not_found`. **Later (fetch, not a bypass product):** if vault retry
   of those 403 / empty httpx bodies is the bottleneck, an opt-in TLS
-  impersonator on scripted HTTP only — [CAPTCHA open question 4](#optional-llm-assist-local-litellm).
+  impersonator on scripted HTTP only — {ref}`CAPTCHA open question 4 <optional-llm-assist-local-litellm>`.
   Dead vault landings (`login` / `captcha` / `no download
   control`) silence that final host for the rest of the run; transport timeouts
   use a short connect budget and do not permanently block a publisher on a
@@ -1882,18 +1881,18 @@ envelope for CLI and MCP.
 
 | Wave | Scope | Acceptance |
 | --- | --- | --- |
-| **1** | **Agent MCP + proposal export** — Extend optional `paperful mcp` with read-only tools that call the same builders as CLI `--format json`: `gaps`; snowball crawl dry-run / keyword preview (no gate that writes parents); collection `export` (BibTeX/RIS). Emit BibTeX or RIS from on-disk snowball / `authorwatch` proposal packs (DOIs already resolved in the pack). | **Shipped** — `export-proposals` + MCP tools; docs in [commands](commands.md#agent-channel-format-json-and-mcp), [snowball](snowball.md#bibtex--ris-from-the-queue), [authorwatch](authorwatch.md#ledger). |
+| **1** | **Agent MCP + proposal export** — Extend optional `paperful mcp` with read-only tools that call the same builders as CLI `--format json`: `gaps`; snowball crawl dry-run / keyword preview (no gate that writes parents); collection `export` (BibTeX/RIS). Emit BibTeX or RIS from on-disk snowball / `authorwatch` proposal packs (DOIs already resolved in the pack). | **Shipped** — `export-proposals` + MCP tools; docs in {ref}`commands <agent-channel-format-json-and-mcp>`, [snowball](snowball.md#bibtex--ris-from-the-queue), [authorwatch](authorwatch.md#ledger). |
 | **2** | **Publication trends** — Count works by publication year for an OpenAlex query or a saved snowball profile seed; reuse `OpenAlexClient` and budget posture as snowball. | **Shipped** — `snowball trends`, MCP `snowball_trends`; dry-run table + `--format json`; no library writes. |
 | **3** | **Author briefing thicken** — `authorwatch show` / list briefing adds co-author network and recent works from OpenAlex (same resolution paths as `resolve` / `suggest`). | **Shipped** — `authorwatch briefing` + compact `show`; `--format json`; no new polling scheduler. |
 | **4** | **Precedent / novelty pack** — Edison Precedent shape, local honesty: phrase in → `rag search` over held PDFs **plus** OpenAlex keyword/similar works not in the library; stamp `held` vs `public-metadata-only`; dry-run pack + read-only MCP tool; never a “nobody has done this” claim. | **Shipped** — `paperful precedent`, MCP `precedent`; [commands](commands.md). |
 | **5** | **Hop-0 sort + DiscoverQuery spine** — `--prioritize recency\|popular\|historical` on keyword/hybrid search (OpenAlex `sort=` **and** hop-0 score so `truncate` does not undo it). Default `popular` = today’s `cited_by_count`. Shared `DiscoverQuery` fields on CLI, MCP `snowball_search`, profiles, Discover Advanced. Public verb stays `snowball`. Neighbour overlap rank and `--per-hop-rank` unchanged. Date window stays `year_from`/`year_to`; watch `from_created_date` stays an index cursor. | **Shipped** — [`discover.py`](../paperful/snowball/discover.py) |
 
-**Later (after Wave 5 has lived a release).** Borrow shapes from [OpenResearch](comparison-reference.md#openresearch) `orx discover` / `orx paper`. Do **not** vendor the experiment tree, GPU backends, or full-text-as-the-deliverable. Keyword search stays thin; the join with the library is still the product.
+**Later (after Wave 5 has lived a release).** Borrow shapes from {ref}`OpenResearch <openresearch>` `orx discover` / `orx paper`. Do **not** vendor the experiment tree, GPU backends, or full-text-as-the-deliverable. Keyword search stays thin; the join with the library is still the product.
 
 | Wave | Scope | Gate |
 | --- | --- | --- |
 | **6** | **MCP knobs** — `snowball_search` (still dry-run) accepts the CLI filters agents already lack: `listed_in`, `study_designs`, `oa_only`, `limit` / `max_candidates`, `search_keywords`. Same JSON envelope. | Agent can express a Wave-5 search without shelling out to CLI flags |
-| **7** | **`paperful discover` facade** — read-only alias that always dry-runs, classifies nothing new, calls the same DiscoverQuery. Docs today say there is no `harvest` / `discover` verb; this is a deliberate exception once MCP/GUI naming pays rent. Writes stay `snowball apply` / `--gate`. | One agent-facing name; no second engine |
+| **7** | **Discover facade** — a read-only alias that always dry-runs, classifies nothing new, and calls the same DiscoverQuery. Docs today say there is no `harvest` / `discover` verb; this is a deliberate exception once MCP/GUI naming pays rent. Writes stay `snowball apply` / `--gate`. | One agent-facing name; no second engine |
 | **8** | **ID router** — one seed token that classifies DOI / arXiv / OpenAlex `W…` / ORCID / PMID / collection path into the existing constructors (`doi` / `orcid` / `collection` / search). OpenResearch `orx paper <id\|url>` shape. Does **not** return full text or a paper report as a Paperful product (that is `run` / `ask` over held PDFs). | Typed constructors remain underneath; help text names the detected kind |
 | **9** | **`relevance` prioritize** — OpenAlex default `search=` rank (no `sort=`). Distinct from `popular` (citation count). Opt-in; do not change the Wave-5 default. | Documented as “topical match, not cited-by”; fixture proves order ≠ popular |
 | **10** | **SearchSource adapters** — `search(query, window, prioritize, limit) → Candidate[]`. OpenAlex remains required. Optional PubMed (NCBI) and/or alphaXiv (CS/ML full-text + reports) behind config, union by DOI / PMID / OpenAlex id. **Test first:** miss rate on one CS collection and one biomed collection vs OpenAlex-only. Sci-Hub and Google Scholar stay **out** of discover sources. | Measured miss, then one adapter; identity merge + rate limits before a second |
@@ -1915,6 +1914,7 @@ auto-attach when below bar.
 Golden CI fixtures for `paperful.run_report.v1`, `paperful.refs_gap.pack.v1`, and
 `paperful.inbox.proposal.v1` — **shipped** (`tests/fixtures/` + `tests/test_schema_freeze.py`).
 
+(optional-llm-assist-local-litellm)=
 ## Optional LLM assist (local / LiteLLM)
 
 **Status:** MVP shipped behind `[llm].enabled = false` — Ollama loopback default,
@@ -2317,7 +2317,7 @@ Critical path).
 
 **Status:** not started. Not on the [live order](#after-17-order). Public
 routing vs the product:
-[comparison reference](comparison-reference.md#paperorchestra). Shipped
+{ref}`comparison reference <paperorchestra>`. Shipped
 `rewrite` stays apply-from-peer-review ([rewrite.md](rewrite.md), 1.9.2 trust
 wave). This row is a **pattern** borrow from
 [PaperOrchestra](https://github.com/google-research/paper-orchestra)
@@ -2600,8 +2600,8 @@ provenance enums where possible. `[rag].parser = "grobid"` reuses the TEI cache.
 the holdings diff.
 
 Read item annotations (and tagged notes where distinguishable) through
-`LibraryBackend` on `snapshot` or a dedicated `paperful annotations mirror`
-verb; store beside `record.json` under `out/` (hashes + page anchors). Read-only
+`LibraryBackend` on `snapshot` or a dedicated annotation export; store
+beside `record.json` under `out/` (hashes + page anchors). Read-only
 sync into Paperful — never replace Zotero’s annotation UI. Consumers: cited
 answers prefer operator highlights; future evidence-pack export. Group libraries
 and adapter parity (Mendeley/EndNote) are explicit non-goals until tested.
@@ -3090,7 +3090,7 @@ Larger product bets. Park until the ledger and core loop justify them.
    locks; optional headless fetch node. Aligns with the house
    [quiet mirror](quiet-mirror.md) stance: Syncthing (or similar) is transport;
    Paperful stays a local workbench, not a sync product. The first mechanisms
-   (`mirror diff`, a file lock around attach) are
+   (compare two `out/` trees, a file lock around attach) are
    [two folders](#after-17-two-folders). A headless fetch node waits until
    two processes have actually clashed.
 9. **Compliance & provenance** — 1.0 attach stamp is listed above. On disk,
@@ -3187,7 +3187,7 @@ second doc tree that drifts from the CLI.
 - [releases.md](releases.md) — 1.0 contract; known limits
 - [comparison.md](comparison.md) — what Paperful does and does not replace today
   (Zotero plugins, Valency, Edison, Elicit/Consensus, SR tools, writers)
-- [comparison-reference.md](comparison-reference.md#paper-factory-stages) —
+- {ref}`comparison-reference.md <paper-factory-stages>` —
   factory-stage matrix (Oct 2026)
 - Repo `reports/AI academic paper factories.md` — contributor research behind
   the matrix (not user-facing)
@@ -3203,7 +3203,7 @@ second doc tree that drifts from the CLI.
 **1.0 deliverable** — workbench (open / Docker first): [gui.md](gui.md).
 **Shipped:** `paperful.item.v1` lock, `paperful serve` HTTP + server-rendered UI
 under `paperful/ui/` — default nav **Wanted** (also `GET /`), **Discover**, **Ask**,
-Preview → Grab (fetch to `out/`; Attach is manual by default, or automatic via `[ui].attach_mode`), with
+Preview → Grab (fetch to `out/` and attach when `[ui].attach_mode` is `auto`, the default), with
 review tokens and command ids under `state/gui/commands/`; Activity run-status
 SSE on `GET /v1/runs/{id}/events`. Empty Wanted shows a
 coach line when there is no collection or the library is down. Discover covers topic

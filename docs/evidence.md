@@ -36,5 +36,5 @@ Reuse `state/sections/<key>.json` when present. A missing PDF or empty text is a
 - Anything without a quote is `check this` and does not count as a finding.
 - This is not a verdict and it does not invent statistics.
 - For per-sentence support of a **draft** you already wrote, use [`ask --claim-check`](rag.md#claim-check).
-- For a summary of one paper with page quotes, use [`summarize --receipts`](llm.md#d-summarize-grounded-summary-note).
+- For a summary of one paper with page quotes, use {ref}`summarize --receipts <d-summarize-grounded-summary-note>`.
 - Hosted OA/preprint tables are [SummarizePaper](comparison.md); this verb only quotes files under `out/`.

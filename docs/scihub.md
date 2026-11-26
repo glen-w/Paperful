@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Sci-Hub
 
 Sci-Hub occupies a **legal grey zone in some jurisdictions**. Paperful does

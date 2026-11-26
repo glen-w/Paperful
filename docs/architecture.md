@@ -6,11 +6,9 @@ Paperful does five jobs — **library**, **find**, **completeness**,
 proposed metadata patches, summaries, and the per-item mirror happen **on
 disk** (`out/`, `state/`). A **library adapter** reads the catalogue and,
 separately, writes PDFs or field patches back. **Zotero** (local API on
-`localhost:23119`) is the well-tested adapter. `manager = "mendeley"` talks
-to the Mendeley REST API; `manager = "endnote"` reads a local `.enl` library
-and stages an XML import bundle instead of editing the database. Both are
-**seeking testers** — do not treat them as proven. The disk mirror is what
-you keep if the manager changes. See [Why Paperful](why.md).
+`localhost:23119`) is the well-tested adapter. Other managers:
+[adapters](adapters.md). The disk mirror is what you keep if the manager
+changes. See [Why Paperful](why.md).
 
 **Package layout.** Flat modules under `paperful/` hold one verb or one
 concern each (`*_cmd.py` is the body of a CLI verb after flag parsing; the
@@ -81,8 +79,7 @@ MD5 against the item folder; it asks the manager only about files the folder
 does not hold, and with the manager down it does not call those ghosts.
 
 Mendeley and EndNote implement `changes(since)` and take the same
-mirror-first path as Zotero. They remain seeking testers; Zotero is the
-well-tested adapter.
+mirror-first path as Zotero. Promotion bar: [adapters](adapters.md).
 
 ## Data flow
 
@@ -192,11 +189,11 @@ Commands hold a `MirrorFirstBackend`: the same protocol, with reads served
 from `out/` and writes passed to the manager adapter. The adapter itself is
 below.
 
-[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: report what changed since a library version (`changes`, Zotero only), list items, fetch one item by key (`get_item`), export a PDF **onto disk**, apply a field patch, merge a duplicate parent (children and better fields, then trash), trash a **note** (`trash_note` — never a parent), attach a file, create-or-update a **tagged child note** (`create_or_update_note`, used by `summarize`), create-or-update a **standalone collection note** (`create_or_update_collection_note`, used by `synthesize`), add an existing item to a collection (`add_to_collection`, used by `collections add`), and `flush_writes()` (EndNote stages `state/endnote-import/<stamp>/`; others no-op). The tag makes re-runs update instead of duplicate. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`, `identity`) must not import a manager except through this protocol. [`paperful/identity.py`](../paperful/identity.py) is the shared DOI then title+year fingerprint used by snowball, `authorwatch`, `refs gap`, `ingest-dois`, and inbox title-match. [`paperful/refs_gap.py`](../paperful/refs_gap.py) and [`paperful/ingest_dois.py`](../paperful/ingest_dois.py) create review packs / parents through the adapter; they do not fetch PDFs. [`paperful/collections_add.py`](../paperful/collections_add.py) files existing keys into a collection (membership only). [`paperful/inbox_match.py`](../paperful/inbox_match.py) is the drop-folder match ladder. Notes are skipped by `items_in_scope`, so a report note never enters `run` / `lint` / `gaps`. Canonical item types are Zotero ids; [`paperful/interop/`](../paperful/interop/) maps RIS / BibTeX / EndNote XML at the edge. `paperful import` / `export` use that layer. **Zotero is well tested.** [Mendeley](mendeley.md) and [EndNote](endnote.md) are seeking testers.
+[`paperful/library.py`](../paperful/library.py) defines `LibraryBackend`: report what changed since a library version (`changes`, Zotero only), list items, fetch one item by key (`get_item`), export a PDF **onto disk**, apply a field patch, merge a duplicate parent (children and better fields, then trash), trash a **note** (`trash_note` — never a parent), attach a file, create-or-update a **tagged child note** (`create_or_update_note`, used by `summarize`), create-or-update a **standalone collection note** (`create_or_update_collection_note`, used by `synthesize`), add an existing item to a collection (`add_to_collection`, used by `collections add`), and `flush_writes()` (EndNote stages `state/endnote-import/<stamp>/`; others no-op). The tag makes re-runs update instead of duplicate. Identifier and dedupe logic (`resolve`, `lint`, `pdfid`, `metadata`, `dedupe`, `identity`) must not import a manager except through this protocol. [`paperful/identity.py`](../paperful/identity.py) is the shared DOI then title+year fingerprint used by snowball, `authorwatch`, `refs gap`, `ingest-dois`, and inbox title-match. [`paperful/refs_gap.py`](../paperful/refs_gap.py) and [`paperful/ingest_dois.py`](../paperful/ingest_dois.py) create review packs / parents through the adapter; they do not fetch PDFs. [`paperful/collections_add.py`](../paperful/collections_add.py) files existing keys into a collection (membership only). [`paperful/inbox_match.py`](../paperful/inbox_match.py) is the drop-folder match ladder. Notes are skipped by `items_in_scope`, so a report note never enters `run` / `lint` / `gaps`. Canonical item types are Zotero ids; [`paperful/interop/`](https://github.com/glen-w/Paperful/tree/main/paperful/interop) maps RIS / BibTeX / EndNote XML at the edge. `paperful import` / `export` use that layer. Catalogue honesty: [adapters](adapters.md).
 
 ## LLM layer (optional, local-first)
 
-[`paperful/llm/`](../paperful/llm/) is a thin transport: `OllamaClient` (httpx to a loopback daemon by default), `LiteLLMClient` (import-gated behind `paperful[llm]`, keys from env), `NullLLMClient` when `[llm].enabled = false`. Verbs import only `paperful.llm`; `validate.py` / `preflight.py` fail before any network call. [`paperful/grounding.py`](../paperful/grounding.py) supplies PDF text disk-first (`out/`, then `state/pdf-cache/` via `export_pdf`) and a head+headings+tail budget slice.
+[`paperful/llm/`](https://github.com/glen-w/Paperful/tree/main/paperful/llm) is a thin transport: `OllamaClient` (httpx to a loopback daemon by default), `LiteLLMClient` (import-gated behind `paperful[llm]`, keys from env), `NullLLMClient` when `[llm].enabled = false`. Verbs import only `paperful.llm`; `validate.py` / `preflight.py` fail before any network call. [`paperful/grounding.py`](../paperful/grounding.py) supplies PDF text disk-first (`out/`, then `state/pdf-cache/` via `export_pdf`) and a head+headings+tail budget slice.
 
 | Verb | Gate | Output | Library write |
 | --- | --- | --- | --- |
@@ -306,7 +303,8 @@ In Zotero 10 the settings pane is **Account** (older builds still say Sync). Tur
   metrics, and heuristic AI-tells without an LLM; optional `--lane` suggested
   comments (`--llm` / `--advanced` aliases), including ScholarPeer-inspired
   `context` / `context-web` (three-round retrieve; `context.json` sidecar),
-  Binoculars extra, and Vale house-style pass. Not a grade and not in `all`.
+  Binoculars extra, and Vale house-style pass. Honesty: [AI](ai.md#honesty).
+  Not in `all`.
 - `paperful rewrite` — apply a peer-review pack (`state/rewrites/`). Default
   area is style. Never overwrites the source. Not a generated paper and not
   in `all`.
@@ -391,10 +389,10 @@ cross-origin non-GET requests with 403 before any route runs; there is still no 
 GUI long jobs enqueue under `state/gui/commands/`; Activity and post-submit pages
 subscribe to `GET /v1/runs/{id}/events` (SSE) with `GET /v1/runs/{id}` as JSON
 poll fallback. GUI writes use review tokens (`state/gui/reviews/`) then the same
-domain entrypoints as the CLI. Grab fetches to `out/`. Attach writes the catalogue
-when you press it (attachable pending only on the main Wanted button; mismatch
-and short PDF need Advanced), or during Grab when `[ui].attach_mode` is `auto`
-and the library can write. Apply writes the catalogue too. See [gui.md](gui.md).
+domain entrypoints as the CLI. Grab fetches to `out/` and attaches when `[ui].attach_mode` is `auto`
+(the default) and the library can write. Attachable pending only on the
+main Wanted button; mismatch and short PDF need Advanced. Apply writes the
+catalogue too. See [gui.md](gui.md).
 `collections add` is CLI-only (`--apply` writes) and is not an MCP tool.
 
 TTY-only paths (a GUI must not claim them): `session login`, `doctor --guide`,
@@ -443,14 +441,13 @@ HTML PDF links before a fixed click list.
 can write `learned.toml` under `grey_playbooks_dir`. That file is a normal
 dir pack (names start with `learned-`); it is not shipped in the wheel.
 Knobs and the propose/promote commands: [Sessions](sessions.md) and
-[Configuration](config.md). A builtin
-**ocean/governance example pack** (`paperful/data/grey_playbooks_ocean.toml`)
-ships the named grey-lit packs below, plus FAO, RFMO, IUCN/DOSI, and IDDRI/Pew.
-IEA/IRENA and OECD/WHO/UNEP/UNDP are optional files in
-`paperful/data/grey_playbooks_examples/` (load them with `grey_playbooks_dir`).
-The pack is not core product logic; set `grey_playbooks_builtin = false` or
-override by `name`. A matching host is a URL→PDF recipe for an item already in
-the library. Provenance stays `grey:<playbook-name>`.
+[Configuration](config.md). Builtin grey playbooks are **optional examples**
+(ocean / governance hosts in `paperful/data/grey_playbooks_ocean.toml`; extra
+energy and intl-orgs files under `grey_playbooks_examples/`). They are not
+core product logic: set `grey_playbooks_builtin = false` or override by
+`name`. Named pack tables: [sources](sources.md#grey-playbook-examples).
+A matching host is a URL→PDF recipe for an item already in the library.
+Provenance stays `grey:<playbook-name>`.
 `paperful search` / Discover → Web **finds** candidate URLs (SearXNG JSON);
 playbooks still **fetch** PDFs after you apply metadata and run Wanted.
 Skip-host item URLs (YouTube, Scholar, …) still allow Extra/title synthesize.
@@ -458,34 +455,6 @@ Domain-agnostic OA rewrites (PMC, arXiv, HAL) and DSpace/OAI stay in code.
 DOI-less `report` / `document` items can fall through to `htmlpdf`. Campus
 EZProxy is never used for these public hosts. Unpaywall/OpenAlex already skip
 DOI-less items (no quota burn on institutional reports).
-
-### Named packs (BBNJ product)
-
-| Pack id | Hosts / patterns | Rules |
-| --- | --- | --- |
-| `undocs-unga-vme` | `undocs.org`, `documents.un.org`, `daccess-ods.un.org` | `rewrite` via `parser = "undocs"` → `https://undocs.org/pdf?symbol=…` |
-| `undocs-unga-vme-symbol` | Extra/title symbols `A/RES/…`, `A/N/N`, `A/CONF.…`, `A/AC.…`, `ISBA/…`, `S/…` | `synthesize` → same undocs PDF URL |
-| `bbnj-doalos-prepcom` | `un.org` (`/bbnjagreement/`, `/depts/los/`), `highseasalliance.org`, `iisd.org` (ENB) | `scrape` first same-origin `.pdf` / `sites/default/files` / Download; direct `.pdf` URLs need no rewrite |
-| `isa-deepdata` | `isa.org.jm` (documents / news landings) | `scrape` same-origin PDF/download; OBIS/ODIS links are not treated as PDF sources |
-| `fao` | `fao.org`, `documents.fao.org` | `rewrite` `/3/{code}/` → `https://www.fao.org/3/{code}/{code}.pdf` |
-| `rfmo-docs` | `sprfmo.int`, `neafc.org`, `ccamlr.org` | `scrape` PDF / meetings / documents. `fao.org` stays on `fao` |
-| `iucn-dosi` | `iucn.org`, `dosi-project.org` | `scrape` PDF / `sites/default/files` / `/resources/` |
-| `thinktank-ocean` | `iddri.org`, `pewtrusts.org` | `scrape` PDF / `/en/publications/`. `highseasalliance.org` stays on `bbnj-doalos-prepcom` |
-
-Optional example packs (not loaded unless `grey_playbooks_dir` includes them):
-
-| Pack id | Hosts | File |
-| --- | --- | --- |
-| `iea_scrape` | `iea.org` | `grey_playbooks_examples/grey_playbooks_energy.toml` |
-| `irena_scrape` | `irena.org` (`.pdf` only) | same energy file |
-| `oecd_scrape` | `oecd.org`, `oecd-ilibrary.org` | `grey_playbooks_examples/grey_playbooks_intl_orgs.toml` |
-| `who_scrape` | `who.int` (`/iris/`) | same intl-orgs file |
-| `unep_scrape` | `unep.org`, `wedocs.unep.org` | same intl-orgs file |
-| `undp_scrape` | `undp.org` | same intl-orgs file |
-
-`un.org` belongs to `bbnj-doalos-prepcom`. The intl-orgs file does not list it.
-
-Smoke collections (dry-run): `HKF7T7EI` (UNGA/VME), `7R77ZJFH` / `XFD86ZFP` (BBNJ/PrepCom), `J2SEXDC5` (ISA).
 
 Items with no DOI, arXiv id, PMID, URL, or matching synthesize playbook still
 stop at `no_identifier`.
@@ -504,5 +473,4 @@ stop at `no_identifier`.
 - [ezproxy.md](ezproxy.md) / [sessions.md](sessions.md) — campus proxy and browser vault
 - [docker.md](docker.md) — build-local light/heavy image (host Zotero + headed login stay outside)
 - [zotero.md](zotero.md) — local API, write keys, attachment modes, ghosts
-- [mendeley.md](mendeley.md) — REST, OAuth, annotations as notes (seeking testers)
-- [endnote.md](endnote.md) — SQLite read, XML import bundle (seeking testers)
+- [mendeley.md](mendeley.md) / [endnote.md](endnote.md) — other adapters ([adapters](adapters.md))

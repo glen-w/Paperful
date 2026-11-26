@@ -52,7 +52,7 @@ def iter_item_dirs(
     if not out_dir.is_dir():
         return
     prefixes = _clean_prefixes(collection_prefixes)
-    for root, dirs, _files in os.walk(out_dir):
+    for root, dirs, _files in os.walk(out_dir, onerror=lambda _exc: None):
         dirs.sort()
         here = Path(root)
         if here == out_dir and TRASH_DIR in dirs:

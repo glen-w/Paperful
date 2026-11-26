@@ -24,7 +24,7 @@ and [architecture](architecture.md).
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `email` | `""` | Contact address for Unpaywall, Crossref, NCBI, and polite OpenAlex use. Required when `unpaywall` is in `sources` |
-| `manager` | `zotero` | Library adapter. **`zotero` is well tested — use that.** `mendeley` and `endnote` are in the tree and seeking testers. EndNote writes are an import bundle, not an edit of the `.enl` file |
+| `manager` | `zotero` | Library adapter. `zotero` is the tested default. `mendeley` / `endnote`: [adapters](adapters.md). EndNote writes are an import bundle, not an edit of the `.enl` file |
 | `[mendeley].client_id` / `client_secret` | `""` | Elsevier OAuth app from [dev.mendeley.com/myapps.html](https://dev.mendeley.com/myapps.html). Or `PAPERFUL_MENDELEY_CLIENT_*`. See [Mendeley](mendeley.md) |
 | `[mendeley].redirect_uri` | `http://127.0.0.1:8765/callback` | Must match the app. Host-only (`session login mendeley`) |
 | `[endnote].library` | (none) | Path to the `.enl` file. Matching `.Data` (with `sdb/sdb.eni`) must sit beside it. See [EndNote](endnote.md) |
@@ -71,13 +71,14 @@ and [architecture](architecture.md).
 | `[playbooks].promote` | `gated` | `gated` only logs fetch wins. `auto` writes `learned.toml` after `auto_min_hits` matching wins. **Auto may promote flukes** (one-off article URLs, cookie-banner clicks). `run --promote` overrides one run |
 | `[playbooks].auto_min_hits` | `2` | How many matching wins `auto` needs before writing a recipe. Manual `playbooks promote` can install a single cluster |
 | `[[grey_playbooks]]` | (none) | User rewrite/scrape/synthesize rules; same `name` overrides the pack |
-| `attach` | `true` | CLI: attach into Zotero after `run` (`--no-attach` overrides). Needs Zotero 10 or newer. The workbench uses `[ui].attach_mode` instead (`manual` or `auto`; Settings shows **After Grab** only after at least one PDF has been attached via the workbench) |
+| `attach` | `true` | CLI: attach into Zotero after `run` (`--no-attach` overrides). Needs Zotero 10 or newer |
+| `[ui].attach_mode` | `auto` | Workbench Grab write: `auto` (default) attaches when Zotero 10+ can write; `manual` leaves Attach as a separate button. Settings shows **After Grab** after at least one PDF has been attached via the workbench |
 | `[ui].citation_map_edit` | `both` | Discover map library panel: `sidebar` / `popup` / `both` / `off` |
 | `[ui].citation_map_auto_search` | `false` | After **Add to library** on the map, also run Find PDF for that item |
 | `[ui].citation_map_remove` | `trash` | Map **Remove from library** behaviour (trash only for now) |
 | `[ui].coauthor_network` | `on` | Discover People co-author map: `on` / `off` |
 | `[ui].web_search` | `on` | Discover Web tab (SearXNG grey search): `on` / `off` |
-| `PAPERFUL_UI_TOKEN` / `serve --ui-token` | (unset) | Env / flag, not a `config.toml` key. When set, every workbench request except `/health` needs `Authorization: Bearer …` or `X-Paperful-Token`. Loopback stays open if unset. See [SECURITY.md](../SECURITY.md) |
+| `PAPERFUL_UI_TOKEN` / `serve --ui-token` | (unset) | Env / flag, not a `config.toml` key. When set, every workbench request except `/health` needs `Authorization: Bearer …` or `X-Paperful-Token`. Loopback stays open if unset. See [SECURITY.md](https://github.com/glen-w/Paperful/blob/main/SECURITY.md) |
 | `[ui].library_page_size` / `library_page_sizes` | `50` / `25, 50, 100, 200` | Rows per page on Library and Wanted, and the choices in the per-page select |
 | `[search].max` | `20` | Default kept hits for `paperful search` / Discover Web. CLI `--max` overrides |
 | `[search].probe` | `true` | HEAD/GET first bytes for PDF vs HTML. CLI `--no-probe` skips |
@@ -401,7 +402,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[rag].abstracts` | `true` | Index the abstract when an item has no readable PDF |
 | `[rag].model` | `""` | Chat model for `ask`; empty uses `[llm].model` |
 | `[rag].focus` | `default` | Prompt preset for `ask` / batch: `default`, `questions`, `gaps`, `methods`, `answered`, `conflict` |
-| `[rag].prompt` | `""` | Custom system prompt file; when set, overrides `focus`. Ask/batch can override per run (inline, upload, path, or a file under `state/prompts/`) — see [rag.md](rag.md#workbench-advanced-index) |
+| `[rag].prompt` | `""` | Custom system prompt file; when set, overrides `focus`. Ask/batch can override per run (inline, upload, path, or a file under `state/prompts/`) — see {ref}`rag.md <workbench-advanced-index>` |
 | `[rag].dest` | `disk` | Batch ask note destination: `disk`, `zotero`, or `both` (Zotero needs `--apply` + one `-C`) |
 | `[rag].extract_questions_llm` | `false` | Default for `rag questions --llm` grounded extract lane |
 | `[rag].ask_mode` | `simple` | Global default for Ask. `simple` is raw excerpts and one completion. `advanced` scores passages then answers. `--ask-mode` / the Ask form override one run and are not written back |

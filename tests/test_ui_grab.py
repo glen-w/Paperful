@@ -120,8 +120,8 @@ def test_grab_production_passes_item_keys(tmp_path, monkeypatch):
     ok, msg = jobs.grab_run(cfg, token=token)
     assert ok, msg
     assert captured.get("item_keys") == ["K1"]
-    assert captured.get("no_attach") is True
-    assert captured.get("force_attach") is False
+    assert captured.get("no_attach") is False
+    assert captured.get("force_attach") is True
 
 
 def test_grab_auto_mode_asks_fetch_to_attach(tmp_path, monkeypatch):

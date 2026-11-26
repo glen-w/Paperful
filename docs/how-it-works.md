@@ -9,9 +9,9 @@ Click-by-click: [First fill](first-fill.md). The landing page is the short
 version of this story.
 
 **Trust the disk** before notes or Ask: `gaps` → `attachments` (honesty) →
-`run` (bytes on disk under `out/`) → you read `out/` → then `summarize` /
-`ask` ([Ask your library](rag.md)). `attach` is the write gate into Zotero. Do
-not call that step **admit**.
+`run` (bytes on disk under `out/`) → attach into Zotero → then `summarize` /
+`ask` ([Ask your library](rag.md)). Fetch stance:
+[legal and privacy](legal-privacy.md).
 
 | Claim | Quote |
 | --- | --- |
@@ -41,8 +41,9 @@ not call that step **admit**.
 6. **Save on your computer first.** The PDF lands under `out/` with a
    provenance stamp (`paperful oa:unpaywall`, `campus:ezproxy`, …) and a
    readable parent line (“Free copy from Unpaywall.”).
-7. **Attach** into Zotero 10 or newer when you ask, or automatically on Grab
-   when Settings is automatic. Zotero 7–9 still gets the file on disk only.
+7. **Attach** into Zotero 10 or newer on Grab by default. Settings → After
+   Grab can make Attach a separate step. Zotero 7–9 still gets the file on
+   disk only.
    Sparse one-page stubs are dropped; denser one-pagers wait for
    `attach --allow-short-pdf`. [Wrong-work PDFs](research-ops.md#wrong-work-pdfs).
    Not every paywalled or DOI-less item comes back.
@@ -146,6 +147,6 @@ EndNote XML.
 Why this shape: [Why Paperful](why.md). Commands: [Commands](commands.md).
 Architecture of the same flow: [Architecture](architecture.md). The same verbs
 on localhost HTTP: [Workbench](gui.md). `docker compose up` serves it at
-http://127.0.0.1:8765. Grab fetches to disk; Attach writes Zotero.
+http://127.0.0.1:8765. Grab fetches to disk and attaches when Zotero 10 or newer can write.
 Walkthroughs: [first fill](first-fill.md), [grow](grow-library.md),
 [tidy](tidy-library.md).

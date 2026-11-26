@@ -71,7 +71,7 @@ attach_mode = "sometimes"
 """,
         )
     )
-    assert kept.ui_attach_mode == "manual"
+    assert kept.ui_attach_mode == "auto"
 
 
 def test_table_then_file_then_cli(tmp_path):

@@ -22,7 +22,7 @@ lists that lane, not the full `sources` list.
 | `serpapi` | Same query as Scholar. **Opt-in:** `[serpapi].enabled` and env `SERPAPI_API_KEY`. Policy order after local Scholar / agent. Cap with `[serpapi].max_calls` / `--serpapi-max`. See [SerpApi](serpapi.md) |
 | `direct` | HTTP(S) URL that is not a resolver/aggregator/video host after playbook rewrite/synthesize, **or** Extra/title match from a `synthesize` playbook (e.g. UN symbol → undocs) |
 | `ezproxy` | `ezproxy_base` plus a session (vault or cookie file), **and** a DOI or a URL on a [known publisher host](ezproxy.md#what-ezproxy-will-try) |
-| `author_site` | A creator with a known listing page: a promoted field author pack (`state/author-packs/`, see [workflows §6](workflows.md#field-author-packs-corpus-frequency-author-site)), a cached contact listing, or an opt-in Twenty CRM person (`[twenty]`). Late grey lane; provenance `grey:author_site` |
+| `author_site` | A creator with a known listing page: a promoted field author pack (`state/author-packs/`, see {ref}`workflows §6 <field-author-packs-corpus-frequency-author-site>`), a cached contact listing, or an opt-in Twenty CRM person (`[twenty]`). Late grey lane; provenance `grey:author_site` |
 | `htmlpdf` | `webpage` / `blogPost` / `newspaperArticle` / `magazineArticle` / `forumPost` (or DOI-less `document` / `report`) with an HTTP(S) URL; needs Playwright Chromium — see [HTML→PDF](#htmlpdf-web-news-blogs) |
 
 Indexes can **find** a publisher PDF URL that then **403s** on httpx (bronze/hybrid Elsevier is the usual case). With a session profile, that GET is retried in Chromium: SSO hops, citation PDF links, and download controls are followed before the miss. Wins can become local playbooks (`paperful playbooks`); see [sessions](sessions.md). The same publisher host is not downloaded again by the next OA source.
@@ -158,3 +158,34 @@ Journal and other DOI items stay off this lane unless `[htmlpdf].academic` is
 `state/htmlpdf/proposals/`. Review them with `paperful htmlpdf proposals list`,
 then `apply` or `reject`. `auto` attaches a snapshot-tier PDF only after the
 landing checks in [config](config.md). The stamp is `snapshot:htmlpdf`.
+
+(grey-playbook-examples)=
+## Grey playbook examples
+
+Builtin packs are **optional examples**, not core product logic
+(`grey_playbooks_builtin = false` turns them off). Engine and provenance:
+[architecture](architecture.md#grey-literature).
+
+| Pack id | Hosts / patterns | Rules |
+| --- | --- | --- |
+| `undocs-unga-vme` | `undocs.org`, `documents.un.org`, `daccess-ods.un.org` | `rewrite` via `parser = "undocs"` → `https://undocs.org/pdf?symbol=…` |
+| `undocs-unga-vme-symbol` | Extra/title symbols `A/RES/…`, `A/N/N`, `A/CONF.…`, `A/AC.…`, `ISBA/…`, `S/…` | `synthesize` → same undocs PDF URL |
+| `bbnj-doalos-prepcom` | `un.org` (`/bbnjagreement/`, `/depts/los/`), `highseasalliance.org`, `iisd.org` (ENB) | `scrape` first same-origin `.pdf` / `sites/default/files` / Download; direct `.pdf` URLs need no rewrite |
+| `isa-deepdata` | `isa.org.jm` (documents / news landings) | `scrape` same-origin PDF/download; OBIS/ODIS links are not treated as PDF sources |
+| `fao` | `fao.org`, `documents.fao.org` | `rewrite` `/3/{code}/` → `https://www.fao.org/3/{code}/{code}.pdf` |
+| `rfmo-docs` | `sprfmo.int`, `neafc.org`, `ccamlr.org` | `scrape` PDF / meetings / documents. `fao.org` stays on `fao` |
+| `iucn-dosi` | `iucn.org`, `dosi-project.org` | `scrape` PDF / `sites/default/files` / `/resources/` |
+| `thinktank-ocean` | `iddri.org`, `pewtrusts.org` | `scrape` PDF / `/en/publications/`. `highseasalliance.org` stays on `bbnj-doalos-prepcom` |
+
+Optional files (load with `grey_playbooks_dir`):
+
+| Pack id | Hosts | File |
+| --- | --- | --- |
+| `iea_scrape` | `iea.org` | `grey_playbooks_examples/grey_playbooks_energy.toml` |
+| `irena_scrape` | `irena.org` (`.pdf` only) | same energy file |
+| `oecd_scrape` | `oecd.org`, `oecd-ilibrary.org` | `grey_playbooks_examples/grey_playbooks_intl_orgs.toml` |
+| `who_scrape` | `who.int` (`/iris/`) | same intl-orgs file |
+| `unep_scrape` | `unep.org`, `wedocs.unep.org` | same intl-orgs file |
+| `undp_scrape` | `undp.org` | same intl-orgs file |
+
+`un.org` belongs to `bbnj-doalos-prepcom`. The intl-orgs file does not list it.

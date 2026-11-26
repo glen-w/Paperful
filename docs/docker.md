@@ -28,7 +28,7 @@ not build the image. Build it yourself (`docker compose build`) and run
 `doctor --no-guide` with **no live Zotero**. Exit **2** means the Zotero row
 is red, which is a first-run stranger machine, not a failed Compose install.
 Putting that check back on CI is step 5 of the
-[CI rebuild](ROADMAP.md#after-17-ci-rebuild).
+{ref}`CI rebuild <after-17-ci-rebuild>`.
 
 ## What still runs on the host
 
@@ -60,7 +60,7 @@ mounts (`PAPERFUL_DATA`).
 ## Quick start
 
 ```sh
-git clone --branch v1.9.9.2 https://github.com/glen-w/Paperful.git
+git clone --branch v1.9.10 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
 ```
@@ -181,7 +181,7 @@ container on `0.0.0.0:8765` (Compose passes `--allow-remote-bind`; the
 workbench has **no HTTP auth unless** `PAPERFUL_UI_TOKEN` is set) and **publishes only** `127.0.0.1:8765:8765`
 (no LAN). Same workbench as host `paperful serve` ([gui.md](gui.md) — Wanted,
 then Discover; Advanced Repair / Mirror / Index / Briefs). Operator threat
-model: [SECURITY.md](../SECURITY.md).
+model: [SECURITY.md](https://github.com/glen-w/Paperful/blob/main/SECURITY.md).
 
 ```sh
 docker compose up
@@ -199,7 +199,7 @@ On **Docker Desktop**, the default Ollama loopback bind is enough (same as
 Zotero). On **Linux Docker Engine**, bind with
 `OLLAMA_HOST=0.0.0.0 ollama serve` so `host-gateway` can connect.
 `docker compose run --rm paperful doctor` shows the `LLM` row. Details:
-[LLM](llm.md#docker). See [rag.md](rag.md) for the index.
+{ref}`LLM <llm-docker>`. See [rag.md](rag.md) for the index.
 
 ## Custom playbook packs
 

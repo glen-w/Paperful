@@ -268,7 +268,7 @@ uv run paperful ask --thread <id> "and the EIA part?"
 `--format json` needs a question on the command line (or `--from-file`; no TTY
 multi-question loop). Agents that can shell out should prefer that over
 `paperful mcp` (`ask` and other read-only tools return the same envelope; see
-[commands — Agent channel](commands.md#agent-channel-format-json-and-mcp)). Exit codes follow the
+{ref}`commands — Agent channel <agent-channel-format-json-and-mcp>`). Exit codes follow the
 [commands](commands.md#exits) table.
 
 `ask` prints the answer as it is written, then the sources it cited:
@@ -294,7 +294,7 @@ the search scope (`--item` is the manuscript, not a scope key). Labels:
 Fail closed when `[rag]` is off or the index is empty. Writes
 `state/ask-claims/<stamp>/` (`paperful.claim_check.v1` + `pack.md`).
 `--apply` and `--from-file` are not valid here. Cited works only, on a
-peer-review pack: `--lane claims` with `-C` — [Peer review](peer-review.md#optional-claims).
+peer-review pack: `--lane claims` with `-C` — {ref}`Peer review <optional-claims>`.
 
 The marker in the text, the paper, the pages the passages came from, and the
 item key. When the model cites nothing, the retrieved papers are listed as

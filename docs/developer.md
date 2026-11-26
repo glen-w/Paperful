@@ -307,7 +307,7 @@ still requires a real-library report; the kit alone does not.
 `uv run pytest` runs offline. `tests/conftest.py` refuses every request a
 real Zotero client makes, so a Zotero running on your machine is never read
 by a test. The socket gate is local until it returns to CI
-([rebuild step 3](ROADMAP.md#after-17-ci-rebuild)):
+({ref}`rebuild step 3 <after-17-ci-rebuild>`):
 `uv run pytest --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,::1,localhost`
 (`tests/conftest.py` re-enables sockets for the `grey_live` /
 `e2e_live` markers). Tests that need Crossref/OpenAlex-shaped answers stub
@@ -327,7 +327,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs one job on Ubuntu, Python
 3.12: `uv run pytest -m smoke` (CLI version, shell pages, workbench command
 paths). Lint, the full offline suite, audit, the socket gate, fresh-install,
 docker, browser, and the other OS/Python cells are not on the gate. The order
-for putting them back is [CI gate, cut back to smoke](ROADMAP.md#after-17-ci-rebuild).
+for putting them back is {ref}`CI gate, cut back to smoke <after-17-ci-rebuild>`.
 
 Run the rest locally before a release:
 
@@ -409,7 +409,7 @@ UV_PUBLISH_TOKEN=pypi-… uv publish dist/paperful-$(python3 -c "import tomllib;
 
 If a local `assessments/*-full-assessment.md` exists, rows marked `Not done`
 or `NEEDS FIXES` block the tag until you close them out. Emergency patches:
-`PAPERFUL_SKIP_ASSESSMENT=1` (document why in [CHANGELOG.md](CHANGELOG.md)).
+`PAPERFUL_SKIP_ASSESSMENT=1` (document why in [CHANGELOG.md](https://github.com/glen-w/Paperful/blob/main/CHANGELOG.md)).
 GitHub publish still runs the version, changelog, and website checks; the
 assessment gate runs only on the maintainer machine (`make pre-release`
 before the tag). Weekly `since` packs you open on your own collections stay
@@ -420,4 +420,4 @@ off this script.
 version than `pyproject.toml`. The name parser keeps every numeric release
 segment (`1.9.9` and `1.9.9.2`), not only `X.Y.Z`.
 
-Confirm: `pip install paperful==<version>` and `paperful --help`.
+Confirm: `pip install paperful==<version>` and `paperful --version` (same as `paperful version`).

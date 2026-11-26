@@ -473,17 +473,17 @@ def test_attach_post_at_zero_is_409_and_writes_nothing(ui_client, cfg, monkeypat
     assert wrote == []
 
 
-# --- Grab never attaches by default -------------------------------------------
+# --- Grab attaches by default when the library can write ----------------------
 
 
-def test_grab_default_is_manual_and_does_not_attach(cfg, monkeypatch):
+def test_grab_default_is_auto_and_asks_fetch_to_attach(cfg, monkeypatch):
     from paperful.store import Manifest
     from paperful.ui import jobs
     from paperful.ui.pages import scope_fingerprint
 
-    assert Config().ui_attach_mode == "manual"
-    assert cfg.ui_attach_mode == "manual"
-    assert jobs.grab_attaches(cfg) is False
+    assert Config().ui_attach_mode == "auto"
+    assert cfg.ui_attach_mode == "auto"
+    assert jobs.grab_attaches(cfg) is True
 
     class _Item:
         key, title, doi, has_pdf, arxiv_id, url = "K1", "K1", "10.1/a", False, None, ""
@@ -509,8 +509,8 @@ def test_grab_default_is_manual_and_does_not_attach(cfg, monkeypatch):
     )
     ok, msg = jobs.grab_run(cfg, token=token)
     assert ok, msg
-    assert captured["no_attach"] is True
-    assert captured["force_attach"] is False
+    assert captured["no_attach"] is False
+    assert captured["force_attach"] is True
     assert attached == []
 
 

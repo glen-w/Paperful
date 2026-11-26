@@ -2,15 +2,14 @@
 
 A **local GUI** over the same verbs as the CLI. `docker compose up` (or
 `paperful serve`) binds http://127.0.0.1:8765. Zotero remains the catalogue
-and reader. Grab fetches to `out/`. Attach writes the library — you press
-it (manual, the default) or Grab does it (automatic, Settings) when the
-library can be written.
+and reader. Grab fetches to `out/` and attaches when Zotero 10 or newer can
+write (`[ui].attach_mode = auto`, the default). Settings → After Grab
+switches to manual Attach.
 
 **Status:** shipped. **Ask** is on the default nav (`/ask`;
 opt-in `[rag]` + `[llm]`). An optional unsigned
 [Firefox add-on](firefox.md) saves the page you are reading into `out/`.
-The Zotero Connector stays the way to save into Zotero. Hosted SaaS stays
-later — see [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10).
+The Zotero Connector stays the way to save into Zotero.
 
 Jobs, with screenshots: [Walkthroughs](walkthroughs.md)
 ([first fill](first-fill.md), [grow](grow-library.md),
@@ -28,7 +27,7 @@ Three jobs sit on the default nav:
 
 | Nav | CLI verbs | Job |
 | --- | --- | --- |
-| **Wanted** | `gaps`, `run`, `attach` | See missing PDFs, preview fetch, grab to `out/`, attach chosen copies |
+| **Wanted** | `gaps`, `run`, `attach` | See missing PDFs, preview fetch, grab to `out/` (attach by default when the library can write) |
 | **Discover** | `snowball`, `authorwatch`, watches, `search` | Find new works (topic, person, or web grey hits), review, add metadata parents |
 | **Ask** | `ask`, `ask --from-file` | Cited answers from PDFs already copied to disk (`simple` / `advanced`; needs `[rag]` + `[llm]` and an index). Per-sentence support vs the index is CLI `ask --claim-check` (no LLM; not on this page) |
 
@@ -74,7 +73,7 @@ Long jobs return a **command id**; Activity subscribes to `GET /v1/runs/{id}/eve
 Bind `127.0.0.1`. `docker compose up` publishes `127.0.0.1:8765:8765` only.
 Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and is
 **unauthenticated unless** `PAPERFUL_UI_TOKEN` or `serve --ui-token` is set
-— see [SECURITY.md](../SECURITY.md).
+— see [SECURITY.md](https://github.com/glen-w/Paperful/blob/main/SECURITY.md).
 `compose.gui.yaml` is a no-op shim for older `-f compose.gui.yaml --profile gui` invocations.
 
 ---
@@ -103,18 +102,19 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and is
    Discover.
    **Preview** → **Grab** (fetch to the `out/` folder on this computer;
    selected vs all; Grab passes the same `item_keys` as the preview token).
-   **Manual** (default): **Attach** writes attachable pending PDFs into
-   Zotero (`doi_match` and hand-ticked rows on **Held** with a pending file).
-   The main button skips DOI mismatches and short PDFs (use Advanced Attach
-   to override). CLI `paperful run` still attaches mismatches unless you pass
-   `--strict-pdf-doi`. The label reads **Attach N PDFs to Zotero** when N are
-   pending, **Attach selected PDFs** once rows are ticked, and **Attach PDFs to
-   Zotero** (disabled) when N is 0 and no **attachable** rows are ticked
-   (mismatch/short ticks alone stay disabled on the main button). **Attach** needs
-   Zotero 10 or newer; on 7–9, attach files in Zotero. **Automatic** (Settings
-   → **After Grab**, shown only after at least one successful Attach): Grab
-   also attaches when the library supports write. Zotero 7–9 never receives
-   the file from Paperful. DOI mismatch and short PDF still wait for Attach.
+   **Automatic** (default, `[ui].attach_mode = auto`): Grab writes `out/` and
+   also attaches when Zotero 10 or newer can write. Zotero 7–9 never receives
+   the file from Paperful. DOI mismatch and short PDF still wait for **Attach**.
+   **Manual** (Settings → **After Grab**): **Attach** writes attachable pending
+   PDFs into Zotero (`doi_match` and hand-ticked rows on **Held** with a pending
+   file). The main button skips DOI mismatches and short PDFs (use Advanced
+   Attach to override). CLI `paperful run` still attaches mismatches unless you
+   pass `--strict-pdf-doi`. The label reads **Attach N PDFs to Zotero** when N
+   are pending, **Attach selected PDFs** once rows are ticked, and **Attach PDFs
+   to Zotero** (disabled) when N is 0 and no **attachable** rows are ticked
+   (mismatch/short ticks alone stay disabled on the main button). **Attach**
+   needs Zotero 10 or newer; on 7–9, attach files in Zotero. The Settings
+   control appears after the first workbench Attach.
 2. **Discover** — Tabs: **Explore**, **Topic**, **Grow** (Advanced),
    **People**, **Web**, **Queue** (map + paginated candidates), **Following**.
    **Explore:** paste a DOI or a title and **Open map** (an ambiguous title
@@ -325,7 +325,7 @@ are mounted by `paperful.ui` (`mount_ui`).
 | POST | `/v1/gui/noop` | Smoke / readiness for the GUI process |
 | GET | `/wanted/report` | Read-only stamp cards for the scoped collection (`format=md|json|csv`; no `% complete`) |
 | POST | `/wanted/preview` | Review token for Grab (Advanced: year/type/retry/… flags) |
-| POST | `/wanted/grab` | Consume token; fetch to `out/` (`item_keys` from preview). Attaches only when `[ui].attach_mode` is `auto` and the library can write |
+| POST | `/wanted/grab` | Consume token; fetch to `out/` (`item_keys` from preview). Attaches when `[ui].attach_mode` is `auto` (default) and the library can write |
 | POST | `/wanted/attach/preview` | Review token for held PDF attach |
 | POST | `/wanted/attach` | Selected keys or all attachable pending in scope (no mismatch/short on the main button). `review_token`: consume Advanced preview |
 | POST | `/wanted/recover/preview` | Review token for browser-agent recover |
@@ -442,8 +442,10 @@ HTTP 500) instead of growing the queue — wait for Activity to drain.
 Writes over HTTP use review tokens under `state/gui/reviews/`; stale library
 fingerprints return **409**. Discover **Add selected** / inbox apply, ingest-dois
 Apply, and Wanted **Grab** / recover require **Preview** first (tokens
-may bake Grab flags). **Grab** fetches to `out/` only; **Attach** is a separate
-labelled library write (ticked keys from Wanted, or Advanced preview then apply).
+may bake Grab flags). **Grab** fetches to `out/` and, when `[ui].attach_mode`
+is `auto` (the default) and the library can write, attaches in the same step.
+**Manual** keeps **Attach** as a separate labelled library write (ticked keys
+from Wanted, or Advanced preview then apply).
 Repair / Mirror **Apply** require **Preview** first.
 **Keep an eye on this** needs an existing snowball profile (`save_watch`); it
 does not write an empty `watch.json`. Long jobs land under `state/gui/commands/`;

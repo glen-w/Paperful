@@ -187,6 +187,12 @@ def test_walkthrough_pages_and_screenshots():
         assert (site / name).is_file(), f"missing homepage shot {name}"
 
 
+def test_docs_do_not_suppress_missing_xrefs():
+    """Missing MyST links must fail the hosted guide, not hide in suppress_warnings."""
+    conf = (DOCS / "conf.py").read_text(encoding="utf-8")
+    assert "myst.xref_missing" not in conf
+
+
 def test_docs_sidebar_does_not_stack_wordmarks():
     """Site chrome already names Paperful; Furo must not print the lockup twice more."""
     conf = (DOCS / "conf.py").read_text(encoding="utf-8")

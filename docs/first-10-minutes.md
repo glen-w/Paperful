@@ -1,11 +1,14 @@
 # First 10 minutes
 
 What you see the first time the workbench opens, in the words on the screen.
-No campus login, no Google Scholar, no Sci-Hub, and no AI model is involved.
+The workbench lands papers on this computer, then you can grow the library,
+ask the PDFs you hold, and use writing help. This walkthrough is the first
+fill only: no campus login, no Google Scholar, and no AI model.
 
 You need the workbench running (`docker compose up`, then
 http://127.0.0.1:8765) and Zotero open on the same computer
-([Docker](docker.md), [Zotero](zotero.md)).
+([Docker](docker.md), [Zotero](zotero.md)). Fetch stance:
+[legal and privacy](legal-privacy.md).
 
 ## 1. Open the workbench
 
@@ -38,7 +41,9 @@ Preview downloads nothing. It shows where each paper could come from.
 ## 5. Grab
 
 Press **Grab selected**. The PDFs are saved to the `out/` folder on this
-computer. Zotero has not changed.
+computer. On Zotero 10 or newer they are also attached into the library.
+On Zotero 7 to 9 the files stay in `out/` and you add them in Zotero
+yourself. Settings → **After Grab** can make Attach a separate button.
 
 ## 6. Find `out/` on disk
 
@@ -46,14 +51,9 @@ Open the folder in your file manager. With the default install it is
 `paperful-out`, beside the folder you cloned. Each paper has its own folder
 with the PDF inside. Open one or two and check they are the right papers.
 
-## 7. Attach
-
-**Attach** is a separate button. It copies the PDFs you trust into Zotero,
-and it needs Zotero 10 or newer. On Zotero 7 to 9 the files stay in `out/`
-and you add them in Zotero yourself.
-
 ## What next
 
 - [First fill](first-fill.md) is the same job in full, with screenshots.
 - [Grow the library](grow-library.md) adds papers on a topic.
+- [Ask](rag.md) answers questions over PDFs already on disk (needs a model).
 - [Tidy a collection](tidy-library.md) fixes duplicates and identifiers.

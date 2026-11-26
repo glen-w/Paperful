@@ -15,27 +15,28 @@
 </p>
 
 <p align="center">
-  <strong>Find missing PDFs. Clean up your library. Keep control of your papers.</strong>
+  <strong>A local workbench for the library you keep. Land the literature. Stay current. Ask the papers you hold.</strong>
 </p>
 
-Paperful is a **local workbench** for a Zotero library you already keep.
+Paperful is a **local research workbench** for a Zotero library you already keep.
 
-It finds PDFs that are missing, tidies the records, and keeps a folder of
-copies on this computer. It looks for free copies first, then uses your
-campus login when you have one. Downloads always go into that folder first.
-On Zotero 10 or newer you can attach them yourself, or let a download attach
-them. On Zotero 7–9 the files stay in the folder; you attach them in Zotero.
+It lands literature on this computer, keeps watches and author lists current,
+answers questions over PDFs you hold, and offers writing help on a draft you
+already wrote. It also fills missing PDFs and tidies records. Free copies
+first, then campus login when you have one. Downloads always go into a folder
+on this machine first. Grab attaches them on Zotero 10 or newer; Settings can
+make Attach a separate step. On Zotero 7–9 the files stay in the folder.
 
-Zotero is well tested. Mendeley and EndNote are seeking testers.
+The tested catalogue is Zotero ([adapters](docs/adapters.md)).
 [How it compares](docs/comparison.md). Fetch stance and what never leaves
 this machine: [legal and privacy](docs/legal-privacy.md).
 
 ## What it does
 
-Every fetch lands in a folder on this computer first: open-access copies when
-they exist, campus login when you have it, then you attach the files you
-trust. Zotero stays the catalogue. Optional notes and answers use a model
-only when you turn one on, and they point back at the PDFs you already hold.
+Every fetch lands in a folder on this computer first. Grab attaches when
+Zotero 10 or newer can write. Zotero stays the catalogue. Optional notes and
+answers use a model only when you turn one on, and they point back at the
+PDFs you already hold. Honesty for those lanes: [AI](docs/ai.md#honesty).
 
 The default nav is Wanted, Discover, Ask, Library, Activity, and System.
 Ask answers need optional AI turned on. ⚙️ marks Advanced; 🤖 marks optional
@@ -47,7 +48,7 @@ machine can run it, or hosted APIs via
 
 | Tool | What it does | Guide |
 | --- | --- | --- |
-| [Wanted](docs/first-fill.md) | See which items still need a PDF, Preview what a search would find, Grab copies into `out/`, Attach the ones you trust (Zotero 10 or newer; on 7–9 the files stay in the folder) | [guide](docs/first-fill.md) |
+| [Wanted](docs/first-fill.md) | See which items still need a PDF, Preview what a search would find, Grab copies into `out/` (and attach when Zotero 10 or newer can write; on 7–9 the files stay in the folder) | [guide](docs/first-fill.md) |
 | [Library](docs/gui.md) | Collection tree with item and missing-PDF counts; the target icon sets the scope for the rest of the workbench | [guide](docs/gui.md) |
 | [Sources](docs/how-it-works.md) | Free copies first (Unpaywall, OpenAlex, and the rest of the open-access lane), campus EZProxy when you choose Campus, playbooks for odd landings | [guide](docs/sources.md) |
 | [Firefox add-on](docs/firefox.md) | Save the page you are reading, or several tabs, into the folder copy. The Zotero Connector stays the way to save into Zotero. This one does not attach | [guide](docs/firefox.md) |
@@ -80,12 +81,13 @@ machine can run it, or hosted APIs via
 | [Index](docs/rag.md) ⚙️ | Ingest the mirror, search passages, extract questions, see what is already answered, pull IMRaD-style sections | [guide](docs/rag.md) |
 | [Claim check](docs/rag.md#claim-check) | Per-sentence support vs the index (CLI `ask --claim-check`; no chat model) | [guide](docs/rag.md#claim-check) |
 | [Evidence](docs/evidence.md) | Sourced n / method / finding table over PDFs you hold; each cell is a quote or `check this`. No chat model. CLI only | [guide](docs/evidence.md) |
+| [Metrics](docs/metrics.md) | Citation counts for items already in the library (OpenAlex, then Crossref). Library column + `metrics refresh`. `--apply` writes a child note | [guide](docs/metrics.md) |
 
 ### Check a draft
 
 | Tool | What it does | Guide |
 | --- | --- | --- |
-| [Peer review](docs/peer-review.md) ⚙️ | A draft you already wrote: structure and citations always; unquoted overlap vs held PDFs; optional academic discourse; optional claim locators. Not a grade | [guide](docs/peer-review.md) |
+| [Peer review](docs/peer-review.md) ⚙️ | A draft you already wrote: structure and citations always; unquoted overlap vs held PDFs; optional academic discourse; optional claim locators | [guide](docs/peer-review.md) |
 | [Suggest edits](docs/rewrite.md) ⚙️ | Apply a peer-review pack as locatable edits / tracked changes; overlap comments name a held item (no cite insert); strip hidden trackers on the copy; never overwrites the source | [guide](docs/rewrite.md) |
 | [Stuff](docs/stuff.md) ⚙️ | Extra library cites per sentence or outline section (needs the index; no chat model) | [guide](docs/stuff.md) |
 
@@ -107,7 +109,7 @@ Walkthroughs: [first fill](docs/first-fill.md), [grow the library](docs/grow-lib
 
 1. Start the workbench and open http://127.0.0.1:8765 (the **Wanted** page).
 2. Choose a collection on **Library**.
-3. **Preview** what can be found, then **Grab** the files. They are saved in a folder on this computer (`out/`). By default you open that folder and **Attach** the copies you want. In Settings you can have Grab attach them for you on Zotero 10 or newer. On Zotero 7–9 the files stay in the folder; attach them in Zotero.
+3. **Preview** what can be found, then **Grab** the files. They are saved in a folder on this computer (`out/`) and attached on Zotero 10 or newer. Settings → After Grab can make Attach a separate step. On Zotero 7–9 the files stay in the folder; attach them in Zotero.
 
 ![Wanted: tick rows, Preview selected, wait for the dry-run, Grab is ready](https://raw.githubusercontent.com/glen-w/Paperful/main/docs/_static/workflows/wanted-preview.gif)
 
@@ -138,7 +140,7 @@ No campus access: choose **Open access**. Campus library login: choose
 [Configuration](docs/config.md).
 
 ```sh
-git clone --branch v1.9.9.2 https://github.com/glen-w/Paperful.git
+git clone --branch v1.9.10 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
 mkdir -p ../paperful-data ../paperful-out
@@ -155,7 +157,7 @@ Compose reads `config.toml` from `PAPERFUL_DATA` and the PDF mirror from
 next to `compose.yaml`. Where those files live, and what the first health
 check means if Zotero is not open yet: [Docker](docs/docker.md).
 
-The guide and this README track `main`. `pip` and the `v1.9.9.2` tag are the
+The guide and this README track `main`. `pip` and the `v1.9.10` tag are the
 current release.
 
 The same jobs from the command line: [Commands](docs/commands.md).

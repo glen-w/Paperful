@@ -6,9 +6,8 @@ you can open on your computer.
 ## Outcome
 
 You will have scoped one collection, **Previewed** a fetch, and **Grabbed**
-files onto `out/`. With the default **manual** setting you open those files
-and **Attach** the copies you trust. **Automatic** (Settings) attaches during
-Grab when the library can be written.
+files onto `out/`. Grab also **attaches** when Zotero 10 or newer can write
+(the default). Settings → After Grab switches to a separate Attach step.
 
 Grab always writes `out/` first. Attach is the write into Zotero, and it
 needs Zotero 10 or newer. On Zotero 7–9 the files stay on disk either way.
@@ -27,10 +26,10 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
 1. Set the collection chip on **Library**.
 2. Open **Wanted** and read Missing / Held / Have.
 3. **Preview** (selected rows or all).
-4. **Grab** onto `out/` (consumes the preview token). Manual stops there.
-   Automatic also attaches when Zotero is 10 or newer.
-5. Open `out/` on disk and skim a couple of files (manual, and any hold).
-6. **Attach** into Zotero when you are on manual, or for files Grab held back.
+4. **Grab** onto `out/` (consumes the preview token). Attaches when Zotero
+   is 10 or newer unless Settings is manual.
+5. Open `out/` on disk and skim a couple of files (and any Held rows).
+6. Use **Attach** for files Grab held back, or when Settings is manual.
 
 ## Walkthrough
 
@@ -56,10 +55,9 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
 ![Wanted: tick three rows, Preview selected, wait for the dry-run, Grab is ready](_static/workflows/wanted-preview.gif)
 
 4. Choose **Grab selected** (or Grab all). Files land in the `out/` folder on
-   this computer with a provenance stamp (`paperful oa:unpaywall`, …). On
-   manual (default), Zotero is unchanged until you Attach. On automatic
-   (Settings → **After Grab**, after your first Attach), matching PDFs are
-   attached when Zotero is 10 or newer.
+   this computer with a provenance stamp (`paperful oa:unpaywall`, …). Matching
+   PDFs attach when Zotero is 10 or newer. Settings → **After Grab** (after
+   your first Attach) can switch that off so you press Attach yourself.
 
 5. Open `out/` in your file manager. Trust the disk before notes or Ask.
 
@@ -68,14 +66,14 @@ The screenshots are `ocean/BBNJ`. The clicks are the same for any collection.
 
 ![Wanted Held: downloads waiting for a human look, rows ticked before Attach](_static/workflows/wanted-held.png)
 
-7. Tick the copies you trust and choose **Attach selected PDFs** (or **Attach N
+7. Held copies still need **Attach selected PDFs** (or **Attach N
    PDFs to Zotero** when nothing is ticked). The main button does not attach
    DOI mismatches or short PDFs — for those, turn on Advanced, tick **Allow
    DOI mismatch** / **Allow short PDF**, then **Preview attach** → **Attach
    held PDFs**. On Zotero
    7–9 the files stay on disk until you attach them in Zotero (`paperful attach`
    on the CLI once you are on Zotero 10 or newer). After your first Attach,
-   Settings → **After Grab** can switch manual and automatic.
+   Settings → **After Grab** switches automatic and manual.
 
 8. **System** is the doctor table if Wanted shows an amber coach line (no
    collection, or the library is down). **Activity** is the command history.

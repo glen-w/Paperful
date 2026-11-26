@@ -3,7 +3,7 @@
 Vendor-by-vendor notes and longer capability tables. Most readers only need
 [How Paperful compares](comparison.md).
 
-**Last reviewed:** 2026-11-22. Feature lists for other products are based on public
+Feature lists for other products are based on public
 docs and positioning — not paid pilots.
 
 ## Capability snapshot
@@ -96,7 +96,7 @@ Edison **Kosmos** is a separate autonomous-scientist job, not an MCP Bond analog
 Docs say Literature covers **175M+** works; Edison’s February 2026 PaperQA3 post says **150M+** with figures — do not reconcile those numbers in a customer table.
 
 (paper-factory-stages)=
-### Paper-factory stages (Oct 2026)
+### Research-workflow stages
 
 Nobody ships discover → campus PDF → dual screen → extract → synthesize →
 novelty → journal manuscript → keep current, **and** local/offline Zotero
@@ -155,7 +155,7 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
   full statcheck, table digit tests, and image duplication. `paperful peer-review
   --forensics` subprocesses `paperguard` when it is on PATH. Collection batch
   and workbench HTML deep-links remain
-  [roadmap](ROADMAP.md#research-integrity-forensics-paperguard).
+  {ref}`roadmap <after-110-research-integrity-paperguard>`.
 - **Not a substitute for:** Missing-PDF fetch, snowball discovery, Ask/RAG over
   your library, or institutional integrity investigations.
 
@@ -235,7 +235,7 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 - **With Paperful:** Edison when the question is a public-corpus review, a novelty search, or a Kosmos/Analysis run on a dataset. Paperful when the question is “fill, fix, mirror, and Ask **this** library.” Local analogue of Precedent is `paperful precedent` (held PDFs + OpenAlex metadata, stamped `held` vs `public-metadata-only`; never “nobody has done this”). Typical stack: Edison Literature or Precedent → snowball / `ingest-dois` → `run` / Wanted → local `ask`. Do not treat their workspace as the quiet mirror. Do not borrow their paper-scraper lane as a default (their own docs flag publisher ToS grey).
 - **Not a substitute for:** missing-PDF fetch, EZProxy / grey playbooks, `snapshot` / `restore`, collection-scoped RAG that never leaves the machine, or unattended attach.
 - **Nearby (not Edison):** Google Co-Scientist / Labs Hypothesis Generation (hypotheses, not manuscripts); [OpenResearch](#openresearch) (local coding-agent harness + experiment tree; lit search without a 175M hosted corpus); [PaperOrchestra](#paperorchestra) (idea + lab log → conference LaTeX; not a discovery loop); Sakana AI Scientist (workshop-grade auto-papers; authors documented citation errors); OpenAI / Gemini / Perplexity Deep Research (web memos; vendors warn about hallucinated cites).
-- **Roadmap borrow (not a clone):** [ROADMAP — Hosted AI scientists](ROADMAP.md#hosted-ai-scientists-edison-scientific) and [v2 factory packs](ROADMAP.md#after-110-paper-factory).
+- **Roadmap borrow (not a clone):** [ROADMAP — Hosted AI scientists](ROADMAP.md#hosted-ai-scientists-edison-scientific) and {ref}`v2 factory packs <after-110-paper-factory>`.
 
 (openresearch)=
 ### OpenResearch (alphaXiv)
@@ -294,7 +294,7 @@ Sources and caveats: repo `reports/AI academic paper factories.md` (contributor 
 
 - **Sites:** [Jenni](https://jenni.ai/) · [Paperpal](https://paperpal.com/) · SciSpace AI Writer · Writefull in [Overleaf](https://docs.overleaf.com/integrations-and-add-ons/ai-features)
 - **Fit:** Draft + cite from library ∪ a 200–300M index. Mitigations are mostly **existence** checks (real DOIs), not “this sentence is supported by that passage.” Elsevier’s 2026 author factsheet still wants a human intellectual contribution and forbids fabricating references.
-- **With Paperful:** do **not** become Jenni. Extra cites belong in Zotero before `\cite` ([`stuff`](ROADMAP.md#stuff-later-extra-citations-from-the-library)). Living reviews without a model: Better BibTeX → Quarto. For a local multi-agent LaTeX writer from idea notes (not a writing workspace), see [PaperOrchestra](#paperorchestra).
+- **With Paperful:** do **not** become Jenni. Extra cites belong in Zotero before `\cite` ({ref}`stuff <stuff-later-extra-citations-from-the-library>`). Living reviews without a model: Better BibTeX → Quarto. For a local multi-agent LaTeX writer from idea notes (not a writing workspace), see [PaperOrchestra](#paperorchestra).
 
 (paperorchestra)=
 ### PaperOrchestra (Google Research)

@@ -4,13 +4,15 @@ A plain-language map of where Paperful sits next to Zotero plugins, bibliography
 fixers, Mendeley export cleaners, DOI-centric download scripts, and the 2026
 cluster of hosted literature / AI-scientist / manuscript tools.
 
-**1.x** is still a disk-first Zotero helper whose public job is **find missing
-PDFs**. Hosted “paper factories” (Edison, Elicit, Deep Research, Jenni) own
-discover and draft; they do not own campus-proxy fetch, grey playbooks, or a
-restore ledger. Factory-stage matrix: [comparison reference](comparison-reference.md#paper-factory-stages).
+Paperful is a **local research workbench** for a Zotero library: land
+literature on this machine, keep watches current, Ask held PDFs, writing
+help on a draft you already wrote, plus missing-PDF fill and a restore
+ledger. Hosted literature tools own discover and draft over a public corpus;
+they do not own campus-proxy fetch, grey playbooks, or that ledger.
+Workflow-stage matrix: {ref}`comparison reference <paper-factory-stages>`.
 
-**Last reviewed:** 2026-11-26. Feature lists for other products are based on public
-docs and positioning — not paid pilots or exhaustive release testing.
+Feature lists for other products are based on public docs and positioning —
+not paid pilots or exhaustive release testing.
 
 Vendor-by-vendor notes live in the [comparison reference](comparison-reference.md).
 Prefer this page for “is this the right tool?”
@@ -19,7 +21,7 @@ Prefer this page for “is this the right tool?”
 
 | If you need… | Look at… |
 |--------------|----------|
-| A platform-agnostic **mirror** of the library (backup, and a way out if the citation manager changes). **Zotero is well tested.** Mendeley and EndNote adapters are seeking testers | **Paperful** `snapshot` / `restore` — [quiet mirror](quiet-mirror.md). Do not treat the other adapters as proven |
+| A platform-agnostic **mirror** of the library (backup, and a way out if the citation manager changes). Zotero is the tested catalogue ([adapters](adapters.md)) | **Paperful** `snapshot` / `restore` — [quiet mirror](quiet-mirror.md) |
 | Bulk **missing-PDF** fetch for a Zotero library (open access first, campus proxy when you have it), collection-shaped folders, resumable CLI | **Paperful** (this repo) |
 | **In-Zotero** “find OA PDF” plus optional grey-zone sources in one plugin UI | [zotero-zotadata](https://github.com/ydeng11/zotero-zotadata) |
 | **Attachment hygiene** (broken links, rename, stored-to-linked, duplicate files on one parent) | **Paperful** `attachments` (report by default; surgery with a flag and `--apply`). In-app: [StorScan](https://github.com/brian-j-griffith/StorScan), [Attanger](https://github.com/MuiseDestiny/zotero-attanger), [ZotMoov](https://github.com/wileyyugioh/zotmoov) |
@@ -35,29 +37,29 @@ Prefer this page for “is this the right tool?”
 | **Semantic search, citation graph, author/trend tools** over the public literature via MCP (hosted corpus; not your Zotero tree) | [Valency MCP Bond](https://www.valency.io/) — see [reference](comparison-reference.md#valency-mcp-bond-and-hub) |
 | **Hosted literature search / cited review** over a public corpus (not your Zotero tree) | [Elicit](https://elicit.com/), [Consensus](https://consensus.app/), [Undermind](https://undermind.ai/), [SciSpace](https://www.typeset.io/), [Scite](https://scite.ai/) — see [reference](comparison-reference.md#hosted-literature-search) |
 | **Hosted AI scientist** — cited reviews over ~175M papers/trials/patents, “has anyone done this?”, optional multi-hour discovery + experimental analysis | [Edison Scientific](https://docs.edisonscientific.com/) (Literature / Precedent / Kosmos). Nearby loops: [Google Co-Scientist](https://deepmind.google/blog/co-scientist-a-multi-agent-ai-partner-to-accelerate-research/), [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) (workshop-grade, not a library helper) — [reference](comparison-reference.md#edison-scientific) |
-| **Local research-agent harness** — coding agents (Claude Code / Codex / Cursor / …) search lit, hypothesize, run experiments on local/SSH/Slurm/cloud GPUs, keep logs on disk; not your Zotero tree | [OpenResearch](https://github.com/alphaXiv/OpenResearch) (`orx`; alphaXiv project) — [reference](comparison-reference.md#openresearch) |
+| **Local research-agent harness** — coding agents (Claude Code / Codex / Cursor / …) search lit, hypothesize, run experiments on local/SSH/Slurm/cloud GPUs, keep logs on disk; not your Zotero tree | [OpenResearch](https://github.com/alphaXiv/OpenResearch) (`orx`; alphaXiv project) — {ref}`reference <openresearch>` |
 | **Web Deep Research memo** (cited longform from the open web in minutes; not a journal manuscript) | OpenAI / Gemini / Perplexity Deep Research. Paperful Ask is over **held** PDFs |
 | **Systematic-review screening** (dual review, extraction forms, PRISMA counts; usually no discovery corpus) | [Covidence](https://www.covidence.org/), [Rayyan](https://www.rayyan.ai/), DistillerSR; local [ASReview](https://asreview.nl/). Paperful `sr` can export counts and CSV; it does not replace those tools. Discover Keep/Skip is hop triage, not dual review |
 | **Chat with PDFs you upload** (no scholarly search, no Zotero restore) | Scholarcy, Explainpaper, Humata, [Gemini Notebook](https://notebooklm.google/). Hosted OA/preprint chat + collection tables: [SummarizePaper](https://www.summarizepaper.com). Paperful `ask` / `evidence` use the **same** `out/` tree as fetch |
-| **Draft a manuscript with citations** (library ∪ global index; language/LaTeX) | [Jenni](https://jenni.ai/), [Paperpal](https://paperpal.com/), SciSpace Writer, Writefull in [Overleaf](https://docs.overleaf.com/integrations-and-add-ons/ai-features). Living cites without a model: Better BibTeX → Quarto. Paperful does not draft papers. [`rewrite`](rewrite.md) applies an existing peer-review pack as locatable edits / tracked changes — it is not a generator |
-| **Turn idea notes + experimental logs into conference LaTeX** (outline, related work, plots, self-peer-review; not your Zotero tree) | [PaperOrchestra](https://github.com/google-research/paper-orchestra) (Google Cloud AI Research; you run it). Nearby: [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) (idea → experiment → workshop paper). Paperful does not generate manuscripts — [reference](comparison-reference.md#paperorchestra) |
+| **Draft a manuscript with citations** (library ∪ global index; language/LaTeX) | [Jenni](https://jenni.ai/), [Paperpal](https://paperpal.com/), SciSpace Writer, Writefull in [Overleaf](https://docs.overleaf.com/integrations-and-add-ons/ai-features). Living cites without a model: Better BibTeX → Quarto. Paperful writing help is peer-review, suggest edits, and extra-cite suggestions ([stuff](stuff.md) does not insert cites) |
+| **Turn idea notes + experimental logs into conference LaTeX** (outline, related work, plots, self-peer-review; not your Zotero tree) | [PaperOrchestra](https://github.com/google-research/paper-orchestra) (Google Cloud AI Research; you run it). Nearby: [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) (idea → experiment → workshop paper). Paperful does not generate manuscripts — {ref}`reference <paperorchestra>` |
 | **Apply a pre-submission pack as tracked changes** (hygiene first; no invented numbers or cites) | **Paperful** [`rewrite`](rewrite.md) from a [`peer-review`](peer-review.md) pack. Patterns (not vendored code): PaperOrchestra worklog, ARIES align-then-generate, XtraGPT selected-span prompts |
 | **Literature-grounded pre-submission peer-review** (your library, optional OpenAlex; no score or accept/reject) | **Paperful** [`peer-review --lane context`](peer-review.md) / `context-web`. ScholarPeer *ideas* (three-round retrieve, historian, baseline scout, novelty Q then A). Not [open-scholar-peer](https://github.com/amirkiarafiei/open-scholar-peer) and not a venue referee |
 | **Grounded Q&A over PDFs you already have** (local index; same collection mirror as fetch) | **Paperful** `rag ingest` / `ask` (`simple` default; `--ask-mode advanced` scores passages then answers) — optional `paperful mcp` (`ask`, `refs_gap`, `gaps`, `snowball_search`, `snowball_trends`, `export`, `proposal_export`). OSS cousin: [PaperQA2](https://github.com/future-house/paper-qa) (you supply the PDFs) |
-| **Deep forensics on tables, stats, and figures** (GRIM/statcheck/TIVA, spreadsheet digit tests, image duplication, paper-mill graphs) — flags anomalies with innocent explanations, not verdicts | [PaperGuard](https://github.com/exergyleizhou-ux/PaperGuard) (`paperguard scan`). **Paperful** [`peer-review --forensics`](peer-review.md) wraps that CLI when it is on PATH. [`screen`](screen.md) / peer-review cover retractions, PPS fingerprints, and light stdlib stats on **manuscript** text — complement, not a substitute. Later buffet items: [Research integrity forensics](ROADMAP.md#research-integrity-forensics-paperguard) |
+| **Deep forensics on tables, stats, and figures** (GRIM/statcheck/TIVA, spreadsheet digit tests, image duplication, paper-mill graphs) — flags anomalies with innocent explanations, not verdicts | [PaperGuard](https://github.com/exergyleizhou-ux/PaperGuard) (`paperguard scan`). **Paperful** [`peer-review --forensics`](peer-review.md) wraps that CLI when it is on PATH. [`screen`](screen.md) / peer-review cover retractions, PPS fingerprints, and light stdlib stats on **manuscript** text — complement, not a substitute. Later buffet items: {ref}`Research integrity forensics <after-110-research-integrity-paperguard>` |
 | **`.bib` normalize / dedupe / upgrade preprints** (no Zotero required) | [bibcite](https://github.com/leo1oel/bibcite), [bibtex-tidy](https://github.com/FlamingTempura/bibtex-tidy), [bibmanager](https://bibmanager.readthedocs.io/) |
-| **Mendeley** dedup inside the app; clean **exported** BibTeX | Mendeley Duplicates smart collection; export cleaners such as [mendeley_bibtex_cleaner](https://gist.github.com/alexandrehuat/6d3263f73ccae87d0107977978316c02) |
+| **Mendeley** dedup inside the app; clean **exported** BibTeX | Mendeley Duplicates smart collection; export cleaners such as bibtex-tidy |
 | **DOI-list PDF batch** without Zotero | [paperscraper](https://github.com/jannisborn/paperscraper) |
 | **Grow the library** from a keyword, one or more DOIs’ references, one or more ORCIDs, a similar-paper hop, or a hybrid hop, then optionally fill PDFs. Hop-0 keyword order is `--prioritize recency` / `popular` / `historical` (citation count by default, not topical relevance). Citation maps such as Research Rabbit link out; Paperful downloads. Re-check later with **watch** (baseline once, then propose new arrivals on disk; you schedule `watch run`) | **Paperful snowball** — dry-run, `approve-each`, `approve-batch`, `--gate auto`, `--fetch-pdfs`, and `watch` ([snowball](snowball.md)). In-app one-hop browsers stay separate ([zotero-snowball](https://github.com/socratic-irony/zotero-snowball), [Citegeist](https://github.com/phdemotions/zotero-citegeist)). General harvesters without the mirror: [findpapers](https://github.com/jonatasgrosman/findpapers), [opencite](https://github.com/neuromechanist/opencite) |
 | **People you follow** → their new papers (ORCID / OpenAlex; no hop; corpus `suggest`; briefing with recent works / co-authors; saved social HTML/CSV, no live scrape) | **Paperful authorwatch** ([authorwatch](authorwatch.md)). Distinct from `snowball watch`. |
 | **Alert loop / weekly what-cites** (poll watches + citers of `-C` on a cadence; apply into the library; no email; you cron it) | **Paperful keepup** ([keepup](keepup.md)) |
-| **Local workbench** over the same CLI (Wanted / Discover / Ask; Advanced Repair, Mirror, Index, Briefs) | **Paperful** `docker compose up` or `paperful serve` — [gui.md](gui.md). Grab fetches to disk; Attach writes the library. Zotero stays the catalogue. Browser login stays the CLI |
+| **Local workbench** over the same CLI (Wanted / Discover / Ask; Advanced Repair, Mirror, Index, Briefs) | **Paperful** `docker compose up` or `paperful serve` — [gui.md](gui.md). Grab fetches to disk and attaches when Zotero 10+ can write. Browser login stays the CLI |
 | **Save the page open in Firefox** into the folder copy. Keep the Zotero Connector for saving into Zotero | **Paperful** [Firefox add-on](firefox.md), optional and unsigned. Writes `out/` only. No PDF on the page: HTML snapshot, plus your configured search lanes if you ask. Several selected tabs at once, reviewed before save. Context menu and Alt+Shift+P |
 | “Just use what ships in Zotero” | Built-in **Find Available PDF** plus [custom PDF resolvers](https://www.zotero.org/support/kb/custom_pdf_resolvers) |
 
 Paperful’s jobs are library, find, completeness, mirror, and control. Fetch
 and lint run on disk; the manager is a write-back adapter (`manager = "zotero"`
-is well tested; Mendeley and EndNote are seeking testers). `attachments`
+is well tested; other managers: [adapters](adapters.md)). `attachments`
 reports layout problems and, with a flag plus `--apply`, repairs them from
 `out/`. `--link` is that repair. For a full metadata editor, phone sync,
 mobile apps, WebDAV, incoming downloads, author folders, or tablet send/get,
@@ -140,12 +142,12 @@ Legend: **Yes** = first-class · **Partial** = adjacent or lighter · **No** = a
 
 zotero-mcp, Valency, Edison, Elicit/Consensus, SR tools, writers, and BibTeX
 columns: [comparison reference](comparison-reference.md#capability-snapshot).
-Factory stages (discover → PDF → screen → write): [paper factory
-stages](comparison-reference.md#paper-factory-stages).
+Workflow stages (discover → PDF → screen → write): {ref}`paper factory
+stages <paper-factory-stages>`.
 
 ## What Paperful does not do today
 
-- Mendeley and EndNote adapters exist and are **seeking testers**. Zotero is the well-tested path. EndNote writes are an import bundle (File → Import); Paperful does not edit the `.enl` database
+- Other citation managers: [adapters](adapters.md). EndNote writes are an import bundle (File → Import); Paperful does not edit the `.enl` database
 - Author-folder layouts, incoming-download matching, and tablet send/get (`attachments --link` can point a personal library at `out/`; it is off unless you pass it)
 - Mendeley and EndNote item merge (`dedupe --apply` is Zotero-only)
 - Two-up scan split, or a chat agent over the library (`ocr` adds a text layer; it does not split pages. `summarize` / `synthesize` / `recover` are opt-in and local)
@@ -245,7 +247,7 @@ How far a snowball hop reaches: [How a hop is cut](snowball.md#how-a-hop-is-cut)
 ## Related docs
 
 - [architecture.md](architecture.md) — disk-first adapters, circuit breaker, Sci-Hub
-- [ROADMAP.md](ROADMAP.md) — 1.x Wanted + mirror; v2 factory packs after the ledger is honest
+- [ROADMAP.md](ROADMAP.md) — contributor map; named packs after the ledger is honest
 - [snowball.md](snowball.md) — keyword, multi-DOI / multi-ORCID, collection, and hybrid library building
 - [authorwatch.md](authorwatch.md) — people lists → new papers (suggest / accept / import; no hop)
 - [comparison-reference.md](comparison-reference.md) — vendor notes and extra tables

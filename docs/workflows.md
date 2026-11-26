@@ -365,6 +365,7 @@ missing rows through the same `ingest-dois --from-pack` path as `refs gap`. See
 
 Contributors: the same verbs with `uv run paperful …`.
 
+(field-author-packs-corpus-frequency-author-site)=
 ## 6. Field author packs (corpus frequency → author_site)
 
 Rank creators already in `-C`, write a report, and seed a **proposed** pack

@@ -480,6 +480,36 @@ def test_attachments_children_and_bytes_come_from_the_mirror(cfg):
     assert mirror_has_bytes({"data": {}}, mirrors) is False
 
 
+def test_folders_skip_an_unreadable_collection(tmp_path, monkeypatch):
+    """One EINVAL directory must not drop the rest of the scope."""
+    out = tmp_path / "out"
+    kept = out / "kept" / "Ada - 2020 - Title -- ABCD2345"
+    blocked = out / "national" / "Bea - 2020 - Other -- EFGH6789"
+    kept.mkdir(parents=True)
+    blocked.mkdir(parents=True)
+    (out / "_collections.json").write_text(
+        json.dumps(
+            {
+                "collections": [
+                    {"key": "KEEP", "name": "kept"},
+                    {"key": "NATL", "name": "national"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    real = Path.iterdir
+
+    def iterdir(self: Path):
+        if self.name == "national":
+            raise OSError(22, "Invalid argument", str(self))
+        return real(self)
+
+    monkeypatch.setattr(Path, "iterdir", iterdir)
+    found = MirrorCatalogue(out)._folders(["KEEP", "NATL"])
+    assert [path.name for path in found] == ["Ada - 2020 - Title -- ABCD2345"]
+
+
 def test_attachments_report_only_never_asks_the_manager_for_children(
     cfg_file, library, monkeypatch
 ):

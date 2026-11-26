@@ -1,6 +1,6 @@
 # Releases and stability
 
-**1.9.9.2** is the current release (`pipx install paperful` / `uv tool install paperful`
+**1.9.10** is the current release (`pipx install paperful` / `uv tool install paperful`
 after this tag is published; `pip install paperful` still works). Optional extras:
 `[browser]`, `[llm]`, `[rag]`, `[rag-docling]`, `[rag-liteparse]`, `[serve]`, `[browser-agent]`, `[openxml]`, `[network]`. **1.1.0** introduced PyPI and
 trusted publishing. For campus login and HTML PDF paths, install
@@ -33,7 +33,7 @@ be added. Required `paperful.run_report.v1` keys and imported-file attach
 (typed `attach_failed`, provenance note) are the contract. **1.1.1** shipped
 Wanted stop-ship hygiene (Grab scope, Attach at zero, copy). Everything after
 that is a buffet by area (Wanted excellence foundation shipped; residual polish).
-**1.9.9.2** (2026-11-26) adds unquoted library-overlap attribution comments on Suggest edits (held item key and pages; no cite insert). **1.9.9** adds academic discourse hygiene on peer-review, a copy sanitizer on Suggest edits (invisible Unicode, C2PA, token trackers on the copy only), and `paperful metrics` (OpenAlex/Crossref citation counts on held items). **1.9.8** ships public What-it-does tables and recaptured workbench shots, Ask Markdown, `evidence` / `summarize --receipts`, optional LiteParse RAG, ORCID snowball knobs, and the critique→`peer-review` rename. **1.9.7** adds hop-0 `--prioritize` (`recency` / `popular` / `historical`) on snowball keyword and hybrid search (OpenAlex `sort=` plus queue score; MCP, profiles, Discover Advanced). **1.9.6** adds cited-source locators on `--lane claims` and CLI `ask --claim-check` (no LLM; not on `/ask`). **1.9.5** deepens Advanced peer-review `context` / `context-web` (three-round retrieve, `context.json` sidecar, split novelty Q then A; still not a grade). **1.9.4** gives `refs gap` a memory (new, still missing, cite count up, now owned), adds a [first 10 minutes](first-10-minutes.md) page, and puts lint and the full suite back on GitHub CI. **1.9.3** adds [`paperful since`](since.md), a read-only report of what changed since the last `run` (retractions, versions of record, dead URLs, upgradable snapshots, healed misses), fixes the Crossref field the retraction check reads, and hardens workbench forms and error pages. **1.9.2** hardens `paperful rewrite` (drift hashes, grounding freeze, fail-closed Word, reproducible LLM calls, post-edit checkers, whole-paragraph returns). **1.9.1** pins peer-review JSON turns (`format=json`, `think=false`, one repair)
+**1.9.10** (2026-11-26) adds `--version` / `-V`, makes Grab attach automatic on Zotero 10+, and skips a mirror folder the mount cannot list. **1.9.9.2** (2026-11-26) adds unquoted library-overlap attribution comments on Suggest edits (held item key and pages; no cite insert). **1.9.9** adds academic discourse hygiene on peer-review, a copy sanitizer on Suggest edits (invisible Unicode, C2PA, token trackers on the copy only), and `paperful metrics` (OpenAlex/Crossref citation counts on held items). **1.9.8** ships public What-it-does tables and recaptured workbench shots, Ask Markdown, `evidence` / `summarize --receipts`, optional LiteParse RAG, ORCID snowball knobs, and the critique→`peer-review` rename. **1.9.7** adds hop-0 `--prioritize` (`recency` / `popular` / `historical`) on snowball keyword and hybrid search (OpenAlex `sort=` plus queue score; MCP, profiles, Discover Advanced). **1.9.6** adds cited-source locators on `--lane claims` and CLI `ask --claim-check` (no LLM; not on `/ask`). **1.9.5** deepens Advanced peer-review `context` / `context-web` (three-round retrieve, `context.json` sidecar, split novelty Q then A; still not a grade). **1.9.4** gives `refs gap` a memory (new, still missing, cite count up, now owned), adds a [first 10 minutes](first-10-minutes.md) page, and puts lint and the full suite back on GitHub CI. **1.9.3** adds [`paperful since`](since.md), a read-only report of what changed since the last `run` (retractions, versions of record, dead URLs, upgradable snapshots, healed misses), fixes the Crossref field the retraction check reads, and hardens workbench forms and error pages. **1.9.2** hardens `paperful rewrite` (drift hashes, grounding freeze, fail-closed Word, reproducible LLM calls, post-edit checkers, whole-paragraph returns). **1.9.1** pins peer-review JSON turns (`format=json`, `think=false`, one repair)
 and ships example Vale packs (`JMLC`, `JCP`, `MarinePolicy`). **1.9.0** cuts GitHub CI to one Ubuntu smoke job (`pytest -m smoke`); the
 OS/Python matrix, lint, audit, socket, fresh-install, browser, and docker
 jobs stay local until each is green on its own. **1.8.0** adds crash-safe ledger appends, one HTTP client, systematic-review
@@ -68,13 +68,13 @@ behavior change, peer-review checkers are a package, and `acronyms` is a
 glossary), Ask `simple`/`advanced` modes, and a CLI/workbench module split
 (`*_cmd.py`, desk row builders, Discover `handle_*` routes). **1.3.1** hardens local-trust boundaries (PDF fetch SSRF checks, review-token
 sanitization, non-loopback `serve` gate, redacted witness digests; see
-[SECURITY.md](../SECURITY.md)) and adds Mendeley/EndNote adapter contract tests
+[SECURITY.md](https://github.com/glen-w/Paperful/blob/main/SECURITY.md)) and adds Mendeley/EndNote adapter contract tests
 plus a field-assessment template for testers. **1.3.0** adds the optional
 unsigned [Firefox add-on](firefox.md): save the open page or selected tabs into
 `out/`. Local OpenAlex snapshot phases beyond
 opt-in v1 and the alert loop stay later — see
 [ROADMAP — Product split](ROADMAP.md#product-split-10-vs-post-10)
-and [After 1.1.0](ROADMAP.md#after-110-buffet-by-area).
+and {ref}`After 1.1.0 <after-110-buffet-by-area>`.
 
 ## Schema compatibility (1.0 contract)
 
@@ -98,7 +98,7 @@ Extra keys may still be added on frozen schemas.
 
 The release path is still clone, `docker compose build`, and `doctor` exiting
 2 when Zotero is absent. That check is local until the docker job returns
-([CI rebuild](ROADMAP.md#after-17-ci-rebuild)). GitHub CI currently runs
+({ref}`CI rebuild <after-17-ci-rebuild>`). GitHub CI currently runs
 the smoke tests only (Ubuntu, Python 3.12); the full suite runs locally.
 
 A second manager is not owed as a finished feature and **does not gate 1.0**.
@@ -145,7 +145,7 @@ are part of the 1.0 surface (additive extras allowed). See [LLM](llm.md).
 | Locked report JSON schema | Required `paperful.run_report.v1` keys frozen; additive keys still allowed |
 | Locked item record + snapshot/restore | Required `paperful.item.v1` keys frozen; restore is create-missing (not identity round-trip) |
 | Mendeley and EndNote adapters | Not a 1.0 blocker. In the tree; seeking testers; Zotero is the well-tested path |
-| Workbench GUI (Discover, Wanted, Preview/Grab) | Shipped on `paperful serve` (Jinja workbench; Wanted first; Grab fetches to disk, Attach writes the library; Advanced Repair / Mirror / Index / Briefs; review tokens; `docker compose up` at `127.0.0.1:8765`) — [gui.md](gui.md) |
+| Workbench GUI (Discover, Wanted, Preview/Grab) | Shipped on `paperful serve` (Jinja workbench; Wanted first; Grab fetches to disk and attaches when Zotero 10 or newer can write; Advanced Repair / Mirror / Index / Briefs; review tokens; `docker compose up` at `127.0.0.1:8765`) — [gui.md](gui.md) |
 | Interactive Ask in GUI (cited chat-over-collection) | **Shipped** on the default nav (`/ask`; opt-in `[rag]` + `[llm]`; threads, batch when Advanced, custom prompts). Index is ingest/search/`rag questions`/`rag answered`. Briefs for summarize/synthesize |
 | Fresh-clone doctor stays quiet without Scholar | Shipped: `scholar` opt-in like `scihub` |
 
@@ -165,4 +165,4 @@ These stay true after the tag. They are not unfinished 1.0 work.
 - TTY stays the shell for `session login`, `doctor --guide`, mid-run EZProxy,
   and Sci-Hub.
 
-Full list: [CHANGELOG](../CHANGELOG.md) (1.0.0).
+Full list: [CHANGELOG](https://github.com/glen-w/Paperful/blob/main/CHANGELOG.md) (1.0.0).

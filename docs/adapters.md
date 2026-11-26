@@ -3,7 +3,7 @@
 A new reference-manager adapter is a **conformance-suite submission**, not
 core surgery. Implement [`LibraryBackend`](../paperful/library.py) and land
 it when the kit plus a real-library field report both pass. Promotion
-criteria are written down in [`docs/plans/1.7-wave.md`](plans/1.7-wave.md)
+criteria are written down in [`docs/plans/1.7-wave.md`](https://github.com/glen-w/Paperful/blob/main/docs/plans/1.7-wave.md)
 *before* reports arrive.
 
 **Zotero is well tested.** Mendeley and EndNote stay **seeking testers**

@@ -344,6 +344,34 @@ a {
   font-weight: 600;
 }
 
+.job-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin: 0 0 0.5rem;
+}
+
+.job {
+  margin: 0;
+  padding: 1rem 1.1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.job h3 {
+  margin: 0 0 0.4rem;
+}
+
+.job p {
+  margin: 0 0 0.55rem;
+  color: var(--ink-soft);
+}
+
+.job p:last-child {
+  margin-bottom: 0;
+}
+
 .shot-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -523,7 +551,8 @@ a {
     grid-column: auto;
   }
 
-  .shot-grid {
+  .shot-grid,
+  .job-grid {
     grid-template-columns: 1fr;
   }
 

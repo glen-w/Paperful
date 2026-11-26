@@ -20,8 +20,8 @@ cp config.example.toml config.toml   # personal — never commit config.toml
 Hosted docs: `uv sync --extra docs && make docs` (Sphinx HTML) or
 `make pages-site` (`website/` + `/guide/` in `_site/`). The guide corpus is
 only `docs/*.md`; every page must appear in `docs/index.md` toctrees
-(`tests/test_sphinx_docs.py`). The docs workflow is advisory (warnings
-allowed) and Pages deploys without `-W`, so run `DOCS_STRICT=1 make docs`
+(`tests/test_sphinx_docs.py`). The docs workflow is advisory (highlighting
+warnings allowed; missing MyST xrefs are not suppressed) and Pages deploys without `-W`, so run `DOCS_STRICT=1 make docs`
 locally before pushing guide changes. Live site: [paperful.app](https://paperful.app/) with the guide at
 [paperful.app/guide/](https://paperful.app/guide/). Public shots use `ocean/BBNJ` (Ocean → BBNJ; `-C BBNJ` will not resolve).
 If that collection is already populated, seed skips snowball and `run`.
@@ -67,8 +67,9 @@ suite, audit, socket, fresh-install, docker, browser, and the OS/Python
 matrix are local until added back one job at a time
 ([roadmap](docs/ROADMAP.md#after-17-ci-rebuild)). The coverage badge refreshes
 only when a suite job uploads `coverage-json` again (also parked). The Docs
-workflow (`.github/workflows/docs.yml`) runs the guide corpus tests and a strict
-Sphinx build; pushes to `main` that touch `docs/` or `website/` also redeploy
+workflow (`.github/workflows/docs.yml`) runs the guide corpus tests and a
+Sphinx build with warnings allowed (`continue-on-error`; it does not set
+`DOCS_STRICT`). Pushes to `main` that touch `docs/` or `website/` also redeploy
 Pages (`.github/workflows/pages.yml`).
 User-facing changes: note them in [CHANGELOG.md](CHANGELOG.md) and
 [docs/releases.md](docs/releases.md) when they affect 1.0 vs post-1.0 promises.

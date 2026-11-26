@@ -9,8 +9,7 @@ EndNote XML (`import` / `export`) are the other door.
 
 Zotero cloud storage is small, and WebDAV is more ops than most people want.
 Zotero stays the bibliographic catalogue and attach target that is well
-tested. Mendeley and EndNote adapters exist for a co-author on another
-manager — they are **seeking testers**. This is a product stance, not a new
+tested. Other managers: [adapters](adapters.md). This is a product stance, not a new
 daemon. Paperful remains a **local workbench** (GUI + CLI). House sync of `out/` (and careful
 use of `state/`) lives outside this repo (e.g. Syncthing on a homeserver).
 See the Toast Heaven ops plan

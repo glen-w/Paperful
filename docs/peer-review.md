@@ -3,8 +3,8 @@
 `paperful peer-review` writes an evidence-backed Markdown pack for a manuscript
 you already have: a mirrored library `--item`, or a `--file` / workbench
 upload. Deterministic checkers always run. Optional review lanes are a
-separate **suggested** extra and can run together. There is **no score, grade,
-or accept/reject**.
+separate **suggested** extra and can run together. Honesty for optional
+lanes: [AI](ai.md#honesty).
 
 This is a **pre-submission / reading-aid pack**, not a referee and not Google
 Deep Review. It does not upload the manuscript and does not call a similarity
@@ -252,7 +252,7 @@ evidence; detailed supplements remain good for reproducibility. When a model
 fills Suggested with appendix nits, use **`claims`** and Critical path to see
 whether the **main narrative** is thin, then fix or dismiss noise. Optional
 prompt guardrails and appendix-share metrics in the pack are **not** shipped
-yet; see [ROADMAP](ROADMAP.md#peer-review-llm-literacy) if you track follow-ups.
+yet; see {ref}`ROADMAP <peer-review-llm-literacy>` if you track follow-ups.
 
 ## Optional reviewers (`--lane reviewers` / `--llm`)
 
@@ -498,16 +498,16 @@ rules is expected.
 
 ### Example Vale styles
 
-The repo ships four example packs under [`styles/`](../styles/README.md).
+The repo ships four example packs under [`styles/`](https://github.com/glen-w/Paperful/blob/main/styles/README.md).
 They are not official journal packages. Copy one ini; do not mix `JCP` with
 `MarinePolicy` (author–year vs numbered cites).
 
 | Pack | Venue | Copy |
 | --- | --- | --- |
-| [`styles/JMLC`](../styles/JMLC/) | Journal of Money Laundering Control (Emerald, Harvard) | `cp styles/JMLC/vale.ini.example .vale.ini` |
-| [`styles/JCP`](../styles/JCP/) | Journal of Cleaner Production (Elsevier, author–year) | `cp styles/JCP/vale.ini.example .vale.ini` |
-| [`styles/MarinePolicy`](../styles/MarinePolicy/) | Marine Policy (Elsevier, numbered `[1]`) | `cp styles/MarinePolicy/vale.ini.example .vale.ini` |
-| [`styles/PaperfulAi`](../styles/PaperfulAi/) | Promotional / chatbot leftovers (not an AI detector) | `cp styles/PaperfulAi/vale.ini.example .vale.ini` |
+| [`styles/JMLC`](https://github.com/glen-w/Paperful/tree/main/styles/JMLC) | Journal of Money Laundering Control (Emerald, Harvard) | `cp styles/JMLC/vale.ini.example .vale.ini` |
+| [`styles/JCP`](https://github.com/glen-w/Paperful/tree/main/styles/JCP) | Journal of Cleaner Production (Elsevier, author–year) | `cp styles/JCP/vale.ini.example .vale.ini` |
+| [`styles/MarinePolicy`](https://github.com/glen-w/Paperful/tree/main/styles/MarinePolicy) | Marine Policy (Elsevier, numbered `[1]`) | `cp styles/MarinePolicy/vale.ini.example .vale.ini` |
+| [`styles/PaperfulAi`](https://github.com/glen-w/Paperful/tree/main/styles/PaperfulAi) | Promotional / chatbot leftovers (not an AI detector) | `cp styles/PaperfulAi/vale.ini.example .vale.ini` |
 
 Other directories under `styles/` are local house tints and are gitignored.
 Keep them beside the examples so `StylesPath = styles` still finds them, and

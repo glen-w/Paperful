@@ -120,8 +120,12 @@ def stub_zotero(monkeypatch):
 
 @pytest.mark.smoke
 def test_version():
-    res = runner.invoke(cli.app, ["version"])
-    assert res.exit_code == 0 and res.stdout.strip()
+    via_cmd = runner.invoke(cli.app, ["version"])
+    via_flag = runner.invoke(cli.app, ["--version"])
+    via_short = runner.invoke(cli.app, ["-V"])
+    assert via_cmd.exit_code == 0 and via_cmd.stdout.strip()
+    assert via_flag.exit_code == 0 and via_flag.stdout.strip() == via_cmd.stdout.strip()
+    assert via_short.exit_code == 0 and via_short.stdout.strip() == via_cmd.stdout.strip()
 
 
 def test_run_uses_mirror_when_manager_is_down(cfg_file, tmp_path, monkeypatch):

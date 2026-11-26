@@ -503,7 +503,7 @@ class Config:
     ui_library_page_sizes: tuple[int, ...] = (25, 50, 100, 200)
     # Workbench Grab: "manual" leaves PDFs in out/ until Attach; "auto" writes
     # them when the library supports it (Zotero 10+). CLI `attach` is separate.
-    ui_attach_mode: str = "manual"
+    ui_attach_mode: str = "auto"
     # Discover citation map library panel: sidebar | popup | both | off.
     ui_citation_map_edit: str = "both"
     # After Add to library from the map, also enqueue Find PDF.
