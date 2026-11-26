@@ -30,12 +30,17 @@ from paperful.peer_review import (
 )
 from paperful.peer_review_extract import extract_path, stage_file
 from paperful.peer_review_overlap import (
+    OverlapHit,
     _drop_biblio,
     _ngrams,
     _tokens,
     collapse_nested_hits,
+    group_overlap_action,
+    locate_phrase_in_pages,
     match_phrases,
+    overlap_action,
     rank_phrases,
+    unquoted_span_for_phrase,
 )
 from paperful.peer_review_stats import grim_possible, scan_stats
 from tests.conftest import make_item
@@ -487,6 +492,75 @@ def test_overlap_needle_among_many_docs():
     assert {h.other_key for h in hits} == {"HIT"}
 
 
+def test_overlap_locator_and_actions():
+    pages = [(1, "Intro. Unique tungsten carbide coating survived. End.")]
+    loc, quote = locate_phrase_in_pages(
+        pages, "unique tungsten carbide coating survived"
+    )
+    assert loc == "p. 1"
+    assert "tungsten carbide" in quote.lower()
+    hit = OverlapHit(
+        other_key="K",
+        ngram="unique tungsten carbide coating survived",
+        n_words=7,
+        source="rag_hybrid",
+    )
+    assert overlap_action(hit) == "review"
+    hit.source_quote = quote
+    hit.n_words = 20
+    assert overlap_action(hit) == "quote"
+    hit.n_words = 8
+    assert overlap_action(hit) == "cite"
+    phrase = "unique tungsten carbide coating survived"
+    quoted = f'He wrote "{phrase}" in the intro.'
+    assert unquoted_span_for_phrase(quoted, phrase) is None
+    mixed = f'He wrote "{phrase}" then {phrase} again with extra words.'
+    span = unquoted_span_for_phrase(mixed, phrase)
+    assert span is not None
+    assert mixed[span[0] : span[1]].casefold().startswith("unique")
+    hybrid = OverlapHit(
+        other_key="OTHER",
+        ngram=phrase,
+        n_words=6,
+        source="rag_hybrid",
+        other_loc="p. 2",
+    )
+    assert group_overlap_action([hybrid]) == "review"
+
+
+def test_hybrid_overlap_without_page_quote_is_review(cfg, monkeypatch):
+    from paperful.peer_review_checks.overlap import _overlap
+    from paperful.peer_review_extract import ExtractedDoc
+
+    phrase = "unique tungsten carbide coating survived the salt spray"
+    text = f"Methods. {phrase}. Extra filler words keep the extract long enough."
+    hit = OverlapHit(
+        other_key="OTHER",
+        ngram=phrase.lower(),
+        n_words=8,
+        source="rag_hybrid",
+        other_loc="p. 2",
+        source_quote="",
+    )
+    monkeypatch.setattr(
+        "paperful.peer_review_checks.overlap.overlap_findings",
+        lambda *_a, **_k: ([hit], ""),
+    )
+    doc = ExtractedDoc(text=text, format="md", paragraphs=[text])
+    rows: list = []
+    findings = _overlap(
+        cfg,
+        doc,
+        None,
+        [make_item(key="OTHER", title="Other paper")],
+        rows,
+    )
+    assert findings and findings[0].code == "text_overlap"
+    assert findings[0].extra["action"] == "review"
+    assert rows[0]["action"] == "review"
+    assert "Review whether" in findings[0].detail
+
+
 def test_overlap_checker_against_rag_text_cache(cfg, tmp_path: Path):
     from paperful.store import write_json
 
@@ -516,7 +590,40 @@ def test_overlap_checker_against_rag_text_cache(cfg, tmp_path: Path):
     overlap = pack["overlap"]
     assert overlap and overlap[0]["other_key"] == "OTHER"
     assert overlap[0]["source"] == "phrase"
+    assert overlap[0]["action"] == "cite"
+    assert overlap[0]["other_loc"] == "p. 1"
+    assert distinctive.split()[0].lower() in overlap[0]["source_quote"].lower()
+    finding = next(f for f in pack["findings"] if f["code"] == "text_overlap")
+    assert finding["action"] == "cite"
+    assert finding["other_key"] == "OTHER"
+    assert "Cite that item" in finding["detail"]
     assert len(overlap) == 1
+
+
+def test_quoted_overlap_is_skipped(cfg, tmp_path: Path):
+    from paperful.store import write_json
+
+    distinctive = "unique tungsten carbide coating survived the salt spray chamber overnight without peeling"
+    text_dir = cfg.rag_dir / "text"
+    text_dir.mkdir(parents=True)
+    write_json(
+        text_dir / "OTHER.json",
+        {"pages": [f"Background. {distinctive}. filler words for length here."]},
+    )
+    src = tmp_path / "draft.md"
+    src.write_text(
+        f'Methods. "{distinctive}". Enough extra words here so extract is not empty.\n',
+        encoding="utf-8",
+    )
+    pack = build_peer_review(
+        cfg,
+        file_path=src,
+        offline=True,
+        scope_items=[make_item(key="OTHER", title="Other paper")],
+    )
+    codes = {f["code"] for f in pack["findings"]}
+    assert "text_overlap" not in codes
+    assert pack["overlap"] == []
 
 
 def test_overlap_uses_rag_text_without_scope_items(cfg, tmp_path: Path):

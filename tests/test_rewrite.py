@@ -82,6 +82,38 @@ def test_default_areas_are_style_only():
     )
 
 
+def test_style_includes_text_overlap():
+    hay = DRAFT
+    findings = [
+        _finding(
+            code="text_overlap",
+            quote="Maritime Area beyond national jurisdictions",
+            extra={"other_key": "OTHER", "action": "cite"},
+            detail="Cite that item OTHER (flags to review).",
+            source="phrase",
+        )
+    ]
+    buckets, skips = bucket_findings(findings, areas=("style",), hay=hay)
+    assert [f["code"] for f in buckets["style"]] == ["text_overlap"]
+    assert skips == []
+
+
+def test_cites_area_includes_text_overlap():
+    hay = DRAFT
+    findings = [
+        _finding(
+            code="text_overlap",
+            quote="Maritime Area beyond national jurisdictions",
+            extra={"other_key": "OTHER"},
+            detail="Cite that item (flags to review).",
+            source="phrase",
+        )
+    ]
+    buckets, skips = bucket_findings(findings, areas=("cites",), hay=hay)
+    assert [f["code"] for f in buckets["cites"]] == ["text_overlap"]
+    assert skips == []
+
+
 def test_style_default_excludes_cites():
     hay = DRAFT.lower()
     findings = [
@@ -206,6 +238,65 @@ def test_no_new_cite_keys():
         hay=hay,
     )
     assert reason == "no_evidence"
+
+
+def test_text_overlap_is_style_comment(cfg, tmp_path: Path):
+    src = tmp_path / "draft.md"
+    span = "unique tungsten carbide coating survived the salt spray"
+    src.write_text(f"Methods. {span}. Extra words for the extract.\n", encoding="utf-8")
+    finding = _finding(
+        code="text_overlap",
+        quote=span,
+        detail="1 distinctive span(s) also in library item OTHER p. 1. Cite that item (flags to review).",
+        extra={
+            "other_key": "OTHER",
+            "other_loc": "p. 1",
+            "action": "cite",
+            "source_quote": span,
+        },
+        source="phrase",
+    )
+    pack = _pack([finding], path=str(src))
+    result = build_rewrite(
+        cfg,
+        pack=pack,
+        manuscript=src,
+        areas=("style",),
+        outputs=("edits",),
+        dry_run=True,
+        llm_client=None,
+    )
+    edits = (result.get("plan") or {}).get("edits") or []
+    assert edits
+    assert all(e["kind"] == "comment" for e in edits)
+    assert "OTHER" in (edits[0].get("body") or "")
+
+
+def test_quoted_text_overlap_skipped_on_rewrite(cfg, tmp_path: Path):
+    src = tmp_path / "draft.md"
+    span = "unique tungsten carbide coating survived the salt spray"
+    src.write_text(f'Methods. "{span}". Extra words for the extract.\n', encoding="utf-8")
+    finding = _finding(
+        code="text_overlap",
+        quote=span,
+        detail="Cite library item OTHER (flags to review).",
+        extra={"other_key": "OTHER", "action": "cite"},
+        source="phrase",
+    )
+    pack = _pack([finding], path=str(src))
+    result = build_rewrite(
+        cfg,
+        pack=pack,
+        manuscript=src,
+        areas=("style",),
+        outputs=("edits",),
+        dry_run=True,
+        llm_client=None,
+    )
+    edits = (result.get("plan") or {}).get("edits") or []
+    skips = (result.get("plan") or {}).get("skips") or []
+    assert edits == []
+    assert any(s.get("reason") == "quote" for s in skips)
 
 
 def test_hedge_words_are_comment_only(cfg, tmp_path: Path):

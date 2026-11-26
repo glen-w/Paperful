@@ -82,6 +82,9 @@ See [config.md](config.md).
 - Not [`refs gap`](commands.md) (cited-in-PDF works you do not own).
 - Not `precedent` (no OpenAlex / public-metadata-only rows).
 - Not auto-insert into the manuscript. `--apply` and stance labels stay later.
+- Not peer-review `text_overlap` (that flags unquoted distinctive spans in
+  held PDFs and comments the Suggest edits copy; this pack lists extra
+  similar cites).
 
 ## Workbench
 

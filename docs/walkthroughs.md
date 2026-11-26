@@ -37,7 +37,8 @@ Walkthroughs 1–3 do **not** need a local model. Ask and Briefs do
 | [Firefox add-on](firefox.md) | Optional. Save the open page, or selected tabs, into `out/`. The Zotero Connector stays for saving into Zotero |
 | [Ask your library](rag.md) | Cited answers from PDFs already on disk. CLI `ask --claim-check` labels each sentence against the index (no LLM) |
 | [Evidence table](evidence.md) | Sourced n / method / finding over held PDFs (CLI; quote or `check this`; no LLM) |
-| [Peer review a draft](peer-review.md) | Pre-submission pack: checkers always; optional `--lane claims` locators against held cited PDFs; optional `context` / `context-web`. Not a grade |
+| [Peer review a draft](peer-review.md) | Pre-submission pack: checkers always, including unquoted overlap vs held PDFs; optional `--lane claims` locators; optional `context` / `context-web`. Not a grade |
+| [Suggest edits](rewrite.md) | Apply that pack as tracked changes on a copy; overlap comments name a held item (no cite insert) |
 
 ## Prerequisites
 

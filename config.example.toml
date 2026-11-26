@@ -225,9 +225,9 @@ mirror_failures_before_skip = 3
 # # lanes = ["reviewers", "marg"]  # when set, llm/advanced bools are ignored
 # # With llm = true and advanced = true (and lanes empty), every peer-review runs reviewers + MARG.
 # # Advanced PDF chunks reuse [grobid] when enabled (see docs/grobid.md).
-# overlap_top_k = 40
+# overlap_top_k = 40              # unquoted spans vs state/rag/text → cite/quote/review
 # overlap_n_min = 6
-# overlap_n_max = 12
+# overlap_n_max = 12              # quote action at n_words ≥ 20
 # overlap_df_max = 0              # 0 = auto from corpus size
 # cite_age_years = 10
 # max_context_chars = 24000

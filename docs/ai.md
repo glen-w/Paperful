@@ -61,7 +61,7 @@ unusable for a 1,500-PDF collection overnight.
 | `ask --claim-check` | One manuscript | **No model** | Per-sentence retrieve + overlap labels vs the local index |
 | `peer-review --lane verify` | One manuscript | Yes locally; slower (per-segment) | Density-budgeted section swarm + local synthesis. Not Deep Review |
 | `peer-review --lane context` | One manuscript | Yes locally; several extra turns | Summary, 3-round retrieve, historian, scout, novelty Q then A, soundness. Local RAG; `context-web` may call OpenAlex / SearXNG |
-| `rewrite` | One peer-review pack | Style-only: no model. Other areas: yes (same 7B–12B band) | One JSON call per area still lacking a glossary/Vale swap. Optional XtraGPT Ollama tag. Not a generated paper |
+| `rewrite` | One peer-review pack | Style-only: no model (glossary/Vale plus discourse and overlap comments). Other areas: yes (same 7B–12B band) | One JSON call per area still lacking a glossary/Vale swap. Overlap comments name a held item; no cite insert. Optional XtraGPT Ollama tag. Not a generated paper |
 
 **Try it out** means: one item, five papers, or a free hosted model while you
 watch for timeouts and bad grounding. **Library scale** means: hundreds or

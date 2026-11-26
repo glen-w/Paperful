@@ -624,8 +624,12 @@ def render_markdown(pack: dict[str, Any], *, show_dismissed: bool = False) -> st
     if overlap:
         lines.extend(["", "## Overlap spans", ""])
         for row in overlap:
+            loc = str(row.get("other_loc") or "").strip()
+            action = str(row.get("action") or "").strip()
+            loc_bit = f" {loc}" if loc else ""
+            action_bit = f", {action}" if action else ""
             lines.append(
-                f"- `{row.get('other_key')}` ({row.get('source')}): "
+                f"- `{row.get('other_key')}` ({row.get('source')}{action_bit}{loc_bit}): "
                 f"“{row.get('ngram', '')[:120]}”"
             )
         lines.append("")

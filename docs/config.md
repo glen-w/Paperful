@@ -313,10 +313,10 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[rewrite].facts_worklog` | `true` | Freeze list (`«PF…»`) in the rewrite prompt |
 | `[rewrite].tell_regression` | `true` | Drop body edits that **introduce** stock phrases |
 | `[rewrite].critic` | `false` | Optional LLM pass that may only reject edits |
-| `[rewrite].stock_comments` | `true` | Discourse findings as comments (except chatbot drops) |
+| `[rewrite].stock_comments` | `true` | Discourse findings as comments (except chatbot drops). Unquoted `text_overlap` comments always (not this flag) |
 | `[[rewrite.specialists]]` | builtin per enabled area | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path). Separate key from `areas` (TOML) |
-| `[peer_review].overlap_top_k` | `40` | Distinctive n-grams ranked for library text overlap |
-| `[peer_review].overlap_n_min` / `overlap_n_max` | `6` / `12` | Word n-gram window |
+| `[peer_review].overlap_top_k` | `40` | Distinctive n-grams ranked for library text overlap (unquoted spans → quote/cite/review) |
+| `[peer_review].overlap_n_min` / `overlap_n_max` | `6` / `12` | Word n-gram window (`cite` under 20 words; `quote` at ≥ 20) |
 | `[peer_review].overlap_df_max` | `0` | Drop grams in this many other docs (`0` = auto from corpus size) |
 | `[peer_review].cite_age_years` | `10` | `info` when that share of bibliography years is this old |
 | `[peer_review].max_context_chars` | `24000` | LLM excerpt budget |

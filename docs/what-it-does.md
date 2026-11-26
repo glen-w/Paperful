@@ -58,6 +58,6 @@ New here: [first 10 minutes](first-10-minutes.md). Click-through jobs:
 
 | Tool | What it does | Guide |
 | --- | --- | --- |
-| [Peer review](peer-review.md) ⚙️ | A draft you already wrote: structure and citations always; optional academic discourse hygiene; optional claim locators against held PDFs; optional comparison with this library. Not a grade | [guide](peer-review.md) |
-| [Suggest edits](rewrite.md) ⚙️ | Apply a peer-review pack as locatable edits / tracked changes; strip hidden trackers on the copy; never overwrites the source | [guide](rewrite.md) |
+| [Peer review](peer-review.md) ⚙️ | A draft you already wrote: structure and citations always; unquoted overlap vs held PDFs (quote/cite/review); optional academic discourse; optional claim locators. Not a grade | [guide](peer-review.md) |
+| [Suggest edits](rewrite.md) ⚙️ | Apply a peer-review pack as locatable edits / tracked changes; overlap comments name a held item (no cite insert); strip hidden trackers on the copy; never overwrites the source | [guide](rewrite.md) |
 | [Stuff](stuff.md) ⚙️ | Extra library cites per sentence or outline section (needs the index; no chat model) | [guide](stuff.md) |

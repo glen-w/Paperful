@@ -307,7 +307,8 @@ uv run paperful rewrite --pack PATH --output edits --dry-run
 
 Pack required. Never re-runs peer-review. Default area is **style** (glossary
 `suggested` and obvious Vale swaps are deterministic and run with `[llm]`
-off). Other areas (`cites`, `structure`, `comments`) need a model for
+off; unquoted `text_overlap` is a comment with the held item key, not an
+inserted cite). Other areas (`cites`, `structure`, `comments`) need a model for
 findings without a deterministic replacement. Body edits must not invent
 numbers or cite keys. Retracted / withdrawn / EoC cites become comments,
 never deletes. Optional `[[rewrite.specialists]]` can point a specialist at

@@ -267,7 +267,9 @@ claims / verify PDF chunks (pre-checked from `[grobid].enabled`; ticking it is
 requests a Binoculars extra (git overlay; not installed by default). Optional Vale checkbox
 runs house-style lint when `vale` is on PATH. The box is not pre-checked;
 `[peer_review].vale = true` still runs the pass. Discourse (weasel/hype/chatbot)
-is on by default. Optional Forensics (PaperGuard)
+is on by default. Library overlap vs `-C` / extra collections is always on when
+`state/rag/text/` exists: unquoted spans get a quote/cite/review action, not a
+verdict. Optional Forensics (PaperGuard)
 checkbox runs `paperguard scan` when that binary is on PATH
 (`[peer_review].forensics = true` still runs the pass). Show-dismissed is
 item-only. Not a score. See [peer_review.md](peer-review.md).
@@ -278,8 +280,9 @@ item-only. Not a score. See [peer_review.md](peer-review.md).
 recent peer-review pack, optional replacement draft if the file moved,
 area/output/comments and copy-sanitizer controls. Writes `state/rewrites/` (edit plan, optional
 sidecar, tracked-changes Word / OpenDocument / PDF). Never overwrites the source. Empty state:
-**Run Peer review first**. Style glossary/Vale swaps run with `[llm]` off. See
-[rewrite.md](rewrite.md).
+**Run Peer review first**. Style glossary/Vale swaps run with `[llm]` off.
+Unquoted library overlap from the pack becomes Word comments (item key and
+pages; no cite insert). See [rewrite.md](rewrite.md).
 
 ![Suggest edits: pick a peer-review pack, choose areas and outputs, optional comments](_static/workflows/rewrite.png)
 

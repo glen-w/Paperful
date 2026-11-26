@@ -275,7 +275,7 @@ Three reading jobs, in order:
 | Cited answers              | `rag ingest`, then `ask` | An index of `out/`, then answers that name the papers and pages. **Ask** on the workbench. Needs `[rag].enabled`                                                          |
 | Sentence support           | `ask --claim-check --file` | Each sentence vs the local index (`supported` / `mixed` / `unsupported`). No chat model. CLI pack under `state/ask-claims/`. [Ask](rag.md#claim-check)                    |
 | Sourced comparison table   | `evidence`               | Design / n / method / finding over held PDFs. Quote or `check this`. No LLM. Pack under `state/evidence/`. [Evidence](evidence.md)                                         |
-| Pre-submission pack        | `peer-review`               | Checkers always. Optional `--lane claims` (intra-doc plus held cited-PDF locators when `-C` and `rag ingest` ran), `--lane context` / `context-web`. Not a grade. [Peer review](peer-review.md) |
+| Pre-submission pack        | `peer-review`               | Checkers always, including unquoted overlap vs `-C` when `rag ingest` ran. Optional `--lane claims` (intra-doc plus held cited-PDF locators), `--lane context` / `context-web`. Not a grade. [Peer review](peer-review.md) |
 
 
 `fix-metadata` (title and identifier patches; `--apply` writes the catalogue)

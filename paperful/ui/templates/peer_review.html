@@ -36,7 +36,7 @@
         {% endfor %}
       </select>
     </label>
-    <label>Also compare against {{ info("Extra Zotero collections, one path per line. Unioned with the header chip for overlap and cited-source locators. Same as repeating -C on the CLI.") }}
+    <label>Also compare against {{ info("Extra Zotero collections, one path per line. Unioned with the header chip for unquoted overlap (quote/cite/review, not a verdict) and cited-source locators. Same as repeating -C on the CLI.") }}
       <textarea name="overlap_collection" rows="2" placeholder="Other collection"></textarea>
     </label>
     {% if llm_on %}
@@ -64,7 +64,7 @@
     <label class="drop-zone">Drop a draft (pdf, docx, odt, html, rtf, txt, md, pptx) or choose a file
       <input type="file" name="file" accept="{{ accept }}">
     </label>
-    <label>Also compare against {{ info("Extra Zotero collections, one path per line. Unioned with the header chip for overlap. Same as repeating -C on the CLI.") }}
+    <label>Also compare against {{ info("Extra Zotero collections, one path per line. Unioned with the header chip for unquoted overlap (quote/cite/review, not a verdict). Same as repeating -C on the CLI.") }}
       <textarea name="overlap_collection" rows="2" placeholder="Other collection"></textarea>
     </label>
     {% if llm_on %}
@@ -75,7 +75,7 @@
     <label><input type="checkbox" name="vale" value="1"> Vale {{ info("Optional house-style pass. Not pre-checked. Needs vale on PATH and a .vale.ini. Missing extra records vale_unavailable / vale_no_config / vale_failed. Also runs when [peer_review].vale is true.") }}</label>
     <label><input type="checkbox" name="forensics" value="1"> Forensics (PaperGuard) {{ info("Optional subprocess scan. Needs paperguard on PATH. Suggested anomalies to investigate, not a grade. Missing extra records paperguard_unavailable. Also runs when [peer_review].forensics is true.") }}</label>
     <button type="submit">Peer review file</button>
-    {{ info("Same checkers as --file. Collection chip plus extra collections are the overlap corpus when text is already cached.") }}
+    {{ info("Same checkers as --file. Collection chip plus extra collections are the unquoted-overlap corpus when state/rag/text is already cached.") }}
   </form>
 </section>
 

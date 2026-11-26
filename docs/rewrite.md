@@ -67,15 +67,18 @@ PDF sticky notes. Library PDFs are read-only; output is always new files.
 
 | Id | Default | What it does |
 | --- | --- | --- |
-| `style` | on | Vale, glossary/acronyms, `long_sentence` / `hedge_words` / `passive_voice`, plus academic discourse (`weasel_citation`, `hype_copy`, `chatbot_residue`, `marketing_closer`, `discourse_scaffold`). Glossary `suggested` and obvious Vale swaps are deterministic. Discourse is comments (chatbot leftovers may drop) |
-| `cites` | off | Bibliography locators. Cite keys only from the extract/pack. Retracted / withdrawn / EoC cites are comments, never deletes |
+| `style` | on | Vale, glossary/acronyms, `long_sentence` / `hedge_words` / `passive_voice`, plus academic discourse (`weasel_citation`, `hype_copy`, `chatbot_residue`, `marketing_closer`, `discourse_scaffold`) and unquoted library overlap (`text_overlap`). Glossary `suggested` and obvious Vale swaps are deterministic. Discourse and overlap are comments (chatbot leftovers may drop). Overlap comments name a held item key and pages; they do not insert a cite |
+| `cites` | off | Bibliography locators. Cite keys only from the extract/pack. Retracted / withdrawn / EoC cites are comments, never deletes. `text_overlap` comments also run here if style is off |
 | `structure` | off | Missing section headings, float caption/mention, missing ethics/data mentions. No invented results |
 | `comments` | off | Suggested findings and reviewer notes as comments on a unique span or heading |
 
-Always skip: dismissed rows, direct quotations, overlap, AI-tells / Binoculars,
+Always skip: dismissed rows, direct quotations, AI-tells / Binoculars,
 PaperGuard, file-health, metrics summaries, identity lint, non-actionable praise.
 AI-tell codes stay skipped so Suggest edits is not a detector scrubber.
-Discourse hygiene is a separate checked lane.
+Discourse hygiene is a separate checked lane. Unquoted `text_overlap` is a
+**comment** on the copy (default style area, or cites if style is off): the
+library item key and pages, not an inserted `\cite{}`. That comment is not
+gated by `[rewrite].stock_comments`. See [peer-review overlap](peer-review.md).
 
 After edits, Paperful **sanitizes the copy** it writes (sidecar, tracked office,
 PDF): invisible Unicode, C2PA provenance parts, and token-tracker channels
@@ -154,8 +157,10 @@ drafts should not assume them. See [llm.md](llm.md).
 
 Advanced **Suggest edits** (next to Peer review; CLI is still `paperful rewrite`):
 pick a recent peer-review pack, optional replacement draft, area/output/comments
-controls, download the result. With no pack on disk, the page shows only
-**Run Peer review first** with an **Open Peer review** link.
+and copy-sanitizer controls, download the result. Default style comments include
+unquoted library overlap (`text_overlap`) when the pack has it. With no pack on
+disk, the page shows only **Run Peer review first** with an **Open Peer review**
+link.
 
 ## See also
 

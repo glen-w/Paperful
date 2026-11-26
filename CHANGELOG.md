@@ -6,6 +6,10 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.9.9.2 — 2026-11-26
+
+- **Overlap attribution comments.** Unquoted distinctive spans that also appear in a held PDF (`state/rag/text/`) keep `text_overlap`, now with a page locator and a quote/cite/review action. Suggest edits comments the copy with the library item key; it does not insert a citation. Quoted passages are skipped. Still flags to review, not a verdict.
+
 ## 1.9.9 — 2026-11-26
 
 - **Academic discourse + copy sanitizer.** Peer-review checks weasel/hype/chatbot leftovers (`[peer_review].discourse`, default on; `--no-discourse`). Suggest edits comments those findings (chatbot leftovers may drop), adds a freeze FACTS block, and drops edits that introduce stock phrases. After writing copies, rewrite strips invisible Unicode, C2PA parts, and token-tracker channels (`--sanitize` / layer flags). Never the source; not a commercial-detector bypass. Example Vale pack `styles/PaperfulAi`.

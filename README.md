@@ -85,8 +85,8 @@ machine can run it, or hosted APIs via
 
 | Tool | What it does | Guide |
 | --- | --- | --- |
-| [Peer review](docs/peer-review.md) ⚙️ | A draft you already wrote: structure and citations always; optional claim locators against held PDFs; optional comparison with this library. Not a grade | [guide](docs/peer-review.md) |
-| [Suggest edits](docs/rewrite.md) ⚙️ | Apply a peer-review pack as locatable edits / tracked changes; never overwrites the source | [guide](docs/rewrite.md) |
+| [Peer review](docs/peer-review.md) ⚙️ | A draft you already wrote: structure and citations always; unquoted overlap vs held PDFs; optional academic discourse; optional claim locators. Not a grade | [guide](docs/peer-review.md) |
+| [Suggest edits](docs/rewrite.md) ⚙️ | Apply a peer-review pack as locatable edits / tracked changes; overlap comments name a held item (no cite insert); strip hidden trackers on the copy; never overwrites the source | [guide](docs/rewrite.md) |
 | [Stuff](docs/stuff.md) ⚙️ | Extra library cites per sentence or outline section (needs the index; no chat model) | [guide](docs/stuff.md) |
 
 New here: [first 10 minutes](docs/first-10-minutes.md).
@@ -138,7 +138,7 @@ No campus access: choose **Open access**. Campus library login: choose
 [Configuration](docs/config.md).
 
 ```sh
-git clone --branch v1.9.9 https://github.com/glen-w/Paperful.git
+git clone --branch v1.9.9.2 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
 mkdir -p ../paperful-data ../paperful-out
@@ -155,7 +155,7 @@ Compose reads `config.toml` from `PAPERFUL_DATA` and the PDF mirror from
 next to `compose.yaml`. Where those files live, and what the first health
 check means if Zotero is not open yet: [Docker](docs/docker.md).
 
-The guide and this README track `main`. `pip` and the `v1.9.9` tag are the
+The guide and this README track `main`. `pip` and the `v1.9.9.2` tag are the
 current release.
 
 The same jobs from the command line: [Commands](docs/commands.md).

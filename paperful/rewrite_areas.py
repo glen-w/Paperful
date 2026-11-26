@@ -28,6 +28,7 @@ STYLE_CODES = frozenset(
         "hedge_words",
         "passive_voice",
         *DISCOURSE_CODES,
+        "text_overlap",
     }
 )
 CITES_CODES = frozenset(
@@ -35,6 +36,7 @@ CITES_CODES = frozenset(
         "cite_not_in_bibliography",
         "bibliography_not_cited",
         "cited_not_in_library",
+        "text_overlap",
     }
 )
 STRUCTURE_CODES = frozenset(
@@ -60,6 +62,7 @@ STYLE_COMMENT_CODES = frozenset(
         "hype_copy",
         "marketing_closer",
         "discourse_scaffold",
+        "text_overlap",
     }
 )
 SKIP_CODES = frozenset(
@@ -68,7 +71,6 @@ SKIP_CODES = frozenset(
         "empty_extract",
         "short_pdf",
         "skipped_not_pdf",
-        "text_overlap",
         "overlap_skipped_no_text",
         "ai_tell",
         "ai_tell_summary",

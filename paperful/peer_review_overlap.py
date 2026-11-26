@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Iterable
@@ -34,6 +34,7 @@ class OverlapHit:
     n_words: int
     source: str  # phrase | rag_hybrid
     other_loc: str = ""
+    source_quote: str = ""
 
 
 def _tokens(text: str) -> list[str]:
@@ -306,7 +307,9 @@ def overlap_findings(
         if ident not in seen:
             hits.append(h)
             seen.add(ident)
-    return collapse_nested_hits(hits, target_text=doc.text), ""
+    collapsed = collapse_nested_hits(hits, target_text=doc.text)
+    pages = load_library_pages(cfg, exclude_key=exclude_key, keys=scope_keys)
+    return annotate_hit_locators(collapsed, pages), ""
 
 
 def _span_in(hay: str, phrase: str) -> tuple[int, int] | None:
@@ -317,6 +320,88 @@ def _span_in(hay: str, phrase: str) -> tuple[int, int] | None:
     if i < 0:
         return None
     return i, i + len(needle)
+
+
+def original_span_for_phrase(text: str, phrase: str) -> tuple[int, int] | None:
+    """First token-aligned span of ``phrase`` in ``text``, or None."""
+    words = _tokens(phrase)
+    n = len(words)
+    if n < 1 or not text:
+        return None
+    spans = [(m.start(), m.end(), m.group(0).lower()) for m in _TOKEN.finditer(text)]
+    if len(spans) < n:
+        return None
+    for i in range(0, len(spans) - n + 1):
+        if all(spans[i + j][2] == words[j] for j in range(n)):
+            return spans[i][0], spans[i + n - 1][1]
+    return None
+
+
+def unquoted_span_for_phrase(text: str, phrase: str) -> tuple[int, int] | None:
+    """First occurrence of ``phrase`` that is not entirely inside quotes."""
+    from .peer_review_direct_quotes import span_in_direct_quote
+
+    words = _tokens(phrase)
+    n = len(words)
+    if n < 1 or not text:
+        return None
+    spans = [(m.start(), m.end(), m.group(0).lower()) for m in _TOKEN.finditer(text)]
+    if len(spans) < n:
+        return None
+    for i in range(0, len(spans) - n + 1):
+        if not all(spans[i + j][2] == words[j] for j in range(n)):
+            continue
+        start, end = spans[i][0], spans[i + n - 1][1]
+        if not span_in_direct_quote(text, start, end):
+            return start, end
+    return None
+
+
+def locate_phrase_in_pages(
+    pages: Iterable[tuple[int, str]],
+    phrase: str,
+) -> tuple[str, str]:
+    """Page locator ``p. N`` and a substring of that page that matches ``phrase``."""
+    for num, raw in pages:
+        span = original_span_for_phrase(raw, phrase)
+        if span is None:
+            continue
+        quote = raw[span[0] : span[1]].strip()
+        if not quote:
+            continue
+        return f"p. {num}", quote
+    return "", ""
+
+
+def overlap_action(hit: OverlapHit) -> str:
+    """``quote`` / ``cite`` when the library page contains the span; else ``review``."""
+    if not (hit.source_quote or "").strip():
+        return "review"
+    if hit.n_words >= 20:
+        return "quote"
+    return "cite"
+
+
+def group_overlap_action(group: list[OverlapHit]) -> str:
+    exact = [h for h in group if (h.source_quote or "").strip()]
+    if not exact:
+        return "review"
+    if max(h.n_words for h in exact) >= 20:
+        return "quote"
+    return "cite"
+
+
+def annotate_hit_locators(
+    hits: list[OverlapHit],
+    pages_by_key: dict[str, list[tuple[int, str]]],
+) -> list[OverlapHit]:
+    """Fill ``other_loc`` / ``source_quote`` from stored pages when the phrase occurs."""
+    for h in hits:
+        loc, quote = locate_phrase_in_pages(pages_by_key.get(h.other_key, ()), h.ngram)
+        if quote:
+            h.source_quote = quote
+            h.other_loc = loc or h.other_loc
+    return hits
 
 
 def collapse_nested_hits(

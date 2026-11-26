@@ -41,7 +41,7 @@ or PaperGuard detectors; docs credit the patterns.
 | Prose | checked | `long_sentence` (≥40 words), `hedge_words`, `passive_voice` (`info` only). Skips direct quotations (quoted spans and `>` block lines) |
 | Metrics | checked | `readability_summary` (Flesch / Fog / ARI), `lexical_diversity_summary` (TTR / MTLD / hapax). Academic FRE is often 0–30; that is expected, not a defect |
 | Heuristic AI-prose tells | suggested | `ai_tell`, `ai_tell_summary`, `ai_tells_abstain` (abstain below 150 words). Formal academic English often looks “smooth” on the same signals |
-| Library text overlap | checked | `text_overlap` (distinctive n-grams vs `state/rag/text/`); `overlap_skipped_no_text` |
+| Library text overlap | checked | `text_overlap` (unquoted distinctive n-grams vs `state/rag/text/`, with page locator and quote/cite/review action); `overlap_skipped_no_text`. Spans already in quotation marks are skipped. Flags to review, not a plagiarism verdict |
 | House style (optional Vale) | checked | `vale_*` from your `.vale.ini` rules; alerts inside direct quotations are dropped; `vale_unavailable` / `vale_no_config` / `vale_failed` / `vale_truncated` when the extra is on |
 | Forensics (optional PaperGuard) | suggested | `paperguard_*` from `paperguard scan` (`--forensics`); skip codes `paperguard_unavailable` / `paperguard_no_input` / `paperguard_failed` / `paperguard_truncated`; not a misconduct verdict |
 
@@ -53,9 +53,20 @@ When online, tortured-phrase and other PPS fingerprints run on the **peer-review
 extract** for both `--item` and `--file` (same `[screen].detectors` and
 `tortured_min` as screen).
 
-Overlap is **flags to review**, not a plagiarism verdict. Boilerplate that
-appears in many library texts is dropped. A large `-C` (or `--library`) scores
-those n-grams with a one-pass inverted n-min index on CPU. Do not narrate misconduct.
+Overlap is **flags to review**, not a plagiarism verdict. Unquoted spans get a
+held-item page locator and a quote/cite/review action; quoted passages are
+skipped. Suggest edits comments the copy with that item key and does not insert
+a citation. Boilerplate that appears in many library texts is dropped. A large
+`-C` (or `--library`) scores those n-grams with a one-pass inverted n-min index
+on CPU. Do not narrate misconduct.
+
+| Action | When |
+| --- | --- |
+| `cite` | Distinctive span also in a held PDF page (default n-gram window, under 20 words) |
+| `quote` | Long overlap (`n_words` ≥ 20) with an exact page quote |
+| `review` | Hybrid near-match without an exact quote in stored page text |
+
+Needs `state/rag/text/` (`rag ingest`). `overlap_skipped_no_text` when that cache is empty. Pack `overlap` rows carry `other_key`, `other_loc`, `source_quote`, and `action`. Extra cites that are only similar, not overlapping, stay on [`stuff`](stuff.md).
 
 ## CLI
 
@@ -548,7 +559,9 @@ Library item form also has force-LLM past identity lint. **Write child note** is
 only). **Show dismissed** is `--show-dismissed`. **AI model** is `--ai-model`.
 **Vale** is `--vale`. The Vale checkbox is not pre-checked; `[peer_review].vale =
 true` still runs the pass even if the box is empty. **Forensics (PaperGuard)**
-is `--forensics` (same on-switch pattern). Uploads have no apply /
+is `--forensics` (same on-switch pattern). Extra collections (and the header
+chip) are the unquoted-overlap corpus when `state/rag/text/` exists.
+Uploads have no apply /
 force / dismissed controls. To turn a pack into tracked changes in a copy of
 the Word file, use workbench **Suggest edits** ([`rewrite`](rewrite.md);
 CLI `paperful rewrite`).

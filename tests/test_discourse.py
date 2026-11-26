@@ -16,6 +16,8 @@ def test_discourse_codes_are_style_comments_except_chatbot():
     assert "chatbot_residue" not in STYLE_COMMENT_CODES
     assert "ai_tell" in SKIP_CODES
     assert "weasel_citation" not in SKIP_CODES
+    assert "text_overlap" not in SKIP_CODES
+    assert "text_overlap" in STYLE_COMMENT_CODES
 
 
 def test_weasel_without_cite_and_hype_and_chatbot():
