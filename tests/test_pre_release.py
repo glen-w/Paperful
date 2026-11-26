@@ -61,6 +61,19 @@ def _project_version() -> str:
     raise AssertionError("pyproject.toml has no version")
 
 
+def test_dist_only_accepts_four_part_version(tmp_path: Path) -> None:
+    version = "1.9.9.2"
+    (tmp_path / "pyproject.toml").write_text(f'version = "{version}"\n', encoding="utf-8")
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / f"paperful-{version}-py3-none-any.whl").write_bytes(b"x")
+    (dist / f"paperful-{version}.tar.gz").write_bytes(b"x")
+
+    proc = _run("--dist-only", root=tmp_path)
+    assert proc.returncode == 0, proc.stderr + proc.stdout
+    assert "stale dist artifact" not in proc.stderr + proc.stdout
+
+
 def test_dist_only_accepts_matching_version(tmp_path: Path) -> None:
     version = _project_version()
     dist = tmp_path / "dist"

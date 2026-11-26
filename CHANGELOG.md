@@ -9,6 +9,7 @@ may still be added). See [releases](docs/releases.md).
 ## 1.9.9.2 — 2026-11-26
 
 - **Overlap attribution comments.** Unquoted distinctive spans that also appear in a held PDF (`state/rag/text/`) keep `text_overlap`, now with a page locator and a quote/cite/review action. Suggest edits comments the copy with the library item key; it does not insert a citation. Quoted passages are skipped. Still flags to review, not a verdict.
+- **Publish dist check.** `pre_release.sh --dist-only` reads the full numeric version from wheel/sdist names (`1.9.9.2`), not only the first three dotted groups.
 
 ## 1.9.9 — 2026-11-26
 

@@ -417,6 +417,7 @@ off this script.
 
 `uv publish` uploads **every** file in `dist/` unless you pass explicit paths.
 `pre_release.sh` fails if `dist/` contains wheels or sdists for an older
-version than `pyproject.toml`.
+version than `pyproject.toml`. The name parser keeps every numeric release
+segment (`1.9.9` and `1.9.9.2`), not only `X.Y.Z`.
 
 Confirm: `pip install paperful==<version>` and `paperful --help`.

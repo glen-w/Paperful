@@ -73,7 +73,9 @@ check_assessment() {
 
 artifact_version() {
   local base="${1##*/}"
-  if [[ "$base" =~ ^paperful-([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+  # PEP 440 numeric release: 1.9.9 or 1.9.9.2. Do not stop at three dots —
+  # paperful-1.9.9.2.whl would otherwise parse as 1.9.9.
+  if [[ "$base" =~ ^paperful-([0-9]+(\.[0-9]+)*)(-py3-none-any\.whl|\.tar\.gz)$ ]]; then
     echo "${BASH_REMATCH[1]}"
     return 0
   fi
