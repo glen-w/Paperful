@@ -233,6 +233,59 @@ def test_hedge_words_are_comment_only(cfg, tmp_path: Path):
     assert all(e["kind"] == "comment" for e in edits)
 
 
+def test_chatbot_residue_drops_phrase(cfg, tmp_path: Path):
+    src = tmp_path / "draft.md"
+    src.write_text("In conclusion, the basin is mixed.\n", encoding="utf-8")
+    finding = _finding(
+        code="chatbot_residue",
+        quote="In conclusion,",
+        detail="drop leftover",
+        extra={"drop": True, "suggested": ""},
+        source="discourse",
+    )
+    pack = _pack([finding], path=str(src))
+    result = build_rewrite(
+        cfg,
+        pack=pack,
+        manuscript=src,
+        areas=("style",),
+        outputs=("edits",),
+        dry_run=True,
+        llm_client=None,
+    )
+    edits = (result.get("plan") or {}).get("edits") or []
+    assert edits
+    assert edits[0]["kind"] == "replace"
+    assert edits[0]["replacement"] == ""
+
+
+def test_ai_tell_is_skipped(cfg, tmp_path: Path):
+    src = tmp_path / "draft.md"
+    src.write_text("We delve into the basin.\n", encoding="utf-8")
+    finding = _finding(
+        code="ai_tell",
+        quote="delve into",
+        detail="stock phrase",
+        extra={},
+        lane="suggested",
+        source="ai_tells",
+    )
+    pack = _pack([finding], path=str(src))
+    result = build_rewrite(
+        cfg,
+        pack=pack,
+        manuscript=src,
+        areas=("style", "comments"),
+        outputs=("edits",),
+        dry_run=True,
+        llm_client=None,
+    )
+    edits = (result.get("plan") or {}).get("edits") or []
+    skips = (result.get("plan") or {}).get("skips") or []
+    assert not edits
+    assert any(s.get("reason") == "not_actionable" for s in skips)
+
+
 def test_retracted_cite_is_comment_not_delete(cfg, tmp_path: Path):
     src = tmp_path / "draft.md"
     src.write_text("We cite Retracted Work (2018) throughout.\n", encoding="utf-8")

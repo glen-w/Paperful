@@ -1,0 +1,10 @@
+extends: existence
+message: "Chatbot leftover '%s'. Drop or recast in academic register."
+level: warning
+ignorecase: true
+tokens:
+  - in conclusion
+  - in summary
+  - i hope this helps
+  - as an AI language model
+  - great question

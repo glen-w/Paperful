@@ -76,6 +76,7 @@ KNOWN_SECTIONS = frozenset(
         "snowball",
         "authorwatch",
         "keepup",
+        "metrics",
         "inbox",
         "ingest",
         "gaps",
@@ -157,4 +158,29 @@ def check_config(path: Path | None = None) -> list[str]:
         issues.append(
             "core_api_key is set in config.toml; use CORE_API_KEY in the environment"
         )
+    metrics = raw.get("metrics")
+    if isinstance(metrics, dict) and "sources" in metrics:
+        from .metrics import IMPLEMENTED_SOURCES, RESERVED_SOURCES
+
+        raw_sources = metrics.get("sources")
+        names: list[str] = []
+        if isinstance(raw_sources, str):
+            names = [raw_sources]
+        elif isinstance(raw_sources, list):
+            names = [str(v) for v in raw_sources]
+        for name in names:
+            key = str(name).strip().lower()
+            if not key:
+                continue
+            if key == "google_scholar":
+                issues.append(
+                    "[metrics].sources lists google_scholar; that source is not "
+                    "implemented (Google Scholar stays out of metrics)"
+                )
+            elif key in RESERVED_SOURCES:
+                issues.append(
+                    f"[metrics].sources lists {key}; reserved and ignored until wired"
+                )
+            elif key not in IMPLEMENTED_SOURCES:
+                issues.append(f"[metrics].sources unknown source {key!r}")
     return issues

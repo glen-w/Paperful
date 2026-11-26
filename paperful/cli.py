@@ -259,6 +259,16 @@ keepup_app = typer.Typer(
     ),
 )
 app.add_typer(keepup_app, name="keepup")
+metrics_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help=(
+        "Citation counts for items already in the library (OpenAlex, then Crossref). "
+        "Writes state/metrics/. Does not write Extra or tags. "
+        "Google Scholar is not a source."
+    ),
+)
+app.add_typer(metrics_app, name="metrics")
 
 
 class _SearchGroup(TyperGroup):
@@ -391,6 +401,7 @@ JOBS: dict[str, tuple[str, ...]] = {
         "summarize",
         "extract-sections",
         "evidence",
+        "metrics",
         "synthesize",
         "rag",
         "ask",

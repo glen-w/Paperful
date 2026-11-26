@@ -60,6 +60,7 @@ from .page_common import (
     library_item_rows,
     library_items_page,
     library_page_from_request,
+    library_sort_from_request,
     library_page_size_options,
     library_per_page_from_request,
     nest_collection_rows,

@@ -138,7 +138,7 @@ No campus access: choose **Open access**. Campus library login: choose
 [Configuration](docs/config.md).
 
 ```sh
-git clone --branch v1.9.8 https://github.com/glen-w/Paperful.git
+git clone --branch v1.9.9 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
 mkdir -p ../paperful-data ../paperful-out
@@ -155,7 +155,7 @@ Compose reads `config.toml` from `PAPERFUL_DATA` and the PDF mirror from
 next to `compose.yaml`. Where those files live, and what the first health
 check means if Zotero is not open yet: [Docker](docs/docker.md).
 
-The guide and this README track `main`. `pip` and the `v1.9.8` tag are the
+The guide and this README track `main`. `pip` and the `v1.9.9` tag are the
 current release.
 
 The same jobs from the command line: [Commands](docs/commands.md).

@@ -10,6 +10,15 @@ KNOWN_AREAS = ("style", "cites", "structure", "comments")
 KNOWN_OUTPUTS = ("edits", "sidecar", "tracked", "odt", "pdf")
 KNOWN_COMMENTS = ("off", "substantive", "all")
 
+DISCOURSE_CODES = frozenset(
+    {
+        "weasel_citation",
+        "hype_copy",
+        "chatbot_residue",
+        "marketing_closer",
+        "discourse_scaffold",
+    }
+)
 STYLE_CODES = frozenset(
     {
         "acronym_undefined",
@@ -18,6 +27,7 @@ STYLE_CODES = frozenset(
         "long_sentence",
         "hedge_words",
         "passive_voice",
+        *DISCOURSE_CODES,
     }
 )
 CITES_CODES = frozenset(
@@ -42,7 +52,16 @@ COMMENT_ONLY_CODES = frozenset(
         "cited_expression_of_concern",
     }
 )
-STYLE_COMMENT_CODES = frozenset({"hedge_words", "passive_voice"})
+STYLE_COMMENT_CODES = frozenset(
+    {
+        "hedge_words",
+        "passive_voice",
+        "weasel_citation",
+        "hype_copy",
+        "marketing_closer",
+        "discourse_scaffold",
+    }
+)
 SKIP_CODES = frozenset(
     {
         "needs_ocr",

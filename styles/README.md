@@ -9,6 +9,7 @@ them is an official journal package.
 | [`JMLC`](JMLC/) | Journal of Money Laundering Control (Emerald) | Harvard author–year |
 | [`JCP`](JCP/) | Journal of Cleaner Production (Elsevier) | Author–year |
 | [`MarinePolicy`](MarinePolicy/) | Marine Policy (Elsevier) | Numbered `[1]` |
+| [`PaperfulAi`](PaperfulAi/) | Promotional / chatbot leftovers | Not venue-specific |
 
 Do not enable `JCP` and `MarinePolicy` together (citation styles conflict).
 
@@ -18,6 +19,7 @@ Copy one example ini to the paperful config directory:
 cp styles/JMLC/vale.ini.example .vale.ini
 # or: cp styles/JCP/vale.ini.example .vale.ini
 # or: cp styles/MarinePolicy/vale.ini.example .vale.ini
+# or: cp styles/PaperfulAi/vale.ini.example .vale.ini
 ```
 
 Then `[peer_review].vale = true` or `paperful peer-review --vale`. See

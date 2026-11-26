@@ -266,6 +266,7 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[peer_review].lanes` | `[]` | Suggested review lanes to run together: `reviewers`, `marg`, `adversary`, `outline`, `claims`, `verify`, `context`, `context-web`. Empty → use `llm` / `advanced` shims. When non-empty those bools are ignored. `--lane` selects for one run |
 | `[peer_review].tag` | `paperful-peer-review` | Child note tag for `peer-review --apply` |
 | `[peer_review].ai_model` | `false` | Optional Binoculars extra (`uv pip install "binoculars @ git+https://github.com/ahans30/Binoculars.git"`). `--ai-model` turns it on for one run (no `--no-ai-model`). Missing extra records `ai_model_unavailable`. `paperful doctor` ambers only when this is on and the extra is missing |
+| `[peer_review].discourse` | `true` | Academic weasel / hype / chatbot leftovers (checked). `--discourse` / `--no-discourse`. Not an authorship detector. Example Vale pack: `styles/PaperfulAi` |
 | `[peer_review].vale` | `false` | Optional Vale house-style pass. `--vale` turns it on for one run (no `--no-vale`). Needs `vale` on PATH and a `.vale.ini`; missing extra records `vale_unavailable` / `vale_no_config` / `vale_failed`. Not in the Compose image |
 | `[peer_review].vale_config` | unset | Path to your `.vale.ini`. Relative paths resolve from the config file. If unset, `.vale.ini` next to the paperful config is used when present. Example inis: `styles/JMLC/vale.ini.example`, `styles/JCP/vale.ini.example`, `styles/MarinePolicy/vale.ini.example` (see [peer_review](peer-review.md#example-vale-styles)) |
 | `[peer_review].vale_min_alert_level` | `suggestion` | Lowest Vale level to keep: `suggestion`, `warning`, or `error` |
@@ -302,6 +303,17 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[rewrite].timeout_s` | `0` | Wall clock for LLM specialists (`0` → `max([llm].timeout_s, 600)`) |
 | `[rewrite].openxml_audit` | `false` | After writing `tracked.docx` / `.pptx` / `.odt`, run [openxml-audit](https://pypi.org/project/openxml-audit/) (`uv sync --extra openxml`). Diffs vs the source draft; pre-existing SDK / ODF errors are ignored. `paperful doctor` ambers only when this is on and the extra is missing |
 | `[rewrite].openxml_audit_policy` | `warn` | `warn` (print, exit 0) or `fail` (exit 1 when rewrite introduced an issue) |
+| `[rewrite].sanitize` | `true` | Strip hidden trackers on rewrite **copies** (`--sanitize` / `--no-sanitize`). Never the source |
+| `[rewrite].sanitize_invisible` | `true` | Purge zero-width / bidi / Unicode tag characters |
+| `[rewrite].sanitize_c2pa` | `true` | Strip C2PA parts from office/PDF copies |
+| `[rewrite].sanitize_trackers` | `true` | Homoglyph fold + closed-class token shatter (`--tracker-scope edited\|all`) |
+| `[rewrite].tracker_scope` | `edited` | `edited` (plan paragraphs) or `all` (whole copy) |
+| `[rewrite].tracker_rate` | `0.08` | Fraction of eligible closed-class tokens to swap |
+| `[rewrite].tracker_prose` | `true` | Extra LLM pass on already-edited paragraphs when `[llm]` is on |
+| `[rewrite].facts_worklog` | `true` | Freeze list (`«PF…»`) in the rewrite prompt |
+| `[rewrite].tell_regression` | `true` | Drop body edits that **introduce** stock phrases |
+| `[rewrite].critic` | `false` | Optional LLM pass that may only reject edits |
+| `[rewrite].stock_comments` | `true` | Discourse findings as comments (except chatbot drops) |
 | `[[rewrite.specialists]]` | builtin per enabled area | `id`, optional `model` (empty → `[llm].model`), `prompt` (`default` or a path). Separate key from `areas` (TOML) |
 | `[peer_review].overlap_top_k` | `40` | Distinctive n-grams ranked for library text overlap |
 | `[peer_review].overlap_n_min` / `overlap_n_max` | `6` / `12` | Word n-gram window |
@@ -341,6 +353,9 @@ networking, and troubleshooting: [LLM](llm.md).
 | `[inbox].manager_metadata_s` | `0` | Wait after attach so a manager recognizer can run (`0` when the backend has none) |
 | `[ingest].default_tags` | `()` | Tags on `ingest-dois --apply` and inbox-created parents |
 | `[keepup].interval_days` | `7` | Default days between `keepup run` polls (`0` = every run). Per-job `--interval-days` overrides. No built-in scheduler — cron `keepup run`. See [Keepup](keepup.md) |
+| `[metrics].stale_days` | `30` | Skip `metrics refresh` rows fetched this recently (`0` = always fetch). CLI `--stale-days`. See [metrics](metrics.md) |
+| `[metrics].sources` | `openalex`, `crossref` | Lookup order. `google_scholar` is refused by `config check`. `semantic_scholar` and `alphaxiv` are reserved and ignored |
+| `[metrics].note_tag` | `paperful-metrics` | Child-note tag for `metrics refresh --apply` (update in place) |
 | `[precedent].held_k` | `10` | Held RAG passages kept by `paperful precedent`. CLI `--held-k` / `-k` overrides |
 | `[precedent].public_k` | `25` | OpenAlex / similar works kept. CLI `--public-k` overrides |
 | `[precedent].search_keywords` | `true` | Also resolve OpenAlex keyword tags for the phrase (same union as snowball search) |

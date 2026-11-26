@@ -30,6 +30,7 @@ PREFIX = {
     "screen": "Screen",
     "capture": "Capture",
     "peer-review": "Peer review",
+    "citations": "Citations",
 }
 
 

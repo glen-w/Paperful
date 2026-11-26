@@ -54,6 +54,7 @@ def apply_nested_tables(raw: dict[str, Any], cfg: "Config", source: Path) -> Non
     apply_searxng(raw, cfg)
     apply_search(raw, cfg)
     apply_keepup(raw, cfg)
+    apply_metrics(raw, cfg)
     apply_precedent(raw, cfg)
     apply_stuff(raw, cfg)
     apply_ui(raw, cfg)
@@ -188,6 +189,7 @@ def apply_peer_review(raw: dict[str, Any], cfg: "Config") -> None:
                 lambda v: max(1000, int(v)),
             ),
             ("ai_model", "peer_review_ai_model", bool),
+            ("discourse", "peer_review_discourse", bool),
             ("vale", "peer_review_vale", bool),
             ("forensics", "peer_review_forensics", bool),
             ("glossary", "peer_review_glossary", bool),
@@ -348,8 +350,26 @@ def apply_rewrite(raw: dict[str, Any], cfg: "Config") -> None:
                 "rewrite_openxml_audit_policy",
                 parse_openxml_audit_policy,
             ),
+            ("sanitize", "rewrite_sanitize", bool),
+            ("sanitize_invisible", "rewrite_sanitize_invisible", bool),
+            ("sanitize_c2pa", "rewrite_sanitize_c2pa", bool),
+            ("sanitize_trackers", "rewrite_sanitize_trackers", bool),
+            (
+                "tracker_rate",
+                "rewrite_tracker_rate",
+                lambda v: min(1.0, max(0.0, float(v))),
+            ),
+            ("tracker_prose", "rewrite_tracker_prose", bool),
+            ("facts_worklog", "rewrite_facts_worklog", bool),
+            ("tell_regression", "rewrite_tell_regression", bool),
+            ("critic", "rewrite_critic", bool),
+            ("stock_comments", "rewrite_stock_comments", bool),
         ],
     )
+    if "tracker_scope" in table:
+        from .rewrite_sanitize import parse_tracker_scope
+
+        cfg.rewrite_tracker_scope = parse_tracker_scope(table.get("tracker_scope"))
     if "areas" in table:
         cfg.rewrite_areas = parse_rewrite_areas_list(table.get("areas"))
     if "outputs" in table:
@@ -1010,6 +1030,27 @@ def apply_keepup(raw: dict[str, Any], cfg: "Config") -> None:
         return
     if "interval_days" in keepup:
         cfg.keepup_interval_days = max(0, int(keepup["interval_days"]))
+
+
+def apply_metrics(raw: dict[str, Any], cfg: "Config") -> None:
+    C = _mod()
+    section = raw.get("metrics")
+    if not isinstance(section, dict):
+        return
+    C._apply_config_table(
+        section,
+        cfg,
+        [
+            ("stale_days", "metrics_stale_days", lambda v: max(0, int(v))),
+            (
+                "note_tag",
+                "metrics_note_tag",
+                lambda v: str(v).strip() or "paperful-metrics",
+            ),
+        ],
+    )
+    if "sources" in section:
+        cfg.metrics_sources = C._snowball_strs(section["sources"])
 
 
 def apply_precedent(raw: dict[str, Any], cfg: "Config") -> None:

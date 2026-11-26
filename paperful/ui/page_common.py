@@ -109,6 +109,13 @@ def _library_item_sort_key(item: Any) -> tuple[int, str]:
     return (item.year or 9999, (item.title or "").lower())
 
 
+def library_sort_from_request(request: Any) -> str:
+    raw = str(getattr(request, "query_params", {}).get("sort") or "").strip().lower()
+    if raw == "citations":
+        return "citations"
+    return "year"
+
+
 def library_page_size_options(cfg: Config) -> tuple[int, ...]:
     from ..config import normalize_ui_library_page_sizes
 
@@ -187,17 +194,25 @@ def pagination_meta(
 
 
 def library_item_rows(
-    cfg: Config, items: list[Any], manifest: Manifest
+    cfg: Config,
+    items: list[Any],
+    manifest: Manifest,
+    *,
+    cache: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
+    from ..metrics import cited_by_count_for
+
     rows: list[dict[str, Any]] = []
-    for item in sorted(items, key=_library_item_sort_key):
+    metrics = cache if cache is not None else {}
+    for item in items:
         rec = manifest.records.get(item.key)
         base = _item_row_base(cfg, item)
         has_pdf = bool(
             item.has_pdf
             or (rec is not None and rec.status in {STATUS_OK, STATUS_ATTACHED})
         )
-        rows.append({**base, "has_pdf": has_pdf})
+        cited = cited_by_count_for(metrics.get(item.key) if metrics else None)
+        rows.append({**base, "has_pdf": has_pdf, "cited_by_count": cited})
     return rows
 
 
@@ -208,13 +223,26 @@ def library_items_page(
     *,
     page: int,
     per_page: int,
+    sort: str = "year",
 ) -> tuple[list[dict[str, Any]], int, int, int]:
     """Return rows for one page plus total count and clamped page index."""
-    sorted_items = sorted(items, key=_library_item_sort_key)
+    from ..metrics import cited_by_count_for, load_cache
+
+    cache = load_cache(cfg)
+    if sort == "citations":
+
+        def _cite_key(item: Any) -> tuple[int, int, str]:
+            cited = cited_by_count_for(cache.get(item.key))
+            rank = -1 if cited is None else cited
+            return (-rank, item.year or 9999, (item.title or "").lower())
+
+        sorted_items = sorted(items, key=_cite_key)
+    else:
+        sorted_items = sorted(items, key=_library_item_sort_key)
     chunk, total, page, page_count = paginate_rows(
         sorted_items, page=page, per_page=per_page
     )
-    rows = library_item_rows(cfg, chunk, manifest)
+    rows = library_item_rows(cfg, chunk, manifest, cache=cache)
     return rows, total, page, page_count
 
 

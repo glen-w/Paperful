@@ -1,0 +1,13 @@
+; Academic hygiene (promotional / chatbot leftovers). Not an AI detector.
+; Copy next to your paperful config as .vale.ini, or merge into an existing ini.
+;
+;   cp styles/PaperfulAi/vale.ini.example .vale.ini
+;   uv run paperful peer-review --file manuscript.docx --vale
+
+StylesPath = styles
+MinAlertLevel = suggestion
+
+[*]
+PaperfulAi.Hype = YES
+PaperfulAi.Chatbot = YES
+PaperfulAi.Weasel = YES

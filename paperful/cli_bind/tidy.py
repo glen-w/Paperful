@@ -154,6 +154,11 @@ def peer_review(
         "--vale",
         help="Optional Vale house-style pass (checked lane). Needs vale on PATH and a .vale.ini.",
     ),
+    discourse: bool | None = typer.Option(
+        None,
+        "--discourse/--no-discourse",
+        help="Academic discourse hygiene (weasel/hype/chatbot). Default: \\[peer_review].discourse (on).",
+    ),
     forensics: bool = typer.Option(
         False,
         "--forensics",
@@ -208,6 +213,7 @@ def peer_review(
         llm=llm,
         ai_model=ai_model,
         vale=vale,
+        discourse=discourse,
         forensics=forensics,
         advanced=advanced,
         lane=lane,
@@ -281,6 +287,31 @@ def rewrite(
         "--comments",
         help="Word comments: off, substantive, or all. Default: \\[rewrite].comments.",
     ),
+    sanitize: bool | None = typer.Option(
+        None,
+        "--sanitize/--no-sanitize",
+        help="Strip hidden trackers on the copy Paperful writes. Default: \\[rewrite].sanitize.",
+    ),
+    sanitize_invisible: bool | None = typer.Option(
+        None,
+        "--sanitize-invisible/--no-sanitize-invisible",
+        help="Purge zero-width / bidi / Unicode tag characters on the copy.",
+    ),
+    sanitize_c2pa: bool | None = typer.Option(
+        None,
+        "--sanitize-c2pa/--no-sanitize-c2pa",
+        help="Strip C2PA provenance parts from office/PDF copies.",
+    ),
+    sanitize_trackers: bool | None = typer.Option(
+        None,
+        "--sanitize-trackers/--no-sanitize-trackers",
+        help="Fold homoglyphs and perturb closed-class tokens on the copy.",
+    ),
+    tracker_scope: str | None = typer.Option(
+        None,
+        "--tracker-scope",
+        help="edited (default) or all. Statistical tracker shatter scope.",
+    ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Print the plan; do not write state/rewrites/."
     ),
@@ -298,6 +329,11 @@ def rewrite(
         area=area,
         output=output,
         comments=comments,
+        sanitize=sanitize,
+        sanitize_invisible=sanitize_invisible,
+        sanitize_c2pa=sanitize_c2pa,
+        sanitize_trackers=sanitize_trackers,
+        tracker_scope=tracker_scope,
         dry_run=dry_run,
         config=config,
         fmt=fmt,

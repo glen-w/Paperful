@@ -21,6 +21,7 @@ from .structure import (
     _pps_fingerprint_findings,
     _structure,
 )
+from .discourse import scan_discourse
 from .style import (
     _abstract_numbers,
     _checklists,
@@ -74,6 +75,9 @@ def run_checks(
     findings.extend(_stats(doc))
     findings.extend(_prose(doc))
     findings.extend(_style_metrics(doc))
+    if bool(getattr(cfg, "peer_review_discourse", True)):
+        say("Checkers: academic discourse")
+        findings.extend(scan_discourse(doc.text or "", doc))
 
     say("Checkers: PPS fingerprints (tortured phrases, etc.)")
     findings.extend(_pps_fingerprint_findings(cfg, client, doc.text, offline=offline))

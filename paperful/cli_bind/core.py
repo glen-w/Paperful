@@ -59,7 +59,7 @@ def jobs() -> None:
 
 @app.command()
 def mcp(config: Path | None = ConfigOpt) -> None:
-    """Optional stdio MCP: read-only gaps, snowball preview, export, refs_gap, ask, precedent, stuff."""
+    """Optional stdio MCP: read-only gaps, snowball preview, export, refs_gap, ask, precedent, stuff, metrics_show."""
     from paperful.mcp_server import serve_stdio
 
     serve_stdio(_cfg(config))

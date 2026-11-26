@@ -52,11 +52,12 @@ New here: [first 10 minutes](first-10-minutes.md). Click-through jobs:
 | [Index](rag.md) ⚙️ | Ingest the mirror, search passages, extract questions, see what is already answered, pull IMRaD-style sections | [guide](rag.md) |
 | [Claim check](rag.md#claim-check) | Per-sentence support vs the index (CLI `ask --claim-check`; no chat model) | [guide](rag.md#claim-check) |
 | [Evidence](evidence.md) | Sourced n / method / finding table over PDFs you hold; each cell is a quote or `check this`. No chat model. CLI only | [guide](evidence.md) |
+| [Metrics](metrics.md) | Citation counts for items already in the library (OpenAlex, then Crossref). Library column + `metrics refresh`. `--apply` writes a child note | [guide](metrics.md) |
 
 ## Check a draft
 
 | Tool | What it does | Guide |
 | --- | --- | --- |
-| [Peer review](peer-review.md) ⚙️ | A draft you already wrote: structure and citations always; optional claim locators against held PDFs; optional comparison with this library. Not a grade | [guide](peer-review.md) |
-| [Suggest edits](rewrite.md) ⚙️ | Apply a peer-review pack as locatable edits / tracked changes; never overwrites the source | [guide](rewrite.md) |
+| [Peer review](peer-review.md) ⚙️ | A draft you already wrote: structure and citations always; optional academic discourse hygiene; optional claim locators against held PDFs; optional comparison with this library. Not a grade | [guide](peer-review.md) |
+| [Suggest edits](rewrite.md) ⚙️ | Apply a peer-review pack as locatable edits / tracked changes; strip hidden trackers on the copy; never overwrites the source | [guide](rewrite.md) |
 | [Stuff](stuff.md) ⚙️ | Extra library cites per sentence or outline section (needs the index; no chat model) | [guide](stuff.md) |

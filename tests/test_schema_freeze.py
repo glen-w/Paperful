@@ -429,3 +429,17 @@ def test_grobid_tei_v1_keys_match_golden():
     )
     assert golden["schema"] == TEI_SCHEMA
     assert TEI_META_KEYS <= golden.keys()
+
+
+def test_metrics_v1_keys_match_golden():
+    from paperful.metrics import PACK_KEYS, PACK_SCHEMA, ROW_KEYS, SCHEMA
+
+    keys = json.loads((FIX / "metrics_v1" / "keys.json").read_text(encoding="utf-8"))
+    assert keys["row"] == sorted(ROW_KEYS)
+    assert keys["pack"] == sorted(PACK_KEYS)
+    row = json.loads((FIX / "metrics_v1" / "row.json").read_text(encoding="utf-8"))
+    pack = json.loads((FIX / "metrics_v1" / "pack.json").read_text(encoding="utf-8"))
+    assert row["schema"] == SCHEMA
+    assert pack["schema"] == PACK_SCHEMA
+    assert ROW_KEYS <= row.keys()
+    assert PACK_KEYS <= pack.keys()

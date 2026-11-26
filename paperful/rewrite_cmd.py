@@ -26,6 +26,11 @@ def run_rewrite(
     dry_run: bool,
     config: Path | None,
     fmt: str,
+    sanitize: bool | None = None,
+    sanitize_invisible: bool | None = None,
+    sanitize_c2pa: bool | None = None,
+    sanitize_trackers: bool | None = None,
+    tracker_scope: str | None = None,
 ) -> None:
     from . import cli_runtime as cli_mod
     from .agent_json import EXIT_OK, EXIT_PARTIAL, envelope
@@ -43,6 +48,24 @@ def run_rewrite(
     from .rewrite_areas import parse_rewrite_areas_list, parse_rewrite_outputs
 
     cfg = cli_mod._cfg(config)
+    if sanitize is not None:
+        cfg.rewrite_sanitize = bool(sanitize)
+    if sanitize_invisible is not None:
+        cfg.rewrite_sanitize_invisible = bool(sanitize_invisible)
+    if sanitize_c2pa is not None:
+        cfg.rewrite_sanitize_c2pa = bool(sanitize_c2pa)
+    if sanitize_trackers is not None:
+        cfg.rewrite_sanitize_trackers = bool(sanitize_trackers)
+    if tracker_scope is not None:
+        from .rewrite_sanitize import parse_tracker_scope
+
+        try:
+            cfg.rewrite_tracker_scope = parse_tracker_scope(tracker_scope)
+        except ValueError as exc:
+            from rich.markup import escape as _esc
+
+            console.print(f"[red]{_esc(str(exc))}[/]")
+            raise typer.Exit(1) from exc
     json_out = cli_mod._agent_json(fmt)
     item_keys = [k.strip() for k in item if k and k.strip()]
     has_pack = pack_path is not None

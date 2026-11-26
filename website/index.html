@@ -48,7 +48,7 @@
         "url": "https://paperful.app/",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Linux, macOS, Windows",
-        "softwareVersion": "1.9.8",
+        "softwareVersion": "1.9.9",
         "license": "https://opensource.org/licenses/MIT"
       }
     </script>
@@ -355,6 +355,11 @@
                   <td>Sourced n / method / finding table over PDFs you hold; each cell is a quote or <code>check this</code>. No chat model. CLI only</td>
                   <td><a href="./guide/evidence.html">guide</a></td>
                 </tr>
+                <tr>
+                  <td><a href="./guide/metrics.html">Metrics</a></td>
+                  <td>Citation counts for items already in the library (OpenAlex, then Crossref). Library column + <code>metrics refresh</code>. <code>--apply</code> writes a child note</td>
+                  <td><a href="./guide/metrics.html">guide</a></td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -372,12 +377,12 @@
               <tbody>
                 <tr>
                   <td><a href="./guide/peer-review.html">Peer review</a> ⚙️</td>
-                  <td>A draft you already wrote: structure and citations always; optional claim locators against held PDFs; optional comparison with this library. Not a grade</td>
+                  <td>A draft you already wrote: structure and citations always; optional academic discourse hygiene; optional claim locators against held PDFs; optional comparison with this library. Not a grade</td>
                   <td><a href="./guide/peer-review.html">guide</a></td>
                 </tr>
                 <tr>
                   <td><a href="./guide/rewrite.html">Suggest edits</a> ⚙️</td>
-                  <td>Apply a peer-review pack as locatable edits / tracked changes; never overwrites the source</td>
+                  <td>Apply a peer-review pack as locatable edits / tracked changes; strip hidden trackers on the copy; never overwrites the source</td>
                   <td><a href="./guide/rewrite.html">guide</a></td>
                 </tr>
                 <tr>
@@ -463,7 +468,7 @@ paperful serve                        # http://127.0.0.1:8765</code></pre>
             <code>uv tool</code> line was run on a Linux box;
             <code>pipx</code> is the same shape. Prefer a container:
           </p>
-          <pre class="code"><code>git clone --branch v1.9.8 https://github.com/glen-w/Paperful.git
+          <pre class="code"><code>git clone --branch v1.9.9 https://github.com/glen-w/Paperful.git
 cd Paperful
 cp .env.example .env
 mkdir -p ../paperful-data ../paperful-out
@@ -481,11 +486,11 @@ docker compose up</code></pre>
             <code>PAPERFUL_DATA=.</code> and <code>PAPERFUL_OUT=./out</code>,
             then copy <code>config.toml</code> next to <code>compose.yaml</code>.
             The guide and this page track <code>main</code>.
-            <code>pip</code> and the <code>v1.9.8</code> tag are the current
+            <code>pip</code> and the <code>v1.9.9</code> tag are the current
             release.
           </p>
           <p class="fine">
-            Omit <code>--branch v1.9.8</code> to track latest <code>main</code>.
+            Omit <code>--branch v1.9.9</code> to track latest <code>main</code>.
             <a href="./guide/docker.html">Docker</a>
             ·
             <a href="./guide/zotero.html">Zotero</a>
@@ -500,7 +505,7 @@ docker compose up</code></pre>
 
     <footer class="site-footer">
       <div class="wrap footer-inner">
-        <p><a href="https://glenwright.earth">© Glen Wright</a> · 1.9.8</p>
+        <p><a href="https://glenwright.earth">© Glen Wright</a> · 1.9.9</p>
         <p>
           <a href="./guide/legal-privacy.html">Legal / privacy</a>
         </p>

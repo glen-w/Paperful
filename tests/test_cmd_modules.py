@@ -25,6 +25,7 @@ from paperful import (
     inbox_cmd,
     ingest_cmd,
     keepup_cmd,
+    metrics_cmd,
     lint_cmd,
     mirrors_cmd,
     notes_delete_cmd,
@@ -140,6 +141,8 @@ ENTRIES = [
     ("snowball_run", snowball_cmd, "run_snowball_run", "snowball_cmd"),
     ("authorwatch_run", authorwatch_cmd, "run_authorwatch_run", "authorwatch_cmd"),
     ("keepup_run", keepup_cmd, "run_keepup_run", "keepup_cmd"),
+    ("metrics_refresh", metrics_cmd, "run_metrics_refresh", "metrics_cmd"),
+    ("metrics_show", metrics_cmd, "run_metrics_show", "metrics_cmd"),
 ]
 
 

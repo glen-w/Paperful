@@ -190,6 +190,7 @@ mirror_failures_before_skip = 3
 # lanes = []                       # reviewers, marg, adversary, outline, claims, verify, context, context-web (empty → llm/advanced shims)
 # tag = "paperful-peer-review"
 # ai_model = false                 # optional Binoculars extra (uv pip install git+https://github.com/ahans30/Binoculars.git); --ai-model turns on (no CLI off)
+# discourse = true                 # academic weasel/hype/chatbot leftovers; --no-discourse off
 # vale = false                     # optional Vale house style; --vale turns on (no CLI off)
 # vale_config = ".vale.ini"        # your house .vale.ini (relative to this file)
 #                                  # examples: cp styles/JMLC/vale.ini.example .vale.ini
@@ -257,6 +258,17 @@ mirror_failures_before_skip = 3
 # timeout_s = 0                    # 0 = max([llm].timeout_s, 600)
 # openxml_audit = false            # optional extra: uv sync --extra openxml (docx/pptx/odt)
 # openxml_audit_policy = "warn"    # warn | fail (diffs vs source; Word drafts may already fail SDK)
+# sanitize = true                  # strip hidden trackers on copies Paperful writes (never the source)
+# sanitize_invisible = true        # zero-width / bidi / Unicode tags
+# sanitize_c2pa = true             # C2PA provenance parts in office/PDF copies
+# sanitize_trackers = true         # homoglyph fold + closed-class token shatter
+# tracker_scope = "edited"         # edited | all
+# tracker_rate = 0.08
+# tracker_prose = true             # extra LLM pass on already-edited paragraphs when [llm] is on
+# facts_worklog = true             # freeze list in the rewrite prompt
+# tell_regression = true           # drop edits that introduce stock phrases
+# critic = false                   # optional LLM reject-only pass
+# stock_comments = true            # discourse findings as Word comments
 # [[rewrite.specialists]]
 # id = "style"
 # model = ""                       # empty → [llm].model
@@ -452,6 +464,14 @@ concurrency = 2
 # point cron at `paperful keepup run <name>`. Interval is also stored per job.
 # [keepup]
 # interval_days = 7
+
+# Citation counts for items already in the library (`paperful metrics refresh`).
+# Writes state/metrics/cache.json. Does not write Extra or tags.
+# Later names (semantic_scholar, alphaxiv, google_scholar) are reserved and ignored.
+# [metrics]
+# stale_days = 30
+# sources = ["openalex", "crossref"]
+# note_tag = "paperful-metrics"
 
 # Phrase → held PDF passages plus OpenAlex works not in the library.
 # Always dry-run. Empty public hits are a query/budget result, not novelty.

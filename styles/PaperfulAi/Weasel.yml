@@ -1,0 +1,11 @@
+extends: existence
+message: "Unattributed '%s'. Name the study or add a cite already in the manuscript."
+level: suggestion
+ignorecase: true
+tokens:
+  - studies show
+  - research suggests
+  - experts say
+  - it has been shown that
+  - the literature suggests
+  - scholars agree

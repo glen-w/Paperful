@@ -2,7 +2,8 @@
 
 Read-only tools: ``refs_gap``, ``gaps``, ``snowball_search``, ``snowball_trends``,
 ``export``, ``proposal_export``, ``ask``, ``precedent``, ``stuff``, ``sr_status``,
-and ``sr_prisma``. ``collections add`` is CLI-only. Prefer CLI ``--format json``.
+``sr_prisma``, and ``metrics_show``. ``collections add`` is CLI-only. Prefer CLI
+``--format json``. Refreshing counts is CLI/workbench only.
 """
 
 from __future__ import annotations
@@ -252,6 +253,23 @@ TOOLS = [
             "required": ["slug"],
         },
     },
+    {
+        "name": "metrics_show",
+        "description": (
+            "Cached citation count for one library item key. Read-only; no network. "
+            "Refresh with CLI paperful metrics refresh."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "item_key": {
+                    "type": "string",
+                    "description": "Library item key.",
+                }
+            },
+            "required": ["item_key"],
+        },
+    },
 ]
 
 
@@ -398,6 +416,29 @@ def call_sr_status(cfg: Config, slug: str) -> dict[str, Any]:
     return {"slug": slug, "counts": review_counts(cfg, slug)}
 
 
+def call_metrics_show(cfg: Config, item_key: str) -> dict[str, Any]:
+    from .agent_json import envelope
+    from .metrics import cache_path, show_cached
+
+    row = show_cached(cfg, item_key.strip())
+    if row is None:
+        return envelope(
+            command="metrics show",
+            summary={"found": 0},
+            items=[],
+            paths={"cache": str(cache_path(cfg))},
+            flags={"item_key": item_key},
+            exit_code=1,
+        )
+    return envelope(
+        command="metrics show",
+        summary={"found": 1, "cited_by_count": row.get("cited_by_count")},
+        items=[row],
+        paths={"cache": str(cache_path(cfg))},
+        flags={"item_key": item_key},
+    )
+
+
 def call_sr_prisma(cfg: Config, slug: str) -> dict[str, Any]:
     from .sr.prisma import prisma_svg
     from .sr.protocol import load_protocol
@@ -469,6 +510,8 @@ def handle_tools_call(
         body = call_sr_status(cfg, str(args.get("slug") or ""))
     elif name == "sr_prisma":
         body = call_sr_prisma(cfg, str(args.get("slug") or ""))
+    elif name == "metrics_show":
+        body = call_metrics_show(cfg, str(args.get("item_key") or ""))
     else:
         return _error(req_id, -32601, f"unknown tool {name}")
     return _result(req_id, _text(body))

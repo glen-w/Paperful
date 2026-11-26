@@ -7,10 +7,30 @@ order so ``--help`` lists commands as before.
 from __future__ import annotations
 
 from paperful.cli import JOBS, app
-from paperful.cli_bind import _shared, core, tidy, find, mirror, ask, snowball, watch
+from paperful.cli_bind import (
+    _shared,
+    core,
+    tidy,
+    find,
+    mirror,
+    ask,
+    snowball,
+    watch,
+    metrics,
+)
 
 # cli.py re-exports every signature; tests and the workbench reach them there.
-for _module in (_shared, core, tidy, find, mirror, ask, snowball, watch):
+for _module in (
+    _shared,
+    core,
+    tidy,
+    find,
+    mirror,
+    ask,
+    snowball,
+    watch,
+    metrics,
+):
     for _name, _value in vars(_module).items():
         if not _name.startswith("__"):
             globals().setdefault(_name, _value)

@@ -6,6 +6,10 @@ may still be added). See [releases](docs/releases.md).
 
 ## Unreleased
 
+## 1.9.9 — 2026-11-26
+
+- **Academic discourse + copy sanitizer.** Peer-review checks weasel/hype/chatbot leftovers (`[peer_review].discourse`, default on; `--no-discourse`). Suggest edits comments those findings (chatbot leftovers may drop), adds a freeze FACTS block, and drops edits that introduce stock phrases. After writing copies, rewrite strips invisible Unicode, C2PA parts, and token-tracker channels (`--sanitize` / layer flags). Never the source; not a commercial-detector bypass. Example Vale pack `styles/PaperfulAi`.
+- **`paperful metrics`.** Citation counts for items already in the library (OpenAlex, then Crossref). Writes `state/metrics/`. Library Citations column, sort, and Refresh citations. `--apply` (Library: Write notes in Zotero) updates one tagged child note per item so the count shows in the Zotero item pane. Extra/parent tags stay off; Google Scholar is not a source. MCP `metrics_show` is cache-only.
 - **Docs.** Walkthrough screenshots and capture defaults use `ocean/BBNJ` (not a coral-reef demo collection).
 
 ## 1.9.8 — 2026-11-23

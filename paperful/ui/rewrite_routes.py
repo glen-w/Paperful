@@ -88,6 +88,12 @@ def handle_page_rewrite(
             rewrite_areas=list(ui.cfg.rewrite_areas),
             rewrite_outputs=list(ui.cfg.rewrite_outputs),
             rewrite_comments=ui.cfg.rewrite_comments,
+            rewrite_sanitize_invisible=bool(ui.cfg.rewrite_sanitize_invisible)
+            and bool(ui.cfg.rewrite_sanitize),
+            rewrite_sanitize_c2pa=bool(ui.cfg.rewrite_sanitize_c2pa)
+            and bool(ui.cfg.rewrite_sanitize),
+            rewrite_sanitize_trackers=bool(ui.cfg.rewrite_sanitize_trackers)
+            and bool(ui.cfg.rewrite_sanitize),
         ),
     )
 
@@ -98,6 +104,10 @@ async def handle_rewrite_run(ui: UiContext, request: Request) -> RedirectRespons
     comments = str(form.get("comments") or "").strip() or None
     areas = [str(v).strip() for v in form.getlist("area") if str(v).strip()]
     outputs = [str(v).strip() for v in form.getlist("output") if str(v).strip()]
+    sanitize_invisible = form.get("sanitize_invisible") == "1"
+    sanitize_c2pa = form.get("sanitize_c2pa") == "1"
+    sanitize_trackers = form.get("sanitize_trackers") == "1"
+    sanitize = sanitize_invisible or sanitize_c2pa or sanitize_trackers
     upload = form.get("file")
     staged: Path | None = None
     name = ""
@@ -133,6 +143,10 @@ async def handle_rewrite_run(ui: UiContext, request: Request) -> RedirectRespons
             areas=areas or None,
             outputs=outputs or None,
             comments=comments,
+            sanitize=sanitize,
+            sanitize_invisible=sanitize_invisible,
+            sanitize_c2pa=sanitize_c2pa,
+            sanitize_trackers=sanitize_trackers,
         )
 
     cmd_id = commands.enqueue(

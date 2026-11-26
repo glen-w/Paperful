@@ -9,7 +9,7 @@ PDFs**. Hosted “paper factories” (Edison, Elicit, Deep Research, Jenni) own
 discover and draft; they do not own campus-proxy fetch, grey playbooks, or a
 restore ledger. Factory-stage matrix: [comparison reference](comparison-reference.md#paper-factory-stages).
 
-**Last reviewed:** 2026-11-22. Feature lists for other products are based on public
+**Last reviewed:** 2026-11-26. Feature lists for other products are based on public
 docs and positioning — not paid pilots or exhaustive release testing.
 
 Vendor-by-vendor notes live in the [comparison reference](comparison-reference.md).
@@ -23,6 +23,7 @@ Prefer this page for “is this the right tool?”
 | Bulk **missing-PDF** fetch for a Zotero library (open access first, campus proxy when you have it), collection-shaped folders, resumable CLI | **Paperful** (this repo) |
 | **In-Zotero** “find OA PDF” plus optional grey-zone sources in one plugin UI | [zotero-zotadata](https://github.com/ydeng11/zotero-zotadata) |
 | **Attachment hygiene** (broken links, rename, stored-to-linked, duplicate files on one parent) | **Paperful** `attachments` (report by default; surgery with a flag and `--apply`). In-app: [StorScan](https://github.com/brian-j-griffith/StorScan), [Attanger](https://github.com/MuiseDestiny/zotero-attanger), [ZotMoov](https://github.com/wileyyugioh/zotmoov) |
+| **Citation counts on items you already hold** (sortable column; OpenAlex / Crossref) | **Paperful** [`metrics`](metrics.md) (disk cache + Library). In-Zotero Extra columns remain complementary: [Google Scholar Citation Count](https://github.com/justinribeiro/zotero-google-scholar-citation-count), [Zotero Open Citations](https://github.com/josesiqueira/zotero-open-citations), [AlphaPulse](https://github.com/IrisM6/AlphaPulse) (also alphaXiv likes) |
 | **Metadata repair** (DOI/ISBN/arXiv bulk update, parent-from-PDF) | Paperful `lint` / `fix-metadata`, or [ZotMeta](https://github.com/RoadToDream/ZotMeta) |
 | **Duplicate parents** in one collection (DOI, then title+year). Review a pack, then merge the PDF, notes, and better fields onto one item. | **Paperful** `dedupe` |
 | **Grey literature** landings (UN, FAO, ISA, and similar) kept as real PDFs | **Paperful** playbooks in `direct` / `landing`. Journal-style OA fetch is the row above |

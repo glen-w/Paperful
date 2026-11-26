@@ -167,7 +167,7 @@ Non-loopback bind (`--host 0.0.0.0`) requires `--allow-remote-bind` and is
 
    ![Discover Following: saved topic watches and people lists, each with Check again](_static/workflows/discover-following.png)
 
-3. **Library** — Nested collection collapsibles with item / missing-PDF counts; target icon sets scope (collection chip) and lands on Wanted. Counts are cached for ten minutes per process (**Refresh counts** or `POST /library/refresh` recomputes). Scoped items paginate (default 50 per page; sizes in `[ui]` — see `config.example.toml`).
+3. **Library** — Nested collection collapsibles with item / missing-PDF counts; target icon sets scope (collection chip) and lands on Wanted. Counts are cached for ten minutes per process (**Refresh counts** or `POST /library/refresh` recomputes). Scoped items paginate (default 50 per page; sizes in `[ui]` — see `config.example.toml`). A **Citations** column reads `state/metrics/cache.json`; **Refresh citations** runs `metrics refresh` for the chip. Tick **Write notes in Zotero** to pass `--apply` (tagged child notes; not Extra). Sort by year (default) or citations.
 
    ![Library: collection tree with item and missing-PDF counts; the target icon sets the chip](_static/workflows/library.png)
 
@@ -266,7 +266,8 @@ claims / verify PDF chunks (pre-checked from `[grobid].enabled`; ticking it is
 `--grobid` even when that setting is false). Optional AI-model checkbox
 requests a Binoculars extra (git overlay; not installed by default). Optional Vale checkbox
 runs house-style lint when `vale` is on PATH. The box is not pre-checked;
-`[peer_review].vale = true` still runs the pass. Optional Forensics (PaperGuard)
+`[peer_review].vale = true` still runs the pass. Discourse (weasel/hype/chatbot)
+is on by default. Optional Forensics (PaperGuard)
 checkbox runs `paperguard scan` when that binary is on PATH
 (`[peer_review].forensics = true` still runs the pass). Show-dismissed is
 item-only. Not a score. See [peer_review.md](peer-review.md).
@@ -275,7 +276,7 @@ item-only. Not a score. See [peer_review.md](peer-review.md).
 
 **Suggest edits** (Advanced; `/rewrite`, CLI `paperful rewrite`): pick a
 recent peer-review pack, optional replacement draft if the file moved,
-area/output/comments controls. Writes `state/rewrites/` (edit plan, optional
+area/output/comments and copy-sanitizer controls. Writes `state/rewrites/` (edit plan, optional
 sidecar, tracked-changes Word / OpenDocument / PDF). Never overwrites the source. Empty state:
 **Run Peer review first**. Style glossary/Vale swaps run with `[llm]` off. See
 [rewrite.md](rewrite.md).

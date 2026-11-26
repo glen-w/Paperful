@@ -93,6 +93,7 @@ def test_root_redirect_and_pages_render(tmp_path, monkeypatch):
     assert 'name="file"' in peer_review.text
     assert 'name="ai_model"' in peer_review.text
     assert 'name="vale"' in peer_review.text
+    assert 'name="discourse"' in peer_review.text
     assert 'name="forensics"' in peer_review.text
     assert client.get("/mirror").status_code == 200
     assert client.get("/index").status_code == 200
@@ -803,6 +804,9 @@ def test_rewrite_form_after_peer_review_pack(tmp_path, monkeypatch):
     page = client.get("/rewrite")
     assert page.status_code == 200
     assert 'name="pack_dir"' in page.text
+    assert 'name="sanitize_invisible"' in page.text
+    assert 'name="sanitize_c2pa"' in page.text
+    assert 'name="sanitize_trackers"' in page.text
     assert "Suggest edits" in page.text
     assert "Run Peer review first" not in page.text
     assert ">Rewrite</a>" not in page.text
@@ -928,6 +932,98 @@ def test_library_counts_cached_and_refreshable(tmp_path, monkeypatch):
     assert res.status_code == 303
     assert client.get(res.headers["location"]).status_code == 200
     assert calls["n"] == 2
+
+
+@pytest.mark.skipif(not fastapi_available(), reason="paperful[serve] extra missing")
+def test_library_citations_column_sort_and_refresh_job(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+
+    from fastapi.testclient import TestClient
+
+    from paperful.metrics import write_cache
+    from paperful.store import Manifest
+    from paperful.ui import jobs
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+
+    class _Item:
+        def __init__(self, key: str, title: str):
+            self.key = key
+            self.title = title
+            self.doi = "10.1000/" + key.lower()
+            self.has_pdf = False
+            self.year = 2020
+            self.arxiv_id = None
+            self.url = ""
+
+    items = [_Item("LOW", "Aaa"), _Item("HIGH", "Bbb")]
+    write_cache(
+        cfg,
+        {
+            "LOW": {"cited_by_count": 2, "source": "openalex"},
+            "HIGH": {"cited_by_count": 90, "source": "openalex"},
+        },
+        now=datetime(2026, 11, 26, tzinfo=timezone.utc),
+    )
+    monkeypatch.setattr("paperful.ui.app.doctor_payload", lambda _c, probe=False: [])
+    monkeypatch.setattr(
+        "paperful.ui.app.collections_tree",
+        lambda _c: {
+            "ok": True,
+            "collections": [
+                {
+                    "path": "ocean",
+                    "name": "ocean",
+                    "key": "C1",
+                    "items": 2,
+                    "missing_pdf": 2,
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        jobs,
+        "load_scope_items_cached",
+        lambda _c, _col, force=False: (items, Manifest(cfg.manifest_path)),
+    )
+    hooked = {"n": 0}
+
+    def _hook(cfg_in, cmd_id, *, collection, stale_days=None, apply=False):
+        hooked["n"] += 1
+        hooked["collection"] = collection
+        hooked["apply"] = apply
+        return {"counts": {"updated": 2, "fetched": 2, "unresolved": 0}, "folder": ""}
+
+    monkeypatch.setattr(jobs, "metrics_refresh_fn", _hook)
+    client = TestClient(create_app(cfg))
+    client.cookies.set("pf_collection", "ocean")
+    page = client.get("/library")
+    assert page.status_code == 200
+    assert "Refresh citations" in page.text
+    assert "Write notes in Zotero" in page.text
+    assert ">Citations<" in page.text or "sort=citations" in page.text
+    ranked = client.get("/library?sort=citations")
+    assert ranked.status_code == 200
+    body = ranked.text
+    assert body.index("Bbb") < body.index("Aaa")
+    res = client.post("/library/metrics", follow_redirects=False)
+    assert res.status_code == 303
+    loc = res.headers.get("location") or ""
+    assert "run=" in loc
+    deadline = time.time() + 3.0
+    while time.time() < deadline and hooked["n"] == 0:
+        time.sleep(0.02)
+    assert hooked["n"] == 1
+    assert hooked["collection"] == "ocean"
+    assert hooked["apply"] is False
+    notes = client.post("/library/metrics", data={"apply": "1"}, follow_redirects=False)
+    assert notes.status_code == 303
+    deadline = time.time() + 3.0
+    while time.time() < deadline and hooked["n"] < 2:
+        time.sleep(0.02)
+    assert hooked["n"] == 2
+    assert hooked["apply"] is True
 
 
 def test_prefs_advanced_never_redirects_off_host(tmp_path, monkeypatch):

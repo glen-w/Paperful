@@ -22,6 +22,7 @@ SKIP_REASONS = (
     "office_miss",
     "context_overflow",
     "broken_check",
+    "critic_reject",
 )
 
 

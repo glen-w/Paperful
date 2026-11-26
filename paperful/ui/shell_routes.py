@@ -45,6 +45,7 @@ from .pages import (
     WANTED_ORDER_LABELS,
     library_items_page,
     library_page_from_request,
+    library_sort_from_request,
     library_page_size_options,
     library_per_page_from_request,
     nest_collection_rows,
@@ -113,6 +114,7 @@ def handle_page_library(ui: UiContext, request: Request) -> HTMLResponse:
     per_page = library_per_page_from_request(request, ui.cfg)
     page_sizes = library_page_size_options(ui.cfg)
     persist_per_page = request.query_params.get("per_page") is not None
+    library_sort = library_sort_from_request(request)
     if prefs.collection:
         try:
             scope_items, manifest = jobs.load_scope_items_cached(
@@ -125,6 +127,7 @@ def handle_page_library(ui: UiContext, request: Request) -> HTMLResponse:
                 manifest,
                 page=page,
                 per_page=per_page,
+                sort=library_sort,
             )
         except Exception as exc:
             error = error or str(exc)
@@ -136,19 +139,30 @@ def handle_page_library(ui: UiContext, request: Request) -> HTMLResponse:
         total=library_total,
         page_sizes=page_sizes,
     )
+    pager_kw: dict[str, Any] = {"per_page": per_page}
+    if library_sort != "year":
+        pager_kw["sort"] = library_sort
     library_pagination.update(
         {
             "prev_url": (
-                ui.page_url("/library", page=library_page - 1, per_page=per_page)
+                ui.page_url("/library", page=library_page - 1, **pager_kw)
                 if library_page > 1
                 else ""
             ),
             "next_url": (
-                ui.page_url("/library", page=library_page + 1, per_page=per_page)
+                ui.page_url("/library", page=library_page + 1, **pager_kw)
                 if library_page < library_page_count
                 else ""
             ),
+            "sort": library_sort,
+            "sort_year_url": ui.page_url("/library", page=1, per_page=per_page),
+            "sort_citations_url": ui.page_url(
+                "/library", page=1, per_page=per_page, sort="citations"
+            ),
         }
+    )
+    metrics_job = last_job_result(
+        ui.cfg, "metrics_refresh", request.query_params.get("run") or ""
     )
     response = ui.templates.TemplateResponse(
         request,
@@ -164,6 +178,7 @@ def handle_page_library(ui: UiContext, request: Request) -> HTMLResponse:
             error=error,
             briefs=briefs,
             dest_options=dest_options(),
+            metrics_job=metrics_job,
         ),
     )
     if persist_per_page:
@@ -202,6 +217,7 @@ _VERB_PAGES: tuple[tuple[str, str], ...] = (
     ("rewrite", "/rewrite"),
     ("stuff", "/stuff"),
     ("doctor", "/system"),
+    ("metrics_refresh", "/library"),
 )
 
 
@@ -712,6 +728,30 @@ def handle_run_status(ui: UiContext, cmd_id: str) -> JSONResponse:
     return JSONResponse({"ok": True, **rec})
 
 
+async def handle_library_metrics(ui: UiContext, request: Request) -> RedirectResponse:
+    prefs = prefs_from_request(request)
+    collection = (prefs.collection or "").strip()
+    if not collection:
+        return RedirectResponse(url="/library", status_code=303)
+    sort = library_sort_from_request(request)
+    form = await request.form()
+    apply = str(form.get("apply") or "").strip().lower() in {
+        "1",
+        "true",
+        "on",
+        "yes",
+    }
+
+    def work(cmd_id: str) -> None:
+        jobs.run_metrics_refresh(ui.cfg, cmd_id, collection=collection, apply=apply)
+
+    cmd_id = commands.enqueue(ui.cfg, "metrics_refresh", work)
+    extra: dict[str, Any] = {}
+    if sort != "year":
+        extra["sort"] = sort
+    return ui.after_job("/library", cmd_id, **extra)
+
+
 def handle_gui_noop(ui: UiContext) -> JSONResponse:
     def work(cmd_id: str) -> None:
         jobs.run_noop(ui.cfg, cmd_id)
@@ -732,6 +772,10 @@ def register_shell(ui: UiContext) -> None:
         ui.invalidate_collections()
         jobs.invalidate_scope_cache()
         return RedirectResponse(url="/library?refresh=1", status_code=303)
+
+    @app.post("/library/metrics")
+    async def library_metrics(request: Request) -> RedirectResponse:
+        return await handle_library_metrics(ui, request=request)
 
     @app.get("/activity", response_class=HTMLResponse)
     def page_activity(request: Request) -> HTMLResponse:

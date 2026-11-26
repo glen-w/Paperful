@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% from "_help.html" import info %}
 {% from "_icon_btn.html" import icon_button %}
+{% from "_job_status.html" import job_status %}
 {% block title %}Library — Paperful{% endblock %}
+{% block body_attrs %}{% if request.query_params.get('run') %} data-poll-run="{{ request.query_params.get('run') }}"{% endif %}{% endblock %}
 {% block content %}
 {% macro collection_line(node) %}
   <span class="coll-toggle" aria-hidden="true"></span>
@@ -33,6 +35,7 @@
 <h1>Library</h1>
 <p class="page-lede">{{ library_label }} collections. The target icon sets the collection chip in the header — Wanted, Discover, Ask, Index, and Briefs all follow that chip. <strong>Missing PDF</strong> is how many items in that collection still have no stored file.</p>
 {% if error %}<div class="error-banner">{{ error }}</div>{% endif %}
+{{ job_status(metrics_job, label='Citation counts') }}
 <form method="post" action="/prefs/collection" id="scope-form"><input type="hidden" name="next" value="/wanted"></form>
 <section class="panel">
   <div class="lib-items-head">
@@ -63,6 +66,11 @@
 <section class="panel">
   <div class="lib-items-head">
     <h2>Items in {{ prefs.collection }}</h2>
+    <form method="post" action="/library/metrics" class="toolbar">
+      <label><input type="checkbox" name="apply" value="1"> Write notes in Zotero</label>
+      <button type="submit">Refresh citations</button>
+      {{ info("Looks up OpenAlex (then Crossref) citation counts for this collection and stores them under state/metrics/. Tick Write notes in Zotero to create or update one tagged child note per item (visible in the Zotero item pane). Does not write Extra or parent tags. Skip rows fetched within [metrics].stale_days.") }}
+    </form>
     <form class="lib-pager" method="get" action="/library">
       <span class="counts">
         {{ library_pagination.range_start }}–{{ library_pagination.range_end }}
@@ -77,6 +85,9 @@
         </select>
       </label>
       <input type="hidden" name="page" value="1">
+      {% if library_pagination.sort and library_pagination.sort != 'year' %}
+      <input type="hidden" name="sort" value="{{ library_pagination.sort }}">
+      {% endif %}
       {% if library_pagination.prev_url %}
       <a class="secondary lib-pager-nav" href="{{ library_pagination.prev_url }}">Previous</a>
       {% endif %}
@@ -86,16 +97,24 @@
       {% endif %}
     </form>
   </div>
-  <p class="section-lede">Items currently in the collection chip. PDF yes means the library already has a stored file. Open Detail for the summary, if one exists.</p>
+  <p class="section-lede">Items currently in the collection chip. PDF yes means the library already has a stored file. Citations come from the last <strong>Refresh citations</strong> (OpenAlex, then Crossref). Open Detail for the summary, if one exists.</p>
 <div class="table-wrap">
 <table class="wb-table">
   <caption class="sr-only">Items in {{ prefs.collection }}</caption>
-  <thead><tr><th scope="col">Title</th><th scope="col">Year</th><th scope="col">PDF</th><th scope="col">Summary</th><th scope="col"><span class="sr-only">Detail</span></th></tr></thead>
+  <thead><tr>
+    <th scope="col">Title</th>
+    <th scope="col">{% if library_pagination.sort == 'citations' %}<a href="{{ library_pagination.sort_year_url }}">Year</a>{% else %}Year{% endif %}</th>
+    <th scope="col">{% if library_pagination.sort == 'citations' %}Citations{% else %}<a href="{{ library_pagination.sort_citations_url }}">Citations</a>{% endif %}</th>
+    <th scope="col">PDF</th>
+    <th scope="col">Summary</th>
+    <th scope="col"><span class="sr-only">Detail</span></th>
+  </tr></thead>
   <tbody>
   {% for row in items %}
   <tr>
     <td>{{ row.title }}</td>
     <td>{{ row.year or '' }}</td>
+    <td>{% if row.cited_by_count is not none %}{{ row.cited_by_count }}{% else %}—{% endif %}</td>
     <td>{% if row.has_pdf %}yes{% else %}no{% endif %}</td>
     <td>{% if row.has_summary %}yes{% else %}—{% endif %}</td>
     <td>

@@ -415,7 +415,149 @@ def test_jobs_matches_registered_commands():
     )
     assert "run-report-counts" in JOBS["utility"]
     assert "evidence" in JOBS["completeness"]
+    assert "metrics" in JOBS["completeness"]
     assert "run-report-new-count" in JOBS["utility"]
+
+
+def test_metrics_show_format_json(cfg_file):
+    from datetime import datetime, timezone
+
+    from paperful.config import load_config
+    from paperful.metrics import SCHEMA, write_cache
+
+    missing = runner.invoke(
+        cli.app,
+        ["metrics", "show", "NOPE", "-c", str(cfg_file), "--format", "json"],
+    )
+    assert missing.exit_code == 1, missing.stdout
+    body = _one_json(missing.stdout)
+    assert body["summary"]["found"] == 0
+    assert body["command"] == "metrics show"
+
+    cfg = load_config(cfg_file)
+    now = datetime(2026, 11, 26, tzinfo=timezone.utc)
+    write_cache(
+        cfg,
+        {
+            "HIT1": {
+                "schema": SCHEMA,
+                "item_key": "HIT1",
+                "doi": "10.1000/hit",
+                "cited_by_count": 12,
+                "source": "openalex",
+                "openalex_id": "",
+                "fetched_at": now.isoformat(),
+                "likes": None,
+                "sources": {"openalex": 12},
+            }
+        },
+        now=now,
+    )
+    hit = runner.invoke(
+        cli.app,
+        ["metrics", "show", "HIT1", "-c", str(cfg_file), "--format", "json"],
+    )
+    assert hit.exit_code == 0, hit.stdout
+    payload = _one_json(hit.stdout)
+    assert payload["summary"]["cited_by_count"] == 12
+
+
+def test_metrics_refresh_dry_run_format_json(cfg_file, stub_zotero, monkeypatch):
+    from tests.conftest import make_item
+    from tests.test_metrics import _oa
+
+    stub_zotero.items_in_scope = lambda keys: [
+        make_item(key="HIT1", doi="10.1000/hit", collection_paths=["BBNJ"])
+    ]
+    monkeypatch.setattr(
+        "paperful.snowball.command._openalex_client",
+        lambda _cfg: _oa({"10.1000/hit": 12}),
+    )
+    res = runner.invoke(
+        cli.app,
+        [
+            "metrics",
+            "refresh",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--dry-run",
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = _one_json(res.stdout)
+    assert body["command"] == "metrics refresh"
+    assert body["flags"]["dry_run"] is True
+    assert body["flags"]["wrote"] is False
+    assert body["summary"]["fetched"] == 1
+
+
+def test_metrics_refresh_dry_run_and_apply_conflict(cfg_file, stub_zotero):
+    res = runner.invoke(
+        cli.app,
+        [
+            "metrics",
+            "refresh",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--dry-run",
+            "--apply",
+        ],
+    )
+    assert res.exit_code == 2
+    assert "--dry-run" in res.stdout and "--apply" in res.stdout
+
+
+def test_metrics_refresh_apply_writes_child_note(cfg_file, stub_zotero, monkeypatch):
+    from tests.conftest import make_item
+    from tests.test_metrics import _oa
+
+    notes: list[tuple[str, str, str]] = []
+
+    class NoteZot(type(stub_zotero)):
+        pass
+
+    stub_zotero.items_in_scope = lambda keys: [
+        make_item(key="HIT1", doi="10.1000/hit", collection_paths=["BBNJ"])
+    ]
+
+    def _note(item_key, html, tag):
+        notes.append((item_key, html, tag))
+        return "NOTE1"
+
+    monkeypatch.setattr(
+        "paperful.snowball.command._openalex_client",
+        lambda _cfg: _oa({"10.1000/hit": 12}),
+    )
+    monkeypatch.setattr(
+        "paperful.library.ZoteroBackend.create_or_update_note",
+        lambda self, item_key, html, tag: _note(item_key, html, tag),
+    )
+    res = runner.invoke(
+        cli.app,
+        [
+            "metrics",
+            "refresh",
+            "-c",
+            str(cfg_file),
+            "-C",
+            "BBNJ",
+            "--apply",
+            "--format",
+            "json",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    body = _one_json(res.stdout)
+    assert body["flags"]["apply"] is True
+    assert body["summary"]["notes_wrote"] == 1
+    assert notes and notes[0][0] == "HIT1"
+    assert "Citations: 12" in notes[0][1]
 
 
 def test_reconcile_jobs_parks_orphans_and_rejects_stale():
@@ -499,6 +641,17 @@ def test_dedupe_dry_run_skips_the_duplicate_line(cfg_file, stub_zotero, monkeypa
     )
     assert live.exit_code == 0, live.stdout
     assert calls == ["note"]
+
+
+def test_rewrite_and_peer_review_help_include_sanitize_and_discourse():
+    rewrite = runner.invoke(cli.app, ["rewrite", "--help"])
+    assert rewrite.exit_code == 0
+    body = plain_text(rewrite.stdout)
+    assert "--no-sanitize" in body
+    assert "--sanitize-invisible" in body
+    peer = runner.invoke(cli.app, ["peer-review", "--help"])
+    assert peer.exit_code == 0
+    assert "--no-discourse" in plain_text(peer.stdout)
 
 
 def test_mutating_commands_name_the_write_gate():

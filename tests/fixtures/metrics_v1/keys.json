@@ -1,0 +1,22 @@
+{
+  "row": [
+    "cited_by_count",
+    "doi",
+    "fetched_at",
+    "item_key",
+    "likes",
+    "openalex_id",
+    "schema",
+    "source",
+    "sources"
+  ],
+  "pack": [
+    "counts",
+    "created_at",
+    "rows",
+    "schema",
+    "scope",
+    "stale_days",
+    "wrote"
+  ]
+}

@@ -1,0 +1,19 @@
+extends: existence
+message: "Promotional wording '%s'. Prefer a concrete claim already in the paragraph."
+level: suggestion
+ignorecase: true
+tokens:
+  - groundbreaking
+  - cutting-edge
+  - game-changer
+  - seamless
+  - delve
+  - tapestry
+  - ever-evolving
+  - in the realm of
+  - holistic approach
+  - unlock the potential
+  - pave the way
+  - shed light on
+  - paradigm shift
+  - unprecedented

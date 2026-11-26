@@ -487,7 +487,7 @@ rules is expected.
 
 ### Example Vale styles
 
-The repo ships three example packs under [`styles/`](../styles/README.md).
+The repo ships four example packs under [`styles/`](../styles/README.md).
 They are not official journal packages. Copy one ini; do not mix `JCP` with
 `MarinePolicy` (author–year vs numbered cites).
 
@@ -496,6 +496,7 @@ They are not official journal packages. Copy one ini; do not mix `JCP` with
 | [`styles/JMLC`](../styles/JMLC/) | Journal of Money Laundering Control (Emerald, Harvard) | `cp styles/JMLC/vale.ini.example .vale.ini` |
 | [`styles/JCP`](../styles/JCP/) | Journal of Cleaner Production (Elsevier, author–year) | `cp styles/JCP/vale.ini.example .vale.ini` |
 | [`styles/MarinePolicy`](../styles/MarinePolicy/) | Marine Policy (Elsevier, numbered `[1]`) | `cp styles/MarinePolicy/vale.ini.example .vale.ini` |
+| [`styles/PaperfulAi`](../styles/PaperfulAi/) | Promotional / chatbot leftovers (not an AI detector) | `cp styles/PaperfulAi/vale.ini.example .vale.ini` |
 
 Other directories under `styles/` are local house tints and are gitignored.
 Keep them beside the examples so `StylesPath = styles` still finds them, and

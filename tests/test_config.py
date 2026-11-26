@@ -439,6 +439,18 @@ def test_peer_review_table_is_parsed(tmp_path):
     assert cfg.rewrite_max_edits == 80
     assert cfg.rewrite_openxml_audit is False
     assert cfg.rewrite_openxml_audit_policy == "warn"
+    assert cfg.rewrite_sanitize is True
+    assert cfg.rewrite_sanitize_invisible is True
+    assert cfg.rewrite_sanitize_c2pa is True
+    assert cfg.rewrite_sanitize_trackers is True
+    assert cfg.rewrite_tracker_scope == "edited"
+    assert cfg.rewrite_tracker_rate == 0.08
+    assert cfg.rewrite_tracker_prose is True
+    assert cfg.rewrite_facts_worklog is True
+    assert cfg.rewrite_tell_regression is True
+    assert cfg.rewrite_critic is False
+    assert cfg.rewrite_stock_comments is True
+    assert cfg.peer_review_discourse is True
     assert cfg.rewrites_dir == cfg.state_dir / "rewrites"
 
 
@@ -458,6 +470,9 @@ def test_rewrite_table_is_parsed(tmp_path):
                 "timeout_s": 30,
                 "openxml_audit": True,
                 "openxml_audit_policy": "fail",
+                "sanitize": False,
+                "tracker_scope": "all",
+                "tracker_rate": 0.2,
                 "specialists": [
                     {
                         "id": "style",
@@ -476,6 +491,9 @@ def test_rewrite_table_is_parsed(tmp_path):
     assert cfg.rewrite_timeout_s == 30.0
     assert cfg.rewrite_openxml_audit is True
     assert cfg.rewrite_openxml_audit_policy == "fail"
+    assert cfg.rewrite_sanitize is False
+    assert cfg.rewrite_tracker_scope == "all"
+    assert cfg.rewrite_tracker_rate == 0.2
     assert cfg.rewrite_specialists[0].model == "xtragpt:7b"
     assert cfg.rewrite_specialists[0].prompt == str(prompt.resolve())
 
@@ -489,6 +507,7 @@ def test_peer_review_reviewers_and_ai_model_are_parsed(tmp_path):
     cfg = _from_dict(
         {
             "peer_review": {
+                "discourse": False,
                 "ai_model": True,
                 "reviewers": [
                     {"id": "general"},
@@ -502,6 +521,7 @@ def test_peer_review_reviewers_and_ai_model_are_parsed(tmp_path):
         },
         tmp_path / "config.toml",
     )
+    assert cfg.peer_review_discourse is False
     assert cfg.peer_review_ai_model is True
     assert [r.id for r in cfg.peer_review_reviewers] == ["general", "methods"]
     assert cfg.peer_review_reviewers[0].model == ""

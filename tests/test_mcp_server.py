@@ -83,6 +83,7 @@ def test_initialize_and_tools_list(cfg):
         "stuff",
         "sr_status",
         "sr_prisma",
+        "metrics_show",
     } <= names
     for tool in listed:
         assert tool["inputSchema"]["type"] == "object"
@@ -183,6 +184,10 @@ def test_tools_call_routes_each_tool_with_normalised_args(cfg, monkeypatch):
     assert calls["stuff"][1]["lane"] == "outline"
     assert calls["stuff"][1]["k"] == 2
 
+    monkeypatch.setattr(mcp, "call_metrics_show", spy("metrics_show"))
+    call("metrics_show", item_key="ABCD1234")
+    assert calls["metrics_show"][0] == (cfg, "ABCD1234")
+
 
 def test_tools_call_tolerates_non_dict_arguments(cfg, monkeypatch):
     monkeypatch.setattr(
@@ -237,6 +242,7 @@ def test_mcp_surface_is_the_documented_read_only_set():
         "stuff",
         "sr_status",
         "sr_prisma",
+        "metrics_show",
     }
     verbs = (
         "apply",

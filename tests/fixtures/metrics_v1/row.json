@@ -1,0 +1,11 @@
+{
+  "schema": "paperful.metrics.v1",
+  "item_key": "ABCD1234",
+  "doi": "10.1000/xyz",
+  "cited_by_count": 12,
+  "source": "openalex",
+  "openalex_id": "https://openalex.org/W123",
+  "fetched_at": "2026-11-26T00:00:00+00:00",
+  "likes": null,
+  "sources": {"openalex": 12}
+}

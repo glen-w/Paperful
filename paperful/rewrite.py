@@ -16,6 +16,7 @@ from .rewrite_align import Alignment, align_finding, unique_span
 from .rewrite_check import filter_broken_edits
 from .rewrite_areas import (
     COMMENT_ONLY_CODES,
+    DISCOURSE_CODES,
     STYLE_COMMENT_CODES,
     bucket_findings,
     parse_rewrite_areas_list,
@@ -158,17 +159,24 @@ def _deterministic_edit(
     aln: Alignment,
     area: str,
 ) -> RewriteEdit | None:
+    extra = finding.get("extra") if isinstance(finding.get("extra"), dict) else {}
+    drop = bool(extra.get("drop") or finding.get("drop"))
     suggested = str(finding.get("suggested") or "").strip()
     if not suggested:
-        extra = finding.get("extra") if isinstance(finding.get("extra"), dict) else {}
         suggested = str(extra.get("suggested") or "").strip()
     quote = aln.quote
-    if not suggested:
+    if not suggested and not drop:
         detail = str(finding.get("detail") or "")
         match = _VALE_SWAP.search(detail)
         if match:
             suggested = match.group(1).strip()
-    if not suggested or not quote or suggested == quote:
+    if drop and quote:
+        suggested = str(
+            finding.get("suggested")
+            if "suggested" in finding
+            else extra.get("suggested") or ""
+        )
+    elif not suggested or not quote or suggested == quote:
         return None
     code = str(finding.get("code") or "")
     # Retracted cites never become a body delete.
@@ -399,6 +407,11 @@ def build_rewrite(
             if aln is None:
                 continue
             code = str(row.get("code") or "")
+            if code in DISCOURSE_CODES and not bool(
+                getattr(cfg, "rewrite_stock_comments", True)
+            ):
+                skips.append({"finding_id": fid, "reason": "not_actionable"})
+                continue
             if (
                 code in COMMENT_ONLY_CODES
                 or code in STYLE_COMMENT_CODES
@@ -479,6 +492,51 @@ def build_rewrite(
             proposed.extend(edits)
             skips.extend(extra_skips)
 
+    critic_on = bool(getattr(cfg, "rewrite_critic", False)) or any(
+        getattr(spec, "id", "") == "critic"
+        for spec in (getattr(cfg, "rewrite_specialists", ()) or ())
+    )
+    if critic_on and llm_client is not None:
+        from .rewrite_llm import critic_filter_edits
+
+        proposed, critic_skips = critic_filter_edits(
+            cfg, proposed, excerpt=text, client=llm_client, timeout_s=timeout
+        )
+        skips.extend(critic_skips)
+
+    if bool(getattr(cfg, "rewrite_sanitize", True)) and bool(
+        getattr(cfg, "rewrite_sanitize_trackers", True)
+    ):
+        from .rewrite_sanitize import apply_tracker_prose, perturb_trackers
+
+        rate = float(getattr(cfg, "rewrite_tracker_rate", 0.08) or 0.0)
+        scope = str(getattr(cfg, "rewrite_tracker_scope", "edited") or "edited")
+        seed_src = (drift.get("file_hash") or str(manuscript))[:16]
+        seed = int(seed_src.encode("utf-8").hex()[:8], 16) % (2**31)
+        if scope == "edited":
+            for edit in proposed:
+                if edit.kind != "replace":
+                    continue
+                blob = edit.replacement or edit.target_paragraph or ""
+                if not blob:
+                    continue
+                new, n = perturb_trackers(blob, rate=rate, seed=seed)
+                if n and new != blob:
+                    if edit.replacement:
+                        edit.replacement = new
+                    if edit.target_paragraph and edit.source_paragraph:
+                        edit.target_paragraph = edit.source_paragraph.replace(
+                            edit.quote, edit.replacement or new, 1
+                        )
+        if (
+            bool(getattr(cfg, "rewrite_tracker_prose", True))
+            and bool(getattr(cfg, "llm_enabled", False))
+            and llm_client is not None
+        ):
+            apply_tracker_prose(
+                cfg, proposed, client=llm_client, timeout_s=timeout
+            )
+
     proposed = filter_broken_edits(cfg, proposed, skips, full_text=text)
 
     plan = merge_edits(
@@ -541,6 +599,17 @@ def build_rewrite(
             )
             (folder / f"sidecar{suffix}").write_text(sidecar, encoding="utf-8")
         paras = _paragraphs(doc, text)
+        if bool(getattr(cfg, "rewrite_sanitize", True)) and bool(
+            getattr(cfg, "rewrite_sanitize_invisible", True)
+        ):
+            from .hidden_text import fold_homoglyphs, strip_invisible
+
+            cleaned: list[str] = []
+            for para in paras:
+                blob, _n = strip_invisible(para)
+                blob, _n = fold_homoglyphs(blob)
+                cleaned.append(blob)
+            paras = cleaned
         office: dict[str, tuple[Path, Path | None]] = {}
         office_skips: list[dict[str, str]] = []
         if "tracked" in output_ids:
@@ -594,6 +663,15 @@ def build_rewrite(
             (folder / "pack.md").write_text(
                 render_markdown(payload, plan), encoding="utf-8"
             )
+        from .rewrite_sanitize import sanitize_rewrite_folder
+
+        payload["sanitize"] = sanitize_rewrite_folder(
+            cfg, folder, payload=payload, manuscript=manuscript
+        )
+        write_json(folder / "pack.json", payload)
+        (folder / "pack.md").write_text(
+            render_markdown(payload, plan), encoding="utf-8"
+        )
     payload["_plan"] = plan
     payload["_doc"] = doc
     return payload

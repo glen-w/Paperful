@@ -192,6 +192,14 @@ def proposed_from_area(
     user = (
         f"<PAPER_CONTENT>\n{frozen_excerpt}\n</PAPER_CONTENT>\n"
         f"<FINDINGS>\n{json.dumps(payload, ensure_ascii=False)}\n</FINDINGS>\n"
+    )
+    if bool(getattr(cfg, "rewrite_facts_worklog", True)):
+        facts = [{"token": k, "text": v} for k, v in mapping.items()]
+        user += (
+            f"<FACTS>\n{json.dumps(facts, ensure_ascii=False)}\n</FACTS>\n"
+            "FACTS are frozen spans. Copy every «PF…» unchanged.\n"
+        )
+    user += (
         "For each finding, treat selected_content as SELECTED_CONTENT and "
         "detail as QUESTION. Copy every «PF…» placeholder unchanged."
     )
@@ -355,6 +363,87 @@ def proposed_from_area(
         "paperful": PAPERFUL_VERSION,
     }
     return edits, skips, model, meta
+
+
+_CRITIC_PROMPT = """You only reject or comment. Do not rewrite.
+Return JSON: {"reject":[{"finding_id":"id","reason":"freeze|leakage|unflagged|overclaim"}]}
+Reject when the edit invents numbers/cites, changes unflagged sentences, leaks tool names, or overclaims.
+Empty reject list means keep every edit.
+"""
+
+
+def critic_filter_edits(
+    cfg: Config,
+    edits: list[RewriteEdit],
+    *,
+    excerpt: str,
+    client: Any,
+    timeout_s: float,
+) -> tuple[list[RewriteEdit], list[dict[str, str]]]:
+    """Optional fail-closed critic. May only drop edits."""
+    if not edits or client is None:
+        return edits, []
+    model = (cfg.llm_model or "").strip()
+    if not model:
+        return edits, []
+    from .llm.client import ChatRequest, chat, ctx_tokens_for, prompt_exceeds_ctx
+
+    payload = [
+        {
+            "finding_id": (e.finding_ids or [""])[0],
+            "kind": e.kind,
+            "quote": e.quote,
+            "replacement": e.replacement,
+            "paragraph": e.target_paragraph,
+        }
+        for e in edits
+        if e.kind in {"replace", "insert", "delete"}
+    ]
+    if not payload:
+        return edits, []
+    user = (
+        f"<PAPER_CONTENT>\n{excerpt[:8000]}\n</PAPER_CONTENT>\n"
+        f"<EDITS>\n{json.dumps(payload, ensure_ascii=False)}\n</EDITS>"
+    )
+    blob = _CRITIC_PROMPT + user
+    max_ctx = int(cfg.llm_max_num_ctx or 32768)
+    if prompt_exceeds_ctx(blob, max_num_ctx=max_ctx):
+        return edits, []
+    req = ChatRequest(
+        model=model,
+        messages=(
+            {"role": "system", "content": _CRITIC_PROMPT},
+            {"role": "user", "content": user},
+        ),
+        timeout_seconds=timeout_s,
+        temperature=0.0,
+        seed=0,
+        num_ctx=ctx_tokens_for(blob, max_num_ctx=max_ctx),
+    )
+    try:
+        raw = chat(client, req)
+    except Exception:
+        return edits, []
+    data = parse_llm_json(raw) or {}
+    reject: set[str] = set()
+    for row in data.get("reject") or []:
+        if isinstance(row, dict) and row.get("finding_id"):
+            reject.add(str(row["finding_id"]))
+        elif isinstance(row, str):
+            reject.add(row)
+    if not reject:
+        return edits, []
+    kept: list[RewriteEdit] = []
+    skips: list[dict[str, str]] = []
+    for edit in edits:
+        ids = edit.finding_ids or []
+        if any(fid in reject for fid in ids):
+            skips.append(
+                {"finding_id": ids[0] if ids else "", "reason": "critic_reject"}
+            )
+            continue
+        kept.append(edit)
+    return kept, skips
 
 
 def budget_excerpt(cfg: Config, text: str) -> str:

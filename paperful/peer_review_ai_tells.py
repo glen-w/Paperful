@@ -11,6 +11,7 @@ import re
 import statistics
 from typing import Any
 
+from .hidden_text import unicode_stego_flags
 from .peer_review_direct_quotes import elide_direct_quotes
 from .peer_review_metrics import split_sentences, tokenize
 
@@ -50,14 +51,6 @@ _CONNECTORS = (
     "additionally",
     "notably",
 )
-_ZERO_WIDTH = (
-    "\u200b",
-    "\u200c",
-    "\u200d",
-    "\ufeff",
-    "\u2060",
-    "\u180e",
-)
 _NOT_MERELY = re.compile(
     r"not merely\b.{0,80}\bbut rather\b",
     re.IGNORECASE | re.DOTALL,
@@ -66,8 +59,24 @@ _RULE_OF_THREE = re.compile(
     r"\b[\w'-]+,\s+[\w'-]+,\s+and\s+[\w'-]+\b",
     re.IGNORECASE,
 )
-_LATIN = re.compile(r"[A-Za-z]")
-_CYRILLIC = re.compile(r"[\u0400-\u04FF]")
+
+
+def distinctive_phrase_hits(lower: str) -> list[dict[str, Any]]:
+    """Stock-phrase hits. No word-count abstain (used by rewrite regression)."""
+    hits: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for phrase in _DISTINCTIVE_PHRASES:
+        n = _phrase_count(lower, phrase)
+        if n:
+            hits.append({"phrase": phrase, "count": n, "kind": "distinctive"})
+            seen.add(phrase)
+    for word in _WORD_TELLS:
+        if word in seen or any(word in h["phrase"] for h in hits):
+            continue
+        n = _phrase_count(lower, word)
+        if n:
+            hits.append({"phrase": word, "count": n, "kind": "distinctive"})
+    return hits
 
 
 def _phrase_count(lower: str, phrase: str) -> int:
@@ -106,17 +115,7 @@ def _paragraph_cv(paragraphs: list[str]) -> float | None:
 
 
 def _unicode_flags(text: str) -> list[str]:
-    flags: list[str] = []
-    zw = sum(text.count(ch) for ch in _ZERO_WIDTH)
-    if zw:
-        flags.append(f"zero_width:{zw}")
-    mixed = 0
-    for token in re.findall(r"\S+", text):
-        if _LATIN.search(token) and _CYRILLIC.search(token):
-            mixed += 1
-    if mixed:
-        flags.append(f"mixed_script_tokens:{mixed}")
-    return flags
+    return unicode_stego_flags(text)
 
 
 def _discourse_flags(text: str, paragraphs: list[str]) -> list[str]:
@@ -164,19 +163,7 @@ def compute_ai_tells(text: str, paragraphs: list[str] | None = None) -> dict[str
             "abstain": True,
         }
     lower = prose.casefold()
-    hits: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for phrase in _DISTINCTIVE_PHRASES:
-        n = _phrase_count(lower, phrase)
-        if n:
-            hits.append({"phrase": phrase, "count": n, "kind": "distinctive"})
-            seen.add(phrase)
-    for word in _WORD_TELLS:
-        if word in seen or any(word in h["phrase"] for h in hits):
-            continue
-        n = _phrase_count(lower, word)
-        if n:
-            hits.append({"phrase": word, "count": n, "kind": "distinctive"})
+    hits = distinctive_phrase_hits(lower)
     connector_total = sum(_phrase_count(lower, c) for c in _CONNECTORS)
     tell_total = sum(h["count"] for h in hits) + connector_total
     sentences = split_sentences(prose)

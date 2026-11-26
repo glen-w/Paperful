@@ -35,6 +35,7 @@ def run_peer_review(
     show_dismissed: bool,
     config: Path | None,
     fmt: str,
+    discourse: bool | None = None,
 ) -> None:
     from . import cli_runtime as cli_mod
     from .agent_json import envelope
@@ -82,6 +83,8 @@ def run_peer_review(
     use_llm = "reviewers" in lanes
     use_ai_model = bool(ai_model) or cfg.peer_review_ai_model
     use_vale = bool(vale) or cfg.peer_review_vale
+    if discourse is not None:
+        cfg.peer_review_discourse = bool(discourse)
     use_forensics = bool(forensics) or cfg.peer_review_forensics
     use_advanced = "marg" in lanes
     use_grobid = cfg.grobid_enabled if grobid is None else grobid
@@ -254,6 +257,7 @@ def run_peer_review(
             "llm": use_llm,
             "ai_model": use_ai_model,
             "vale": use_vale,
+            "discourse": bool(cfg.peer_review_discourse),
             "forensics": use_forensics,
             "advanced": use_advanced,
             "lanes": list(lanes),

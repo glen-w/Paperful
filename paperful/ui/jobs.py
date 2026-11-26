@@ -35,6 +35,7 @@ synthesize_fn: Callable[..., dict[str, Any]] | None = None
 peer_review_fn: Callable[..., dict[str, Any]] | None = None
 rewrite_fn: Callable[..., dict[str, Any]] | None = None
 stuff_fn: Callable[..., dict[str, Any]] | None = None
+metrics_refresh_fn: Callable[..., dict[str, Any]] | None = None
 noop_sleep: float = 0.05
 
 from .index_jobs import (
@@ -553,6 +554,7 @@ def peer_review(
     llm: bool = False,
     ai_model: bool = False,
     vale: bool = False,
+    discourse: bool | None = None,
     forensics: bool = False,
     advanced: bool = False,
     lanes: list[str] | tuple[str, ...] | None = None,
@@ -571,6 +573,7 @@ def peer_review(
             llm=llm,
             ai_model=ai_model,
             vale=vale,
+            discourse=discourse,
             forensics=forensics,
             advanced=advanced,
             lanes=lanes,
@@ -668,6 +671,8 @@ def peer_review(
             commands.write_command(cfg, rec)
             return
     http = None if offline else make_client(cfg)
+    if discourse is not None:
+        cfg.peer_review_discourse = bool(discourse)
 
     def on_status(msg: str) -> None:
         rec = commands.read_command(cfg, cmd_id) or {}
@@ -742,6 +747,10 @@ def rewrite(
     areas: list[str] | tuple[str, ...] | None = None,
     outputs: list[str] | tuple[str, ...] | None = None,
     comments: str | None = None,
+    sanitize: bool | None = None,
+    sanitize_invisible: bool | None = None,
+    sanitize_c2pa: bool | None = None,
+    sanitize_trackers: bool | None = None,
 ) -> None:
     if rewrite_fn is not None:
         result = rewrite_fn(
@@ -752,6 +761,10 @@ def rewrite(
             areas=areas,
             outputs=outputs,
             comments=comments,
+            sanitize=sanitize,
+            sanitize_invisible=sanitize_invisible,
+            sanitize_c2pa=sanitize_c2pa,
+            sanitize_trackers=sanitize_trackers,
         )
         if result is not None:
             _attach_result(cfg, cmd_id, result)
@@ -791,6 +804,14 @@ def rewrite(
         return
     llm_client = None
     area_list = list(areas or cfg.rewrite_areas)
+    if sanitize is not None:
+        cfg.rewrite_sanitize = bool(sanitize)
+    if sanitize_invisible is not None:
+        cfg.rewrite_sanitize_invisible = bool(sanitize_invisible)
+    if sanitize_c2pa is not None:
+        cfg.rewrite_sanitize_c2pa = bool(sanitize_c2pa)
+    if sanitize_trackers is not None:
+        cfg.rewrite_sanitize_trackers = bool(sanitize_trackers)
     if cfg.llm_enabled:
         try:
             validate_llm_for_verb(cfg)
@@ -1322,6 +1343,67 @@ def authorwatch_import(
     from ..authorwatch import import_file
 
     import_file(cfg, list_name, path=path, source=source, resolve=False)
+
+
+def run_metrics_refresh(
+    cfg: Config,
+    cmd_id: str,
+    *,
+    collection: str,
+    stale_days: int | None = None,
+    apply: bool = False,
+) -> None:
+    """Refresh citation cache for the Library collection chip.
+
+    ``apply`` writes tagged child notes. Extra/parent tags stay off.
+    """
+    if metrics_refresh_fn is not None:
+        result = metrics_refresh_fn(
+            cfg,
+            cmd_id,
+            collection=collection,
+            stale_days=stale_days,
+            apply=apply,
+        )
+    else:
+        from ..catalogue import open_library
+        from ..metrics import apply_citation_notes, refresh
+        from ..snowball.command import _openalex_client
+
+        items, _manifest = _load_scope_items(cfg, collection)
+        result = refresh(
+            cfg,
+            items,
+            oa_client=_openalex_client(cfg) if items else None,
+            dry_run=False,
+            scope=collection,
+            stale_days=stale_days,
+        )
+        if apply and isinstance(result, dict):
+            backend = open_library(cfg)
+            notes = apply_citation_notes(
+                backend,
+                cfg,
+                result.get("rows") or [],
+                run_id=str((result.get("pack") or {}).get("created_at") or ""),
+            )
+            counts = dict(result.get("counts") or {})
+            counts.update(notes)
+            result = dict(result)
+            result["counts"] = counts
+    counts = result.get("counts") if isinstance(result, dict) else {}
+    folder = result.get("folder") if isinstance(result, dict) else None
+    _attach_result(
+        cfg,
+        cmd_id,
+        {
+            "updated": (counts or {}).get("updated", 0),
+            "fetched": (counts or {}).get("fetched", 0),
+            "unresolved": (counts or {}).get("unresolved", 0),
+            "notes_wrote": (counts or {}).get("notes_wrote", 0),
+            "pack": str(folder or ""),
+        },
+    )
 
 
 def set_snowball_keep(cfg: Config, run_id: str, dois: list[str], keep: bool) -> None:

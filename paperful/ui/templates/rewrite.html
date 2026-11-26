@@ -44,6 +44,12 @@
       <label><input type="checkbox" name="output" value="odt"{% if "odt" in rewrite_outputs %} checked{% endif %}> OpenDocument (.odt)</label>
       <label><input type="checkbox" name="output" value="pdf"{% if "pdf" in rewrite_outputs %} checked{% endif %}> PDF</label>
     </fieldset>
+    <fieldset>
+      <legend>Copy sanitizer {{ info("Runs on the files Paperful writes (sidecar, tracked office, PDF). Never the source. Strips hidden Unicode, C2PA provenance, and token-tracker channels. Not a commercial-detector bypass.") }}</legend>
+      <label><input type="checkbox" name="sanitize_invisible" value="1"{% if rewrite_sanitize_invisible %} checked{% endif %}> Invisible Unicode</label>
+      <label><input type="checkbox" name="sanitize_c2pa" value="1"{% if rewrite_sanitize_c2pa %} checked{% endif %}> C2PA metadata</label>
+      <label><input type="checkbox" name="sanitize_trackers" value="1"{% if rewrite_sanitize_trackers %} checked{% endif %}> Token trackers</label>
+    </fieldset>
     <label>Comments {{ info("Attach reviewer/MARG notes as Word comments.") }}
       <select name="comments">
         <option value="off"{% if rewrite_comments == "off" %} selected{% endif %}>off</option>

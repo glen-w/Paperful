@@ -239,6 +239,7 @@ class Config:
     peer_review_cite_age_years: int = 10
     peer_review_max_context_chars: int = 24_000
     peer_review_ai_model: bool = False
+    peer_review_discourse: bool = True
     peer_review_vale: bool = False
     peer_review_vale_config: Path | None = None
     peer_review_vale_min_alert_level: str = "suggestion"
@@ -275,6 +276,17 @@ class Config:
     rewrite_timeout_s: float = 0.0
     rewrite_openxml_audit: bool = False
     rewrite_openxml_audit_policy: str = "warn"  # warn | fail
+    rewrite_sanitize: bool = True
+    rewrite_sanitize_invisible: bool = True
+    rewrite_sanitize_c2pa: bool = True
+    rewrite_sanitize_trackers: bool = True
+    rewrite_tracker_scope: str = "edited"  # edited | all
+    rewrite_tracker_rate: float = 0.08
+    rewrite_tracker_prose: bool = True
+    rewrite_facts_worklog: bool = True
+    rewrite_tell_regression: bool = True
+    rewrite_critic: bool = False
+    rewrite_stock_comments: bool = True
     rewrite_specialists: tuple[RewriteArea, ...] = ()
     summarize_prompt_template: str = "default"
     summarize_max_context_chars: int = 24_000
@@ -405,6 +417,10 @@ class Config:
     snowball_stop_max_screened: int = 0
     # Alert loop / collection digest cadence (days). 0 = every keepup run.
     keepup_interval_days: int = 7
+    # ``paperful metrics refresh``: skip cache rows newer than this (0 = always fetch).
+    metrics_stale_days: int = 30
+    metrics_sources: tuple[str, ...] = ("openalex", "crossref")
+    metrics_note_tag: str = "paperful-metrics"
     # `paperful precedent`: held RAG passages + OpenAlex public metadata.
     precedent_held_k: int = 10
     precedent_public_k: int = 25

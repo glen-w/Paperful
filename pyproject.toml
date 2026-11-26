@@ -1,6 +1,6 @@
 [project]
 name = "paperful"
-version = "1.9.8"
+version = "1.9.9"
 description = "Find missing PDFs for a Zotero library: clean records, summarise papers, keep a platform-agnostic mirror."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -366,6 +366,7 @@ files = [
     "paperful/grobid_client.py",
     "paperful/grounding.py",
     "paperful/handoff_rank.py",
+    "paperful/hidden_text.py",
     "paperful/htmlpdf_cmd.py",
     "paperful/identity.py",
     "paperful/inbox_cmd.py",
@@ -426,6 +427,7 @@ files = [
     "paperful/rewrite_pdf.py",
     "paperful/rewrite_plan.py",
     "paperful/rewrite_render.py",
+    "paperful/rewrite_sanitize.py",
     "paperful/routing.py",
     "paperful/run_hooks.py",
     "paperful/runreport.py",

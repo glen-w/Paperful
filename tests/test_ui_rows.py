@@ -283,6 +283,35 @@ def test_library_items_page_slices(tmp_path):
     assert page_count == 3
     assert len(rows) == 2
     assert rows[0]["title"] == "Title 02"
+    assert rows[0]["cited_by_count"] is None
+
+
+def test_library_items_page_sorts_by_citations(tmp_path):
+    from paperful.metrics import write_cache
+    from datetime import datetime, timezone
+
+    cfg = Config(out_dir=tmp_path / "out", state_dir=tmp_path / "state")
+    cfg.state_dir.mkdir(parents=True)
+    manifest = Manifest(cfg.manifest_path)
+    items = [
+        _Item("LOW", "Aaa", None, False),
+        _Item("HIGH", "Bbb", None, False),
+        _Item("NONE", "Ccc", None, False),
+    ]
+    write_cache(
+        cfg,
+        {
+            "LOW": {"cited_by_count": 2, "source": "openalex"},
+            "HIGH": {"cited_by_count": 90, "source": "openalex"},
+        },
+        now=datetime(2026, 11, 26, tzinfo=timezone.utc),
+    )
+    rows, total, _, _ = library_items_page(
+        cfg, items, manifest, page=1, per_page=10, sort="citations"
+    )
+    assert total == 3
+    assert [row["key"] for row in rows] == ["HIGH", "LOW", "NONE"]
+    assert rows[0]["cited_by_count"] == 90
 
 
 def test_discover_queue_fixture(tmp_path):

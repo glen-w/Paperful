@@ -77,6 +77,7 @@ def handle_page_peer_review(
             peer_review_advanced=bool(ui.cfg.peer_review_advanced),
             peer_review_lanes=list(_default_lanes(ui.cfg)),
             grobid_enabled=bool(ui.cfg.grobid_enabled),
+            peer_review_discourse=bool(ui.cfg.peer_review_discourse),
         ),
     )
 
@@ -89,6 +90,7 @@ async def handle_peer_review_run(ui: UiContext, request: Request) -> RedirectRes
     llm = form.get("llm") == "1"
     ai_model = form.get("ai_model") == "1"
     vale = form.get("vale") == "1"
+    discourse = form.get("discourse") == "1"
     forensics = form.get("forensics") == "1"
     advanced = form.get("advanced") == "1"
     raw_lanes = [str(v).strip() for v in form.getlist("lane") if str(v).strip()]
@@ -146,6 +148,7 @@ async def handle_peer_review_run(ui: UiContext, request: Request) -> RedirectRes
             llm=llm,
             ai_model=ai_model,
             vale=vale,
+            discourse=discourse,
             forensics=forensics,
             advanced=advanced,
             lanes=raw_lanes,

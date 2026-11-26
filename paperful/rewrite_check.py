@@ -34,6 +34,25 @@ def _vale_regressed(cfg: Config, source: str, target: str) -> bool:
     return len(tgt_hits) > len(src_hits)
 
 
+def _tells_regressed(source: str, target: str) -> bool:
+    """True when the edit introduces distinctive stock phrases absent in source."""
+    try:
+        from .peer_review_ai_tells import distinctive_phrase_hits
+    except ImportError:
+        return False
+    before = {
+        str(h.get("phrase") or "")
+        for h in distinctive_phrase_hits((source or "").casefold())
+        if h.get("phrase")
+    }
+    after = {
+        str(h.get("phrase") or "")
+        for h in distinctive_phrase_hits((target or "").casefold())
+        if h.get("phrase")
+    }
+    return bool(after - before)
+
+
 def _cite_regressed(full_text: str, source: str, target: str) -> bool:
     """True when the edit introduces a cite key that is not in the manuscript."""
     del source
@@ -61,6 +80,10 @@ def edit_breaks_checks(
     if _glossary_regressed(cfg, source, target):
         return "broken_check"
     if _cite_regressed(full_text, source, target):
+        return "broken_check"
+    if bool(getattr(cfg, "rewrite_tell_regression", True)) and _tells_regressed(
+        source, target
+    ):
         return "broken_check"
     try:
         if _vale_regressed(cfg, source, target):

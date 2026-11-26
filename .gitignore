@@ -31,7 +31,7 @@ docker-compose.override.yml
 assessments/
 docs/dogfood/
 docs/bbnj-author-lanes.md
-# Local Vale house styles. JCP, JMLC, and MarinePolicy are shipped examples.
+# Local Vale house styles. JCP, JMLC, MarinePolicy, and PaperfulAi are shipped examples.
 styles/*
 !styles/README.md
 !styles/JCP/
@@ -40,6 +40,8 @@ styles/*
 !styles/JMLC/**
 !styles/MarinePolicy/
 !styles/MarinePolicy/**
+!styles/PaperfulAi/
+!styles/PaperfulAi/**
 # Local measurement lists for unshipped Vale packs
 research/iddri-ocean-blogs/
 .claude/

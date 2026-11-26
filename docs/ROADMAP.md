@@ -39,7 +39,7 @@ split novelty Q then A ([peer_review.md](peer-review.md)). **1.9.6** (2026-11-19
 ships cited-source locators on `--lane claims` and CLI `ask --claim-check`
 ([rag.md](rag.md#claim-check)). **1.9.7** (2026-11-20) ships hop-0
 `--prioritize` (`recency` / `popular` / `historical`) on keyword and hybrid
-search ([snowball](snowball.md)). The **live map** is [After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
+search ([snowball](snowball.md)). **1.9.9** (2026-11-26) ships academic discourse hygiene, Suggest edits copy sanitizer, and [`metrics`](metrics.md). The **live map** is [After 1.7](#after-17-live-map). The [1.1 area index](#after-110-buffet-by-area)
 still lists jobs by area; many of those rows have shipped. Do not re-pick
 them as the next thing to build.
 
@@ -118,6 +118,7 @@ product decisions.
 | Workbench exposure | Loopback by default. Opt-in bearer token (`PAPERFUL_UI_TOKEN` / `serve --ui-token`) for a deliberate `--allow-remote-bind`. One shared secret, no accounts |
 | OS keyring | **No** for 1.7. Headless and Docker installs have no keyring daemon. Secrets stay in the environment; `config check` points at them |
 | Signed desktop bundle | **Rejected**, not deferred. Reach does not pay for notarisation while pipx and Compose cover the tested routes |
+| Library citation counts | **Shipped** as `paperful metrics` (OpenAlex then Crossref; `state/metrics/`; Library column; `--apply` child note). Extra/parent-tag writes and Scholar/alphaXiv likes stay later |
 | Update notice | Opt-in check against PyPI. No general telemetry |
 | Adapter “supported” | Conformance suite on a fake, **and** a filled [field assessment](templates/adapter-field-assessment.md) under `assessments/`, **and** mirror-first reads with the manager closed. Until then, Mendeley and EndNote stay “seeking testers” |
 | Legal and fetch stance | Written on [legal-privacy](legal-privacy.md). Not legal advice. Publisher terms and campus licences stay the operator’s call |
@@ -824,7 +825,7 @@ Paperful every week, not just once to fill gaps?
 ### Facts settled against 1.1.0
 
 - 1.1.0 is tagged and on PyPI; trusted publishing (`publish.yml`) exists.
-- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.8).
+- Version: single source via `importlib.metadata` / `pyproject.toml` (1.9.9).
 - Attach is **manual by default** (`[ui].attach_mode`); Grab does not write to
   Zotero unless Settings is automatic.
 - **1.1.1 closed P0s:** Grab-selected `item_keys`, Held hand-ticks, Attach at
@@ -832,7 +833,7 @@ Paperful every week, not just once to fill gaps?
 - **Ask** is on the default nav (third after Wanted and Discover); it does
   not need Advanced. Whether it *stays* there is an [open
   question](#after-110-open-questions).
-- Install docs are pinned to `v1.9.8` (README, `docs/docker.md`,
+- Install docs are pinned to `v1.9.9` (README, `docs/docker.md`,
   `website/index.html`). Recheck every paperful.app claim before launch.
 
 (after-110-1-1-1)=
