@@ -4775,7 +4775,7 @@ wheels = [
 
 [[package]]
 name = "paperful"
-version = "1.9.9"
+version = "1.9.9.2"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
